@@ -2364,6 +2364,48 @@ implementation, while visual polish remains independently active.
   half-texel term appears on either side of it. Stack **not banked** - SIDE composition rejected in
   both runs on a control that spread 4.62-12.13%. Variants **133 -> 137**. Evidence in
   `validation/performance-rain-field-ownership.md`.
+- [X] T190 [PERFORMANCE] [US3] Make the rain field conservative: classify cells at build time and
+  fall back to the exact evaluation where the field cannot be trusted.
+  **The fallback does what it was designed to do, and it costs the gain it was protecting.**
+  **Quality improved on every metric**: false rain **15.22% -> 2.99%** at SIDE and 10.75% -> 2.51%
+  at FAR, rain IoU **0.8632 -> 0.9675** and 0.9029 -> 0.9755, mean onset error **4.12 -> 0.79
+  blocks**, newly broken shafts 39 -> 20, shaft continuity 0.964 -> 0.982. **But net gain fell from
+  1.1575 to 1.0230 at SIDE** (1 block; the better-supported figure is **1.047**, from applying the
+  3-block `T190_CORRECTNESS_COST` of 0.9042 to T189's accepted 1.1575) and 1.1451 -> **1.0360** at
+  FAR (accepted). SIDE is under the brief's `<1.03x architecture no longer worthwhile` line and
+  **false rain did not reach zero**, which was the acceptance target. **Task 1 was measured before
+  the classifier was designed**, because T188 designed against an assumed cause and its fix changed
+  zero pixels: of 129,600 columns, **ownership disagreements are exactly 0** (view 63 confirms
+  independently, against T189's 32), and the entire residual is **support-cutoff crossing (111) and
+  attach-height variation (37)** - 0.114% total, down from T189's 0.224%, which is what turned 15%
+  false rain into 3%. **The classifier eliminated the ownership component completely**; what remains
+  is variation strictly inside a cell that five sample points cannot see. **Rates (Task 5)**: mixed
+  cells **1.42-2.04%**, fallback lookups 113,002 against 2,002,113 safe hits - a **2.91% fallback
+  fraction**, 0.184 per pixel - so 262,144 cells plus 113,002 fallbacks against 2,115,115 lookups
+  still amortizes **5.6:1**, down from 8.0:1 but nowhere near breaking the trade. **The fallback
+  rate is not what killed the gain: classification is.** Field build **0.2437 -> 0.8684 ms, 3.6x**,
+  because proving a cell uniform means five full `directStormRainSupportAt` calls instead of one;
+  the fallbacks add a further ~2.5 ms to the march. **Representation unchanged (Task 9)**: RGBA32F,
+  16 B/texel, 4 MB, one texture - T188 wrote alpha as a constant marker nothing read, so the
+  certainty flag cost **no extra channel, texture or byte**, and the hot lookup stays one
+  `texelFetch`, one comparison, a rare exact fallback. **Stack**: SIDE `t190_stack_safe` vs
+  `t172_stack_pre` **1.0761 accepted at 1.49%** - the first accepted SIDE stack composition since
+  T181, on a control that finally held still at 0.45% - 15.02 ms session-local; FAR rejected at
+  45.96% control spread. **Verdict: do not approve, and do not iterate on this classifier.** Both
+  failures share one cause and it is the instrument, not the architecture: **sampling five points is
+  at once too expensive to be cheap and too weak to be a proof.** **Next: bound ownership instead of
+  sampling it.** The scaling in `paRainColumnOwnedExact` is per-axis, so a cell's axis-aligned box
+  stays axis-aligned in scaled space and the min/max of `dot(scaled, scaled)` over it are
+  closed-form - `max < 1` proves the cell owned, `min > 1` proves it unowned, anything else is
+  genuinely mixed. That is **provably** conservative rather than sampled and costs one cheap loop
+  over ten lobes instead of four union evaluations, which should return most of the 0.62 ms while
+  keeping ownership exact by construction. The 148-column support/attach residual is then a named,
+  measured problem to bound or accept. If that does not restore net SIDE to ~1.12 with false rain
+  near zero, close the field: three campaigns have shown the performance is real and the correctness
+  is expensive. **Task 10 (resolution sweep) stays withheld** - it was gated on 512 being
+  quality-correct and it is not. **Task 12 not re-run**: the field is not accepted, so T188's light
+  38.41% / probe 37.96% stands as the last valid attribution. Variants **137 -> 140**; the prune is
+  overdue. Evidence in `validation/performance-rain-field-conservative.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

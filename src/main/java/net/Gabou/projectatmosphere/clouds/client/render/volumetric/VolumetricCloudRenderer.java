@@ -667,6 +667,16 @@ public final class VolumetricCloudRenderer {
                 VolumetricCloudRenderTargets.clearAndBind(rainFieldTarget);
                 shader.safeGetUniform("PaRainFieldPass").set(1);
                 shader.safeGetUniform("PaRainFieldEnabled").set(0);
+                // T190. Classification is part of the build, so it is set for
+                // the generation pass and for the lookup alike. The monolith
+                // gets it too when the campaign forces the field onto it, or
+                // every mixed-cell counter would read zero for want of a
+                // classified field rather than for want of mixed cells.
+                int paConservative = program.rainFieldConservative()
+                        || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                            && VolumetricCloudDebugConfig.rainFieldForcedOnMonolith())
+                        ? 1 : 0;
+                shader.safeGetUniform("PaRainFieldConservative").set(paConservative);
                 shader.apply();
                 PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
                 bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
@@ -682,6 +692,7 @@ public final class VolumetricCloudRenderer {
                 VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
                 rainFieldTextureId = rainFieldTarget.getColorTextureId();
                 shader.safeGetUniform("PaRainFieldPass").set(0);
+                shader.safeGetUniform("PaRainFieldConservative").set(paConservative);
                 shader.safeGetUniform("PaRainFieldEnabled").set(
                         program.rainFieldLookup()
                                 || program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH

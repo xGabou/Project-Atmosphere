@@ -167,7 +167,13 @@ public enum VolumetricCloudRaymarchDebugView {
      * samples, and the filtered-minus-exact delta on the ownership and support
      * channels. Tests the premise T188's diagnosis rested on.
      */
-    STORM_WORKLOAD_RAIN_FIELD_D(64, "storm_workload_rain_field_d");
+    STORM_WORKLOAD_RAIN_FIELD_D(64, "storm_workload_rain_field_d"),
+
+    /** T190. Why a column disagrees: ownership, support cutoff, or attach height. */
+    STORM_WORKLOAD_RAIN_FIELD_E(65, "storm_workload_rain_field_e"),
+
+    /** T190. The mixed-cell census, sampled off the field the build wrote. */
+    STORM_WORKLOAD_RAIN_FIELD_F(66, "storm_workload_rain_field_f");
 
     private final int shaderId;
     private final String serializedName;

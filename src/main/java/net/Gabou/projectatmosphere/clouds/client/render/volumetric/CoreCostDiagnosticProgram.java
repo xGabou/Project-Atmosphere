@@ -616,7 +616,23 @@ public enum CoreCostDiagnosticProgram {
     T189_RAIN_MASK_NEAREST("t189_rain_mask_nearest"),
 
     /** T189 Task 5 diagnostic: the erosion side, a strict bilinear threshold. */
-    T189_RAIN_MASK_STRICT("t189_rain_mask_strict");
+    T189_RAIN_MASK_STRICT("t189_rain_mask_strict"),
+
+    // -----------------------------------------------------------------------
+    // T190. The conservative field. Cells the build cannot prove uniform are
+    // answered by the exact evaluation, so field approximation stops being a
+    // source of rain error at all rather than being made smaller - which is the
+    // only fix that survives being amplified sixty-fold by an existence test.
+    // -----------------------------------------------------------------------
+
+    /** T190: the conservative field with an exact mixed-cell fallback. */
+    T190_FIELD_SAFE("t190_field_safe"),
+
+    /** T190: the quality-approved stack with the conservative field. */
+    T190_STACK_SAFE("t190_stack_safe"),
+
+    /** T190: rain-only capture through the conservative field. */
+    T190_RAIN_MASK_SAFE("t190_rain_mask_safe");
 
 
     private final String serializedName;
@@ -678,7 +694,9 @@ public enum CoreCostDiagnosticProgram {
                 || this == T188_STACK_FIELD || this == T188_RAIN_MASK_FIELD
                 || this == T189_FIELD_NEAREST || this == T189_STACK_NEAREST
                 || this == T189_RAIN_MASK_NEAREST
-                || this == T189_RAIN_MASK_STRICT;
+                || this == T189_RAIN_MASK_STRICT
+                || this == T190_FIELD_SAFE || this == T190_STACK_SAFE
+                || this == T190_RAIN_MASK_SAFE;
     }
 
     /**
@@ -691,7 +709,19 @@ public enum CoreCostDiagnosticProgram {
                 || this == T188_RAIN_MASK_FIELD
                 || this == T189_FIELD_NEAREST || this == T189_STACK_NEAREST
                 || this == T189_RAIN_MASK_NEAREST
-                || this == T189_RAIN_MASK_STRICT;
+                || this == T189_RAIN_MASK_STRICT
+                || this == T190_FIELD_SAFE || this == T190_STACK_SAFE
+                || this == T190_RAIN_MASK_SAFE;
+    }
+
+    /**
+     * True for the arms whose certainty flag is written by the build and
+     * honoured by the lookup, so a cell whose rain-existence decision could not
+     * be proven uniform is answered by the exact evaluation instead.
+     */
+    public boolean rainFieldConservative() {
+        return this == T190_FIELD_SAFE || this == T190_STACK_SAFE
+                || this == T190_RAIN_MASK_SAFE;
     }
 
     /**
@@ -703,7 +733,8 @@ public enum CoreCostDiagnosticProgram {
     public boolean rainMaskCapture() {
         return this == T188_RAIN_MASK_REF || this == T188_RAIN_MASK_FIELD
                 || this == T189_RAIN_MASK_NEAREST
-                || this == T189_RAIN_MASK_STRICT;
+                || this == T189_RAIN_MASK_STRICT
+                || this == T190_RAIN_MASK_SAFE;
     }
 
     public String resourceName() {

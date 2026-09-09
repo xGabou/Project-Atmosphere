@@ -78,6 +78,7 @@
     { "name": "PaOracleBaseSize", "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
     { "name": "PaRainFieldPass", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaRainFieldEnabled", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PaRainFieldConservative", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "StormTraceOrigin", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
     { "name": "StormTraceYStart", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "StormTraceYInterval", "type": "float", "count": 1, "values": [ 1.0 ] },

@@ -632,6 +632,105 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT188RainMaskHarness);
         runCorrected("T189 rain-field ownership is sampled discretely",
                 StormVolumetricGeometrySandbox::validateT189DiscreteOwnership);
+        runCorrected("T190 uncertain field cells fall back to the exact evaluation",
+                StormVolumetricGeometrySandbox::validateT190ConservativeFallback);
+    }
+
+    /**
+     * T190. The field is an acceleration structure, and an acceleration
+     * structure may be fast but never wrong.
+     *
+     * <p>T189 established why that matters here: the field's per-column error
+     * was only 0.22%, but rain reachability is an existence test asked of order
+     * sixty times per ray, which amplified it to 12% false rain. A smaller
+     * approximation would still be multiplied by sixty, so the only fix that
+     * survives is removing the approximation where it cannot be proven safe.
+     *
+     * <p>This pins the shape of that fix: classification in the build, an exact
+     * fallback in the lookup, and the certainty flag carried in a channel that
+     * already existed.
+     */
+    private static void validateT190ConservativeFallback() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+
+        String lookup = functionBlock(shader, "float paRainFieldSupportAt(");
+        require(lookup.contains("if (PaRainFieldConservative == 1) {"),
+                "T190 lookup does not consult the certainty flag");
+        require(lookup.contains("if (paSafeCell.a >= 0.5) {")
+                        && lookup.contains(
+                                "return directStormRainSupportAt(\n"
+                                        + "                worldXZ, attachY,"
+                                        + " ownsDescriptorGroup);"),
+                "T190 mixed cells do not fall back to the exact evaluation, so the"
+                        + " field is still allowed to answer where it cannot be trusted");
+        require(lookup.contains("ownsDescriptorGroup = paSafeCell.b >= 0.5;"),
+                "T190 takes ownership from a different fetch than the certainty flag,"
+                        + " so the flag can vouch for a value it did not see");
+
+        // The fallback must be the production path, not a second approximation.
+        require(!lookup.contains("paRainFieldSupportAt(worldXZ"),
+                "T190 fallback recurses into the field instead of evaluating exactly");
+
+        // Classification belongs to the build. A per-query classifier would put
+        // the cost back in the loop the field exists to empty.
+        String generation = between(shader, "if (PaRainFieldPass == 1) {",
+                "if (paRayTraceActive()) {", "T190 generation pass");
+        require(generation.contains("for (int paCorner = 0; paCorner < 4; paCorner++)"),
+                "T190 classification is not performed during field generation");
+        require(generation.contains("paMixedOwn")
+                        && generation.contains("paMixedSupport")
+                        && generation.contains("PA_FIELD_ATTACH_TOLERANCE"),
+                "T190 classification does not cover all three quantities the ray"
+                        + " decides on: ownership, the support cutoff, and attach height");
+        require(!lookup.contains("paCorner"),
+                "T190 moved classification into the hot lookup");
+
+        // The certainty flag rides in alpha, which T188 wrote as a constant
+        // marker nothing read. No new texture, no extra byte per texel.
+        require(generation.contains(
+                        "fieldSupport, fieldAttachY, fieldOwnsGroup ? 1.0 : 0.0,"
+                                + " fieldMixed);"),
+                "T190 certainty flag is not carried in the field's spare alpha channel");
+        String targets = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/VolumetricCloudRenderTargets.java");
+        require(targets.split("createFloatMap\\(size, size, GL11.GL_LINEAR\\)", -1)
+                        .length - 1 == 1,
+                "T190 expects exactly one RGBA32F field target; a second texture would"
+                        + " make the certainty flag cost storage it does not need");
+
+        // The classifier reads its cell size from the weather map because the
+        // field is this pass's own render target and sampling a bound target is
+        // undefined. That substitution is only sound while the two are the same
+        // size, which the renderer guarantees by construction.
+        require(generation.contains("textureSize(WeatherMapSampler, 0)"),
+                "T190 classification reads the cell grid from the field it is writing,"
+                        + " which is a bound render target");
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/VolumetricCloudRenderer.java");
+        require(renderer.contains("prepareRainFieldTarget(\n"
+                        + "                            profile.weatherMapSize())"),
+                "T190 field and weather map are no longer the same size, so the"
+                        + " classifier's cell grid is wrong");
+
+        // FINAL must not carry any of it.
+        String gradle = readWorkspaceSource("build.gradle");
+        require(gradle.contains("'uniform int PaRainFieldConservative;'")
+                        && gradle.contains("'const int PaRainFieldConservative = 0;'"),
+                "T190 conservative path is not compiled out of the lean programs");
+        for (String variant : new String[] {
+                "cloud_atmosphere_volume_t190_field_safe",
+                "cloud_atmosphere_volume_t190_stack_safe",
+                "cloud_atmosphere_volume_t190_rain_mask_safe"}) {
+            String block = between(gradle, "[name: '" + variant + "'", "]],",
+                    "T190 variant " + variant);
+            require(block.contains("'PaRainFieldConservative'"),
+                    "T190 variant " + variant + " does not keep the certainty uniform,"
+                            + " so it would silently measure the approximate field");
+        }
+        System.out.println("T190_CONSERVATIVE_FALLBACK classifiedAtBuild=true"
+                + "|exactFallback=true|flagInSpareAlpha=true|noNewTexture=true"
+                + "|compiledOutOfFinal=true");
     }
 
     /**

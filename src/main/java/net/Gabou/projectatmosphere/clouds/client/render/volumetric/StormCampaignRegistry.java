@@ -163,7 +163,10 @@ public final class StormCampaignRegistry {
                     "T188_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
             new Campaign("T189", "t189-rain-field-ownership.txt",
                     "rainFieldOwnershipRunRequested", "t189Run",
-                    "T189_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "T189_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            new Campaign("T190", "t190-rain-field-conservative.txt",
+                    "conservativeRainFieldRunRequested", "t190Run",
+                    "T190_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.

@@ -252,6 +252,29 @@ uniform int PaRainFieldPass;
  */
 uniform int PaRainFieldEnabled;
 /**
+ * T190. 1 when the field carries a per-cell certainty flag and the lookup
+ * honours it: a cell whose rain-existence decision is not uniform across its
+ * own area falls back to the exact descriptor evaluation.
+ *
+ * <p>A uniform rather than a define because the classification lives in the
+ * generation pass, which is not hot, and because the diagnostic monolith is the
+ * only program that can read workload counters - a define would leave it
+ * unclassified and every mixed-cell counter reading zero.
+ */
+uniform int PaRainFieldConservative;
+/**
+ * T190. The support level below which localRainSupportAt returns no rain, so
+ * the side of it a column falls on is a decision rather than a magnitude.
+ * Matches the cutoff that function applies to localSupport.
+ */
+const float PA_FIELD_SUPPORT_CUTOFF = 0.01;
+/**
+ * T190. How far the attach height may vary across a cell before the cell is
+ * called mixed, in world blocks. One block is well inside the T145 height
+ * gate's own resolution, so a cell that passes cannot move a segment across it.
+ */
+const float PA_FIELD_ATTACH_TOLERANCE = 1.0;
+/**
  * Uploaded as exactly zero. The amplification arm perturbs its extra
  * evaluation by this, so the compiler cannot prove the second call redundant
  * and fold it away, while the result stays bit-identical to the first.
@@ -444,6 +467,10 @@ int paRainAcceptedZeroSupport = 0;
 // and the columns outside the field domain that still have to traverse.
 int paRainFieldFetches = 0;
 int paRainFieldFallbacks = 0;
+// T190. Lookups the field answered outright, and those that landed in a cell
+// the build could not prove uniform and so paid the exact traversal for.
+int paRainFieldSafeHits = 0;
+int paRainFieldMixedFallbacks = 0;
 #ifdef PA_RAIN_MASK_OUTPUT
 // T188 Task 0. The rain-only capture. Rain and cloud are composited in the
 // rendered frame, so no mask can be recovered from it after the fact; these
@@ -793,7 +820,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 64);
+        || (DebugView >= 28 && DebugView <= 66);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -4482,6 +4509,42 @@ float paRainFieldSupportAt(
     if (paWorkloadCaptureActive()) {
         paRainFieldFetches++;
     }
+    if (PaRainFieldConservative == 1) {
+        // T190. The field is an acceleration structure, and an acceleration
+        // structure is only allowed to be fast, never to be wrong. The build
+        // marks every cell whose rain-existence decision it could not prove
+        // uniform across the cell's own area; those cells are answered by the
+        // exact evaluation instead.
+        //
+        // This is the whole architecture: the field's per-column error was only
+        // 0.22%, but rain reachability is an existence test asked ~60 times per
+        // ray, which amplified it to 12% false rain. Removing the error at
+        // source is the only fix that survives that amplification - a smaller
+        // error still gets multiplied by sixty.
+        ivec2 paSafeSize = textureSize(RainFieldSampler, 0);
+        ivec2 paSafeTexel = clamp(
+            ivec2(floor(uv * vec2(paSafeSize))),
+            ivec2(0),
+            paSafeSize - ivec2(1)
+        );
+        vec4 paSafeCell = texelFetch(RainFieldSampler, paSafeTexel, 0);
+        if (paSafeCell.a >= 0.5) {
+            if (paWorkloadCaptureActive()) {
+                paRainFieldMixedFallbacks++;
+            }
+            return directStormRainSupportAt(
+                worldXZ, attachY, ownsDescriptorGroup);
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainFieldSafeHits++;
+        }
+        vec4 paSafeFiltered = texture(RainFieldSampler, uv);
+        attachY = paSafeFiltered.g;
+        // Ownership from the same exact texel the certainty flag came from, so
+        // the flag and the value it vouches for cannot disagree.
+        ownsDescriptorGroup = paSafeCell.b >= 0.5;
+        return paSafeFiltered.r;
+    }
     // Support and attach height are continuous, so they keep the filtering
     // the neighbouring weather maps use: without it every rain edge shows the
     // eight-block staircase of the underlying grid.
@@ -6795,8 +6858,54 @@ void main() {
         bool fieldOwnsGroup;
         float fieldSupport = directStormRainSupportAt(
             fieldWorldXZ, fieldAttachY, fieldOwnsGroup);
+        // T188 wrote alpha as a constant 1.0 marker that nothing read, so the
+        // certainty flag costs no extra channel, no extra texture and no extra
+        // byte per texel.
+        float fieldMixed = 1.0;
+        if (PaRainFieldConservative == 1) {
+            // T190 Task 2. Classification happens here, once per cell per
+            // frame, and never in the ray loop.
+            //
+            // A cell is safe only if the three quantities the ray actually
+            // decides on are uniform across it: descriptor ownership, which
+            // side of the support cutoff the column falls, and the attach
+            // height. The weather and morphology terms are excluded on purpose
+            // - localRainSupportAt samples those directly and they never come
+            // from the field, so they cannot be a source of field error.
+            //
+            // The cell grid is read from the weather map rather than from the
+            // field: the field is the render target of this very pass, and
+            // sampling a bound target is undefined. They are the same size by
+            // construction, which the sandbox asserts.
+            ivec2 paCellGrid = textureSize(WeatherMapSampler, 0);
+            vec2 paCellHalf = (WeatherExtent / vec2(paCellGrid)) * 0.5;
+            bool paMixedOwn = false;
+            bool paMixedSupport = false;
+            bool paCentreSupported = fieldSupport > PA_FIELD_SUPPORT_CUTOFF;
+            float paMinAttach = fieldAttachY;
+            float paMaxAttach = fieldAttachY;
+            for (int paCorner = 0; paCorner < 4; paCorner++) {
+                vec2 paCornerOffset = vec2(
+                    (paCorner == 0 || paCorner == 3) ? -paCellHalf.x : paCellHalf.x,
+                    paCorner < 2 ? -paCellHalf.y : paCellHalf.y
+                );
+                float paCornerAttachY;
+                bool paCornerOwns;
+                float paCornerSupport = directStormRainSupportAt(
+                    fieldWorldXZ + paCornerOffset, paCornerAttachY, paCornerOwns);
+                paMixedOwn = paMixedOwn || (paCornerOwns != fieldOwnsGroup);
+                paMixedSupport = paMixedSupport
+                    || ((paCornerSupport > PA_FIELD_SUPPORT_CUTOFF)
+                        != paCentreSupported);
+                paMinAttach = min(paMinAttach, paCornerAttachY);
+                paMaxAttach = max(paMaxAttach, paCornerAttachY);
+            }
+            fieldMixed = (paMixedOwn || paMixedSupport
+                || (paMaxAttach - paMinAttach) > PA_FIELD_ATTACH_TOLERANCE)
+                ? 1.0 : 0.0;
+        }
         fragColor = vec4(
-            fieldSupport, fieldAttachY, fieldOwnsGroup ? 1.0 : 0.0, 1.0);
+            fieldSupport, fieldAttachY, fieldOwnsGroup ? 1.0 : 0.0, fieldMixed);
         gl_FragDepth = 0.0;
         return;
     }
@@ -8801,8 +8910,65 @@ void main() {
         fragColor = vec4(
             float(paRainFieldFetches),
             float(paRainFieldFallbacks),
-            0.0,
-            0.0
+            float(paRainFieldSafeHits),
+            float(paRainFieldMixedFallbacks)
+        );
+        return;
+    }
+    // T190 Task 1. WHY a column disagrees, not just how often.
+    //
+    // The ~0.22% disagreement has to be attributed before a classifier can be
+    // designed against it: a classifier that proves ownership uniform is no use
+    // if the disagreements are actually support-cutoff crossings.
+    if (DebugView == 65) {
+        gl_FragDepth = 1.0;
+        vec2 paWhyWorldXZ = WeatherOrigin + texCoord * WeatherExtent;
+        float paWhyExactAttachY;
+        bool paWhyExactOwns;
+        float paWhyExactSupport = directStormRainSupportAt(
+            paWhyWorldXZ, paWhyExactAttachY, paWhyExactOwns);
+        float paWhyFieldAttachY;
+        bool paWhyFieldOwns;
+        float paWhyFieldSupport = paRainFieldSupportAt(
+            paWhyWorldXZ, paWhyFieldAttachY, paWhyFieldOwns);
+        bool paWhyOwnDiffers = paWhyExactOwns != paWhyFieldOwns;
+        // Only meaningful where ownership agrees; otherwise the ownership
+        // disagreement is the cause and counting a second one double-reports it.
+        bool paWhySupportDiffers = !paWhyOwnDiffers
+            && ((paWhyExactSupport > PA_FIELD_SUPPORT_CUTOFF)
+                != (paWhyFieldSupport > PA_FIELD_SUPPORT_CUTOFF));
+        bool paWhyAttachDiffers = !paWhyOwnDiffers && !paWhySupportDiffers
+            && paWhyExactOwns
+            && abs(paWhyExactAttachY - paWhyFieldAttachY)
+                > PA_FIELD_ATTACH_TOLERANCE;
+        fragColor = vec4(
+            paWhyOwnDiffers ? 1.0 : 0.0,
+            paWhySupportDiffers ? 1.0 : 0.0,
+            paWhyAttachDiffers ? 1.0 : 0.0,
+            1.0
+        );
+        return;
+    }
+    // T190 Task 5. The mixed-cell census, read off the field the build wrote.
+    //
+    // Each capture pixel takes the cell its own texCoord lands in, so the
+    // sample is stratified over the grid; 129,600 pixels cover 49.4% of the
+    // 262,144 cells, which makes this an estimate of the mixed fraction rather
+    // than an exact count, and it is reported as one.
+    if (DebugView == 66) {
+        gl_FragDepth = 1.0;
+        ivec2 paCensusSize = textureSize(RainFieldSampler, 0);
+        ivec2 paCensusTexel = clamp(
+            ivec2(floor(texCoord * vec2(paCensusSize))),
+            ivec2(0),
+            paCensusSize - ivec2(1)
+        );
+        vec4 paCensusCell = texelFetch(RainFieldSampler, paCensusTexel, 0);
+        fragColor = vec4(
+            paCensusCell.a >= 0.5 ? 1.0 : 0.0,
+            paCensusCell.b >= 0.5 ? 1.0 : 0.0,
+            paCensusCell.r > PA_FIELD_SUPPORT_CUTOFF ? 1.0 : 0.0,
+            1.0
         );
         return;
     }

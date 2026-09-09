@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 42;
+    private static final int STAGES = 44;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -132,6 +132,8 @@ final class StormWorkloadRuntimeCapture {
             case 39 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_B;
             case 40 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_C;
             case 41 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_D;
+            case 42 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_E;
+            case 43 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_F;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -256,8 +258,10 @@ final class StormWorkloadRuntimeCapture {
                     values[36][0], values[36][1], values[36][2], values[36][3],
                     values[37][0], values[37][1],
                     values[38][0], values[38][1],
+                    values[38][2], values[38][3],
                     values[39][0], values[39][1], values[39][2], values[39][3],
-                    FieldProbe.of(values[40], values[41]));
+                    FieldProbe.of(values[40], values[41]),
+                    FieldCertainty.of(values[42], values[43]));
         }
     }
 
@@ -279,6 +283,34 @@ final class StormWorkloadRuntimeCapture {
      * and the diagnosis is simply wrong. Zero fractional samples over a grid of
      * sub-texel-offset columns settles it either way.
      */
+    /**
+     * T190. The attribution of the field's column disagreements, and the census
+     * of what the build could prove safe.
+     *
+     * <p>The attribution exists because a classifier has to be designed against
+     * the actual cause. T188 designed against a cause it had assumed, and the
+     * fix changed zero pixels.
+     */
+    record FieldCertainty(
+            double ownershipDiffers,
+            double supportCutoffDiffers,
+            double attachDiffers,
+            double attributionSamples,
+            double mixedCells,
+            double ownedCells,
+            double supportedCells,
+            double censusSamples
+    ) {
+        static final FieldCertainty ZERO =
+                new FieldCertainty(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+
+        static FieldCertainty of(double[] why, double[] census) {
+            return new FieldCertainty(
+                    why[0], why[1], why[2], why[3],
+                    census[0], census[1], census[2], census[3]);
+        }
+    }
+
     record FieldProbe(
             double supportErrorSum,
             double attachErrorSum,
@@ -361,12 +393,18 @@ final class StormWorkloadRuntimeCapture {
             double rainSegTrueAt0, double rainSegTrueAt1,
             // T188. Ray-side field use, then the per-cell build cost.
             double rainFieldFetches, double rainFieldFallbacks,
+            // T190. Lookups the field answered, and those that paid the
+            // exact traversal because the cell was not provably uniform.
+            double rainFieldSafeHits, double rainFieldMixedFallbacks,
             double fieldCellShapeCalls, double fieldCellGroupWalks,
             double fieldCellLobeVisits, double fieldCellExactSdf,
             // T189. The field measured against the function it replaces, and
             // whether the texture is filtered at all. Grouped because the
             // record sits at the JVM's 255-parameter ceiling.
-            FieldProbe fieldProbe
+            FieldProbe fieldProbe,
+            // T190. Why columns disagree, and how much of the field the
+            // build could prove safe.
+            FieldCertainty fieldCertainty
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -412,10 +450,14 @@ final class StormWorkloadRuntimeCapture {
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
                     // T186 segment-sample split, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
-                    // T188 rain-field use and per-cell build cost, likewise absent.
-                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T188 rain-field use and per-cell build cost, plus T190's
+                    // safe/fallback split, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D,
+                    0.0D, 0.0D, 0.0D, 0.0D,
                     // T189 field probe, likewise absent.
-                    FieldProbe.ZERO);
+                    FieldProbe.ZERO,
+                    // T190 certainty census, likewise absent.
+                    FieldCertainty.ZERO);
         }
 
         private static String ratio(double numerator, double denominator) {
@@ -749,7 +791,35 @@ final class StormWorkloadRuntimeCapture {
                     + " fieldSupportFilterDeltaSum=" + fmt(fieldProbe.supportFilterDeltaSum())
                     + " fieldTextureIsFiltered="
                     + (fieldProbe.ownFilterDeltaSum()
-                            + fieldProbe.supportFilterDeltaSum() > 0.0D);
+                            + fieldProbe.supportFilterDeltaSum() > 0.0D)
+                    // T190. What actually causes a column to disagree, so the
+                    // classifier is designed against the measured cause rather
+                    // than an assumed one.
+                    + " whyOwnershipDiffers=" + fmt(fieldCertainty.ownershipDiffers())
+                    + " whySupportCutoffDiffers="
+                    + fmt(fieldCertainty.supportCutoffDiffers())
+                    + " whyAttachDiffers=" + fmt(fieldCertainty.attachDiffers())
+                    + " whySamples=" + fmt(fieldCertainty.attributionSamples())
+                    + " whyOwnershipFraction="
+                    + ratio(fieldCertainty.ownershipDiffers(),
+                            Math.max(1.0D, fieldCertainty.attributionSamples()))
+                    // The census. Sampled over 49.4% of the cells, so a mixed
+                    // FRACTION rather than an exact count.
+                    + " censusMixedCells=" + fmt(fieldCertainty.mixedCells())
+                    + " censusOwnedCells=" + fmt(fieldCertainty.ownedCells())
+                    + " censusSupportedCells=" + fmt(fieldCertainty.supportedCells())
+                    + " censusSamples=" + fmt(fieldCertainty.censusSamples())
+                    + " mixedCellFraction="
+                    + ratio(fieldCertainty.mixedCells(),
+                            Math.max(1.0D, fieldCertainty.censusSamples()))
+                    // The rate that decides the architecture: what fraction of
+                    // ray lookups the field answered outright.
+                    + " rainFieldSafeHits=" + fmt(rainFieldSafeHits)
+                    + " rainFieldMixedFallbacks=" + fmt(rainFieldMixedFallbacks)
+                    + " fallbackFraction="
+                    + ratio(rainFieldMixedFallbacks,
+                            Math.max(1.0D, rainFieldSafeHits + rainFieldMixedFallbacks))
+                    + " fallbacksPerPixel=" + perPixel(rainFieldMixedFallbacks);
         }
 
         double oraclePostOpacityDistance() {
