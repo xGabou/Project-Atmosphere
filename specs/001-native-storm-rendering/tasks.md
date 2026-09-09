@@ -2495,6 +2495,52 @@ implementation, while visual polish remains independently active.
   line close here - so the next architecture target is the largest non-rain uniform consumer: light
   tap plus empty-span probe, together about a third of the descriptor work. Evidence in
   `validation/performance-rain-field-bound.md`.
+- [X] T193 [PERFORMANCE] [US3] Fresh production-path attribution, and pick the next architecture
+  from it rather than from history.
+  **Both remaining non-rain consumers price in the major band, and unlike rain both are
+  structurally suited to precomputation.** **Ceilings**: SIDE light removal **1.2490 accepted**
+  (2.22% spread), SIDE probe removal 1.2424 (4.33%, rejected on spread), FAR light **1.2302
+  accepted**, FAR probe 1.2771 (4.69%, rejected). Every rain-field campaign topped out at 1.12x net,
+  so **each of these on its own is worth more than the entire rain architecture was**. **Fresh
+  attribution** - the capture T192 could not provide, since no rain-field campaign is armed and the
+  monolith is therefore not forced to build a field: SIDE with `shapeUntagged=0` and residual
+  fraction 0.0001, rain segment **41.49%** (3.09/px), **light tap 21.96%** (1.64/px), **empty-span
+  probe 21.17%** (1.58/px), primary body 9.78%, refinement 3.89%, rain shaft 1.71%, total 7.46 shape
+  calls/px. The named consumers sum to `shapeTagged` exactly - **nothing attributed by subtraction,
+  no residual bucket**. `exactSdfPerGroupWalk` is 7.04 throughout, so ranking by group walks is also
+  ranking by exact-SDF work; two captures agree to 0.03%. **Rain remains the largest single consumer
+  at 41.49% and stays out of scope** - both its lines closed on measurement. **The ceilings are
+  ceilings**: `t176_nolight` leaves silhouette IoU at exactly 1.0000 while dark-interior retention
+  falls to **0.0032** (shape untouched, shading gone), `t180_noprobe` keeps dark-interior at 0.9996
+  and moves the silhouette instead (sample placement, not lighting) - two clean, diagnostic damage
+  signatures. **The semantics decide the architecture**: the probe is a *threshold* test
+  (`paProbeDensity > 0.0008`) whose only output is how far the ray may advance, and **its error is
+  one-sided and benign** - "material may be present" costs march time, never correctness; the light
+  tap is *integrated* over four taps into extinction, so errors **average** rather than compound.
+  **Neither has rain's structure**, and that is the whole argument: rain reachability is an
+  existence test ORed ~60 times per ray, which turned a 0.22% per-column error into 12% false rain
+  (`1-(1-0.00224)^60 = 12.6%`, measured). **The failure that closed the rain field does not
+  transfer**; what transfers is the part that worked - moving descriptor traversal out of the ray
+  gave a real 1.15x class gain on a 0.23 ms build. **Selected: a shared coarse 3D
+  storm-occupancy/density field serving both probe and light tap** - they are within 0.8 points of
+  each other in share and 0.007 in ceiling, so choosing one would be arbitrary, and they consume the
+  same quantity at different precisions, amortising one build across **43.13%** of shape calls
+  instead of 21%. **This is not the per-lane pruning that failed**: T179 removed 46.75% of exact SDFs
+  per lane for 1.0159x and T185 removed 71.50% for 1.0155x, because both changed what a thread
+  decided without changing what the shader executed; this removes the traversal from the ray for
+  whole coherent workloads, the shape that produced T180's 1.1972x and T188's 1.1158x. **Expected
+  gain deliberately not guessed**: the combined ceiling is **not measured** and neither is the 3D
+  build cost. **The open risk is dimensionality** - the rain field was 2D and cheap only because
+  T184 proved rain support XZ-invariant; storm density is not, so 262,144 cells at 0.23 ms becomes
+  1.05M-4.2M voxels, and whether the build leaves any of the 1.24x standing is exactly what T187
+  asked before T188 built anything. **Next task is semantics and pricing, not implementation**:
+  measure the combined ceiling in one arm, re-measure the probe ceiling to protocol (both its arms
+  were rejected on spread), establish what resolution each consumer needs, then price the 3D build
+  against the 43% it would remove. **Both lines stay open**; if the shared field does not survive
+  pricing they separate cleanly and light is the better-established of the two. **No new shader
+  variants** - both ceilings already existed, and T193 owning no programs of its own makes it the
+  clean test of T192's cross-campaign registration fix (`registered=2 crossCampaignControls=3`).
+  Evidence in `validation/performance-production-attribution.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
