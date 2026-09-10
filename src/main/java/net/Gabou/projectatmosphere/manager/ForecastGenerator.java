@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
@@ -14,6 +15,7 @@ import net.Gabou.projectatmosphere.async.BiomeSampler;
 import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
 import net.Gabou.projectatmosphere.client.loading.IntegratedForecastLoadingBridge;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
+import net.Gabou.projectatmosphere.compat.projectlandscape.ProjectLandscapeForecastCompat;
 import net.Gabou.projectatmosphere.compat.ToughAsNailsCompat;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -224,7 +226,8 @@ public class ForecastGenerator {
         BiomeSource biomeSource = AsyncAtmosphereService.callOnMainThread(
                 () -> level.getChunkSource().getGenerator().getBiomeSource()
         );
-        BiomeSampler sampler = new BiomeSampler(level, biomeSource);
+        ProjectLandscapeForecastCompat.Sampler landscapeSampler = ProjectLandscapeForecastCompat.open(level).orElse(null);
+        BiomeSampler sampler = landscapeSampler == null ? new BiomeSampler(level, biomeSource) : null;
         Map<ResourceLocation, BiomeStats> statsByBiome = new HashMap<>();
         int samplesPerAxis = (radius * 2) / SAMPLE_STEP + 1;
         int sampleColumn = 0;
@@ -242,7 +245,18 @@ public class ForecastGenerator {
             int x = center.getX() + dx;
             for (int dz = -radius; dz <= radius; dz += SAMPLE_STEP) {
                 int z = center.getZ() + dz;
-                ResourceLocation biomeId = sampler.getBiomeId(x, center.getY(), z);
+                Optional<ResourceLocation> landscapeBiome = landscapeSampler == null
+                        ? Optional.empty()
+                        : landscapeSampler.biomeId(x, z);
+                ResourceLocation biomeId;
+                if (landscapeBiome.isPresent()) {
+                    biomeId = landscapeBiome.get();
+                } else {
+                    if (sampler == null) {
+                        sampler = new BiomeSampler(level, biomeSource);
+                    }
+                    biomeId = sampler.getBiomeId(x, center.getY(), z);
+                }
                 if (isSkippedBiome(biomeId)) {
                     continue;
                 }
