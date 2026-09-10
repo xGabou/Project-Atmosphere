@@ -25,6 +25,9 @@ public final class VolumetricCloudRenderTargets {
     private static RenderTarget stormDescriptorTarget;
     private static RenderTarget puffCandidateTarget;
     private static RenderTarget shadowTarget;
+    private static RenderTarget rainFieldTarget;
+    /** T153-only ground-truth interval map; never sampled by production. */
+    private static RenderTarget visibleVolumeOracleTarget;
     private static final RenderTarget[] cloudTargets = new RenderTarget[2];
     private static int currentIndex;
     private static boolean historyValid;
@@ -150,6 +153,34 @@ public final class VolumetricCloudRenderTargets {
         return cumulusStageTopTarget;
     }
 
+    /**
+     * T188. The precomputed rain-support field, on the same domain and at the
+     * same resolution as the weather and morphology maps it sits beside.
+     *
+     * <p>RGBA32F rather than the RGBA16F those maps use, because channel G is
+     * an attach height in world blocks. Half float carries an ulp of 0.5 near
+     * a 1000-block storm top, which would put a quantisation error into the
+     * stored value on top of the spatial one this field is measured for, and
+     * confound the two.
+     *
+     * <p>Filtered LINEAR to match the maps it joins: the field is a smooth
+     * scalar sampled at arbitrary XZ, so the alternative is a visible
+     * eight-block staircase at every rain edge.
+     */
+    public static RenderTarget prepareRainFieldTarget(int size) {
+        if (rainFieldTarget == null || rainFieldTarget.width != size) {
+            if (rainFieldTarget != null) {
+                rainFieldTarget.destroyBuffers();
+            }
+            rainFieldTarget = createFloatMap(size, size, GL11.GL_LINEAR);
+        }
+        return rainFieldTarget;
+    }
+
+    public static RenderTarget rainFieldTargetOrNull() {
+        return rainFieldTarget;
+    }
+
     public static RenderTarget weatherTargetOrNull() {
         return weatherTarget;
     }
@@ -218,6 +249,41 @@ public final class VolumetricCloudRenderTargets {
 
     public static RenderTarget historyCloudTarget() {
         return cloudTargets[1 - currentIndex];
+    }
+
+    /**
+     * Allocates the T153 diagnostic oracle publication target. Four horizontal
+     * banks provide sixteen packed occupied intervals per production pixel.
+     * Each packed interval also carries the alpha-98 optical cutoff. The target exists
+     * only while an oracle arm is selected and is excluded from production
+     * history and timing.
+     */
+    public static RenderTarget prepareVisibleVolumeOracleTarget(int width, int height) {
+        int oracleWidth = Math.max(1, width) * 4;
+        int oracleHeight = Math.max(1, height);
+        if (visibleVolumeOracleTarget == null
+                || visibleVolumeOracleTarget.width != oracleWidth
+                || visibleVolumeOracleTarget.height != oracleHeight) {
+            if (visibleVolumeOracleTarget != null) {
+                visibleVolumeOracleTarget.destroyBuffers();
+            }
+            visibleVolumeOracleTarget = new TextureTarget(
+                    oracleWidth, oracleHeight, true, Minecraft.ON_OSX);
+            visibleVolumeOracleTarget.setFilterMode(GL11.GL_NEAREST);
+            configureClamp(visibleVolumeOracleTarget.getColorTextureId());
+            upgradeColorToRgba32f(
+                    visibleVolumeOracleTarget.getColorTextureId(), oracleWidth, oracleHeight);
+            configureDepth(visibleVolumeOracleTarget.getDepthTextureId());
+            visibleVolumeOracleTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        }
+        return visibleVolumeOracleTarget;
+    }
+
+    public static void releaseVisibleVolumeOracleTarget() {
+        if (visibleVolumeOracleTarget != null) {
+            visibleVolumeOracleTarget.destroyBuffers();
+            visibleVolumeOracleTarget = null;
+        }
     }
 
     public static boolean isHistoryValid() {
@@ -293,6 +359,14 @@ public final class VolumetricCloudRenderTargets {
         if (shadowTarget != null) {
             shadowTarget.destroyBuffers();
             shadowTarget = null;
+        }
+        if (rainFieldTarget != null) {
+            rainFieldTarget.destroyBuffers();
+            rainFieldTarget = null;
+        }
+        if (visibleVolumeOracleTarget != null) {
+            visibleVolumeOracleTarget.destroyBuffers();
+            visibleVolumeOracleTarget = null;
         }
         destroyCloudTargets();
         StormGeometryBuildCoordinator.reset();

@@ -6,7 +6,68 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
  * for A/B tests; no simulation, tuning, or generation state reads them.
  */
 public final class VolumetricCloudDebugConfig {
+    /**
+     * T098 evidence arm. When true the cloud pass restores the pre-fix
+     * behaviour in which a hit's depth could saturate to the composite's miss
+     * sentinel. It exists so a before/after image pair can be captured on one
+     * fixture, at one pose, in one run, differing only in the corrected line.
+     * Never enabled by production; the T098 capture set turns it on for its
+     * two comparison shots and clears it immediately after.
+     */
+    private static volatile boolean t098LegacyHitDepth;
+    /**
+     * T098 evidence arm. When true the marcher restores the pre-fix promotion,
+     * which spent one march iteration per fine sample while crossing empty
+     * coverage envelope. It exists so the cost and the image of the two
+     * policies can be compared on one fixture in one run.
+     */
+    private static volatile boolean t098LegacyFinePromotion;
+    /**
+     * T136 cost-attribution arm. When true the cloud pass replaces lighting
+     * with a constant radiance, so the GPU-time difference against production
+     * is the lighting and self-shadow share. Never enabled by production.
+     */
+    private static volatile boolean t136ConstantLighting;
+    /**
+     * T161 A/B arm. Null lets the renderer pick the program automatically: the
+     * lean FINAL build whenever the frame's uploads match its baked-in
+     * constants, and the diagnostic monolith otherwise. A non-null value pins
+     * one program so a controlled same-fixture comparison can render the old
+     * monolithic FINAL and the new lean FINAL from one run. Never set outside a
+     * deliberate capture; {@link #resetDefaults()} clears it.
+     */
+    /**
+     * T162 descriptor-count scaling arm. Negative means no limit. A positive
+     * value caps the StormLobeCount the shader is told about, so a fixed-work
+     * arm evaluates fewer descriptors per sample while everything else - pose,
+     * target, sample count, fixture - is held identical. It changes what is
+     * drawn, so it is only meaningful for the fixed-work ladder, where the
+     * number of evaluations does not depend on what the storm looks like.
+     */
+    private static volatile int descriptorCountLimit = -1;
+    private static volatile CoreCostDiagnosticProgram finalProgramOverride;
+    /**
+     * T188. Enables the rain-support field on the DIAGNOSTIC_MONOLITH.
+     *
+     * <p>Workload counters can only be read from the monolith, because every
+     * lean program bakes DebugView to a constant. The monolith is not a field
+     * program, so without this the ray-side fetch count and the post-field
+     * attribution both read zero - not because the field did nothing, but
+     * because the only program that can count was not using it.
+     *
+     * <p>Scoped to the monolith deliberately. Applying it to the timed arms
+     * would make an anchor pay for a generation pass it does not run.
+     */
+    private static volatile boolean rainFieldForcedOnMonolith;
     private static volatile boolean depthCompositeEnabled = true;
+
+    public static boolean rainFieldForcedOnMonolith() {
+        return rainFieldForcedOnMonolith;
+    }
+
+    public static void setRainFieldForcedOnMonolith(boolean forced) {
+        rainFieldForcedOnMonolith = forced;
+    }
     private static volatile boolean sceneRayLimitEnabled = true;
     // Uniform ray probes can miss narrow world-space cloud footprints and cut
     // complete horizontal bands from an otherwise valid volume. Keep the A/B
@@ -25,6 +86,13 @@ public final class VolumetricCloudDebugConfig {
     private static volatile VolumetricPuffDensityStage puffDensityStage = VolumetricPuffDensityStage.FINAL;
     private static volatile VolumetricPuffTierFilter puffTierFilter = VolumetricPuffTierFilter.ALL;
     private static volatile boolean historyEnabled = true;
+    /**
+     * Rank 1 reconstruction arm. False keeps the shipped composite accumulation
+     * unchanged; true selects the coverage-alpha reconstruction, which removes
+     * the resolution-scale beat by separating the silhouette's coverage from
+     * the depth-aware colour accumulation. Diagnostic until T138 promotes it.
+     */
+    private static volatile boolean coverageAlphaReconstruction;
     private static volatile VolumetricCloudRaymarchDebugView raymarchDebugView =
             VolumetricCloudRaymarchDebugView.FINAL;
     // Fixed empty-map base/top sentinels bleed into cloud fringes through the
@@ -49,6 +117,30 @@ public final class VolumetricCloudDebugConfig {
             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION;
 
     private VolumetricCloudDebugConfig() {
+    }
+
+    public static boolean t136ConstantLighting() {
+        return t136ConstantLighting;
+    }
+
+    public static void setT136ConstantLighting(boolean enabled) {
+        t136ConstantLighting = enabled;
+    }
+
+    public static boolean t098LegacyFinePromotion() {
+        return t098LegacyFinePromotion;
+    }
+
+    public static void setT098LegacyFinePromotion(boolean enabled) {
+        t098LegacyFinePromotion = enabled;
+    }
+
+    public static boolean t098LegacyHitDepth() {
+        return t098LegacyHitDepth;
+    }
+
+    public static void setT098LegacyHitDepth(boolean enabled) {
+        t098LegacyHitDepth = enabled;
     }
 
     public static boolean depthCompositeEnabled() {
@@ -79,9 +171,19 @@ public final class VolumetricCloudDebugConfig {
         return fixedResolutionScale;
     }
 
+    /**
+     * Diagnostic override for the cloud target's linear scale.
+     *
+     * <p>The floor matches {@code VolumetricCloudRenderTargets.prepareCloudTargets},
+     * which is the only place the value is finally clamped. It was 0.25 here,
+     * which silently pinned every more aggressive arm to a 480x270 target: the
+     * Rank 1 sweep's 0.1875 and 0.125 cells reported their labels and rendered
+     * a quarter-scale image. A diagnostic floor tighter than the renderer's own
+     * makes the frontier it exists to explore unreachable.
+     */
     public static void setFixedResolutionScale(float scale) {
         fixedResolutionScale = Float.isFinite(scale)
-                ? Math.max(0.25F, Math.min(1.0F, scale))
+                ? Math.max(0.10F, Math.min(1.0F, scale))
                 : Float.NaN;
     }
 
@@ -141,6 +243,14 @@ public final class VolumetricCloudDebugConfig {
 
     public static void setPuffTierFilter(VolumetricPuffTierFilter filter) {
         puffTierFilter = filter == null ? VolumetricPuffTierFilter.ALL : filter;
+    }
+
+    public static boolean coverageAlphaReconstruction() {
+        return coverageAlphaReconstruction;
+    }
+
+    public static void setCoverageAlphaReconstruction(boolean enabled) {
+        coverageAlphaReconstruction = enabled;
     }
 
     public static boolean historyEnabled() {
@@ -226,6 +336,24 @@ public final class VolumetricCloudDebugConfig {
                 mode == null ? StormOptimizationDiagnosticMode.NORMAL_PRODUCTION : mode;
     }
 
+    /** Negative when the shader sees the true resident descriptor count. */
+    public static int descriptorCountLimit() {
+        return descriptorCountLimit;
+    }
+
+    public static void setDescriptorCountLimit(int limit) {
+        descriptorCountLimit = limit;
+    }
+
+    /** Null when the renderer selects the FINAL program automatically. */
+    public static CoreCostDiagnosticProgram finalProgramOverride() {
+        return finalProgramOverride;
+    }
+
+    public static void setFinalProgramOverride(CoreCostDiagnosticProgram program) {
+        finalProgramOverride = program;
+    }
+
     /**
      * Returns every comparison switch to the production baseline. Debug state
      * is process-static, so session/world/backend transitions must call this
@@ -251,6 +379,8 @@ public final class VolumetricCloudDebugConfig {
         coveragePretestDilation = 0;
         stormTopologyMode = StormTopologyMode.COMPACT;
         optimizationDiagnosticMode = StormOptimizationDiagnosticMode.NORMAL_PRODUCTION;
+        finalProgramOverride = null;
+        descriptorCountLimit = -1;
     }
 
     /** Pure reset-contract check for the standalone renderer sandbox. */
@@ -273,6 +403,8 @@ public final class VolumetricCloudDebugConfig {
         coveragePretestThreshold = 0.02F;
         coveragePretestDilation = 2;
         stormTopologyMode = StormTopologyMode.LEGACY_SCAN;
+        finalProgramOverride = CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH;
+        descriptorCountLimit = 4;
         resetDefaults();
         if (!depthCompositeEnabled
                 || !sceneRayLimitEnabled
@@ -291,7 +423,9 @@ public final class VolumetricCloudDebugConfig {
                 || coveragePretestSamples != 6
                 || coveragePretestThreshold != 0.004F
                 || coveragePretestDilation != 0
-                || stormTopologyMode != StormTopologyMode.COMPACT) {
+                || stormTopologyMode != StormTopologyMode.COMPACT
+                || finalProgramOverride != null
+                || descriptorCountLimit != -1) {
             throw new IllegalStateException("volumetric debug defaults did not reset exactly");
         }
     }
@@ -313,6 +447,9 @@ public final class VolumetricCloudDebugConfig {
                 + "\nsentinelHeights=" + (sentinelHeightsEnabled ? "on" : "off")
                 + "\nfullres=" + (fullResolutionEnabled ? "on" : "off")
                 + "\nweatherCoverageScale=" + weatherCoverageScale
-                + "\nstormTopology=" + stormTopologyMode.serializedName();
+                + "\nstormTopology=" + stormTopologyMode.serializedName()
+                + "\nfinalProgram=" + (finalProgramOverride == null
+                        ? "auto"
+                        : finalProgramOverride.serializedName());
     }
 }

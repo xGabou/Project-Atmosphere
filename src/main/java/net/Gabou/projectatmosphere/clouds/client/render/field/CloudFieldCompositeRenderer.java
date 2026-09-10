@@ -97,6 +97,9 @@ public final class CloudFieldCompositeRenderer {
         shader.safeGetUniform("CompositeMode").set(mode.shaderId());
         shader.safeGetUniform("DepthCompositeEnabled").set(depthAwareComposite ? 1 : 0);
         shader.safeGetUniform("SceneDepthValid").set(guidedUpsampling ? 1 : 0);
+        shader.safeGetUniform("CoverageAlphaReconstruction").set(
+                net.Gabou.projectatmosphere.clouds.client.render.volumetric
+                        .VolumetricCloudDebugConfig.coverageAlphaReconstruction() ? 1 : 0);
         shader.apply();
 
         GPU_TIMER.begin();
@@ -124,6 +127,19 @@ public final class CloudFieldCompositeRenderer {
 
     public static LastDrawInputs lastDrawInputs() {
         return lastDrawInputs;
+    }
+
+    /**
+     * Last completed reconstruction/upsample GPU time in milliseconds, or a
+     * negative value when the timer is unsupported or has no result yet. The
+     * T138 resolution sweep needs the composite's own cost separated from the
+     * raymarch's, because the composite runs at full display resolution and
+     * therefore does <em>not</em> shrink when the cloud target does.
+     */
+    public static float lastGpuMilliseconds() {
+        return GPU_TIMER.isSupported() && GPU_TIMER.hasResult()
+                ? GPU_TIMER.getLastMilliseconds()
+                : -1.0F;
     }
 
     public static String performanceDiagnostics() {

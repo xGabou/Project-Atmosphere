@@ -1,3 +1,14 @@
+# Project Atmosphere 0.9.2
+
+## Small Fixes And Compatibility
+
+* Added an early in-game compatibility screen for conflicting TFC seasonal-mod setups.
+* Removed the unused legacy launcher-auth configuration category and its ghost settings.
+* Updated GPU detection charts and vendor coverage.
+* Reduced redundant forecast biome lookups that could cause C2ME density-function work.
+
+---
+
 # Project Atmosphere 0.9.1 Alpha
 
 ## Atmospheric Continuity Update

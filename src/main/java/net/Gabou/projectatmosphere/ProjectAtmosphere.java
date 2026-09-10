@@ -80,6 +80,7 @@ public class ProjectAtmosphere {
         NetworkHandler.init();
 
         modEventBus.addListener(this::setup);
+        modEventBus.addListener(ProjectAtmosphere::onConfigLoaded);
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> ProjectAtmosphere::registerClientBootstrap);
 
         
@@ -216,9 +217,18 @@ public class ProjectAtmosphere {
 
     @SubscribeEvent
     public static void onConfigLoaded(ModConfigEvent event) {
+        ModConfig config = event.getConfig();
+        if (config.getType() != ModConfig.Type.COMMON || !MODID.equals(config.getModId())) {
+            return;
+        }
 
-
-
+        // Versions before 0.9.2 wrote an unused auth category. Remove it from existing
+        // installations as well as from the current config specification.
+        if (config.getConfigData().contains("auth")) {
+            config.getConfigData().remove("auth");
+            config.save();
+            LOGGER.info("Removed obsolete legacy auth settings from the common config.");
+        }
     }
 
     private static void sendInfo() {

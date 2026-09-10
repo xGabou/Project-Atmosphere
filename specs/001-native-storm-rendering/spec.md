@@ -4,22 +4,7 @@
 
 **Created**: 2026-08-17
 
-**Status**: Revised — 2026-09-01 parallel correctness, performance, and visual-quality roadmap
-
-> **2026-09-01 planning supersession.** The project no longer serializes all performance and
-> quality-mode work behind one monolithic visual T098 gate. T098 is split into **T098a —
-> Structural / Correctness Acceptance** and **T098b — Final Visual Polish**. T098a is the
-> prerequisite for rain/whiteout acceptance (T099); T098b is the authoritative final regrade of
-> the shipping marcher, reconstruction, lighting, and quality settings. Performance design,
-> profiling, quality-mode plumbing, diagnostics consolidation, and independent compatibility work
-> run in parallel with T098b. SC-006 is unchanged and is not weakened by this ordering change.
-
-> **Evidence/integration boundary.** The latest structural campaign is present in repository
-> history on `worktree-t098-production-ray-trace` (`29dccf9`, `20a7fe5`, `4d82f3f`, `902811c`),
-> rather than as ancestors of this checkout's `Forge-1.20.1` HEAD. Its evidence establishes the
-> proposed T098a criteria, but this branch may mark T098a complete only after that exact production
-> correction/evidence chain is integrated and its retained guards are re-run. This preserves an
-> honest current-branch acceptance state without discarding the historical result.
+**Status**: Revised — 2026-09-03 post-T149 adaptive visible-volume roadmap
 
 **Revision**: The 2026-08-19 correction supersedes the earlier morphology acceptance model. The
 previous criteria described only the *absence* of artifacts, so a smooth balloon-shaped storm could
@@ -47,8 +32,20 @@ and confirmed by controlled live SIDE/FAR/BELOW/ABOVE evidence on fixture
 Because T134 changed the physical dimensions of every severe system, T132 has been rebased onto a
 fresh post-T134 controlled reference and a fresh post-T134 material trace; the pre-T134 T130 and
 T121--T123 fixtures are historical record only. SC-018's three reference viewing distances and the
-aspect-ratio/ANVIL-span guards are carried into T133. **T133 is accepted**; its historical OPEN
-record remains an audit trail, not the current gate. T099 now depends on T098a, not T098b.
+aspect-ratio/ANVIL-span guards were carried into T133. At that 2026-08-21 checkpoint, T098 and
+T099 remained blocked by T133; the 2026-09-03 status below supersedes that dependency state.
+
+**Status 2026-09-03 (supersedes the active-roadmap parts of the 2026-08-21 status)**: T133 and
+T098a are accepted. T149's graded lighting/detail LOD was measured and rejected with no production
+render-path change: PLAY_VIS_NEAR is 103.9 ms against the 8 ms Ultra cloud budget (13.0x), and
+NEAR_EDGE is 198.4 ms (24.8x). At representative poses approximately 83--100% of primary steps
+resolve empty while still paying traversal-related work, and selective per-lane/per-sample
+reductions have repeatedly failed to convert proportionally into GPU time. The active performance
+strategy is therefore an oracle-gated adaptive visible-volume/occupancy traversal track that seeks
+warp-coherent elimination of large empty or optically irrelevant spans. The current shipped Ultra
+ladder is 0.25 internal scale (480x270 at 1920x1080) and is too soft/foggy for final acceptance; it
+must not be reduced further as the primary solution. T098b remains the final visual regrade after
+the shipping traversal, resolution, reconstruction, lighting, and quality policy stabilize.
 
 **Input**: User description: "Redesign Project Atmosphere's native severe-cloud rendering so storms are genuinely volumetric, visually stable, performant across quality modes, and compatible with the existing authoritative weather architecture and optional integrations."
 
@@ -300,18 +297,25 @@ final output and can detect capacity or performance fallback without enabling no
   light, ambient light, and final rendered contribution. A material-continuity correction MUST be
   based on the first measured discontinuity in that trace, not on another unmeasured overlap or
   union-radius adjustment.
-- **FR-030**: Performance budgets, profiling, and architecture design MAY proceed after T133 in
-  parallel with T098a/T098b. Major performance implementation begins after T098a establishes
-  structural correctness. It MUST retain the Phase 4S density composition and ownership boundaries,
-  begin from measured workload, and prioritize bounded descriptor access/fetches, raymarch and
-  lighting cost, adaptive stepping, reconstruction, internal resolution, and quality-mode-specific
-  LOD. A change may alter the image only when it is explicitly routed to T098b's final
-  shipping-configuration regrade; SC-006 MUST NOT be weakened.
-- **FR-031**: Physical scale, material continuity, rain/whiteout parity, retained regressions, and
-  performance evidence remain required release inputs. T099 depends on T098a structural correctness
-  and final-density behavior, not T098b polish. Quality-mode plumbing/configuration/governor/LOD
-  may proceed with performance design; final visual acceptance for shipped modes remains part of
-  T098b and release validation.
+- **FR-030**: Foundational storm-performance architecture MAY proceed before T098b/T099 when
+  it retains T098a structural correctness, the Phase 4S density composition, and ownership
+  boundaries. Exact optimizations MUST prove neutrality; deliberately image-changing performance
+  architecture MAY proceed in parallel with T098b only when its visual change is bounded, recorded,
+  and returned to T098b for authoritative grading. After T149, the active priority is coherent
+  elimination of large empty or optically irrelevant ray spans rather than descriptor
+  micro-optimization, per-lane conditional grading, or further reduction of Ultra's internal
+  resolution.
+- **FR-031**: Physical-scale, material-continuity, morphology, rain/whiteout parity, and
+  performance evidence MUST remain valid through the final shipping renderer. T098a gates T099;
+  T098b does not block performance architecture, quality-mode plumbing, or unrelated release work,
+  but it MUST regrade the final shipped marcher, resolution/reconstruction, lighting, and quality
+  policy before release.
+- **FR-032**: Any visible-volume or occupancy accelerator MUST keep the complete production
+  `cloudDensity` field authoritative and MUST support multiple occupied -> empty -> occupied
+  intervals along a ray. Where remaining transmittance is meaningful, deeper cloud through a
+  transparent opening MUST still render. Camera-inside-cloud rendering MUST retain nearby dense and
+  thin regions, internal structure, holes, openings, and deeper re-entry; a generic fog replacement,
+  first-hit opaque shell, or fixed shell-thickness rule is prohibited.
 
 ### Scope Boundaries
 
@@ -322,6 +326,8 @@ final output and can detect capacity or performance fallback without enabling no
 - Existing quality-mode scalability and cloud-rendering diagnostics.
 - Physical severe-storm scale derivation, vertical material-continuity attribution, and visually
   neutral storm-performance architecture required to make the corrected renderer practical.
+- Oracle diagnostics and production prototypes for coherent visible-volume/occupancy traversal,
+  including holes, re-entry, camera-inside behavior, and recovery of a sharper Ultra resolution.
 - Regression protection for renderer ownership and optional Simple Clouds operation.
 
 **Out of scope**:
@@ -331,6 +337,8 @@ final output and can detect capacity or performance fallback without enabling no
 - Creating a second weather or cloud population.
 - Reworking ordinary cloud families except where shared behavior must remain compatible.
 - Adding god rays, multiple independent altitude layers, or unrelated visual features.
+- Replacing production cloud density with toy-sphere density, a hollow shell, or generic
+  inside-cloud fog in order to accelerate traversal.
 - Porting the mod to another Minecraft version or loader.
 - Retiring the entire legacy Field renderer before its agreed stable-release rollback window ends.
 - Changing existing save or network formats unless later planning proves a compatible change is
@@ -409,17 +417,19 @@ final output and can detect capacity or performance fallback without enabling no
   than 16-block intervals through every role transition, identifies any first discontinuity, and
   the corrected fixture has no unaccounted lower/upper material split in all reviewed FAR, SIDE,
   BELOW, and ABOVE captures.
-- **SC-020**: Before T098a structural acceptance, the reference viewpoint matrix records storm
-  raymarch cost, primary/light-cone descriptor work, early-rejection rate, and termination behavior;
-  every approved foundational optimization in that gate preserves the comparison image within its
-  documented visually-neutral tolerance and reduces or bounds the measured work it owns. Later
-  measured performance redesign is governed by T098b regrading rather than a fabricated neutrality
-  claim.
-- **SC-021**: The performance track MUST maintain a written budget table for Low, Low 24, Medium,
-  High, and Ultra that separates cloud GPU budget from total-frame budget, records the measured
-  non-cloud remainder, and identifies the fixture, resolution, hardware, and percentile used.
-  Ultra's total-frame requirement remains SC-006; lower-mode budgets may be revised only through
-  documented measured evidence, never by silently weakening SC-006.
+- **SC-020**: Before final T098b acceptance, the reference viewpoint matrix records storm raymarch
+  cost, primary/light-cone descriptor work, early-rejection rate, termination behavior, and the
+  current traversal architecture. Exact foundational optimizations preserve the comparison image
+  within their documented visually-neutral tolerance; image-changing architecture preserves
+  T098a and carries an explicit T098b regrade obligation.
+- **SC-021**: Low, Low 24, Medium, High, and Ultra each have a written cloud-GPU and total-frame
+  budget with hardware, resolution, fixture, percentile, and measured non-cloud remainder. Ultra's
+  cloud target remains 8.0 ms and SC-006 remains unchanged unless a later evidence-based decision
+  explicitly respecifies it.
+- **SC-022**: Before an adaptive visible-volume/occupancy design is considered production-ready,
+  ground-truth tests cover outside, near, inside, transparent-opening, and deeper re-entry rays;
+  the moving-camera route covers outside -> approach -> entry -> interior -> holes/openings -> exit;
+  and no visibly contributing interval is skipped while remaining transmittance is meaningful.
 
 ## Assumptions
 
@@ -436,6 +446,9 @@ final output and can detect capacity or performance fallback without enabling no
   mod load does not invalidate comparisons.
 - The severe-system physical targets and pre-T098 performance budget are derived from the current
   live fixture and the reference-horizon validation route before production constants are changed.
+- The current 0.25 Ultra internal scale is an interim performance compromise, not the desired final
+  quality target. A successful traversal architecture is expected to fund explicit 0.375 and 0.50
+  recovery experiments rather than another primary reduction below 0.25.
 - Existing unrelated working-tree changes are preserved throughout this feature.
 
 ## Obsolete Assumptions (superseded 2026-08-19)

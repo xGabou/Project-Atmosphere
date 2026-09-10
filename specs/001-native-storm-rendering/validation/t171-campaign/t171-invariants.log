@@ -1,0 +1,4 @@
+T170_WIRING campaigns=16|armMatrices=12|violations=0
+T170_WIRING_NEGATIVE mutations=5|allDetected=true
+T171_CONTROLS duplicates=2|byteIdenticalToFinal=true
+T171_SAMPLING freshnessGate=wired|duplicateCounter=wired|dispersion=wired

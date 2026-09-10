@@ -13,7 +13,17 @@ public final class CloudTextureUnitContract {
     public static final int PUFF_CANDIDATE_UNIT = 12;
     public static final int BASE_NOISE_UNIT = 13;
     public static final int DETAIL_NOISE_UNIT = 14;
-    public static final int MAX_PA_TOUCHED_UNIT = DETAIL_NOISE_UNIT;
+    /**
+     * T188. The rain-support field, bound manually like the three above.
+     *
+     * <p>It cannot be an ordinary JSON sampler. Minecraft binds those to
+     * consecutive units starting at 0 and tracks exactly
+     * MAX_MINECRAFT_TRACKED_UNIT + 1 of them, so a thirteenth sampler in
+     * cloud_atmosphere_volume.json indexes one past the end of
+     * GlStateManager's array and throws inside ShaderInstance.apply.
+     */
+    public static final int RAIN_FIELD_UNIT = 15;
+    public static final int MAX_PA_TOUCHED_UNIT = RAIN_FIELD_UNIT;
     public static final int REQUIRED_FRAGMENT_TEXTURE_UNITS = MAX_PA_TOUCHED_UNIT + 1;
 
     private CloudTextureUnitContract() {
@@ -26,6 +36,7 @@ public final class CloudTextureUnitContract {
                 || PUFF_CANDIDATE_UNIT != MAX_MINECRAFT_TRACKED_UNIT + 1
                 || BASE_NOISE_UNIT != PUFF_CANDIDATE_UNIT + 1
                 || DETAIL_NOISE_UNIT != BASE_NOISE_UNIT + 1
+                || RAIN_FIELD_UNIT != DETAIL_NOISE_UNIT + 1
                 || REQUIRED_FRAGMENT_TEXTURE_UNITS != MAX_PA_TOUCHED_UNIT + 1) {
             throw new IllegalStateException("native cloud texture-unit contract is not contiguous");
         }

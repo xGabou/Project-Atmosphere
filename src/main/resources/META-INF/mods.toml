@@ -64,7 +64,7 @@ side = "BOTH"
 [[dependencies."${mod_id}"]]
 modId = "gaboulibs"
 mandatory = true
-versionRange = "[1.7.2,)"
+versionRange = "[1.9,)"
 ordering = "AFTER"
 side = "BOTH"
 
