@@ -647,7 +647,26 @@ public enum CoreCostDiagnosticProgram {
     T192_STACK_BOUND("t192_stack_bound"),
 
     /** T192: rain-only capture through the triaged field. */
-    T192_RAIN_MASK_BOUND("t192_rain_mask_bound");
+    T192_RAIN_MASK_BOUND("t192_rain_mask_bound"),
+
+    // -----------------------------------------------------------------------
+    // T194. Pricing a shared 3D storm field for light and probe. Nothing is
+    // built and nothing is wired into the renderer: one arm measures the whole
+    // budget available to pay for a field, three price what generating one of
+    // a given size would cost.
+    // -----------------------------------------------------------------------
+
+    /** T194: light AND probe descriptor traversal removed together. */
+    T194_NO_BOTH("t194_noboth"),
+
+    /** T194 build oracle: 512x512x16 voxel evaluations per frame. */
+    T194_SLICES16("t194_slices16"),
+
+    /** T194 build oracle: 512x512x32. */
+    T194_SLICES32("t194_slices32"),
+
+    /** T194 build oracle: 512x512x64. */
+    T194_SLICES64("t194_slices64");
 
 
     private final String serializedName;
@@ -713,7 +732,11 @@ public enum CoreCostDiagnosticProgram {
                 || this == T190_FIELD_SAFE || this == T190_STACK_SAFE
                 || this == T190_RAIN_MASK_SAFE
                 || this == T192_FIELD_BOUND || this == T192_STACK_BOUND
-                || this == T192_RAIN_MASK_BOUND;
+                || this == T192_RAIN_MASK_BOUND
+                // T194 oracles generate but never read: the pass exists
+                // to be timed, and its output is deliberately discarded.
+                || this == T194_SLICES16 || this == T194_SLICES32
+                || this == T194_SLICES64;
     }
 
     /**

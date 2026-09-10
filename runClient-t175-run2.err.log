@@ -1,0 +1,33 @@
+java.util.concurrent.RejectedExecutionException: Server already shutting down
+	at TRANSFORMER/minecraft@1.20.1/net.minecraft.server.MinecraftServer.executeIfPossible(MinecraftServer.java:1279)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.forge.plugin.ForgeServerSparkPlugin.executeSync(ForgeServerSparkPlugin.java:222)
+	at java.base/java.util.concurrent.CompletableFuture.asyncSupplyStage(CompletableFuture.java:1782)
+	at java.base/java.util.concurrent.CompletableFuture.supplyAsync(CompletableFuture.java:2005)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.platform.world.AsyncWorldInfoProvider.async(AsyncWorldInfoProvider.java:54)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.platform.world.AsyncWorldInfoProvider.pollCounts(AsyncWorldInfoProvider.java:76)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.platform.world.AsyncWorldInfoProvider.getCounts(AsyncWorldInfoProvider.java:84)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.sampler.window.WindowStatisticsCollector.measure(WindowStatisticsCollector.java:185)
+	at java.base/java.util.concurrent.ConcurrentHashMap.computeIfAbsent(ConcurrentHashMap.java:1708)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.sampler.window.WindowStatisticsCollector.measureNow(WindowStatisticsCollector.java:123)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.sampler.java.JavaSampler.stop(JavaSampler.java:115)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.sampler.java.JavaSampler.run(JavaSampler.java:138)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:305)
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:305)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':runClient'.
+> Process 'command 'C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot\bin\java.exe'' finished with non-zero exit value -1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 11m 11s

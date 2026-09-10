@@ -1,0 +1,41 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.8/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :
+MixinGradle is skipping eclipse integration, extension not found
+files(...) dependencies are not deobfuscated. Use a flatDir repository instead: https://docs.gradle.org/current/userguide/declaring_repositories.html#sub:flat_dir_resolver
+Cannot deobfuscate dependency of type DefaultFileCollectionDependency_Decorated, using obfuscated version!
+
+> Task :downloadMcpConfig
+> Task :extractSrg UP-TO-DATE
+> Task :createMcpToSrg UP-TO-DATE
+> Task :compileJava UP-TO-DATE
+> Task :generateLeanFinalShader
+> Task :processResources
+> Task :classes
+> Task :compileTestJava
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses
+
+> Task :stormVolumetricGeometrySandbox FAILED
+PHASE4T_RESULT|T132 authoritative control separation|PASSED|invariant satisfied
+PHASE4T_RESULT|T133 production default unchanged|PASSED|invariant satisfied
+Exception in thread "main" java.lang.IllegalStateException: T123 workload counter at shader line 2497 is not guarded by paWorkloadCaptureActive(): paCurrentGroupOrdinal++;
+	at net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormVolumetricGeometrySandbox.require(StormVolumetricGeometrySandbox.java:7308)
+	at net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormVolumetricGeometrySandbox.validateT123InstrumentationOnly(StormVolumetricGeometrySandbox.java:841)
+	at net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormVolumetricGeometrySandbox.main(StormVolumetricGeometrySandbox.java:52)
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':stormVolumetricGeometrySandbox'.
+> Process 'command 'C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot\bin\java.exe'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 44s
+9 actionable tasks: 5 executed, 4 up-to-date

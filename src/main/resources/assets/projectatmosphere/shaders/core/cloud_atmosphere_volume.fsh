@@ -6956,6 +6956,36 @@ void main() {
         vec2 fieldWorldXZ = WeatherOrigin + texCoord * WeatherExtent;
         float fieldAttachY;
         bool fieldOwnsGroup;
+#ifdef PA_ARM_FIELD_SLICES
+        // T194 Task 5. Price a 3D field build without building one.
+        //
+        // Every fragment of this 512x512 pass sweeps PA_ARM_FIELD_SLICES
+        // heights through the cloud slab and evaluates the production density
+        // at each, so the draw performs exactly 512 * 512 * slices voxel
+        // evaluations. Nothing is stored: the question is what generating a
+        // volume of this size costs, and storing it would only add bandwidth to
+        // a number that is already dominated by descriptor traversal.
+        //
+        // The accumulator is written to fragColor so no slice can be folded
+        // away, which is the same reason T141's amplification arm exists.
+        float paSliceAccum = 0.0;
+        float paSliceSpan = max(SlabTopY - SlabBaseY, 1.0);
+        for (int paSlice = 0; paSlice < PA_ARM_FIELD_SLICES; paSlice++) {
+            float paSliceY = SlabBaseY
+                + paSliceSpan * ((float(paSlice) + 0.5)
+                    / float(PA_ARM_FIELD_SLICES));
+            paSliceAccum += cloudDensity(
+                vec3(fieldWorldXZ.x, paSliceY, fieldWorldXZ.y),
+                0.0,
+                false,
+                false,
+                false
+            );
+        }
+        fragColor = vec4(paSliceAccum, 0.0, 0.0, 1.0);
+        gl_FragDepth = 0.0;
+        return;
+#endif
         float fieldSupport = directStormRainSupportAt(
             fieldWorldXZ, fieldAttachY, fieldOwnsGroup);
         // T188 wrote alpha as a constant 1.0 marker that nothing read, so the

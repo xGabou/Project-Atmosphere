@@ -1,0 +1,151 @@
+
+> Configure project :
+MixinGradle is skipping eclipse integration, extension not found
+files(...) dependencies are not deobfuscated. Use a flatDir repository instead: https://docs.gradle.org/current/userguide/declaring_repositories.html#sub:flat_dir_resolver
+Cannot deobfuscate dependency of type DefaultFileCollectionDependency_Decorated, using obfuscated version!
+
+> Task :architectureBoundaryCheck
+> Task :downloadMcpConfig
+> Task :extractSrg UP-TO-DATE
+> Task :createMcpToSrg UP-TO-DATE
+> Task :compileJava UP-TO-DATE
+> Task :generateLeanFinalShader UP-TO-DATE
+> Task :processResources
+> Task :classes
+> Task :compileTestJava
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses
+
+> Task :cloudMorphologyTopologySandbox
+Structured tower topology heightRadiusR2=0.271449 heightRadialR2=0.223182 crownSeparation=135.000 stageRadiusMeans=0.900000/0.866667/0.820000/0.830000 stageRadialMeans=0.305000/0.373333/0.366667/0.330000
+PUFF topology type=cumulus_humilis placement=production samples=4096 meanMembers=7.000 disconnectedBirth=0(0.000%) disconnectedTarget=0(0.000%) meanComponentsBirthTarget=1.0000/1.0000 nearestBirth[p05/p50/p95/max]=0.2735/0.2999/0.4463/0.4583 nearestTarget[p05/p50/p95/max]=0.2626/0.2879/0.4284/0.4400 primaryBirth[p50/p95/max]=0.5304/0.8020/0.8959 nearestCentreMinRadius[p05/p50]=0.5706/0.6388 centreSpread[p50/p95/max]=0.5502/0.5828/0.6135 footprint[p50/p95/max]=0.8317/0.8752/0.9117 centroidOffset[p50/p95/max]=0.1225/0.1466/0.1603 centreAnisotropy[p50/p95/max]=1.5498/1.8029/1.9205 baseSpreadMax=0.0180 shoulderBirth[min/max]=0.4823/0.5305 shoulderTarget[min/max]=0.4630/0.5093 basePairMin=0.4630 upperSupportMax=1.0791 upperOffset[min/max]=0.4034/0.6135 upperProtrusion[p05/p50]=0.1538/0.2583 upperSpanMin=15.2274 upperCoreMin=0.5075 structuralMass[p05/p50/p95]=0.5745/0.6111/0.6492 radius120Members[birth/target]=0.000%/0.000% radius120GroupsNone[birth/target]=100.000%/100.000%
+PUFF topology type=cumulus_mediocris placement=production samples=4096 meanMembers=8.000 disconnectedBirth=0(0.000%) disconnectedTarget=0(0.000%) meanComponentsBirthTarget=1.0000/1.0000 nearestBirth[p05/p50/p95/max]=0.2739/0.3033/0.4443/0.4583 nearestTarget[p05/p50/p95/max]=0.2630/0.2912/0.4265/0.4400 primaryBirth[p50/p95/max]=0.5852/0.8161/0.8999 nearestCentreMinRadius[p05/p50]=0.5711/0.6484 centreSpread[p50/p95/max]=0.6162/0.6464/0.6766 footprint[p50/p95/max]=0.9384/0.9773/1.0106 centroidOffset[p50/p95/max]=0.1352/0.1516/0.1685 centreAnisotropy[p50/p95/max]=1.6660/1.7772/1.8705 baseSpreadMax=0.0180 shoulderBirth[min/max]=0.4823/0.5305 shoulderTarget[min/max]=0.4630/0.5093 basePairMin=0.4630 upperSupportMax=1.2943 upperOffset[min/max]=0.4390/0.6766 upperProtrusion[p05/p50]=0.2098/0.3955 upperSpanMin=31.3435 upperCoreMin=0.7607 structuralMass[p05/p50/p95]=0.9046/0.9591/1.0176 radius120Members[birth/target]=0.000%/0.000% radius120GroupsNone[birth/target]=100.000%/100.000%
+PUFF carrier type=cumulus_humilis samples=512 carrier=0.000 material=0.186 threshold=.0008 disconnected=0 parentCorridorMin=0.05481337 baseCorridorMin=0.09725269 outsideEnvelopeLeaks=0/87552 permutationDeltaMax=0.000e+00 sampledPositiveDensityMin=0.00003788
+PUFF carrier type=cumulus_mediocris samples=512 carrier=0.000 material=0.186 threshold=.0008 disconnected=0 parentCorridorMin=0.06168347 baseCorridorMin=0.09719829 outsideEnvelopeLeaks=0/89088 permutationDeltaMax=0.000e+00 sampledPositiveDensityMin=0.00030245
+PUFF analytic type=cumulus_humilis samples=512 disconnected[.02/.05/.15/baseSlice]=0/0/0/0 widthHeight[baseMax/upperMax/upperMinorMin]=1.4347/1.2626/0.7505 footprint[min/max]=0.7703/0.9023 groupHeight[min/max]=0.9376/1.1061 groupWidthHeight[min/max]=1.3198/1.7362 projected[minWidth/anisoMax]=1.1359/1.3085 upperOffsetMin=0.4115 middleSeparationMin=0.7137 crownSeparationMin=n/a crownRiseMin=0.2378 upperParentSeparationMin=0.1811 junction[protrusion/bridge]=2.096/2.059 upperSilhouetteExposureMin=0.797
+PUFF analytic type=cumulus_mediocris samples=512 disconnected[.02/.05/.15/baseSlice]=0/0/0/0 widthHeight[baseMax/upperMax/upperMinorMin]=1.3744/1.1185/0.6767 footprint[min/max]=0.8734/1.0075 groupHeight[min/max]=1.2030/1.4352 groupWidthHeight[min/max]=1.1443/1.4890 projected[minWidth/anisoMax]=1.2696/1.3189 upperOffsetMin=0.4511 middleSeparationMin=0.7777 crownSeparationMin=0.9595 crownRiseMin=0.3600 upperParentSeparationMin=0.2020 junction[protrusion/bridge]=-3.590/-2.208 upperSilhouetteExposureMin=0.875
+T133_GUARD_FAIL_FIRST|aspectRatio=rejects(0.7333,0.4800)|anvilSpan=rejects(990.0,1500.0)
+T098_BLEND_SATURATION|pairs=1152|saturated=1024(88.9%)|requestedBlocks=37.58..297.00|meanRequested=162.05|cap=48.00|worstEffectiveOverRequested=0.1616
+T098_ROLE_DIAMETERS|base=1044.0..1044.0|core=504.0..504.0|lowerTower=352.8..352.8|upperTower=300.6..300.6|anvilUnion=1269.9..1287.3
+T098_ROLE_RATIOS|core/base=0.483..0.483|lowerTower/base=0.338..0.338|upperTower/base=0.288..0.288|anvil/base=1.216..1.233|anvil/upperTower=4.22..4.28
+T098_T127_TARGETS|base=900..1100|core=420..520|lowerTower=273..390|upperTower=230..414|anvilSpan=1150..1450|relationships core/base=0.45-0.50 lowerTower/core=0.65-0.75 anvil/base=1.20-1.35 anvil/upperTower=3.5-5.0
+T098_PROPORTION_GUARD|coreOverBase=0.483|lowerTowerOverCore=0.700|anvilOverBase=1.224|anvilOverUpperTower=4.251|narrowing=0.852|allRelationshipsSatisfied=true|rejectsOldLowerTower=0.625|rejectsOldAnvilOverUpper=5.917
+T133_ASPECT_CONTRACT|band=0.55..0.70|widestLobeSpan=990.000..990.000|aspectPlan=0.6698..0.6818|aspectResolvedLower=0.6558..0.6825|aspectResolvedUpper=0.6100..0.6330
+T133_ANVIL_CONTRACT|band=1150..1450|widestLobe=990.000..990.000|unionSpan=1268.710..1286.527|anvilMembers=4|widestOverBase=0.9483..0.9483|unionOverBase=1.2152..1.2323
+T134_SCALE_CONTRACT|members=10|planRadius=450.0|groupRadius=400.0|baseDrop=120.0|topRise=780.0|footprint=1200..1500|height=720..880
+T134_RESOLVED_CENTRE_ENVELOPE|matureLowerMin=1265.701|matureUpperMax=1416.327
+PUFF analyticalWorstPrimaryRatio=0.886564 parameters[group=1.650 radial=0.300..0.640 angularJitter=0.280]
+
+> Task :cloudRegionMotionSandbox
+Cloud region motion self-check passed.
+
+> Task :materialAdvectionSandbox
+Material advection self-check passed.
+
+> Task :stormDensityThresholdSandbox
+--- T100 measured cloud noise statistics ---
+samples                     = 262144
+detail FBM sd                        = 0.0742
+detail FBM p05                       = 0.3568
+base carrier p05                     = 0.7121
+base carrier p95                     = 0.8453
+storm base field sd                  = 0.3287
+base low FBM sd                      = 0.0790
+detail band share R                  = 0.8520
+detail band share G                  = 0.1225
+detail band share B                  = 0.0255
+--- derived ---
+required CORE_FILL (weakest live minimum) = 0.9289
+recorded CORE_FILL                   = 0.4500
+effective fill BASE @ 0.7832         = 0.8018
+p05 retained BASE @ 0.7832           = 0.0083
+effective fill BASE @ 0.8792         = 0.6073
+p05 retained BASE @ 0.8792           = 0.0093
+effective fill CORE @ 0.9485         = 0.4914
+p05 retained CORE @ 0.9485           = 0.0101
+effective fill CORE @ 1.0000         = 0.4500
+p05 retained CORE @ 1.0000           = 0.0273
+effective fill TOWER @ 0.9700        = 0.4589
+p05 retained TOWER @ 0.9700          = 0.0103
+effective fill TOWER @ 0.9539        = 0.4831
+p05 retained TOWER @ 0.9539          = 0.0101
+effective fill ANVIL @ 0.8222        = 0.7173
+p05 retained ANVIL @ 0.8222          = 0.0087
+effective fill ANVIL @ 0.7231        = 0.9498
+p05 retained ANVIL @ 0.7231          = 0.0077
+effective fill ANVIL @ 0.7851        = 0.7975
+p05 retained ANVIL @ 0.7851          = 0.0084
+effective fill ANVIL @ 0.7992        = 0.7661
+p05 retained ANVIL @ 0.7992          = 0.0085
+analytic occupied sd                 = 0.2290
+recorded MIN_OCCUPIED_REGION_SD      = 0.1148
+lowest detail wavelength (blocks)    = 22.7273
+min variance region (blocks)         = 68.1818
+PHASE4S_RESULT|T100 measured noise thresholds|PASSED|all recorded statistics and derivations reproduced
+
+> Task :stormMaterialContinuityDiagnosticsSandbox
+T128_TRACE_HEADER|Y|roles|coverage|strength|baseNoise|detailFbm|body|erosion|density|coreFill|height01|extinction|opticalDepth|direct|ambient|phaseShadow|final|branch
+T128_TRACE|208|[]|0.04234|0.83394|0.72563|0.48510|0.00000|0.00000|0.00000|0.69344|0.00000|cpu-field-only; shader-light-capture-required
+T128_TRACE|224|[BASE]|0.74226|0.83394|0.48668|0.46854|0.59162|0.23384|0.35778|0.69344|0.00000|cpu-field-only; shader-light-capture-required
+T128_TRACE|240|[BASE, CORE]|0.83394|0.83394|0.74570|0.48198|0.81993|0.22793|0.59200|0.69344|0.20126|cpu-field-only; shader-light-capture-required
+T128_TRACE|256|[BASE, CORE]|0.83394|0.83394|0.70045|0.40272|0.78789|0.26280|0.52509|0.69344|0.22241|cpu-field-only; shader-light-capture-required
+T128_TRACE|272|[BASE, CORE, TOWER]|0.88288|0.88288|0.00000|0.49074|0.37992|0.22408|0.15584|0.82662|0.29592|cpu-field-only; shader-light-capture-required
+T128_TRACE|288|[BASE, CORE, TOWER]|0.95762|0.95762|0.02935|0.53396|0.40846|0.20506|0.20340|0.71350|0.38847|cpu-field-only; shader-light-capture-required
+T128_TRACE|304|[BASE, CORE, TOWER]|0.95852|0.95852|0.13027|0.51018|0.46997|0.21552|0.25445|0.71191|0.39951|cpu-field-only; shader-light-capture-required
+T128_TRACE|320|[CORE, TOWER]|0.95667|0.95667|0.00000|0.49350|0.29319|0.22286|0.07033|0.47888|0.34833|cpu-field-only; shader-light-capture-required
+T128_TRACE|336|[CORE, TOWER]|0.94159|0.94159|0.02148|0.48659|0.30821|0.22590|0.08231|0.50224|0.44712|cpu-field-only; shader-light-capture-required
+T128_TRACE|352|[CORE, TOWER]|0.92366|0.92366|0.60955|0.46689|0.72389|0.23457|0.48932|0.53099|0.54591|cpu-field-only; shader-light-capture-required
+T128_TRACE|368|[CORE, TOWER, ANVIL]|0.92122|0.92122|0.64594|0.48890|0.74962|0.22489|0.52473|0.53499|0.59078|cpu-field-only; shader-light-capture-required
+T128_TRACE|384|[CORE, TOWER, ANVIL]|0.91679|0.91679|0.12217|0.51242|0.37917|0.21454|0.16463|0.54230|0.40814|cpu-field-only; shader-light-capture-required
+T128_TRACE|400|[CORE, TOWER, ANVIL]|0.87495|0.87495|0.50518|0.46787|0.64983|0.23414|0.41569|0.61506|0.47536|cpu-field-only; shader-light-capture-required
+T128_TRACE|416|[CORE, TOWER, ANVIL]|0.81254|0.81254|0.94911|0.53865|0.96395|0.20300|0.76096|0.73748|0.42153|cpu-field-only; shader-light-capture-required
+T128_TRACE|432|[TOWER, ANVIL]|0.80055|0.80055|0.99972|0.39835|0.99980|0.26473|0.73507|0.76319|0.52825|cpu-field-only; shader-light-capture-required
+T128_TRACE|448|[TOWER, ANVIL]|0.80102|0.80102|0.84091|0.43670|0.88729|0.24785|0.63944|0.76218|0.61189|cpu-field-only; shader-light-capture-required
+T128_TRACE|464|[ANVIL]|0.79745|0.79745|0.81827|0.51446|0.87125|0.21364|0.65761|0.76996|0.58995|cpu-field-only; shader-light-capture-required
+T128_TRACE|480|[ANVIL]|0.79745|0.79745|0.92735|0.53726|0.94853|0.20360|0.74493|0.76996|0.71032|cpu-field-only; shader-light-capture-required
+T128_TRACE|496|[ANVIL]|0.79745|0.79745|0.60681|0.50186|0.72143|0.21918|0.50225|0.76996|0.83070|cpu-field-only; shader-light-capture-required
+T128_TRACE|512|[ANVIL]|0.79745|0.79745|0.45249|0.51849|0.61210|0.21187|0.40023|0.76996|0.95108|cpu-field-only; shader-light-capture-required
+T128_TRACE|528|[ANVIL]|0.72763|0.79745|0.71939|0.52888|0.78212|0.20729|0.57482|0.76996|1.00000|cpu-field-only; shader-light-capture-required
+T128_LARGEST_DENSITY_STEP|Y=352|density=0.48932|roles=[CORE, TOWER]
+
+> Task :stormMorphologySandbox
+T125_METRICS|coreTowerOverlap=1.0000|towerAnvilOverlap=1.0000|canopyTower=6.0991|upperBase=1.8372|neckRatio=0.9708
+T126_METRICS|radiusDerivative=0.0903|areaDerivative=0.1724|coreTowerRun=104.0000/29.5000|embeddedTowerRun=104.0000/59.0000|towerAnvilRun=92.0000/26.2500|canopyTower=6.1330/5.6159|undersideSd=9.1334/8.5227|anisotropyEnvelopeLow=1.4242/1.7500/1.9200
+PHASE4S_RESULT|T101 interior noise influence|PASSED|invariant satisfied
+PHASE4S_RESULT|T102 occupied-region density variance|PASSED|invariant satisfied
+PHASE4S_RESULT|T103 multi-scale spectral contribution|PASSED|invariant satisfied
+PHASE4S_RESULT|T104 geometric distance field|PASSED|invariant satisfied
+PHASE4S_RESULT|T105 positive storm structure|PASSED|invariant satisfied
+PHASE4S_RESULT|T106 rejected morphology forms|PASSED|invariant satisfied
+PHASE4S_RESULT|T117 envelope-side LOD cross-fade|PASSED|invariant satisfied
+PHASE4S_RESULT|T124 live-calibrated macro coherence|PASSED|invariant satisfied
+PHASE4S_RESULT|T125 live-calibrated role-envelope transitions|PASSED|invariant satisfied
+PHASE4S_RESULT|T126 live 3c039aa7 structural continuity|PASSED|invariant satisfied
+
+> Task :stormVolumetricGeometrySandbox FAILED
+PHASE4T_RESULT|T132 authoritative control separation|PASSED|invariant satisfied
+PHASE4T_RESULT|T133 production default unchanged|PASSED|invariant satisfied
+PHASE4T_RESULT|T123 instrumentation only|PASSED|invariant satisfied guardedCounterMutations=111
+T143_REACH_GUARD|probes=388800|falseNegatives=0|worstMargin=88.090 blocks at BASE major=24.0 minor=24.0 radius=171.14763120863816 y=302.5|nonVacuousCentres=360
+PHASE4T_RESULT|T143 reachability bound has no false negatives|PASSED|invariant satisfied
+PHASE4T_RESULT|T143 reach bound and gate keep one derivation|PASSED|invariant satisfied
+T145_RAIN_GATE|verticalProbes=240|verticalFalseNegatives=0|ellipseProbes=69120|ellipseFalseNegatives=0|ownedProbes=32304
+Exception in thread "main" java.lang.IllegalStateException: unterminated function: float localRainSupportAt(
+	at net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormVolumetricGeometrySandbox.functionBlock(StormVolumetricGeometrySandbox.java:7010)
+	at net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormVolumetricGeometrySandbox.validateT145RainLocalityGate(StormVolumetricGeometrySandbox.java:7322)
+	at net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormVolumetricGeometrySandbox.main(StormVolumetricGeometrySandbox.java:55)
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':stormVolumetricGeometrySandbox'.
+> Process 'command 'C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot\bin\java.exe'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 3m 26s
+16 actionable tasks: 11 executed, 5 up-to-date

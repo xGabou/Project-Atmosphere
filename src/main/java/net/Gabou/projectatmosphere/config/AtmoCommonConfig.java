@@ -227,9 +227,6 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> FOG_WET_BIOME_KEYWORDS;
     public static final ForgeConfigSpec.BooleanValue TELEMETRY_ENABLED;
     public static final ForgeConfigSpec.IntValue TELEMETRY_RETENTION_DAYS;
-    public static final ForgeConfigSpec.BooleanValue AUTH_STRICT_OFFLINE_UUID_REJECT;
-    public static final ForgeConfigSpec.BooleanValue AUTH_KICK_ON_FAILURE;
-    public static final ForgeConfigSpec.IntValue AUTH_CHALLENGE_TIMEOUT_TICKS;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -636,18 +633,6 @@ public class AtmoCommonConfig {
         TELEMETRY_RETENTION_DAYS = builder
                 .comment("Number of days to retain exported telemetry archives before pruning")
                 .defineInRange("telemetryRetentionDays", 14, 0, 365);
-        builder.pop();
-
-        builder.push("auth");
-        AUTH_STRICT_OFFLINE_UUID_REJECT = builder
-                .comment("Reject offline UUID v3 identities during the launcher auth check")
-                .define("strictOfflineUuidReject", true);
-        AUTH_KICK_ON_FAILURE = builder
-                .comment("Kick players who fail or timeout the launcher auth challenge")
-                .define("kickOnFailure", true);
-        AUTH_CHALLENGE_TIMEOUT_TICKS = builder
-                .comment("Ticks before a pending launcher auth challenge times out")
-                .defineInRange("challengeTimeoutTicks", 200, 1, Integer.MAX_VALUE);
         builder.pop();
 
         builder.push("debug");

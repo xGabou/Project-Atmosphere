@@ -257,7 +257,10 @@ public final class StormCampaignRegistry {
                     "T192_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
             new Campaign("T193", "t193-production-attribution.txt",
                     "productionAttributionRunRequested", "t193Run",
-                    "T193_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "T193_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            new Campaign("T194", "t194-shared-field-pricing.txt",
+                    "sharedFieldPricingRunRequested", "t194Run",
+                    "T194_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.

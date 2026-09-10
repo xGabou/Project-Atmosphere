@@ -163,19 +163,26 @@ dependencies {
     // Simple Clouds and its libraries are optional as one runtime unit. The
     // compile-only branch is the default so a missing integration dependency
     // is exercised by normal development launches.
-    def enableSimpleCloudsRuntime = project.findProperty("enableSimpleCloudsRuntime") == "true"
+    def enableSimpleCloudsRuntime =
+            project.findProperty("enableSimpleCloudsRuntime") == "true" ||
+                    gradle.startParameter.taskNames.any {
+                        it == "runSimpleClouds" || it.endsWith(":runSimpleClouds")
+                    }
     if (enableSimpleCloudsRuntime) {
         implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
         implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
+        implementation fg.deobf("curse.maven:better-simple-clouds-1606950:8802325")
         implementation fg.deobf("nonamecrackers2:simpleclouds:0.7.3+1.20.1-forge")
     } else {
         compileOnly fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
         compileOnly fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
         compileOnly fg.deobf("nonamecrackers2:simpleclouds:0.7.3+1.20.1-forge")
+        compileOnly fg.deobf("curse.maven:better-simple-clouds-1606950:8802325")
     }
 
     compileOnly fg.deobf("curse.maven:oculus-for-simpleclouds-1386686:7870940")
     compileOnly fg.deobf("curse.maven:simple-clouds-1121215:6928978")
+    compileOnly fg.deobf("curse.maven:better-simple-clouds-1606950:8802325")
     //implementation fg.deobf("curse.maven:oculus-for-simpleclouds-1386686:8234238")
 
     // World generation dependencies
@@ -878,6 +885,35 @@ def leanProgramVariants = [
         [name: 'cloud_atmosphere_volume_t188_rain_mask_field',
          defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
                    'PA_ARM_RAIN_OWN_BILINEAR 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+
+        // T194. Pricing only: no field is built and nothing is wired into the
+        // renderer. The combined ceiling measures how much GPU time light and
+        // probe descriptor traversal cost together - which is the whole budget
+        // available to pay for a field - and the slice arms price what
+        // generating a volume of that size would cost.
+        // Light is removed the way T176 removes it - by baking
+        // PaDiagnosticLightingMode to the constant-lighting arm - because there
+        // is no PA_ARM_NO_LIGHT define; the probe is removed by its own define.
+        // Composing the two exactly as their single-consumer arms do is what
+        // makes this ceiling comparable to T193's.
+        [name: 'cloud_atmosphere_volume_t194_noboth',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_NO_PROBE 1'],
+         keepUniforms: [],
+         overrides: ['uniform int PaDiagnosticLightingMode;':
+                     'const int PaDiagnosticLightingMode = 1;']],
+        [name: 'cloud_atmosphere_volume_t194_slices16',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_FIELD_SLICES 16'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+        [name: 'cloud_atmosphere_volume_t194_slices32',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_FIELD_SLICES 32'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+        [name: 'cloud_atmosphere_volume_t194_slices64',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_FIELD_SLICES 64'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
 
         // T192. The closed-form ownership bound as classification triage.
@@ -1611,6 +1647,11 @@ publishing {
 
 if (!hasGithubPackagesCredentials) {
     logger.lifecycle("GitHub package credentials not set; skipping private GitHub Maven repositories.")
+}
+tasks.register('runSimpleClouds') {
+    group = 'project atmosphere'
+    description = 'Runs the Minecraft client with Simple Clouds and its required runtime dependencies.'
+    dependsOn tasks.named('runClient')
 }
 
 

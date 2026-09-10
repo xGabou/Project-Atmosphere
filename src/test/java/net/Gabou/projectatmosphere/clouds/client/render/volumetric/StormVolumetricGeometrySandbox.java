@@ -1513,7 +1513,12 @@ public final class StormVolumetricGeometrySandbox {
         int maskDepth = 0;
         for (int index = 0; index < lines.length; index++) {
             String line = lines[index].trim();
-            if (line.startsWith("#ifdef PA_RAIN_MASK_OUTPUT")) {
+            // T194 adds the slice oracle on the same reasoning: its
+            // accumulator exists only so the compiler cannot fold the
+            // slices away, and the block is absent from every program
+            // that does not define the macro.
+            if (line.startsWith("#ifdef PA_RAIN_MASK_OUTPUT")
+                    || line.startsWith("#ifdef PA_ARM_FIELD_SLICES")) {
                 maskDepth++;
                 continue;
             }
@@ -1541,7 +1546,7 @@ public final class StormVolumetricGeometrySandbox {
                             + " is not guarded by paWorkloadCaptureActive(): " + line);
         }
         require(maskDepth == 0,
-                "T188 rain-mask #ifdef blocks are unbalanced in the shader source");
+                "T188/T194 diagnostic #ifdef blocks are unbalanced in the shader source");
         require(mutations >= 10,
                 "T123 workload counters were not found; the instrumentation check is vacuous");
         String guard = functionBlock(shader, "bool paWorkloadCaptureActive()");
