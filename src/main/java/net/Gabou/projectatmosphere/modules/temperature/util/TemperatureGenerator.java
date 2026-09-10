@@ -70,6 +70,8 @@ public class TemperatureGenerator {
 
         float seaLevelC = toCelsiusSeaLevel(biomeId, base.baseTemp, base.currentSeason);
         float altitudeBase = seaLevelC + (chunkPos.getY() - SEA_LEVEL) * LAPSE_RATE;
+        altitudeBase = (float) net.Gabou.projectatmosphere.api.climate.RuntimeClimateBridge.initialTemperature(
+                level, chunkPos.getX(), chunkPos.getZ(), altitudeBase);
 
         float randomAmp = isTropicalBiome(biomeId, level, 4f, 8f);
         float fluctuationAmp = isTropicalBiome(biomeId, level, 2f, 4f);

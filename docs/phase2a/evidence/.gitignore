@@ -1,0 +1,2 @@
+# Build output remains local; build_summary.json retains hashes and results.
+*.log
