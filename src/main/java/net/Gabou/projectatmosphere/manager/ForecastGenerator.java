@@ -224,7 +224,7 @@ public class ForecastGenerator {
         BiomeSource biomeSource = AsyncAtmosphereService.callOnMainThread(
                 () -> level.getChunkSource().getGenerator().getBiomeSource()
         );
-        BiomeSampler sampler = new BiomeSampler(ProjectAtmosphere.seed, level.registryAccess(), biomeSource);
+        BiomeSampler sampler = new BiomeSampler(level, biomeSource);
         Map<ResourceLocation, BiomeStats> statsByBiome = new HashMap<>();
         int samplesPerAxis = (radius * 2) / SAMPLE_STEP + 1;
         int sampleColumn = 0;
