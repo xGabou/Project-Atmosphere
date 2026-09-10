@@ -84,6 +84,7 @@ public final class VolumetricCloudRenderHook {
         return "volumetricActive=" + isActive()
                 + " status=" + lastStatus
                 + " cells=" + ClientCloudCellCache.trackedCellCount()
+                + " cloudProgram=" + VolumetricCloudRenderer.lastProgram().serializedName()
                 + " raymarchGpuMs=" + VolumetricCloudRenderer.lastGpuMilliseconds()
                 + " governorScale=" + VolumetricCloudRenderer.governorStepScale()
                 + " cloudlets[" + lastCloudletBudgetStats.summary() + "]"
@@ -140,6 +141,17 @@ public final class VolumetricCloudRenderHook {
                         "[VolumetricClouds] render exception; volumetric pass disabled for this session", throwable);
             }
         }
+    }
+
+    /**
+     * Frames the volumetric pass has actually presented. The capture and
+     * autorun drivers run on the client tick, which is 20 Hz and independent of
+     * how long a frame takes; at the resolution ladder's most expensive arm a
+     * frame costs over a second, so a tick-counted settle window can elapse
+     * before a single new frame has been drawn.
+     */
+    public static long presentedFrames() {
+        return frameCounter;
     }
 
     private static void renderFrame(RenderLevelStageEvent event, Minecraft minecraft, ClientLevel level) {
@@ -421,9 +433,12 @@ public final class VolumetricCloudRenderHook {
             CameraCloudDensityTracker.update(0.0F);
         }
         RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
+        StormT135PerformanceProfile.observeFrame(mainTarget.width, mainTarget.height);
+        VolumetricCloudFrameDiagnostics.tryCaptureStormProductionRayTrace(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryCaptureStormMaterialTrace(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryCaptureStormWorkload(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryCaptureStormReferenceImage(cloudTarget);
+        VolumetricCloudFrameDiagnostics.tryCaptureStormMovingCamera(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryDispatchStabilityCapture(
                 cloudTarget,
                 sceneDepth,
@@ -485,6 +500,7 @@ public final class VolumetricCloudRenderHook {
                 + " regionalSource=" + (renderingFields
                         ? "disabled_for_fields"
                         : (regionalCoverage > 0.01F ? "enabled" : "none"))
+                + " cloudProgram=" + VolumetricCloudRenderer.lastProgram().serializedName()
                 + " debug[depthComposite=" + VolumetricCloudDebugConfig.depthCompositeEnabled()
                 + " sceneRayLimit=" + VolumetricCloudDebugConfig.sceneRayLimitEnabled()
                 + " coveragePretest=" + VolumetricCloudDebugConfig.coveragePretestEnabled()

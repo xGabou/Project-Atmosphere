@@ -127,6 +127,32 @@ public final class VolumetricCloudFrameDiagnostics {
         return StormWorkloadRuntimeCapture.request(view);
     }
 
+    /** T136: the counter readback for the cell just measured, or null. */
+    public static String stormWorkloadResultLine() {
+        StormWorkloadRuntimeCapture.WorkloadResult result =
+                StormWorkloadRuntimeCapture.latestResult();
+        return result == null ? null : result.format();
+    }
+
+    /**
+     * T150: cloud density evaluations from the most recent completed workload
+     * readback, or a negative value when there is none. The visibility guard
+     * uses this as its authoritative "the march really produced cloud" signal.
+     */
+    public static double stormWorkloadCloudDensityCalls() {
+        StormWorkloadRuntimeCapture.WorkloadResult result =
+                StormWorkloadRuntimeCapture.latestResult();
+        return result == null ? -1.0D : result.cloudDensityCalls();
+    }
+
+    public static void abortStormWorkloadCapture() {
+        StormWorkloadRuntimeCapture.abort("driver_timeout");
+    }
+
+    public static boolean stormWorkloadActive() {
+        return StormWorkloadRuntimeCapture.active();
+    }
+
     public static String stormWorkloadLatest() {
         return StormWorkloadRuntimeCapture.latest();
     }
@@ -147,12 +173,53 @@ public final class VolumetricCloudFrameDiagnostics {
         StormReferenceImageCapture.capture(cloudTarget);
     }
 
+    /**
+     * T152: advances the moving-camera route and measures the frame it just
+     * drew. Inert unless the route is running, which only its marker starts.
+     */
+    public static void tryCaptureStormMovingCamera(RenderTarget cloudTarget) {
+        StormT152MovingCameraFixture.capture(cloudTarget);
+    }
+
     public static void tickT132AutoDriver() {
         StormT132AutoDriver.tick();
     }
 
     public static void tryCaptureStormMaterialTrace(RenderTarget cloudTarget) {
         StormMaterialRuntimeTrace.capture(cloudTarget);
+    }
+
+    public static void tryCaptureStormProductionRayTrace(RenderTarget cloudTarget) {
+        StormProductionRayTrace.capture(cloudTarget);
+    }
+
+    /**
+     * T098 production ray trace. Each requested pixel is traced twice: arm A is
+     * unmodified production, arm B disables only the outer weather-gated
+     * empty-space skip.
+     */
+    public static String requestStormProductionRayTrace(
+            String setLabel,
+            java.util.List<int[]> pixels,
+            java.util.List<String> labels,
+            int frameWidth,
+            int frameHeight) {
+        java.util.List<StormProductionRayTrace.Pixel> targets = new java.util.ArrayList<>();
+        for (int index = 0; index < pixels.size(); index++) {
+            int[] pixel = pixels.get(index);
+            targets.add(new StormProductionRayTrace.Pixel(
+                    index < labels.size() ? labels.get(index) : ("pixel" + index),
+                    pixel[0], pixel[1]));
+        }
+        return StormProductionRayTrace.request(setLabel, targets, frameWidth, frameHeight);
+    }
+
+    public static String stormProductionRayTraceLatest() {
+        return StormProductionRayTrace.latest();
+    }
+
+    public static boolean stormProductionRayTraceActive() {
+        return StormProductionRayTrace.active();
     }
 
     public static String beginStormPerformanceBaseline(double x, double y, double z) {

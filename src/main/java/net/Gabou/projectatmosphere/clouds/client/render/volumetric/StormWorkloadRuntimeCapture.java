@@ -10,13 +10,13 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * T123's short, on-demand workload readback. Two diagnostic frames encode
+ * T123's short, on-demand workload readback. Diagnostic frames encode
  * integer per-pixel counter channels; their target-wide sum is the actual
  * executed work for that rendered frame. FINAL rendering never enters this
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 2;
+    private static final int STAGES = 44;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -56,7 +56,8 @@ final class StormWorkloadRuntimeCapture {
         latestResult = null;
         long token = CAPTURE_SEQUENCE.incrementAndGet();
         active = new Request(view.trim().toLowerCase(Locale.ROOT), token);
-        latest = "acquiring view=" + active.view + " captureToken=" + token + " stage=0/2";
+        latest = "acquiring view=" + active.view + " captureToken=" + token
+                + " stage=0/" + STAGES;
         VolumetricCloudRenderer.invalidateHistory();
         return new CaptureRequest(latest, token);
     }
@@ -65,11 +66,76 @@ final class StormWorkloadRuntimeCapture {
         return active != null;
     }
 
+    /**
+     * Abandons an in-flight capture and drops any partial values. A capture the
+     * caller has given up on must not stay active: the next request would be
+     * refused as busy and the stale request would then finish its remaining
+     * stages from frames rendered under a different arm, producing a result
+     * stitched from several configurations.
+     */
+    static synchronized void abort(String reason) {
+        Request request = active;
+        if (request == null) {
+            return;
+        }
+        active = null;
+        latestResult = null;
+        latest = "capture_abandoned:view=" + request.view
+                + " captureToken=" + request.token
+                + " stage=" + request.stage + "/" + STAGES
+                + " reason=" + reason;
+        VolumetricCloudRenderer.invalidateHistory();
+    }
+
     static VolumetricCloudRaymarchDebugView view() {
         Request request = active;
-        return request != null && request.stage == 1
-                ? VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SECONDARY
-                : VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
+        int stage = request == null ? 0 : request.stage;
+        return switch (stage) {
+            case 1 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SECONDARY;
+            case 2 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_TERTIARY;
+            case 3 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_QUATERNARY;
+            case 4 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_QUINARY;
+            case 5 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_DISTANCE;
+            case 6 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_STATUS;
+            case 7 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_STEPS;
+            case 8 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_DENSITY;
+            case 9 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_DESCRIPTOR;
+            case 10 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_LIGHT;
+            case 11 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_DETAIL;
+            case 12 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LIGHT_ATTRIBUTION;
+            case 13 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DETAIL_ATTRIBUTION;
+            case 14 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY_DENSITY_A;
+            case 15 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY_DENSITY_B;
+            case 16 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_A;
+            case 17 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_B;
+            case 18 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_C;
+            case 19 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LOBE_A;
+            case 20 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LOBE_B;
+            case 21 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DOMINANCE_A;
+            case 22 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DOMINANCE_B;
+            case 23 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_CONSUMER_A;
+            case 24 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_CONSUMER_B;
+            case 25 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_CONSUMER_C;
+            case 26 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SCAN_A;
+            case 27 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SCAN_B;
+            case 28 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SCAN_C;
+            case 29 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_A;
+            case 30 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_B;
+            case 31 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_C;
+            case 32 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_A;
+            case 33 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_B;
+            case 34 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_C;
+            case 35 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_D;
+            case 36 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_E;
+            case 37 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_F;
+            case 38 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_A;
+            case 39 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_B;
+            case 40 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_C;
+            case 41 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_D;
+            case 42 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_E;
+            case 43 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_F;
+            default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
+        };
     }
 
     static String latest() {
@@ -118,7 +184,8 @@ final class StormWorkloadRuntimeCapture {
                 VolumetricCloudRenderer.invalidateHistory();
             } else {
                 latest = "acquiring view=" + request.view
-                        + " captureToken=" + request.token + " stage=1/2";
+                        + " captureToken=" + request.token
+                        + " stage=" + request.stage + "/" + STAGES;
             }
         } catch (RuntimeException exception) {
             // A failed capture must leave no result behind. Previously the last
@@ -153,7 +220,48 @@ final class StormWorkloadRuntimeCapture {
             return new WorkloadResult(token, view, width, height,
                     values[1][3], values[0][3],
                     values[0][0], values[0][1], values[0][2],
-                    values[1][0], values[1][1], values[1][2]);
+                    values[1][0], values[1][1], values[1][2],
+                    values[2][0], values[2][1], values[2][2], values[2][3],
+                    values[3][0], values[3][1], values[3][2], values[3][3],
+                    values[4][0], values[4][1], values[4][2], values[4][3],
+                    values[5][0], values[5][1], values[5][2], values[5][3],
+                    values[6][0], values[6][1], values[6][2], values[6][3],
+                    ThresholdWork.of(values[7]),
+                    ThresholdWork.of(values[8]),
+                    ThresholdWork.of(values[9]),
+                    ThresholdWork.of(values[10]),
+                    ThresholdWork.of(values[11]),
+                    values[12][0], values[12][1], values[12][2], values[12][3],
+                    values[13][0], values[13][1], values[13][2], values[13][3],
+                    values[14][0], values[14][1], values[14][2], values[14][3],
+                    values[15][0], values[15][1], values[15][2], values[15][3],
+                    values[16][0], values[16][1], values[16][2], values[16][3],
+                    values[17][0], values[17][1], values[17][2], values[17][3],
+                    values[18][0], values[18][1],
+                    values[19][0], values[19][1], values[19][2], values[19][3],
+                    values[20][0], values[20][1],
+                    values[21][0], values[21][1], values[21][2], values[21][3],
+                    values[22][0], values[22][1], values[22][2],
+                    values[23][0], values[23][1], values[23][2], values[23][3],
+                    values[24][0], values[24][1], values[24][2], values[24][3],
+                    values[25][0],
+                    values[26][0], values[26][1], values[26][2], values[26][3],
+                    values[27][0], values[27][1], values[27][2], values[27][3],
+                    values[28][0],
+                    values[29][0], values[29][1], values[29][2], values[29][3],
+                    values[30][0], values[30][1], values[30][2], values[30][3],
+                    values[31][0], values[31][1],
+                    values[32][0], values[32][1], values[32][2], values[32][3],
+                    values[33][0],
+                    values[34][0], values[34][1], values[34][2], values[34][3],
+                    values[35][0],
+                    values[36][0], values[36][1], values[36][2], values[36][3],
+                    values[37][0], values[37][1],
+                    values[38][0], values[38][1],
+                    values[38][2], values[38][3],
+                    values[39][0], values[39][1], values[39][2], values[39][3],
+                    FieldProbe.of(values[40], values[41]),
+                    FieldCertainty.of(values[42], values[43]));
         }
     }
 
@@ -164,12 +272,198 @@ final class StormWorkloadRuntimeCapture {
         }
     }
 
+    /**
+     * T189. The rain field measured against the exact function, and the test of
+     * whether the field texture is filtered at all.
+     *
+     * <p>The filter test exists because T188 attributed its false rain to
+     * bilinear interpolation of a boolean channel. That explanation requires
+     * the texture to actually interpolate, and RGBA32F linear filtering is not
+     * universally honoured; a driver that declines it returns the nearest texel
+     * and the diagnosis is simply wrong. Zero fractional samples over a grid of
+     * sub-texel-offset columns settles it either way.
+     */
+    /**
+     * T190. The attribution of the field's column disagreements, and the census
+     * of what the build could prove safe.
+     *
+     * <p>The attribution exists because a classifier has to be designed against
+     * the actual cause. T188 designed against a cause it had assumed, and the
+     * fix changed zero pixels.
+     */
+    record FieldCertainty(
+            double ownershipDiffers,
+            double supportCutoffDiffers,
+            double attachDiffers,
+            double attributionSamples,
+            double mixedCells,
+            double ownedCells,
+            double provablyDryCells,
+            double censusSamples
+    ) {
+        static final FieldCertainty ZERO =
+                new FieldCertainty(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+
+        static FieldCertainty of(double[] why, double[] census) {
+            return new FieldCertainty(
+                    why[0], why[1], why[2], why[3],
+                    census[0], census[1], census[2], census[3]);
+        }
+    }
+
+    record FieldProbe(
+            double supportErrorSum,
+            double attachErrorSum,
+            double ownershipDisagreements,
+            double bothOwnSamples,
+            double fractionalOwnSamples,
+            double ownFilterDeltaSum,
+            double supportFilterDeltaSum,
+            double filterSamples
+    ) {
+        static final FieldProbe ZERO =
+                new FieldProbe(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+
+        static FieldProbe of(double[] error, double[] filter) {
+            return new FieldProbe(
+                    error[0], error[1], error[2], error[3],
+                    filter[0], filter[1], filter[2], filter[3]);
+        }
+    }
+
     record WorkloadResult(
             long captureToken, String view, int width, int height,
             double conservativeDescriptorRejects, double avoidedDescriptorTextureFetches,
             double primaryRaySteps, double descriptorEvaluations, double descriptorTextureFetches,
-            double lightMarchDensityEvaluations, double emptySpaceRejects, double earlyTerminations
+            double lightMarchDensityEvaluations, double emptySpaceRejects, double earlyTerminations,
+            double directStormShapeCalls, double groupFieldCalls, double lobesVisited,
+            double cloudDensityCalls,
+            double densityZeroCalls, double segmentTestCalls, double segmentTestPositive,
+            double boxBoundRejects, double detailOctaveEvaluations,
+            double descriptorCandidateRanks, double descriptorGroupsEntered,
+            double descriptorUnionContributors,
+            double oracleSkippedDistance, double oraclePreCloudDistance,
+            double oracleHoleDistance, double oraclePostCloudDistance,
+            double oracleSkipEvents, double oracleIntervalsSeen,
+            double oracleOverflowPixels, double oracleOpticalExits,
+            ThresholdWork stepsAfterAlpha, ThresholdWork densityAfterAlpha,
+            ThresholdWork descriptorAfterAlpha, ThresholdWork lightAfterAlpha,
+            ThresholdWork detailAfterAlpha,
+            double lightConeMarches, double lightConeTaps,
+            double lightConeEarlyOuts, double lightCheapProbes,
+            double detailFetchPrimary, double detailFetchLight,
+            double detailFetchSecondOctave, double lightMarchBelowFloor,
+            double primaryDensityCalls, double primaryDensityZero,
+            double primaryDensityNegligible, double primaryDensityLow,
+            double primaryDensityMedium, double primaryDensityHigh,
+            double primaryMaterialRuns, double primaryZeroRuns,
+            double reuseTapsClassified, double reuseTapsEmpty,
+            double reuseSufficient, double reusePartial,
+            double reuseWrong, double reuseGroupsEnteredInTaps,
+            double reuseSuffOrd1, double reuseSuffOrd2,
+            double reuseSuffOrd3, double reuseSuffOrd4,
+            double lobeExactSdf, double lobeExactSdfNoChange,
+            double lobeVisitsLight, double lobeExactSdfLight,
+            double lobeCheapRejectLight, double lobeDominanceRejects,
+            double domChangeZero, double domChangeBelowEpsilon,
+            double domChangeTiny, double domChangeMeaningful,
+            double domZeroLight, double domZeroPrimary,
+            double domWouldRejectWithExactBlend,
+            double probeCalls, double probeGroupWalks, double probeExactSdf,
+            double bracketCalls, double bracketGroupWalks, double bracketExactSdf,
+            double otherCalls, double otherGroupWalks, double otherExactSdf,
+            double refineEvents, double scanEvents, double scanFoundMaterial,
+            double scanCapReached,
+            double scanProbes1To2, double scanProbes3To4,
+            double scanProbes5To8, double scanProbes9To16,
+            double scanWastedProbes,
+            double shapePrimary, double shapeLight, double shapeProbe,
+            double shapeBracket,
+            double shapeRefine, double shapeRainSegment, double shapeRainShaft,
+            double shapeCamera,
+            double shapeLightForward, double shapeUntagged,
+            double rainSupportCalls, double rainSupportPruned,
+            double rainSameExactXZ, double rainSameBlock,
+            double rainSameTile8,
+            double rainPrecipLow, double rainOutsideCircle,
+            double rainOutsideAabb, double rainOutsideExact,
+            double rainAcceptedZeroSupport,
+            double rainSegCalls, double rainSegSupport0, double rainSegSupport1,
+            double rainSegHeightSkip,
+            double rainSegTrueAt0, double rainSegTrueAt1,
+            // T188. Ray-side field use, then the per-cell build cost.
+            double rainFieldFetches, double rainFieldFallbacks,
+            // T190. Lookups the field answered, and those that paid the
+            // exact traversal because the cell was not provably uniform.
+            double rainFieldSafeHits, double rainFieldMixedFallbacks,
+            double fieldCellShapeCalls, double fieldCellGroupWalks,
+            double fieldCellLobeVisits, double fieldCellExactSdf,
+            // T189. The field measured against the function it replaces, and
+            // whether the texture is filtered at all. Grouped because the
+            // record sits at the JVM's 255-parameter ceiling.
+            FieldProbe fieldProbe,
+            // T190. Why columns disagree, and how much of the field the
+            // build could prove safe.
+            FieldCertainty fieldCertainty
     ) {
+        /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
+        WorkloadResult(
+                long captureToken, String view, int width, int height,
+                double conservativeDescriptorRejects, double avoidedDescriptorTextureFetches,
+                double primaryRaySteps, double descriptorEvaluations,
+                double descriptorTextureFetches, double lightMarchDensityEvaluations,
+                double emptySpaceRejects, double earlyTerminations,
+                double directStormShapeCalls, double groupFieldCalls, double lobesVisited,
+                double cloudDensityCalls, double densityZeroCalls, double segmentTestCalls,
+                double segmentTestPositive, double boxBoundRejects,
+                double detailOctaveEvaluations) {
+            this(captureToken, view, width, height,
+                    conservativeDescriptorRejects, avoidedDescriptorTextureFetches,
+                    primaryRaySteps, descriptorEvaluations, descriptorTextureFetches,
+                    lightMarchDensityEvaluations, emptySpaceRejects, earlyTerminations,
+                    directStormShapeCalls, groupFieldCalls, lobesVisited, cloudDensityCalls,
+                    densityZeroCalls, segmentTestCalls, segmentTestPositive,
+                    boxBoundRejects, detailOctaveEvaluations,
+                    0.0D, 0.0D, 0.0D,
+                    0.0D, 0.0D, 0.0D, 0.0D,
+                    0.0D, 0.0D, 0.0D, 0.0D,
+                    ThresholdWork.ZERO, ThresholdWork.ZERO, ThresholdWork.ZERO,
+                    ThresholdWork.ZERO, ThresholdWork.ZERO,
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T175 primary density histogram, absent from the legacy shape.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T177 reuse validity, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T178 lobe attribution, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T179 dominance histogram, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T180 consumer attribution, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T181 scan distribution, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T182 shape attribution, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T184 rain-support reuse, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T185 ownership prune diagnostics, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T186 segment-sample split, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T188 rain-field use and per-cell build cost, plus T190's
+                    // safe/fallback split, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D,
+                    0.0D, 0.0D, 0.0D, 0.0D,
+                    // T189 field probe, likewise absent.
+                    FieldProbe.ZERO,
+                    // T190 certainty census, likewise absent.
+                    FieldCertainty.ZERO);
+        }
+
+        private static String ratio(double numerator, double denominator) {
+            return denominator <= 0.0D ? "n/a" : String.format("%.4f", numerator / denominator);
+        }
+
         String format() {
             return "T123 workload view=" + view
                     + " captureToken=" + captureToken
@@ -181,7 +475,380 @@ final class StormWorkloadRuntimeCapture {
                     + " descriptorTextureFetches=" + fmt(descriptorTextureFetches)
                     + " lightMarchDensityEvaluations=" + fmt(lightMarchDensityEvaluations)
                     + " emptySpaceRejects=" + fmt(emptySpaceRejects)
-                    + " earlyTerminations=" + fmt(earlyTerminations);
+                    + " earlyTerminations=" + fmt(earlyTerminations)
+                    + " directStormShapeCalls=" + fmt(directStormShapeCalls)
+                    + " groupFieldCalls=" + fmt(groupFieldCalls)
+                    + " lobesVisited=" + fmt(lobesVisited)
+                    + " cloudDensityCalls=" + fmt(cloudDensityCalls)
+                    + " densityZeroCalls=" + fmt(densityZeroCalls)
+                    + " segmentTestCalls=" + fmt(segmentTestCalls)
+                    + " segmentTestPositive=" + fmt(segmentTestPositive)
+                    + " boxBoundRejects=" + fmt(boxBoundRejects)
+                    + " detailOctaveEvaluations=" + fmt(detailOctaveEvaluations)
+                    + " lightEvaluationsPerPixel=" + perPixel(lightMarchDensityEvaluations)
+                    + " detailOctaveEvaluationsPerPixel=" + perPixel(detailOctaveEvaluations)
+                    // T168. The traversal question is how many descriptors enter
+                    // the loop versus how many change the answer, so both are
+                    // reported per density call rather than per pixel.
+                    + " descriptorCandidateRanks=" + fmt(descriptorCandidateRanks)
+                    + " descriptorGroupsEntered=" + fmt(descriptorGroupsEntered)
+                    + " descriptorUnionContributors=" + fmt(descriptorUnionContributors)
+                    + " oracleSkippedDistance=" + fmt(oracleSkippedDistance)
+                    + " oraclePreCloudDistance=" + fmt(oraclePreCloudDistance)
+                    + " oracleHoleDistance=" + fmt(oracleHoleDistance)
+                    + " oraclePostCloudDistance=" + fmt(oraclePostCloudDistance)
+                    + " oraclePostOpacityDistance=" + fmt(oraclePostOpacityDistance())
+                    + " oracleSkipEvents=" + fmt(oracleSkipEvents)
+                    + " oracleIntervalsSeen=" + fmt(oracleIntervalsSeen)
+                    + " oracleOverflowPixels=" + fmt(oracleOverflowPixels)
+                    + " oracleOpticalExits=" + fmt(oracleOpticalExits)
+                    + " stepsAfterAlpha=" + stepsAfterAlpha.format()
+                    + " densityAfterAlpha=" + densityAfterAlpha.format()
+                    + " descriptorAfterAlpha=" + descriptorAfterAlpha.format()
+                    + " lightAfterAlpha=" + lightAfterAlpha.format()
+                    + " detailAfterAlpha=" + detailAfterAlpha.format()
+                    // T169. Taps alone cannot separate "more material sampled"
+                    // from "more lighting per sample", so marches and taps are
+                    // reported apart, and detail is split by the path that
+                    // asked for it.
+                    + " lightConeMarches=" + fmt(lightConeMarches)
+                    + " lightConeTaps=" + fmt(lightConeTaps)
+                    + " lightConeEarlyOuts=" + fmt(lightConeEarlyOuts)
+                    + " lightCheapProbes=" + fmt(lightCheapProbes)
+                    + " lightMarchBelowFloor=" + fmt(lightMarchBelowFloor)
+                    + " tapsPerConeMarch=" + ratio(lightConeTaps, lightConeMarches)
+                    + " coneMarchesPerDensityCall=" + ratio(lightConeMarches, cloudDensityCalls)
+                    + " detailFetchPrimary=" + fmt(detailFetchPrimary)
+                    + " detailFetchLight=" + fmt(detailFetchLight)
+                    + " primaryDensityCalls=" + fmt(primaryDensityCalls)
+                    + " primaryDensityZero=" + fmt(primaryDensityZero)
+                    + " primaryDensityNegligible=" + fmt(primaryDensityNegligible)
+                    + " primaryDensityLow=" + fmt(primaryDensityLow)
+                    + " primaryDensityMedium=" + fmt(primaryDensityMedium)
+                    + " primaryDensityHigh=" + fmt(primaryDensityHigh)
+                    + " primaryMaterialRuns=" + fmt(primaryMaterialRuns)
+                    + " primaryZeroRuns=" + fmt(primaryZeroRuns)
+                    // Derived here so the report cannot restate them wrongly:
+                    // T174 conflated primary and lighting density calls and
+                    // reported 25.37 per pixel when the primary march makes
+                    // 11.28. These ratios are primary-only by construction.
+                    + " primaryDensityPerPixel="
+                    + ratio(primaryDensityCalls, (double) width * (double) height)
+                    + " materialFraction="
+                    + ratio(primaryDensityLow + primaryDensityMedium + primaryDensityHigh,
+                            primaryDensityCalls)
+                    + " emptyFraction="
+                    + ratio(primaryDensityZero + primaryDensityNegligible, primaryDensityCalls)
+                    + " meanMaterialRun="
+                    + ratio(primaryDensityLow + primaryDensityMedium + primaryDensityHigh,
+                            primaryMaterialRuns)
+                    + " meanEmptyRun="
+                    + ratio(primaryDensityZero + primaryDensityNegligible, primaryZeroRuns)
+                    + " detailFetchSecondOctave=" + fmt(detailFetchSecondOctave)
+                    + " detailFetchLightShare=" + ratio(detailFetchLight,
+                            detailFetchPrimary + detailFetchLight)
+                    // T177. Reuse validity, derived here for the same reason
+                    // the primary ratios are: so a report cannot restate them
+                    // wrongly. "Classified" counts only taps that reached the
+                    // candidate walk and resolved at least one contributing
+                    // group; taps that resolved none are counted separately
+                    // rather than being scored as trivially reusable.
+                    + " reuseTapsClassified=" + fmt(reuseTapsClassified)
+                    + " reuseTapsEmpty=" + fmt(reuseTapsEmpty)
+                    + " reuseSufficient=" + fmt(reuseSufficient)
+                    + " reusePartial=" + fmt(reusePartial)
+                    + " reuseWrong=" + fmt(reuseWrong)
+                    + " reuseGroupsEnteredInTaps=" + fmt(reuseGroupsEnteredInTaps)
+                    + " reuseSuffOrd1=" + fmt(reuseSuffOrd1)
+                    + " reuseSuffOrd2=" + fmt(reuseSuffOrd2)
+                    + " reuseSuffOrd3=" + fmt(reuseSuffOrd3)
+                    + " reuseSuffOrd4=" + fmt(reuseSuffOrd4)
+                    + " reuseValidFraction="
+                    + ratio(reuseSufficient, reuseTapsClassified)
+                    + " reusePartialFraction="
+                    + ratio(reusePartial, reuseTapsClassified)
+                    + " reuseWrongFraction="
+                    + ratio(reuseWrong, reuseTapsClassified)
+                    + " groupsPerLightTap="
+                    + ratio(reuseGroupsEnteredInTaps, lightConeTaps)
+                    // T178. A lobe VISIT is not an expensive lobe EVALUATION.
+                    // Production already rejects some visits cheaply through
+                    // the T121 bound; only the lobes that pay a full exact SDF
+                    // and then fail to move the union are opportunity.
+                    + " lobeExactSdf=" + fmt(lobeExactSdf)
+                    + " lobeExactSdfNoChange=" + fmt(lobeExactSdfNoChange)
+                    + " lobeVisitsLight=" + fmt(lobeVisitsLight)
+                    + " lobeExactSdfLight=" + fmt(lobeExactSdfLight)
+                    + " lobeCheapRejectLight=" + fmt(lobeCheapRejectLight)
+                    + " lobeDominanceRejects=" + fmt(lobeDominanceRejects)
+                    // T179. What each exact SDF did to the union. "Zero" is the
+                    // strict ceiling: those lobes could have been skipped with
+                    // no image consequence at all.
+                    + " domChangeZero=" + fmt(domChangeZero)
+                    + " domChangeBelowEpsilon=" + fmt(domChangeBelowEpsilon)
+                    + " domChangeTiny=" + fmt(domChangeTiny)
+                    + " domChangeMeaningful=" + fmt(domChangeMeaningful)
+                    + " domZeroLight=" + fmt(domZeroLight)
+                    + " domZeroPrimary=" + fmt(domZeroPrimary)
+                    + " domWouldRejectWithExactBlend="
+                    + fmt(domWouldRejectWithExactBlend)
+                    + " domZeroFraction=" + ratio(domChangeZero, lobeExactSdf)
+                    + " domZeroPerGroupWalk=" + ratio(domChangeZero, groupFieldCalls)
+                    + " domExactBlendGainPerGroupWalk="
+                    + ratio(domWouldRejectWithExactBlend, groupFieldCalls)
+                    // T180. Direct consumer attribution. T175 derived the
+                    // "48% segment/probe/quadrature" class by subtraction;
+                    // these are tagged at the real call sites instead, so the
+                    // buckets are disjoint and sum back to the total.
+                    + " probeCalls=" + fmt(probeCalls)
+                    + " probeGroupWalks=" + fmt(probeGroupWalks)
+                    + " probeExactSdf=" + fmt(probeExactSdf)
+                    + " bracketCalls=" + fmt(bracketCalls)
+                    + " bracketGroupWalks=" + fmt(bracketGroupWalks)
+                    + " bracketExactSdf=" + fmt(bracketExactSdf)
+                    + " otherCalls=" + fmt(otherCalls)
+                    + " otherGroupWalks=" + fmt(otherGroupWalks)
+                    + " otherExactSdf=" + fmt(otherExactSdf)
+                    + " probeWalkShare=" + ratio(probeGroupWalks, groupFieldCalls)
+                    + " bracketWalkShare=" + ratio(bracketGroupWalks, groupFieldCalls)
+                    + " otherWalkShare=" + ratio(otherGroupWalks, groupFieldCalls)
+                    + " probeSdfShare=" + ratio(probeExactSdf, lobeExactSdf)
+                    + " bracketSdfShare=" + ratio(bracketExactSdf, lobeExactSdf)
+                    // T181. The probe cap is 16 but the loop exits early, so
+                    // these say whether 16 ever binds - and how much of the
+                    // scan is duplicated by the fine march that follows it.
+                    + " refineEvents=" + fmt(refineEvents)
+                    + " scanEvents=" + fmt(scanEvents)
+                    + " scanFoundMaterial=" + fmt(scanFoundMaterial)
+                    + " scanCapReached=" + fmt(scanCapReached)
+                    + " scanProbes1To2=" + fmt(scanProbes1To2)
+                    + " scanProbes3To4=" + fmt(scanProbes3To4)
+                    + " scanProbes5To8=" + fmt(scanProbes5To8)
+                    + " scanProbes9To16=" + fmt(scanProbes9To16)
+                    + " scanWastedProbes=" + fmt(scanWastedProbes)
+                    + " probesPerScan=" + ratio(probeCalls, scanEvents)
+                    + " scanCapBindFraction=" + ratio(scanCapReached, scanEvents)
+                    + " scanMaterialFraction=" + ratio(scanFoundMaterial, scanEvents)
+                    + " wastedProbeFraction=" + ratio(scanWastedProbes, probeCalls)
+                    // T182. directStormShape by consumer. shapeUntagged must be
+                    // zero and shapeTagged must equal directStormShapeCalls, or
+                    // the attribution is incomplete and no share derived from it
+                    // can be trusted - which is exactly how T180 went wrong.
+                    + " shapePrimary=" + fmt(shapePrimary)
+                    + " shapeLight=" + fmt(shapeLight)
+                    + " shapeProbe=" + fmt(shapeProbe)
+                    + " shapeBracket=" + fmt(shapeBracket)
+                    + " shapeRefine=" + fmt(shapeRefine)
+                    + " shapeRainSegment=" + fmt(shapeRainSegment)
+                    + " shapeRainShaft=" + fmt(shapeRainShaft)
+                    + " shapeCamera=" + fmt(shapeCamera)
+                    + " shapeLightForward=" + fmt(shapeLightForward)
+                    + " shapeUntagged=" + fmt(shapeUntagged)
+                    + " shapeTagged=" + fmt(shapePrimary + shapeLight + shapeProbe
+                            + shapeBracket + shapeRefine + shapeRainSegment
+                            + shapeRainShaft + shapeCamera + shapeLightForward)
+                    // T183. The tolerance was half a call, which is stricter than
+                    // the capture can be: each debug view is a separately rendered
+                    // frame, so the totals are sampled from different frames and
+                    // disagree by a fraction of a percent. 0.5% is two orders of
+                    // magnitude above that variance and two orders below the
+                    // smallest consumer ever found (rain shaft, 0.77% at SIDE), so
+                    // it still fails if a real consumer goes missing.
+                    // shapeUntagged stays a strict zero - that is the structural
+                    // check, and this is only the arithmetic one.
+                    + " shapeAccountingResidual="
+                    + fmt(shapePrimary + shapeLight + shapeProbe + shapeBracket
+                            + shapeRefine + shapeRainSegment + shapeRainShaft
+                            + shapeCamera + shapeLightForward + shapeUntagged
+                            - directStormShapeCalls)
+                    + " shapeAccountingResidualFraction="
+                    + ratio(Math.abs(shapePrimary + shapeLight + shapeProbe
+                            + shapeBracket + shapeRefine + shapeRainSegment
+                            + shapeRainShaft + shapeCamera + shapeLightForward
+                            + shapeUntagged - directStormShapeCalls),
+                            directStormShapeCalls)
+                    + " shapeAccountingClosed="
+                    + (shapeUntagged == 0.0D
+                        && Math.abs(shapePrimary + shapeLight + shapeProbe
+                            + shapeBracket + shapeRefine + shapeRainSegment
+                            + shapeRainShaft + shapeCamera + shapeLightForward
+                            + shapeUntagged - directStormShapeCalls)
+                                <= 0.005D * Math.max(1.0D, directStormShapeCalls))
+                    + " shapeRainSegmentShare="
+                    + ratio(shapeRainSegment, directStormShapeCalls)
+                    // T184. localRainSupportAt is a pure function of worldXZ
+                    // within a frame, so these say how much of it is literally
+                    // recomputed - measured against the immediately preceding
+                    // query, which is the only cache shape worth building.
+                    + " rainSupportCalls=" + fmt(rainSupportCalls)
+                    + " rainSupportPruned=" + fmt(rainSupportPruned)
+                    + " rainSameExactXZ=" + fmt(rainSameExactXZ)
+                    + " rainSameBlock=" + fmt(rainSameBlock)
+                    + " rainSameTile8=" + fmt(rainSameTile8)
+                    + " rainPrunedFraction=" + ratio(rainSupportPruned, rainSupportCalls)
+                    + " rainExactReuseFraction="
+                    + ratio(rainSameExactXZ, rainSupportCalls)
+                    + " rainBlockReuseFraction="
+                    + ratio(rainSameBlock, rainSupportCalls)
+                    + " rainTileReuseFraction="
+                    + ratio(rainSameTile8, rainSupportCalls)
+                    // T185. The prune is a conjunct, so each half is counted
+                    // separately: if the precipitation half fails, tightening
+                    // the geometry cannot help no matter how loose it is.
+                    + " rainPrecipLow=" + fmt(rainPrecipLow)
+                    + " rainOutsideCircle=" + fmt(rainOutsideCircle)
+                    + " rainOutsideAabb=" + fmt(rainOutsideAabb)
+                    + " rainOutsideExact=" + fmt(rainOutsideExact)
+                    + " rainAcceptedZeroSupport=" + fmt(rainAcceptedZeroSupport)
+                    + " rainPrecipLowFraction=" + ratio(rainPrecipLow, rainSupportCalls)
+                    + " rainOutsideCircleFraction="
+                    + ratio(rainOutsideCircle, rainSupportCalls)
+                    + " rainOutsideAabbFraction="
+                    + ratio(rainOutsideAabb, rainSupportCalls)
+                    + " rainOutsideExactFraction="
+                    + ratio(rainOutsideExact, rainSupportCalls)
+                    + " rainFalsePositiveFraction="
+                    + ratio(rainAcceptedZeroSupport,
+                            Math.max(1.0D, rainSupportCalls - rainSupportPruned))
+                    // T186. The two-sample rule is an OR with an early return,
+                    // so the second sample is already conditional. These say
+                    // how often it runs at all and how often it is the one
+                    // that finds the rain - which is what a one-sample arm
+                    // would actually remove, and lose.
+                    + " rainSegCalls=" + fmt(rainSegCalls)
+                    + " rainSegSupport0=" + fmt(rainSegSupport0)
+                    + " rainSegSupport1=" + fmt(rainSegSupport1)
+                    + " rainSegHeightSkip=" + fmt(rainSegHeightSkip)
+                    + " rainSegTrueAt0=" + fmt(rainSegTrueAt0)
+                    + " rainSegTrueAt1=" + fmt(rainSegTrueAt1)
+                    + " rainSupportPerSegCall="
+                    + ratio(rainSegSupport0 + rainSegSupport1, rainSegCalls)
+                    + " rainSecondSampleRunFraction="
+                    + ratio(rainSegSupport1, rainSegCalls)
+                    + " rainSecondSampleDecidesFraction="
+                    + ratio(rainSegTrueAt1,
+                            Math.max(1.0D, rainSegTrueAt0 + rainSegTrueAt1))
+                    + " lobeVisitsPerGroupWalk=" + ratio(lobesVisited, groupFieldCalls)
+                    + " exactSdfPerGroupWalk=" + ratio(lobeExactSdf, groupFieldCalls)
+                    + " cheapRejectPerGroupWalk="
+                    + ratio(conservativeDescriptorRejects, groupFieldCalls)
+                    + " contributorsPerGroupWalk="
+                    + ratio(descriptorUnionContributors, groupFieldCalls)
+                    + " wastedSdfPerGroupWalk="
+                    + ratio(lobeExactSdfNoChange, groupFieldCalls)
+                    + " wastedSdfFraction="
+                    + ratio(lobeExactSdfNoChange, lobeExactSdf)
+                    // T188. The structural proof. Fetches are the traversals the
+                    // field removed from the ray; fallbacks are the columns
+                    // outside the field domain that still have to walk, and are
+                    // the honest cost of keeping the answer exact at the edge.
+                    + " rainFieldFetches=" + fmt(rainFieldFetches)
+                    + " rainFieldFallbacks=" + fmt(rainFieldFallbacks)
+                    + " rainFieldFallbackFraction="
+                    + ratio(rainFieldFallbacks,
+                            Math.max(1.0D, rainFieldFetches + rainFieldFallbacks))
+                    // The build side, per cell. Multiplying by the cell count
+                    // gives the generation pass's descriptor work, which is the
+                    // half of the trade a cloud-ray saving alone hides.
+                    + " fieldCellShapeCalls=" + fmt(fieldCellShapeCalls)
+                    + " fieldCellGroupWalks=" + fmt(fieldCellGroupWalks)
+                    + " fieldCellLobeVisits=" + fmt(fieldCellLobeVisits)
+                    + " fieldCellExactSdf=" + fmt(fieldCellExactSdf)
+                    + " fieldCellShapeCallsPerPixel="
+                    + perPixel(fieldCellShapeCalls)
+                    + " fieldCellGroupWalksPerPixel="
+                    + perPixel(fieldCellGroupWalks)
+                    + " fieldCellExactSdfPerPixel="
+                    + perPixel(fieldCellExactSdf)
+                    // T189. Ownership is the channel that failed, so its
+                    // disagreement rate is reported over every sampled column,
+                    // while the two continuous errors are means over the
+                    // columns where a comparison is meaningful at all.
+                    + " fieldOwnershipDisagreements="
+                    + fmt(fieldProbe.ownershipDisagreements())
+                    + " fieldOwnershipDisagreementFraction="
+                    + ratio(fieldProbe.ownershipDisagreements(),
+                            Math.max(1.0D, (double) width * (double) height))
+                    + " fieldBothOwnSamples=" + fmt(fieldProbe.bothOwnSamples())
+                    + " fieldSupportErrorSum=" + fmt(fieldProbe.supportErrorSum())
+                    + " fieldMeanSupportError="
+                    + ratio(fieldProbe.supportErrorSum(),
+                            Math.max(1.0D, (double) width * (double) height))
+                    + " fieldAttachErrorSum=" + fmt(fieldProbe.attachErrorSum())
+                    + " fieldMeanAttachError="
+                    + ratio(fieldProbe.attachErrorSum(),
+                            Math.max(1.0D, fieldProbe.bothOwnSamples()))
+                    // T189. The premise test. Zero fractional samples over a
+                    // grid of sub-texel-offset columns means the texture is not
+                    // being filtered, whatever GL_LINEAR was asked for - and
+                    // then interpolation cannot be the cause of anything.
+                    + " fieldFractionalOwnSamples=" + fmt(fieldProbe.fractionalOwnSamples())
+                    + " fieldFilterSamples=" + fmt(fieldProbe.filterSamples())
+                    + " fieldFractionalOwnFraction="
+                    + ratio(fieldProbe.fractionalOwnSamples(),
+                            Math.max(1.0D, fieldProbe.filterSamples()))
+                    + " fieldOwnFilterDeltaSum=" + fmt(fieldProbe.ownFilterDeltaSum())
+                    + " fieldSupportFilterDeltaSum=" + fmt(fieldProbe.supportFilterDeltaSum())
+                    + " fieldTextureIsFiltered="
+                    + (fieldProbe.ownFilterDeltaSum()
+                            + fieldProbe.supportFilterDeltaSum() > 0.0D)
+                    // T190. What actually causes a column to disagree, so the
+                    // classifier is designed against the measured cause rather
+                    // than an assumed one.
+                    + " whyOwnershipDiffers=" + fmt(fieldCertainty.ownershipDiffers())
+                    + " whySupportCutoffDiffers="
+                    + fmt(fieldCertainty.supportCutoffDiffers())
+                    + " whyAttachDiffers=" + fmt(fieldCertainty.attachDiffers())
+                    + " whySamples=" + fmt(fieldCertainty.attributionSamples())
+                    + " whyOwnershipFraction="
+                    + ratio(fieldCertainty.ownershipDiffers(),
+                            Math.max(1.0D, fieldCertainty.attributionSamples()))
+                    // The census. Sampled over 49.4% of the cells, so a mixed
+                    // FRACTION rather than an exact count.
+                    + " censusMixedCells=" + fmt(fieldCertainty.mixedCells())
+                    + " censusOwnedCells=" + fmt(fieldCertainty.ownedCells())
+                    + " censusProvablyDryCells=" + fmt(fieldCertainty.provablyDryCells())
+                    + " closedFormTriageFraction="
+                    + ratio(fieldCertainty.provablyDryCells(),
+                            Math.max(1.0D, fieldCertainty.censusSamples()))
+                    + " censusSamples=" + fmt(fieldCertainty.censusSamples())
+                    + " mixedCellFraction="
+                    + ratio(fieldCertainty.mixedCells(),
+                            Math.max(1.0D, fieldCertainty.censusSamples()))
+                    // The rate that decides the architecture: what fraction of
+                    // ray lookups the field answered outright.
+                    + " rainFieldSafeHits=" + fmt(rainFieldSafeHits)
+                    + " rainFieldMixedFallbacks=" + fmt(rainFieldMixedFallbacks)
+                    + " fallbackFraction="
+                    + ratio(rainFieldMixedFallbacks,
+                            Math.max(1.0D, rainFieldSafeHits + rainFieldMixedFallbacks))
+                    + " fallbacksPerPixel=" + perPixel(rainFieldMixedFallbacks);
+        }
+
+        double oraclePostOpacityDistance() {
+            return Math.max(0.0D, oracleSkippedDistance
+                    - oraclePreCloudDistance - oracleHoleDistance - oraclePostCloudDistance);
+        }
+
+        private String perPixel(double value) {
+            long pixels = (long) width * (long) height;
+            return pixels <= 0L
+                    ? "n/a"
+                    : String.format(Locale.ROOT, "%.6f", value / (double) pixels);
+        }
+    }
+
+    record ThresholdWork(double alpha50, double alpha90, double alpha95, double alpha98) {
+        private static final ThresholdWork ZERO = new ThresholdWork(0.0D, 0.0D, 0.0D, 0.0D);
+        static ThresholdWork of(double[] values) {
+            return new ThresholdWork(values[0], values[1], values[2], values[3]);
+        }
+
+        String format() {
+            return "[50=" + fmt(alpha50)
+                    + ",90=" + fmt(alpha90)
+                    + ",95=" + fmt(alpha95)
+                    + ",98=" + fmt(alpha98) + "]";
         }
     }
 

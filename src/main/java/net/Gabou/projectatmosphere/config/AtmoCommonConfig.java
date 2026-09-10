@@ -23,12 +23,23 @@ public class AtmoCommonConfig {
         }
     }
 
+    /**
+     * User-facing quality presets.
+     *
+     * <p>The step and resolution values carried here are <strong>labels only</strong>:
+     * {@code VolumetricQualityProfile} is the authority the renderer actually reads, and these
+     * must be kept equal to it. T139 found them stale - they still carried the pre-Rank-1 ladder
+     * (0.25/0.375/0.50/0.50/0.75) after the shipped ladder moved to 0.125/0.125/0.125/0.1875/0.25
+     * - so the in-game quality label advertised resolutions 2x to 4x higher than the renderer was
+     * using. Only the label and the performance record's "configured" field read these; no
+     * rendering behaviour does.
+     */
     public enum CloudRaymarchQuality {
-        LOW("LOW", 24, 0.25F),
-        LOW_24("LOW 32", 32, 0.375F),
-        MEDIUM("MEDIUM", 40, 0.50F),
-        HIGH("HIGH", 64, 0.50F),
-        ULTRA("ULTRA", 96, 0.75F);
+        LOW("LOW", 24, 0.125F),
+        LOW_24("LOW 32", 32, 0.125F),
+        MEDIUM("MEDIUM", 40, 0.125F),
+        HIGH("HIGH", 64, 0.1875F),
+        ULTRA("ULTRA", 96, 0.25F);
 
         private final String displayName;
         private final int raymarchSteps;
@@ -216,9 +227,6 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> FOG_WET_BIOME_KEYWORDS;
     public static final ForgeConfigSpec.BooleanValue TELEMETRY_ENABLED;
     public static final ForgeConfigSpec.IntValue TELEMETRY_RETENTION_DAYS;
-    public static final ForgeConfigSpec.BooleanValue AUTH_STRICT_OFFLINE_UUID_REJECT;
-    public static final ForgeConfigSpec.BooleanValue AUTH_KICK_ON_FAILURE;
-    public static final ForgeConfigSpec.IntValue AUTH_CHALLENGE_TIMEOUT_TICKS;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -230,7 +238,7 @@ public class AtmoCommonConfig {
                 .comment("Maximum distance in blocks to render clouds; higher values impact performance")
                 .defineInRange("cloudRenderDistance", 2000, 100, Integer.MAX_VALUE);
         CLOUD_RAYMARCH_QUALITY = builder
-                .comment("Qualite du raymarch volumetrique PA: LOW=24 etapes a 25%, LOW_24=32 etapes a 37.5%, MEDIUM=40 etapes a 50%, HIGH=64 etapes a 50%, ULTRA=96 etapes a 75%")
+                .comment("Qualite du raymarch volumetrique PA: LOW=24 etapes a 12.5%, LOW_24=32 etapes a 12.5%, MEDIUM=40 etapes a 12.5%, HIGH=64 etapes a 18.75%, ULTRA=96 etapes a 25%")
                 .defineEnum("cloudRaymarchQuality", CloudRaymarchQuality.MEDIUM);
         CLOUD_FIELD_RENDERER_ENABLED = builder
                 .comment("Enable the Project Atmosphere CloudField volume renderer when Simple Clouds is not installed. Disable this as a persistent kill switch to fall back to vanilla clouds.")
@@ -625,18 +633,6 @@ public class AtmoCommonConfig {
         TELEMETRY_RETENTION_DAYS = builder
                 .comment("Number of days to retain exported telemetry archives before pruning")
                 .defineInRange("telemetryRetentionDays", 14, 0, 365);
-        builder.pop();
-
-        builder.push("auth");
-        AUTH_STRICT_OFFLINE_UUID_REJECT = builder
-                .comment("Reject offline UUID v3 identities during the launcher auth check")
-                .define("strictOfflineUuidReject", true);
-        AUTH_KICK_ON_FAILURE = builder
-                .comment("Kick players who fail or timeout the launcher auth challenge")
-                .define("kickOnFailure", true);
-        AUTH_CHALLENGE_TIMEOUT_TICKS = builder
-                .comment("Ticks before a pending launcher auth challenge times out")
-                .defineInRange("challengeTimeoutTicks", 200, 1, Integer.MAX_VALUE);
         builder.pop();
 
         builder.push("debug");

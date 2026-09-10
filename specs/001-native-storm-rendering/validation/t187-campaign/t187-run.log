@@ -1,0 +1,113 @@
+T187 - precomputed rain support field, feasibility campaign
+Branch experiment/cloud-descriptor-k, parent 443e742 (T186). Not merged.
+Ultra, raw scale 0.2500, cloud target 480x270, framebuffer 1920x1080,
+96 steps, 60 samples per cell, three anchor-bracketed blocks per arm per pose.
+
+The first launch hard-crashed the client during shader-variant loading
+(exit -805306369) after ~6 minutes of compilation with 127 declared variants;
+runClient-t187.out.log is that partial run. A clean relaunch
+(runClient-t187b.out.log) completed all 38 cells and is the run reported here.
+
+=== T187 campaign markers ===
+T187_RAIN_FIELD_BEGIN poses=2 arms=19 mode=ULTRA steps=96 resolutionScale=NaN target=1920x1080
+T187_RAIN_FIELD_DECISION
+T187_BLOCK pose=SIDE block=1 arm=t187_field_oracle#r1 anchorBefore=19.7038 anchorAfter=19.7990 anchorDrift=0.0048 cloudP50=16.7291 cloudP95=17.7203 localRatio=1.1807 blockVerdict=accepted
+T187_BLOCK pose=SIDE block=1 arm=t172_stack_pre#r1 anchorBefore=19.7990 anchorAfter=19.7560 anchorDrift=0.0022 cloudP50=11.5190 cloudP95=12.8686 localRatio=1.7170 blockVerdict=accepted
+T187_BLOCK pose=SIDE block=1 arm=t187_stack_field#r1 anchorBefore=19.7560 anchorAfter=19.4847 anchorDrift=0.0138 cloudP50=7.7834 cloudP95=8.4357 localRatio=2.5208 blockVerdict=accepted
+T187_BLOCK pose=SIDE block=2 arm=t187_field_oracle#r2 anchorBefore=19.4847 anchorAfter=19.8400 anchorDrift=0.0181 cloudP50=16.5714 cloudP95=17.8657 localRatio=1.1865 blockVerdict=accepted
+T187_BLOCK pose=SIDE block=2 arm=t172_stack_pre#r2 anchorBefore=19.8400 anchorAfter=19.6383 anchorDrift=0.0102 cloudP50=11.2650 cloudP95=12.4006 localRatio=1.7522 blockVerdict=accepted
+T187_BLOCK pose=SIDE block=2 arm=t187_stack_field#r2 anchorBefore=19.6383 anchorAfter=19.4918 anchorDrift=0.0075 cloudP50=7.7588 cloudP95=8.3876 localRatio=2.5216 blockVerdict=accepted
+T187_BLOCK pose=SIDE block=3 arm=t187_field_oracle#r3 anchorBefore=19.4918 anchorAfter=19.3096 anchorDrift=0.0094 cloudP50=16.7291 cloudP95=17.9845 localRatio=1.1597 blockVerdict=accepted
+T187_BLOCK pose=SIDE block=3 arm=t172_stack_pre#r3 anchorBefore=19.3096 anchorAfter=19.4806 anchorDrift=0.0088 cloudP50=9.7393 cloudP95=10.6281 localRatio=1.9914 blockVerdict=accepted
+T187_BLOCK pose=SIDE block=3 arm=t187_stack_field#r3 anchorBefore=19.4806 anchorAfter=19.4519 anchorDrift=0.0015 cloudP50=7.7025 cloudP95=8.3446 localRatio=2.5273 blockVerdict=accepted
+T187_ARM pose=SIDE arm=t187_field_oracle blocks=3 ratioMin=1.1597 ratioMax=1.1865 ratioMean=1.1756 ratioSpread=0.0228 sessionLocalP50=16.6765 sessionLocalP95=17.9845 verdict=accepted
+T187_ARM pose=SIDE arm=t172_stack_pre blocks=3 ratioMin=1.7170 ratioMax=1.9914 ratioMean=1.8202 ratioSpread=0.1508 sessionLocalP50=10.8411 sessionLocalP95=12.8686 verdict=REJECTED_ratio_spread
+T187_ARM pose=SIDE arm=t187_stack_field blocks=3 ratioMin=2.5208 ratioMax=2.5273 ratioMean=2.5232 ratioSpread=0.0026 sessionLocalP50=7.7483 sessionLocalP95=8.4357 verdict=accepted
+T187_WITHIN_BLOCK pose=SIDE arm=t187_stack_field vsControl=t172_stack_pre blocks=3 ratioMin=1.2644 ratioMax=1.4799 ratioMean=1.3988 ratioSpread=0.1541 verdict=REJECTED_ratio_spread
+T187_BLOCK pose=FAR block=1 arm=t187_field_oracle#r1 anchorBefore=12.4703 anchorAfter=12.5645 anchorDrift=0.0075 cloudP50=11.4668 cloudP95=12.9270 localRatio=1.0916 blockVerdict=accepted
+T187_BLOCK pose=FAR block=1 arm=t172_stack_pre#r1 anchorBefore=12.5645 anchorAfter=12.3843 anchorDrift=0.0144 cloudP50=4.8916 cloudP95=5.2961 localRatio=2.5501 blockVerdict=accepted
+T187_BLOCK pose=FAR block=1 arm=t187_stack_field#r1 anchorBefore=12.3843 anchorAfter=12.4877 anchorDrift=0.0083 cloudP50=4.2394 cloudP95=4.5599 localRatio=2.9335 blockVerdict=accepted
+T187_BLOCK pose=FAR block=2 arm=t187_field_oracle#r2 anchorBefore=12.4877 anchorAfter=12.4058 anchorDrift=0.0066 cloudP50=11.0848 cloudP95=13.0048 localRatio=1.1229 blockVerdict=accepted
+T187_BLOCK pose=FAR block=2 arm=t172_stack_pre#r2 anchorBefore=12.4058 anchorAfter=13.2608 anchorDrift=0.0666 cloudP50=4.9480 cloudP95=5.3719 localRatio=2.5936 blockVerdict=REJECTED_anchor_drift
+T187_BLOCK pose=FAR block=2 arm=t187_stack_field#r2 anchorBefore=13.2608 anchorAfter=12.8502 anchorDrift=0.0315 cloudP50=4.2670 cloudP95=4.5548 localRatio=3.0596 blockVerdict=REJECTED_anchor_drift
+T187_BLOCK pose=FAR block=3 arm=t187_field_oracle#r3 anchorBefore=12.8502 anchorAfter=12.9567 anchorDrift=0.0083 cloudP50=11.4780 cloudP95=13.1461 localRatio=1.1242 blockVerdict=accepted
+T187_BLOCK pose=FAR block=3 arm=t172_stack_pre#r3 anchorBefore=12.9567 anchorAfter=13.0140 anchorDrift=0.0044 cloudP50=8.5207 cloudP95=8.6272 localRatio=1.5240 blockVerdict=accepted
+T187_BLOCK pose=FAR block=3 arm=t187_stack_field#r3 anchorBefore=13.0140 anchorAfter=12.9649 anchorDrift=0.0038 cloudP50=4.1953 cloudP95=4.5619 localRatio=3.0962 blockVerdict=accepted
+T187_ARM pose=FAR arm=t187_field_oracle blocks=3 ratioMin=1.0916 ratioMax=1.1242 ratioMean=1.1129 ratioSpread=0.0293 sessionLocalP50=11.3432 sessionLocalP95=13.1461 verdict=accepted
+T187_ARM pose=FAR arm=t172_stack_pre blocks=2 ratioMin=1.5240 ratioMax=2.5501 ratioMean=2.0371 ratioSpread=0.5037 sessionLocalP50=6.7062 sessionLocalP95=8.6272 verdict=REJECTED_ratio_spread
+T187_ARM pose=FAR arm=t187_stack_field blocks=2 ratioMin=2.9335 ratioMax=3.0962 ratioMean=3.0148 ratioSpread=0.0540 sessionLocalP50=4.2173 sessionLocalP95=4.5619 verdict=REJECTED_ratio_spread
+T187_WITHIN_BLOCK pose=FAR arm=t187_stack_field vsControl=t172_stack_pre blocks=3 ratioMin=1.1539 ratioMax=2.0310 ratioMean=1.4482 ratioSpread=0.6057 verdict=REJECTED_ratio_spread
+T187_FLOOR ratioTolerance=0.030
+T187_REJECTED count=0 none
+
+=== image / quality A-B ===
+T166_IMAGE_AB pose=SIDE arm=t187_field_oracle a=lean_final referenceImageComparison evaluated=true passed=false maxAbsRGBA=5.747070e-01 meanAbsRGBA=2.648699e-05 rmsRGBA=1.340374e-03 changedPixelCountAboveEpsilon=292 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.907227e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=239a37df61899d6a informationalDigestB=2aa047f3ab91f0ff t178Quality evaluated=true cloudSsim=0.999917 edgeSsim=0.999303 silhouetteIoU=0.998656 thinRetention=0.889344 holeRetention=1.000000 selfShadowContrastRef=0.071255 selfShadowContrastArm=0.071267 selfShadowContrastRatio=1.000174 darkInteriorRetention=1.000000 shadowPocketRetention=0.998440 valleyDepthRefProxy=0.063800 valleyDepthArmProxy=0.063773 valleyDepthRatioProxy=0.999588 interiorPixels=19452 puffSeparation=not_implemented_needs_segmentation armQuality evaluated=true comparedPixels=20154 silhouetteIoU=0.9968 cloudRegionSSIM=0.9998 edgeBandSSIM=0.9995 thinRetention=0.7862 holeRetention=1.0000 alphaMassRatio=0.9998 seamIndex=0.00009 digestsEqual=false
+T166_IMAGE_AB pose=SIDE arm=t187_stack_field a=lean_final referenceImageComparison evaluated=true passed=false maxAbsRGBA=9.877930e-01 meanAbsRGBA=2.159761e-03 rmsRGBA=9.014907e-03 changedPixelCountAboveEpsilon=20117 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.931641e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=239a37df61899d6a informationalDigestB=e12cf29e5bccff75 t178Quality evaluated=true cloudSsim=0.988584 edgeSsim=0.986054 silhouetteIoU=0.995423 thinRetention=0.725410 holeRetention=0.992701 selfShadowContrastRef=0.071255 selfShadowContrastArm=0.071557 selfShadowContrastRatio=1.004248 darkInteriorRetention=0.993023 shadowPocketRetention=0.837754 valleyDepthRefProxy=0.063800 valleyDepthArmProxy=0.064380 valleyDepthRatioProxy=1.009094 interiorPixels=19452 puffSeparation=not_implemented_needs_segmentation armQuality evaluated=true comparedPixels=20162 silhouetteIoU=0.9932 cloudRegionSSIM=0.9793 edgeBandSSIM=0.9839 thinRetention=0.6349 holeRetention=1.0000 alphaMassRatio=0.9802 seamIndex=0.00451 digestsEqual=false
+T166_IMAGE_AB pose=FAR arm=t187_field_oracle a=lean_final referenceImageComparison evaluated=true passed=false maxAbsRGBA=6.549072e-02 meanAbsRGBA=4.788464e-06 rmsRGBA=3.241598e-04 changedPixelCountAboveEpsilon=85 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.907227e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=cb51fd8ce8da6314 informationalDigestB=b1cab9121f16fff4 t178Quality evaluated=true cloudSsim=0.999900 edgeSsim=0.999918 silhouetteIoU=0.999486 thinRetention=0.964286 holeRetention=1.000000 selfShadowContrastRef=0.078944 selfShadowContrastArm=0.078961 selfShadowContrastRatio=1.000216 darkInteriorRetention=1.000000 shadowPocketRetention=0.990050 valleyDepthRefProxy=0.099677 valleyDepthArmProxy=0.099614 valleyDepthRatioProxy=0.999370 interiorPixels=3759 puffSeparation=not_implemented_needs_segmentation armQuality evaluated=true comparedPixels=3909 silhouetteIoU=0.9969 cloudRegionSSIM=0.9999 edgeBandSSIM=0.9999 thinRetention=0.8310 holeRetention=1.0000 alphaMassRatio=0.9998 seamIndex=0.00015 digestsEqual=false
+T166_IMAGE_AB pose=FAR arm=t187_stack_field a=lean_final referenceImageComparison evaluated=true passed=false maxAbsRGBA=7.153320e-01 meanAbsRGBA=4.704141e-04 rmsRGBA=5.630083e-03 changedPixelCountAboveEpsilon=3892 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.951172e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=cb51fd8ce8da6314 informationalDigestB=dd024fb151e04189 t178Quality evaluated=true cloudSsim=0.973137 edgeSsim=0.986798 silhouetteIoU=0.990508 thinRetention=0.535714 holeRetention=0.950000 selfShadowContrastRef=0.078944 selfShadowContrastArm=0.079490 selfShadowContrastRatio=1.006918 darkInteriorRetention=0.978746 shadowPocketRetention=0.840796 valleyDepthRefProxy=0.099677 valleyDepthArmProxy=0.099322 valleyDepthRatioProxy=0.996443 interiorPixels=3759 puffSeparation=not_implemented_needs_segmentation armQuality evaluated=true comparedPixels=3914 silhouetteIoU=0.9877 cloudRegionSSIM=0.9658 edgeBandSSIM=0.9766 thinRetention=0.4648 holeRetention=1.0000 alphaMassRatio=0.9876 seamIndex=0.00803 digestsEqual=false
+
+=== pose fixture and qualification ===
+T153_POSE_FIXTURE pose=FAR group=7864e985-14f7-43c8-ad9a-cdf0cb29e7b5 fingerprint=eb216fa6c03ee416
+T153_POSE_FIXTURE pose=SIDE group=7864e985-14f7-43c8-ad9a-cdf0cb29e7b5 fingerprint=eb216fa6c03ee416
+T162_QUALIFY before arm=lean_final#a01 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a01 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a02 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a02 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a03 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a03 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a04 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a04 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a05 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a05 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a06 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a06 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a07 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a07 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a08 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a08 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a09 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a09 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a10 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=lean_final#a10 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=t166_image_anchor descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=t166_image_anchor descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=t172_stack_pre#r1 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=t172_stack_pre#r1 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=t172_stack_pre#r2 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=t172_stack_pre#r2 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=t172_stack_pre#r3 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=t172_stack_pre#r3 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=t187_field_oracle#r1 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=t187_field_oracle#r1 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=t187_field_oracle#r2 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=t187_field_oracle#r2 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=t187_field_oracle#r3 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=t187_field_oracle#r3 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=t187_stack_field#r1 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=t187_stack_field#r1 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=t187_stack_field#r2 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=t187_stack_field#r2 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+T162_QUALIFY before arm=t187_stack_field#r3 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1083.8 projectedFraction=0.4937 valid=true reason=ok
+T162_QUALIFY before arm=t187_stack_field#r3 descriptors=10 descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=474.2 projectedFraction=0.8049 valid=true reason=ok
+
+=== infrastructure invariants ===
+T132_AUTORUN_FINISHED outcome=complete frames=11208
+T132_AUTORUN_FIXTURE_CONTROL cloudMovementFreezeRestored=true
+T132_AUTORUN_FIXTURE_CONTROL cloudMovementFrozen=true priorValue=true restoredOnExit=true
+T132_AUTORUN_FIXTURE_CONTROL daylightCycleFrozen=true dayTime=6000 restoredOnExit=true
+T132_AUTORUN_FIXTURE_CONTROL daylightCycleRestored=true
+T132_AUTORUN_FIXTURE_CONTROL fixedResolutionScale=0.75000 priorValue=adaptive restoredOnExit=true
+T132_AUTORUN_FIXTURE_CONTROL fixedResolutionScaleRestored=adaptive
+T132_AUTORUN_FIXTURE_CONTROL raymarchQuality=ULTRA(96/6) priorValue=ULTRA restoredOnExit=true
+T132_AUTORUN_FIXTURE_CONTROL raymarchQualityRestored=ULTRA
+T132_AUTORUN_INFRA accepting normal current-registry confirmation screen=net.minecraft.client.gui.screens.ConfirmScreen
+T132_AUTORUN_INFRA create_requested world=pa-t132-autogen-source
+T132_AUTORUN_INFRA restore valid path=C:\Users\matga\Downloads\Project-Atmosphere\run\saves\pa-t132-autogen-restored dataVersion=3465 sessionLockExcluded=true
+T132_AUTORUN_INFRA restore_load_requested world=pa-t132-autogen-restored snapshotDataVersion=3465
+T132_AUTORUN_INFRA snapshot valid path=C:\Users\matga\Downloads\Project-Atmosphere\run\t132-fixtures\pristine-current dataVersion=3465 sessionLockExcluded=true
+T132_AUTORUN_INFRA source_cleanly_unloaded
+T132_AUTORUN_INFRA source_entered world=pa-t132-autogen-source player=9.50, 112.00, 1.50
+T132_AUTORUN_INFRA source_halt_requested
+T132_AUTORUN_INFRA world seed overridden by marker: 5510001
+T132_AUTORUN_INFRASTRUCTURE_VALID source=pa-t132-autogen-source restored=pa-t132-autogen-restored restoredEntry=9.50, 112.00, 1.50 autoQuickPlay=true
+T132_AUTORUN_INFRA_BEGIN source=pa-t132-autogen-source restored=pa-t132-autogen-restored template=C:\Users\matga\Downloads\Project-Atmosphere\run\t132-fixtures\pristine-current

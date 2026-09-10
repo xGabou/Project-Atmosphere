@@ -1,0 +1,41 @@
+T173 phase 2 - anchor-bracketed T121 bound arms (22:34-22:36)
+
+T173_CELL arm=lean_final#a01 samples=60 duplicatesRejected=0 cloudP50=23.4035 cloudP95=25.7096 cloudMean=23.4389 cloudSd=1.3046 cloudCv=0.05566 cloudMin=20.8230 cloudMax=29.4953
+T173_CELL arm=t173_boxbound#r1 samples=60 duplicatesRejected=0 cloudP50=24.5576 cloudP95=27.3193 cloudMean=24.9263 cloudSd=1.3643 cloudCv=0.05474 cloudMin=22.9038 cloudMax=28.5317
+T173_CELL arm=lean_final#a02 samples=60 duplicatesRejected=0 cloudP50=23.4527 cloudP95=25.2600 cloudMean=23.5895 cloudSd=0.8503 cloudCv=0.03604 cloudMin=22.1563 cloudMax=25.7167
+T173_CELL arm=t173_boxbound_pre#r1 samples=60 duplicatesRejected=0 cloudP50=22.9908 cloudP95=25.6317 cloudMean=23.3521 cloudSd=1.6126 cloudCv=0.06906 cloudMin=21.2122 cloudMax=30.1926
+T173_CELL arm=lean_final#a03 samples=60 duplicatesRejected=0 cloudP50=23.5561 cloudP95=25.8611 cloudMean=23.8027 cloudSd=1.3051 cloudCv=0.05483 cloudMin=21.4702 cloudMax=27.8917
+T173_CELL arm=t169_stack_fast#r1 samples=60 duplicatesRejected=0 cloudP50=14.1107 cloudP95=15.7143 cloudMean=14.1641 cloudSd=0.8263 cloudCv=0.05834 cloudMin=12.6874 cloudMax=16.6380
+T173_CELL arm=lean_final#a04 samples=60 duplicatesRejected=0 cloudP50=23.3380 cloudP95=26.0229 cloudMean=23.6597 cloudSd=1.2289 cloudCv=0.05194 cloudMin=21.3248 cloudMax=28.7017
+T173_CELL arm=t172_stack_pre#r1 samples=60 duplicatesRejected=0 cloudP50=12.5880 cloudP95=14.4261 cloudMean=12.7622 cloudSd=0.9344 cloudCv=0.07322 cloudMin=10.9425 cloudMax=15.0149
+T173_CELL arm=lean_final#a05 samples=60 duplicatesRejected=0 cloudP50=23.9503 cloudP95=26.9476 cloudMean=24.2308 cloudSd=1.5103 cloudCv=0.06233 cloudMin=21.9935 cloudMax=29.3437
+T173_CELL arm=t173_stack_boxbound_pre#r1 samples=60 duplicatesRejected=0 cloudP50=13.8455 cloudP95=15.0518 cloudMean=13.8869 cloudSd=0.6968 cloudCv=0.05018 cloudMin=12.3884 cloudMax=15.0784
+T173_CELL arm=lean_final#a06 samples=60 duplicatesRejected=0 cloudP50=23.0380 cloudP95=25.0573 cloudMean=23.2183 cloudSd=0.9953 cloudCv=0.04287 cloudMin=21.4139 cloudMax=25.9031
+T173_CELL arm=t173_boxbound#r2 samples=60 duplicatesRejected=0 cloudP50=25.1085 cloudP95=27.7893 cloudMean=25.3752 cloudSd=1.2159 cloudCv=0.04792 cloudMin=23.4998 cloudMax=28.6525
+T173_CELL arm=lean_final#a07 samples=60 duplicatesRejected=0 cloudP50=23.5960 cloudP95=25.8048 cloudMean=23.6364 cloudSd=1.1545 cloudCv=0.04884 cloudMin=21.5276 cloudMax=27.1933
+T173_CELL arm=t173_boxbound_pre#r2 samples=60 duplicatesRejected=0 cloudP50=23.3523 cloudP95=24.9426 cloudMean=23.4135 cloudSd=0.8994 cloudCv=0.03841 cloudMin=21.4077 cloudMax=25.6973
+T173_CELL arm=lean_final#a08 samples=60 duplicatesRejected=0 cloudP50=23.5704 cloudP95=26.1427 cloudMean=23.8620 cloudSd=1.2813 cloudCv=0.05370 cloudMin=21.7047 cloudMax=28.2245
+T173_CELL arm=t169_stack_fast#r2 samples=60 duplicatesRejected=0 cloudP50=14.3278 cloudP95=15.9273 cloudMean=14.4582 cloudSd=0.9520 cloudCv=0.06584 cloudMin=13.0703 cloudMax=18.8406
+T173_CELL arm=lean_final#a09 samples=60 duplicatesRejected=0 cloudP50=23.8039 cloudP95=29.4431 cloudMean=24.3043 cloudSd=2.0608 cloudCv=0.08479 cloudMin=21.8542 cloudMax=29.7482
+T173_CELL arm=t172_stack_pre#r2 samples=60 duplicatesRejected=0 cloudP50=12.5092 cloudP95=13.6714 cloudMean=12.6324 cloudSd=0.6222 cloudCv=0.04925 cloudMin=11.5620 cloudMax=13.9366
+T173_CELL arm=lean_final#a10 samples=60 duplicatesRejected=0 cloudP50=23.0584 cloudP95=25.2508 cloudMean=23.1938 cloudSd=1.1673 cloudCv=0.05033 cloudMin=21.2593 cloudMax=26.8452
+T173_CELL arm=t173_stack_boxbound_pre#r2 samples=60 duplicatesRejected=0 cloudP50=13.6970 cloudP95=14.6924 cloudMean=13.6865 cloudSd=0.6400 cloudCv=0.04676 cloudMin=12.3863 cloudMax=15.0764
+T173_CELL arm=lean_final#a11 samples=60 duplicatesRejected=0 cloudP50=23.7476 cloudP95=26.1202 cloudMean=23.8473 cloudSd=1.1958 cloudCv=0.05014 cloudMin=21.8429 cloudMax=27.2466
+T173_ARM arm=t173_boxbound#r1 anchorBefore=23.4035 anchorAfter=23.4527 anchorDrift=0.0021 cloudP50=24.5576 cloudP95=27.3193 speedup=0.9540 verdict=accepted
+T173_ARM arm=t173_boxbound_pre#r1 anchorBefore=23.4527 anchorAfter=23.5561 anchorDrift=0.0044 cloudP50=22.9908 cloudP95=25.6317 speedup=1.0223 verdict=accepted
+T173_ARM arm=t169_stack_fast#r1 anchorBefore=23.5561 anchorAfter=23.3380 anchorDrift=0.0093 cloudP50=14.1107 cloudP95=15.7143 speedup=1.6616 verdict=accepted
+T173_ARM arm=t172_stack_pre#r1 anchorBefore=23.3380 anchorAfter=23.9503 anchorDrift=0.0259 cloudP50=12.5880 cloudP95=14.4261 speedup=1.8783 verdict=accepted
+T173_ARM arm=t173_stack_boxbound_pre#r1 anchorBefore=23.9503 anchorAfter=23.0380 anchorDrift=0.0388 cloudP50=13.8455 cloudP95=15.0518 speedup=n/a verdict=REJECTED_anchor_drift
+T173_ARM arm=t173_boxbound#r2 anchorBefore=23.0380 anchorAfter=23.5960 anchorDrift=0.0239 cloudP50=25.1085 cloudP95=27.7893 speedup=0.9287 verdict=accepted
+T173_ARM arm=t173_boxbound_pre#r2 anchorBefore=23.5960 anchorAfter=23.5704 anchorDrift=0.0011 cloudP50=23.3523 cloudP95=24.9426 speedup=1.0099 verdict=accepted
+T173_ARM arm=t169_stack_fast#r2 anchorBefore=23.5704 anchorAfter=23.8039 anchorDrift=0.0099 cloudP50=14.3278 cloudP95=15.9273 speedup=1.6532 verdict=accepted
+T173_ARM arm=t172_stack_pre#r2 anchorBefore=23.8039 anchorAfter=23.0584 anchorDrift=0.0318 cloudP50=12.5092 cloudP95=13.6714 speedup=n/a verdict=REJECTED_anchor_drift
+T173_ARM arm=t173_stack_boxbound_pre#r2 anchorBefore=23.0584 anchorAfter=23.7476 anchorDrift=0.0294 cloudP50=13.6970 cloudP95=14.6924 speedup=1.7086 verdict=accepted
+T173_BREAK between=4 and=5 a=23.9503 b=23.0380 disagreement=0.0388
+T173_BREAK between=8 and=9 a=23.8039 b=23.0584 disagreement=0.0318
+T173_SUMMARY anchors=11 mean=23.5014 sd=0.2864 cv=0.01218 min=23.0380 max=23.9503 range=0.0388 consecutivePairsAccepted=8 rejected=2 verdict=SIDE_NOT_MEASURABLE
+
+--- image equality ---
+T166_IMAGE_AB pose=SIDE arm=t173_boxbound a=lean_final referenceImageComparison evaluated=true passed=true maxAbsRGBA=1.525879e-05 meanAbsRGBA=2.943439e-11 rmsRGBA=2.119276e-08 changedPixelCountAboveEpsilon=0 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.907227e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=0bac1d094cc4aea9 informationalDigestB=2a7e8a86eaa38fcf armQuality evaluated=true comparedPixels=25905 silhouetteIoU=1.0000 cloudRegionSSIM=1.0000 edgeBandSSIM=1.0000 thinRetention=1.0000 holeRetention=1.0000 alphaMassRatio=1.0000 seamIndex=0.00000 digestsEqual=false
+T166_IMAGE_AB pose=SIDE arm=t173_boxbound_pre a=lean_final referenceImageComparison evaluated=true passed=true maxAbsRGBA=1.525879e-05 meanAbsRGBA=2.943439e-11 rmsRGBA=2.119276e-08 changedPixelCountAboveEpsilon=0 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.907227e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=0bac1d094cc4aea9 informationalDigestB=2a7e8a86eaa38fcf armQuality evaluated=true comparedPixels=25905 silhouetteIoU=1.0000 cloudRegionSSIM=1.0000 edgeBandSSIM=1.0000 thinRetention=1.0000 holeRetention=1.0000 alphaMassRatio=1.0000 seamIndex=0.00000 digestsEqual=false
+T166_IMAGE_AB pose=SIDE arm=t173_stack_boxbound_pre a=lean_final referenceImageComparison evaluated=true passed=false maxAbsRGBA=9.892578e-01 meanAbsRGBA=2.750337e-03 rmsRGBA=1.030188e-02 changedPixelCountAboveEpsilon=25855 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.965820e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=0bac1d094cc4aea9 informationalDigestB=7b0229a8d148d7ca armQuality evaluated=true comparedPixels=25950 silhouetteIoU=0.9952 cloudRegionSSIM=0.9773 edgeBandSSIM=0.9825 thinRetention=0.8226 holeRetention=0.7857 alphaMassRatio=0.9798 seamIndex=0.00428 digestsEqual=false

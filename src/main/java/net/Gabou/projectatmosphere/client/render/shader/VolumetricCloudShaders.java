@@ -2,6 +2,8 @@ package net.Gabou.projectatmosphere.client.render.shader;
 
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.CoreCostDiagnosticProgram;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormCampaignRegistry;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
@@ -25,6 +27,13 @@ public final class VolumetricCloudShaders {
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_weather_cumulus_layers");
     private static final ResourceLocation VOLUME_ID =
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_atmosphere_volume");
+    /**
+     * T161: the compile-time-specialized FINAL program, generated from the same
+     * source by the {@code generateLeanFinalShader} Gradle task.
+     */
+    private static final ResourceLocation LEAN_FINAL_VOLUME_ID =
+            ResourceLocation.fromNamespaceAndPath(
+                    ProjectAtmosphere.MODID, "cloud_atmosphere_volume_final");
     private static final ResourceLocation SHADOW_MAP_ID =
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_shadow_map");
     private static final ResourceLocation SHADOW_APPLY_ID =
@@ -34,6 +43,16 @@ public final class VolumetricCloudShaders {
     private static ShaderInstance morphologySplatShader;
     private static ShaderInstance cumulusLayerSplatShader;
     private static ShaderInstance volumeShader;
+    private static ShaderInstance leanFinalVolumeShader;
+    /**
+     * The generated diagnostic builds, keyed by the arm that selects them.
+     * There are several dozen; a field, a ResourceLocation, a registration
+     * line and a switch case per program meant every attribution campaign
+     * added four more places to forget.
+     */
+    private static final java.util.Map<CoreCostDiagnosticProgram, ShaderInstance>
+            diagnosticVolumeShaders =
+                    new java.util.EnumMap<>(CoreCostDiagnosticProgram.class);
     private static ShaderInstance shadowMapShader;
     private static ShaderInstance shadowApplyShader;
 
@@ -52,6 +71,65 @@ public final class VolumetricCloudShaders {
                 loaded -> cumulusLayerSplatShader = loaded);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), VOLUME_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> volumeShader = loaded);
+        // Registered defensively. If the generated program is missing or fails
+        // to compile, that must not abort the registration of the other cloud
+        // programs: the renderer's own guard then refuses to draw FINAL with
+        // the monolith and session-disables with a diagnostic status, which is
+        // a far more legible failure than an unexplained loss of every cloud
+        // shader. leanFinalVolumeShader simply stays null.
+        try {
+            event.registerShader(new ShaderInstance(
+                            event.getResourceProvider(), LEAN_FINAL_VOLUME_ID,
+                            DefaultVertexFormat.POSITION_TEX),
+                    loaded -> leanFinalVolumeShader = loaded);
+            diagnosticVolumeShaders.clear();
+            // T191. Campaign arms are loaded only while their campaign is
+            // armed. Every arm ever measured used to be compiled and linked on
+            // every startup - 139 full-size fragment programs by T190 - which
+            // is minutes of compilation and enough memory pressure that one
+            // launch died in the middle of it. Nothing about a historical
+            // experiment requires it to be a live program on a run that cannot
+            // select it.
+            //
+            // The source, the generated variants and the evidence all stay in
+            // the tree; only the ShaderInstance is conditional.
+            java.util.Set<String> activeCampaigns =
+                    StormCampaignRegistry.activeCampaignIds();
+            // A campaign's arms are not confined to its own prefix: matrices
+            // reuse earlier campaigns' programs as controls. Registering only
+            // the prefix match leaves those controls unloaded, which the
+            // renderer can only report as a missing program mid-sweep.
+            java.util.Set<CoreCostDiagnosticProgram> selectable =
+                    StormCampaignRegistry.programsSelectableByActiveCampaigns();
+            int registered = 0;
+            int skipped = 0;
+            for (CoreCostDiagnosticProgram program : CoreCostDiagnosticProgram.values()) {
+                if (program.isProductionProgram()) {
+                    continue;
+                }
+                if (!activeCampaigns.contains(program.campaignId())
+                        && !selectable.contains(program)) {
+                    skipped++;
+                    continue;
+                }
+                registerDiagnosticVolumeProgram(event, program);
+                registered++;
+            }
+            ProjectAtmosphere.LOGGER.info(
+                    "T191_VARIANT_SCOPE declared={} activeCampaigns={} registered={}"
+                            + " skipped={} crossCampaignControls={}"
+                            + " productionAlwaysLoaded=2",
+                    CoreCostDiagnosticProgram.values().length - 2,
+                    activeCampaigns.isEmpty() ? "none" : String.join(",", activeCampaigns),
+                    registered, skipped, selectable.size());
+        } catch (IOException | RuntimeException failure) {
+            leanFinalVolumeShader = null;
+            ProjectAtmosphere.LOGGER.error(
+                    "[VolumetricClouds] lean FINAL program {} failed to load;"
+                            + " the volumetric pass will session-disable rather than"
+                            + " silently render FINAL with the diagnostic program",
+                    LEAN_FINAL_VOLUME_ID, failure);
+        }
         event.registerShader(new ShaderInstance(event.getResourceProvider(), SHADOW_MAP_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> shadowMapShader = loaded);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), SHADOW_APPLY_ID, DefaultVertexFormat.POSITION_TEX),
@@ -67,8 +145,75 @@ public final class VolumetricCloudShaders {
         return splatShader;
     }
 
+    /** The unmodified program retaining every dormant diagnostic path. */
     public static ShaderInstance volumeShader() {
         return volumeShader;
+    }
+
+    /**
+     * Returns the program for {@code program}, or null when it failed to link.
+     *
+     * <p>A null lean program is never silently replaced by the monolith: the
+     * caller session-disables instead, because binding the monolith for FINAL
+     * would quietly restore the pre-T161 cost while still producing the right
+     * image, which is precisely the regression this split exists to prevent.
+     */
+    public static ShaderInstance volumeShader(CoreCostDiagnosticProgram program) {
+        if (program == null) {
+            return volumeShader;
+        }
+        return switch (program) {
+            case DIAGNOSTIC_MONOLITH -> volumeShader;
+            case LEAN_FINAL -> leanFinalVolumeShader;
+            default -> diagnosticVolumeShaders.get(program);
+        };
+    }
+
+    /**
+     * T191. Why a diagnostic program is unavailable, for the renderer's status
+     * line. A campaign arm selected without its marker is a setup mistake with
+     * an obvious fix, and it must not read as a compile failure.
+     */
+    public static String missingProgramReason(CoreCostDiagnosticProgram program) {
+        if (program == null || volumeShader(program) != null) {
+            return "loaded";
+        }
+        if (program.isProductionProgram()) {
+            return "production_program_failed_to_load";
+        }
+        String campaign = program.campaignId();
+        return StormCampaignRegistry.activeCampaignIds().contains(campaign)
+                ? "campaign_" + campaign + "_active_but_program_failed_to_load"
+                : "campaign_" + campaign + "_not_armed:"
+                        + " create its marker file and restart the client";
+    }
+
+    /**
+     * Registers one generated diagnostic program. A diagnostic program that
+     * fails to build must not take the renderer down with it, so the failure
+     * is logged and the slot left empty; the campaign that selects it reports
+     * the missing program instead.
+     */
+    private static void registerDiagnosticVolumeProgram(
+            RegisterShadersEvent event,
+            CoreCostDiagnosticProgram program) {
+        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(
+                ProjectAtmosphere.MODID, program.resourceName());
+        try {
+            event.registerShader(
+                    new ShaderInstance(event.getResourceProvider(), id,
+                            DefaultVertexFormat.POSITION_TEX),
+                    loaded -> diagnosticVolumeShaders.put(program, loaded));
+        } catch (IOException | RuntimeException failure) {
+            ProjectAtmosphere.LOGGER.error(
+                    "[VolumetricClouds] diagnostic program {} failed to load",
+                    id, failure);
+        }
+    }
+
+    /** True when the separately linked lean FINAL program is available. */
+    public static boolean leanFinalShaderReady() {
+        return leanFinalVolumeShader != null;
     }
 
     public static ShaderInstance morphologySplatShader() {

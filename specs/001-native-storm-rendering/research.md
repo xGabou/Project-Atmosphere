@@ -120,6 +120,8 @@ Descriptor values that change smoothly are refreshed in reusable upload buffers.
 - CORE: rooted, vertically stretched mass bridging base and tower;
 - TOWER: narrower rising body with height-dependent wind lean and taper;
 - ANVIL: high, thin, horizontally extended wind-aligned outflow with curved underside and top.
+  T160 measured the shipped implementation of this role and found it stops extending horizontally
+  at about 62% of its own height; see Decision 18.
 
 Descriptor-local bounds, not generic global cloud bounds, constrain these shapes. Java `StormLobeEvaluator` is the authoritative source of storm equations and is consumed by `ClientCloudVisualDensity` and deterministic tests. GLSL independently mirrors that contract, and an independent equation fixture or real parity harness—not two Java callers of the same function and not hard-coded fake GPU values—proves parity. Per-frame density publication includes the exact adopted storm render snapshot.
 
@@ -291,7 +293,7 @@ of them. Positive criteria with derived thresholds make the intended result fals
 - Fixed hand-tuned numeric thresholds: unanchored thresholds drift toward whatever the current
   implementation produces, which is how the previous gate stayed green.
 
-### Decision 15: Storm performance architecture (planned, deferred)
+### Decision 15: Storm performance architecture (historical Phase 4P; implemented and measured)
 
 **Decision**: Record the following performance architecture as required plan items. Implement them
 in a separate Phase 4P, not inside the correctness refactor, except where an item is inseparable
@@ -339,6 +341,88 @@ question. With the model itself being replaced, an absolute ordering gate blocks
 new model depends on while providing no protection - the gate's own acceptance criteria were the
 ones found insufficient.
 
+### Decision 17: Gate adaptive visible-volume traversal with a production-density oracle
+
+**Decision (2026-09-03)**: T149 closes the descriptor/light/detail micro-optimization sequence and
+changes the active performance architecture. At PLAY_VIS_NEAR, 103.9 ms of Ultra cloud work remains
+against an 8 ms budget, while NEAR_EDGE remains 198.4 ms. Approximately 83--100% of primary march
+steps at representative poses resolve empty, yet those steps still pay storm, safe-advance, and
+descriptor-related work. T141, T151, and T149 also show that reducing work on selected lanes or
+samples often fails to produce proportional time because execution becomes divergent or loses
+fixed-loop compilation.
+
+The next architecture therefore targets **warp-coherent elimination of large empty or optically
+irrelevant ray spans**. T153 is diagnostic only: production `cloudDensity` is sampled as ground
+truth to construct perfect empty-space, perfect occupied-interval, perfect optical-relevance, and
+combined oracle arms. These arms are deliberately not production algorithms. If the combined
+oracle is below approximately 2x, the architecture stops before an occupancy system is built;
+2x permits a bounded prototype, 3x is a strong candidate, and 4x is a very strong candidate with
+potential to fund higher internal resolution.
+
+If the gate passes, implementation proceeds in measured stages: one real production descriptor
+and lobe; then multi-lobe occupied -> empty -> occupied re-entry; then camera-inside-cloud behavior;
+then a complete severe cumulonimbus. Candidate representations include a low-resolution 3D
+occupancy or coarse density volume, a distance field, a macrocell grid, and a hierarchy, but no
+representation is selected before the oracle and single-blob measurements. The selected design
+must enable neighboring rays to skip large spans coherently. The complete density field remains
+authoritative, and neither a generic inside-cloud fog nor a first-hit shell is permitted.
+
+The current Ultra 0.25 scale (480x270 at 1920x1080) is an interim compromise that is visibly too
+soft/foggy for final acceptance. A banked traversal architecture must be remeasured before explicit
+0.375 (720x405) and 0.50 (960x540) recovery experiments. T152's deterministic moving-camera route
+is a production-readiness prerequisite, and T098b remains the authoritative final regrade.
+
+**Alternatives rejected by measurement and retained as evidence**:
+
+- Rank 2 descriptor micro-optimization: measured ceilings too small.
+- T143 geometric reach gate: a sound bound covered almost the entire render distance.
+- T144 same-point `directStormShape` collapse: the presumed duplicate calls used different points.
+- Interleaved reconstruction: 1.42x/1.67x ceilings before resolve/history overhead.
+- T149 graded lighting/detail LOD: approximately 1.02x representative and a PLAY_VIS_NEAR
+  regression.
+
+These directions are not reopened without new evidence that invalidates their measured ceilings or
+premises.
+
+### Decision 18: The upper canopy is an ANVIL profile-shape defect, not a clipping defect
+
+**Decision**: Treat the rounded upper canopy as a defect in the ANVIL radius profile, and address
+it by moving the radius-growth knee later rather than by extending any bound. Recorded by T160
+(commit `9b8ccc5`), evidence `validation/t098b-upper-anvil-envelope.md`.
+
+**Measurement**: taken on the real production density path - `StormDensityModel` is the CPU
+authority the shader mirrors - against the measured ten-member severe fixture and the real baked
+noise volumes, so the cross-sections are final production density rather than descriptor geometry.
+
+**Rationale**: The canopy is not clipped. Final density realises about 104.6% of its intended
+horizontal width and its support extends about 28 blocks above the nominal role-envelope top. The
+shape is authored by `profileRadius(ANVIL, v)`: the radius-growth knee lands at v ~= 0.62, the
+radius peaks at v ~= 0.65, horizontal growth then collapses and the radius decreases while
+`verticalShape` fades to zero at v = 1.0. The upper third is constant-then-narrowing under fading
+density, which is a rounded cap by construction. Measured visible width peaks around v ~= 0.81 and
+decreases before support ends, so the cloud narrows too early rather than being cut off while
+still expanding.
+
+**Falsified alternatives** (measured, not argued):
+
+- vertical clipping or a maximum-height cutoff - support exceeds the role top, width exceeds intent;
+- the upper TOWER to ANVIL transition - the tower never widens (about 76-85 blocks), is fully
+  enclosed by the anvil from about y = 380, and ends about y = 476 hidden inside it;
+- density remap and erosion - envelope to body to final density preserves width to within about 3%
+  at every measured slice;
+- renderer safety bounds and extent clamps as the primary lever.
+
+**Capability**: the diagnostic relaxed arm reached about 1.86x half-width and 1.32x height, moved
+width/height from 2.93 to 4.14, kept density bounded, and was still widening at its own
+termination - CASE A. The existing profile family can produce the intended anvil; its constants
+stop it early. Those relaxed values are diagnostic only and are never promoted directly.
+
+**Open**: T160 did not measure rendered occupancy, so a renderer or reconstruction contribution is
+not excluded. The final-density footprint from ABOVE is about a 1.5:1 ellipse (468 x 312 blocks)
+while the in-game view appears markedly more circular; a rendered A/B must classify that
+discrepancy before the upper canopy can be accepted. See the plan section **Upper-Canopy
+Morphology Strategy**.
+
 ## Resolved Unknowns
 
 - **Network or save migration**: none required.
@@ -354,8 +438,9 @@ ones found insufficient.
   pseudo-distance; no zero-density lobe skipping.
 - **Morphology thresholds**: derived in `validation/morphology-thresholds.md` from the erosion
   strength, noise amplitude, and octave weights actually configured in the shader.
-- **Performance architecture**: planned in Phase 4P; only precomputed group topology may enter the
-  correctness phase, and only if the corrected model is otherwise impractical.
+- **Performance architecture**: Phase 4P's bounded descriptor work is implemented and retained;
+  post-T149 Phase 4Q is the oracle-gated adaptive visible-volume/occupancy traversal track in
+  Decision 17.
 - **Forecast behavior**: unchanged.
 - **Simple Clouds behavior**: unchanged and remains externally owned when selected.
 

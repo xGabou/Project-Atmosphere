@@ -6,6 +6,9 @@ uniform sampler2D SceneDepthSampler;
 uniform int CompositeMode;
 uniform int DepthCompositeEnabled;
 uniform int SceneDepthValid;
+// Rank 1 reconstruction arm. 0 keeps the shipped accumulation exactly; 1
+// separates coverage from colour, which removes the resolution-scale beat.
+uniform int CoverageAlphaReconstruction;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -169,6 +172,11 @@ void main() {
 
     vec4 accumulated = vec4(0.0);
     float acceptedWeight = 0.0;
+    // Coverage over every visible cloud tap at its full bilinear weight,
+    // independent of which taps survive the same-surface test. This is the term
+    // that carries the silhouette, and keeping it separate from the colour
+    // accumulation is what removes the beat: see below.
+    float coverageAlpha = 0.0;
     float depthTolerance = max(0.00002, (1.0 - selectedDepth) * 0.08);
     for (int i = 0; i < 4; i++) {
         bool visibleAgainstScene = SceneDepthValid == 0
@@ -176,6 +184,9 @@ void main() {
             || depths[i] <= sceneDepth + sceneDepthBias;
         bool paired = colors[i].a > ALPHA_EPSILON && depths[i] < 1.0 && visibleAgainstScene;
         bool sameSurface = abs(depths[i] - selectedDepth) <= depthTolerance;
+        if (paired) {
+            coverageAlpha += colors[i].a * weights[i];
+        }
         if (paired && (sameSurface || opaqueVolumeNeighborhood)) {
             accumulated += colors[i] * weights[i];
             acceptedWeight += weights[i];
@@ -202,7 +213,20 @@ void main() {
     // producing a bright halo. RGB is premultiplied, so only the final colour
     // conversion divides by the weighted alpha.
     vec3 straightColor = accumulated.rgb / max(accumulated.a, ALPHA_EPSILON);
-    fragColor = vec4(straightColor, clamp(accumulated.a, 0.0, 1.0));
+    // Shipped path: alpha is the accumulation over accepted taps only. Where
+    // the same-surface test rejects part of the neighbourhood the surviving
+    // absolute weights sum to less than one, so alpha dips. The bilinear weight
+    // pattern of a scale p/q repeats every q display pixels, so those dips are
+    // periodic - that is the ~4-pixel beat at the shipped 3/4 Ultra scale.
+    //
+    // Coverage arm: alpha is the bilinear interpolation of the neighbourhood's
+    // alpha with absent and occluded taps read as zero, which is the correct
+    // smooth answer and has no dependence on the same-surface test. Colour
+    // still comes from same-surface taps only, so nothing bleeds across a depth
+    // discontinuity, and alpha is never divided by anything, so the halo the
+    // shipped comment describes cannot reappear.
+    float outputAlpha = CoverageAlphaReconstruction != 0 ? coverageAlpha : accumulated.a;
+    fragColor = vec4(straightColor, clamp(outputAlpha, 0.0, 1.0));
     if (CompositeMode == 0 || CompositeMode == 5) {
         gl_FragDepth = selectedDepth;
     }

@@ -694,6 +694,84 @@ final class StormLobeEvaluator {
     }
 
     /** Envelope boundary half-width in blocks for this descriptor. */
+    /**
+     * T143. Horizontal distance from a lobe's stored centre beyond which no
+     * column can receive any contribution from it, in world blocks.
+     *
+     * <p>This is the single source for the reach bound the shader hoists out of
+     * the march loop, and every term is an upper bound on something the exact
+     * evaluation can do:
+     *
+     * <ul>
+     *   <li>the widest radius the role's height profile can reach anywhere in
+     *       [0,1], including the anvil's 1.56 short-axis widening, and floored
+     *       at 1.0 the way the exact evaluation floors its radii;</li>
+     *   <li>x1.08 for the most the coherent morphology warp can subtract from
+     *       the normalized radius (its three components each lie in [-1,1] and
+     *       are weighted by 0.45, 0.20 and 0.35, then scaled by 0.08);</li>
+     *   <li>the full shear magnitude, which covers every shear progress the
+     *       role profiles produce in [0,1];</li>
+     *   <li>the cap-rounding fillet the signed distance subtracts at the
+     *       end;</li>
+     *   <li>the lobe's own edge softness, which is how far past its surface the
+     *       coverage envelope still fades;</li>
+     *   <li>the maximum blend, which bounds how far below the individual lobe
+     *       distances the ordered smooth union - the webbing - can sit.</li>
+     * </ul>
+     *
+     * <p>A column further away than this cannot be inside the lobe, inside its
+     * envelope fade, or inside webbing the union forms with it.
+     */
+    public static double horizontalReachBlocks(StormLobeDescriptor lobe) {
+        double profileMax = maximumProfileRadius(lobe.role());
+        double profileMin = minimumProfileRadius(lobe.role());
+        double anvilWiden = lobe.role() == StormLobeDescriptor.Role.ANVIL ? 1.56D : 1.0D;
+        double widest = Math.max(
+                Math.max(1.0D, lobe.majorRadius() * profileMax),
+                Math.max(1.0D, lobe.minorRadius() * anvilWiden * profileMax));
+        double narrowest = Math.min(
+                Math.max(1.0D, lobe.majorRadius() * profileMin),
+                Math.max(1.0D, lobe.minorRadius() * profileMin));
+        // The signed distance converts its normalized ellipse coordinate to
+        // blocks by dividing out the gradient magnitude, and that conversion is
+        // exact only for a circular section. Writing u = oriented / radii, the
+        // wall term is (|u| - 1) * |u| / |u / radii|, and |u| / |u / radii| is
+        // bounded below by the smaller radius - so an eccentric lobe reports a
+        // distance that grows at only minor/major of the geometric rate, and a
+        // bound of the form "widest radius plus a guard band" is not sound. A
+        // 5:1 BASE lobe falsified exactly that form by 25.9 blocks.
+        //
+        // Solving (|o| / widest - 1.08) * narrowest > guard for |o| gives the
+        // multiplicative form below. The 0.9 on the narrow radius covers the
+        // most the domain warp can shrink the effective radius by.
+        double guard = edgeWidthBlocks(lobe) + MAX_BLEND_BLOCKS + MIN_EDGE_BLOCKS;
+        return widest * (1.08D + guard / (0.9D * narrowest))
+                + Math.hypot(lobe.shearX(), lobe.shearZ());
+    }
+
+    /** Smallest value {@link #profileRadius} can take over a role's height. */
+    static double minimumProfileRadius(StormLobeDescriptor.Role role) {
+        return switch (role) {
+            case BASE -> 0.58D;
+            case CORE -> 0.56D;
+            case TOWER -> 0.60D;
+            case ANVIL -> 0.70D;
+        };
+    }
+
+    /**
+     * Largest value {@link #profileRadius} can take over the whole height of a
+     * role. Each is the analytic maximum of that role's expression, rounded up.
+     */
+    static double maximumProfileRadius(StormLobeDescriptor.Role role) {
+        return switch (role) {
+            case BASE -> 1.06D;
+            case CORE -> 1.02D;
+            case TOWER -> 1.43D;
+            case ANVIL -> StormT160UpperExtentArm.anvilMaxProfileRadius();
+        };
+    }
+
     static double edgeWidthBlocks(StormLobeDescriptor lobe) {
         double normalized = switch (lobe.role()) {
             // The live anvil strengths are deliberately below the core.
@@ -841,7 +919,12 @@ final class StormLobeEvaluator {
                     + 0.18D * Math.pow(Math.sin(Math.PI * vertical01), 0.65D);
             // A mature anvil begins while the tower is still present and its
             // wide profile retains the actual descriptor-strength differences.
-            case ANVIL -> lerp(smoothstep(0.0D, 0.62D, vertical01), 0.70D, 2.10D)
+            // T160 reads the knee and endpoint through the diagnostic arm.
+            // With the arm off - which is every production frame - these are
+            // the shipped 0.62 and 2.10 and the expression is unchanged.
+            case ANVIL -> lerp(
+                        smoothstep(0.0D, StormT160UpperExtentArm.anvilRadiusKnee(), vertical01),
+                        0.70D, StormT160UpperExtentArm.anvilRadiusMax())
                     + 0.08D * Math.pow(Math.sin(Math.PI * vertical01), 0.55D)
                     - 0.10D * smoothstep(0.88D, 1.0D, vertical01);
         };
@@ -866,7 +949,7 @@ final class StormLobeEvaluator {
             case CORE -> lobe.topY() + 32.0D;
             // Keep the lateral canopy substantial through the measured upper
             // role transition instead of collapsing at a thin cap.
-            case ANVIL -> lobe.topY() + 16.0D;
+            case ANVIL -> lobe.topY() + StormT160UpperExtentArm.anvilTopExtension();
             default -> lobe.topY();
         };
     }
@@ -878,9 +961,11 @@ final class StormLobeEvaluator {
             case CORE -> smoothstep(0.0D, 0.24D, vertical01)
                     * (1.0D - smoothstep(0.62D, 1.0D, vertical01));
             case TOWER -> smoothstep(0.0D, 0.28D, vertical01)
-                    * (1.0D - smoothstep(0.72D, 1.0D, vertical01));
+                    * (1.0D - smoothstep(
+                            StormT160UpperExtentArm.towerFadeStart(), 1.0D, vertical01));
             case ANVIL -> smoothstep(0.0D, 0.35D, vertical01)
-                    * (1.0D - smoothstep(0.76D, 1.0D, vertical01));
+                    * (1.0D - smoothstep(
+                            StormT160UpperExtentArm.anvilFadeStart(), 1.0D, vertical01));
         };
     }
 

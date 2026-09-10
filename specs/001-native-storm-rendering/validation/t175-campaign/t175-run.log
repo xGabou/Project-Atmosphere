@@ -1,0 +1,36 @@
+T175 density necessity - 06Sep2026, anchor-bracketed, SIDE then FAR
+Run 2 is banked; run 1's histogram read zero (views 35-38 were not enabled).
+
+--- decision block (run 2) ---
+T175_ARM pose=SIDE arm=t175_density_every2#r1 anchorBefore=21.5706 anchorAfter=21.8399 anchorDrift=0.0124 cloudP50=21.3934 cloudP95=22.9960 speedup=1.0146 verdict=accepted
+T175_ARM pose=SIDE arm=t175_clearance_first_group#r1 anchorBefore=21.8399 anchorAfter=21.7641 anchorDrift=0.0035 cloudP50=21.6300 cloudP95=23.3185 speedup=1.0080 verdict=accepted
+T175_ARM pose=SIDE arm=t172_stack_pre#r1 anchorBefore=21.7641 anchorAfter=21.7354 anchorDrift=0.0013 cloudP50=12.5215 cloudP95=13.6602 speedup=1.7370 verdict=accepted
+T175_ARM pose=SIDE arm=t175_density_every2#r2 anchorBefore=21.7354 anchorAfter=21.8900 anchorDrift=0.0071 cloudP50=21.8624 cloudP95=23.9872 speedup=0.9977 verdict=accepted
+T175_ARM pose=SIDE arm=t175_clearance_first_group#r2 anchorBefore=21.8900 anchorAfter=21.4548 anchorDrift=0.0201 cloudP50=21.8849 cloudP95=23.3615 speedup=0.9903 verdict=accepted
+T175_ARM pose=SIDE arm=t172_stack_pre#r2 anchorBefore=21.4548 anchorAfter=21.5388 anchorDrift=0.0039 cloudP50=11.9009 cloudP95=13.1574 speedup=1.8063 verdict=accepted
+T175_ARM pose=FAR arm=t175_density_every2#r1 anchorBefore=12.7898 anchorAfter=12.7570 anchorDrift=0.0026 cloudP50=12.7703 cloudP95=13.9837 speedup=1.0002 verdict=accepted
+T175_ARM pose=FAR arm=t175_clearance_first_group#r1 anchorBefore=12.7570 anchorAfter=12.8635 anchorDrift=0.0083 cloudP50=12.7273 cloudP95=14.3534 speedup=1.0065 verdict=accepted
+T175_ARM pose=FAR arm=t172_stack_pre#r1 anchorBefore=12.8635 anchorAfter=12.8819 anchorDrift=0.0014 cloudP50=5.3565 cloudP95=5.8173 speedup=2.4032 verdict=accepted
+T175_ARM pose=FAR arm=t175_density_every2#r2 anchorBefore=12.8819 anchorAfter=12.9106 anchorDrift=0.0022 cloudP50=12.8092 cloudP95=13.9080 speedup=1.0068 verdict=accepted
+T175_ARM pose=FAR arm=t175_clearance_first_group#r2 anchorBefore=12.9106 anchorAfter=12.7130 anchorDrift=0.0154 cloudP50=12.8010 cloudP95=13.8588 speedup=1.0008 verdict=accepted
+T175_ARM pose=FAR arm=t172_stack_pre#r2 anchorBefore=12.7130 anchorAfter=12.7252 anchorDrift=0.0010 cloudP50=5.2808 cloudP95=5.8491 speedup=2.4086 verdict=accepted
+T175_FLOOR repeatTolerance=0.030
+T175_REJECTED count=0 none
+
+--- repeat-agreement rule ---
+SIDE density_every2          21.3934 21.8624  2.17%  accepted
+SIDE clearance_first_group   21.6300 21.8849  1.17%  accepted
+SIDE t172_stack_pre          12.5215 11.9009  5.08%  REJECTED_repeat
+FAR  density_every2          12.7703 12.8092  0.30%  accepted
+FAR  clearance_first_group   12.7273 12.8010  0.58%  accepted
+FAR  t172_stack_pre           5.3565  5.2808  1.42%  accepted
+
+--- primary density histogram + walk attribution (per pixel) ---
+SIDE steps=30.90 bodyDensity=4.99 lightTaps=14.98 shapeCalls=45.04 groupField=38.25 lobes=382.5
+FAR  steps=28.64 bodyDensity=0.82 lightTaps= 1.89 shapeCalls=10.87 groupField= 6.21 lobes= 62.1
+
+primaryDensityCalls=647029 primaryDensityZero=91852 primaryDensityNegligible=283 primaryDensityLow=18971 primaryDensityMedium=110659 primaryDensityHigh=425266 primaryMaterialRuns=37248 primaryZeroRuns=9867 primaryDensityPerPixel=4.9925 materialFraction=0.8576 emptyFraction=0.1424 meanMaterialRun=14.8973 meanEmptyRun=9.3377
+primaryDensityCalls=647092 primaryDensityZero=91892 primaryDensityNegligible=283 primaryDensityLow=18972 primaryDensityMedium=110662 primaryDensityHigh=425282 primaryMaterialRuns=37249 primaryZeroRuns=9865 primaryDensityPerPixel=4.9930 materialFraction=0.8576 emptyFraction=0.1424 meanMaterialRun=14.8975 meanEmptyRun=9.3436
+
+--- workload view invariant ---
+T175_WORKLOAD_VIEWS declared=16|allEnabled=true

@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 
+import net.Gabou.projectatmosphere.clouds.client.render.CloudTextureUnitContract;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyMemberTier;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
@@ -50,6 +51,10 @@ public final class StormVolumetricGeometrySandbox {
         validateT132AuthoritativeControlSeparation();
         validateT133ProductionDefaultUnchanged();
         validateT123InstrumentationOnly();
+        validateT143ReachabilityGuard();
+        validateT143ShaderReachabilityShape();
+        validateT145RainLocalityGate();
+        validateT150StormVisibilityGuard();
         validateT121VerticalBoundIsConservative();
         validateT121Float32BoundaryMargin();
         validateT121GuardAdmitsNoUnionContribution();
@@ -63,6 +68,8 @@ public final class StormVolumetricGeometrySandbox {
         validateT132Attribution();
         reportT098CarrierDistribution();
         reportT098ErosionVersusBody();
+        reportT098AnvilSurfaceStructure();
+        reportT098AnvilOpticalSurface();
         reportT098VerticalWidthProfile();
         reportT098TransitionCandidates();
         reportT098PercolationWidth();
@@ -73,12 +80,134 @@ public final class StormVolumetricGeometrySandbox {
         reportT098OpticalProfile();
         reportT098WebbingExcess();
         reportT098MarchSimulation();
+        reportT098PromotionPolicySweep();
+        validateT098PromotionBudget();
         validateT098MarchReachesMaterial();
+        validateT098CloudHitDepthNeverSaturates();
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
             runPhase4RCorrected();
         }
+    }
+
+
+    /**
+     * T098 defect boundary: a cloud HIT must never publish the composite's
+     * "no cloud" depth sentinel.
+     *
+     * <p>Measured on the live SIDE waist ray with the production ray trace: the
+     * march integrated alpha 0.63 over material whose alpha-weighted
+     * representative point sat 912 blocks away, while the cloud pass was drawn
+     * with the scene projection whose far plane is 768.24 blocks. {@code
+     * depthAt} clamps to [0, 1], so that representative point published depth
+     * exactly 1.0. {@code cloud_field_composite.fsh} reads a cloud texel as
+     * carrying no cloud when its depth is not below 1.0 - {@code hasDepth =
+     * depths[i] < 1.0}, then {@code selectedDepth >= 1.0} discards - so every
+     * bit of that alpha was thrown away and the storm rendered as clear sky.
+     * The BASE and ANVIL controls on the same frame sat at 736 and 665.5
+     * blocks, inside the far plane, published 0.99999416 and 0.99998683, and
+     * were composited normally.
+     *
+     * <p>The volume is marched to MaxRenderDistance, which is a cloud setting
+     * unrelated to the scene frustum, so this is not an exotic case: it is
+     * every storm whose material centroid lies past the render distance. This
+     * check sweeps representative distances across the far plane for several
+     * render distances and requires that a hit is always composited. The old
+     * expression is evaluated alongside and must fail the same sweep, so the
+     * regression cannot silently pass on the behaviour it was written for.
+     */
+    private static void validateT098CloudHitDepthNeverSaturates() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String constantKey = "const float PA_CLOUD_HIT_MAX_DEPTH = ";
+        int constantAt = shader.indexOf(constantKey);
+        require(constantAt >= 0, "PA_CLOUD_HIT_MAX_DEPTH is missing from the production shader");
+        float hitMaxDepth = Float.parseFloat(shader.substring(
+                constantAt + constantKey.length(), shader.indexOf(';', constantAt)).trim());
+        require(hitMaxDepth < 1.0F,
+                "PA_CLOUD_HIT_MAX_DEPTH must be below the composite's 1.0 miss sentinel");
+        require(hitMaxDepth >= 0.99999F,
+                "PA_CLOUD_HIT_MAX_DEPTH below 0.99999 would change history depth confidence,"
+                        + " which this correction must leave alone");
+        require(shader.contains("min(depthAt(relRepresentative), PA_CLOUD_HIT_MAX_DEPTH)"),
+                "the cloud hit depth is no longer bounded away from the composite's sentinel");
+
+        // The before/after evidence arm must stay diagnostic-only: production
+        // frames take the corrected bound, never the saturating one.
+        require(shader.contains("PaLegacyHitDepth != 0"),
+                "the T098 legacy-depth evidence arm is no longer gated by its uniform");
+        String shaderJson = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.json");
+        require(shaderJson.contains(
+                        "{ \"name\": \"PaLegacyHitDepth\", \"type\": \"int\", \"count\": 1, \"values\": [ 0 ] }"),
+                "the T098 legacy-depth arm does not default to off");
+        require(!VolumetricCloudDebugConfig.t098LegacyHitDepth(),
+                "the T098 legacy-depth evidence arm is enabled by default");
+
+        String composite = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_field_composite.fsh");
+        require(composite.contains("bool hasDepth = depths[i] < 1.0;")
+                        && composite.contains("selectedDepth >= 1.0"),
+                "the composite no longer treats depth 1.0 as absence of cloud;"
+                        + " this guard's premise must be re-derived");
+
+        long probes = 0L;
+        long correctedDiscards = 0L;
+        long legacyDiscards = 0L;
+        String firstLegacyWitness = "";
+        for (int renderChunks : new int[] {8, 12, 16, 24, 32}) {
+            // Minecraft's own projection far plane for that render distance.
+            float far = renderChunks * 16.0F * 4.0F;
+            float near = 0.05F;
+            for (double representativeT = 32.0D; representativeT <= 2000.0D;
+                    representativeT += 0.5D) {
+                // A view-axis point at this distance, through the standard
+                // OpenGL perspective depth mapping the cloud pass inherits.
+                // View space looks down -Z, so a point straight ahead at this
+                // distance has viewZ = -representativeT and clipW = +distance.
+                double clipZ = representativeT * (far + near) / (far - near)
+                        - 2.0D * far * near / (far - near);
+                double clipW = representativeT;
+                double ndcDepth = clipZ / Math.max(Math.abs(clipW), 0.00001D);
+                float clamped = (float) Math.max(0.0D, Math.min(1.0D, ndcDepth * 0.5D + 0.5D));
+                float corrected = Math.min(clamped, hitMaxDepth);
+                probes++;
+                if (clamped >= 1.0F) {
+                    legacyDiscards++;
+                    if (firstLegacyWitness.isEmpty()) {
+                        firstLegacyWitness = "renderChunks=" + renderChunks
+                                + " far=" + far
+                                + " representativeT=" + representativeT
+                                + " legacyDepth=" + clamped;
+                    }
+                }
+                if (corrected >= 1.0F) {
+                    correctedDiscards++;
+                }
+            }
+        }
+        System.out.printf(
+                "T098_HIT_DEPTH|probes=%d|legacyDiscardedHits=%d|correctedDiscardedHits=%d%n",
+                probes, legacyDiscards, correctedDiscards);
+        require(probes > 15_000L, "the hit-depth sweep did not cover enough of the range");
+        require(legacyDiscards > 0L,
+                "the pre-fix expression discarded no hit anywhere in the sweep;"
+                        + " this regression would pass against the behaviour it was written for");
+        System.out.println("T098_HIT_DEPTH_LEGACY_WITNESS|" + firstLegacyWitness);
+        require(correctedDiscards == 0L,
+                "a cloud hit still publishes the composite's miss sentinel in "
+                        + correctedDiscards + " of " + probes + " probes");
+
+        // The correction must not make a cloud visible through terrain. The
+        // composite keeps a texel only when its depth is at or in front of the
+        // scene depth, and that comparison is unchanged by the bound.
+        float sceneDepthInFront = 0.98F;
+        require(hitMaxDepth > sceneDepthInFront,
+                "the bounded cloud depth would draw in front of nearer scene geometry");
+
+        System.out.println(
+                "PHASE4T_RESULT|T098 cloud hit depth never saturates|PASSED|invariant satisfied");
     }
 
     /**
@@ -459,6 +588,713 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateBoundedPerGroupIntersection);
         runCorrected("T111 production storm shader compiles",
                 StormVolumetricGeometrySandbox::validateProductionShaderCompiles);
+        runCorrected("T161 lean FINAL shader specializes and compiles",
+                StormVolumetricGeometrySandbox::validateLeanFinalShaderCompiles);
+        runCorrected("T140 oracle variants compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT140OracleVariants);
+        runCorrected("T162 attribution arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT162AttributionArms);
+        runCorrected("T166 attribution arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT166AttributionArms);
+        runCorrected("T167 refinement arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT167RefinementArms);
+        runCorrected("T168 footprint arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT168FootprintArms);
+        runCorrected("T169 lighting and detail arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT169LightingDetailArms);
+        runCorrected("T170 primary march arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT170PrimaryMarchArms);
+        runCorrected("T170 every registered campaign is wired into every dispatch site",
+                StormVolumetricGeometrySandbox::validateCampaignWiring);
+        runCorrected("T170 the campaign wiring invariant detects an omitted wire",
+                StormVolumetricGeometrySandbox::validateCampaignWiringCatchesOmissions);
+        runCorrected("T171 program identity controls are byte-identical to FINAL",
+                StormVolumetricGeometrySandbox::validateT171ProgramIdentityControls);
+        runCorrected("T171 the GPU sampler records only fresh timer results",
+                StormVolumetricGeometrySandbox::validateGpuSampleFreshnessGating);
+        runCorrected("T172 precompute arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT172PrecomputeArms);
+        runCorrected("T172 the CPU precompute still matches the shader formula",
+                StormVolumetricGeometrySandbox::validateT172PrecomputeEquivalence);
+        runCorrected("T175 every workload debug view is actually enabled",
+                StormVolumetricGeometrySandbox::validateWorkloadViewsAreEnabled);
+        runCorrected("T182 every consumer tag has a counter that reads it",
+                StormVolumetricGeometrySandbox::validateConsumerTagsAreCounted);
+        runCorrected("T163 FINAL is specialized against the dead precipitation path",
+                StormVolumetricGeometrySandbox::validateT163PrecipitationSpecialization);
+        runCorrected("T183 rain rendering survives the precipitation specialization",
+                StormVolumetricGeometrySandbox::validateRainRenderSurvivesPrecipitationSpecialization);
+        runCorrected("T188 the rain field is generated by the production function",
+                StormVolumetricGeometrySandbox::validateT188FieldGeneratedByProduction);
+        runCorrected("T188 FINAL carries no rain field",
+                StormVolumetricGeometrySandbox::validateT188FinalIsUnaffected);
+        runCorrected("T188 rain quality is measured on a rain-only capture",
+                StormVolumetricGeometrySandbox::validateT188RainMaskHarness);
+        runCorrected("T189 rain-field ownership is sampled discretely",
+                StormVolumetricGeometrySandbox::validateT189DiscreteOwnership);
+        runCorrected("T190 uncertain field cells fall back to the exact evaluation",
+                StormVolumetricGeometrySandbox::validateT190ConservativeFallback);
+        runCorrected("T191 every campaign arm is reachable and scoped to its campaign",
+                StormVolumetricGeometrySandbox::validateT191VariantScope);
+        runCorrected("T192 the closed-form ownership bound never claims a cell falsely",
+                StormVolumetricGeometrySandbox::validateT192OwnershipBound);
+    }
+
+    /**
+     * T192. The closed-form ownership bound, proven rather than inspected.
+     *
+     * <p>The bound claims that when every descriptor's scaled cell box has a
+     * nearest-point squared distance above 1, no point in the cell is owned. A
+     * false claim there would invent rain, which is the exact failure mode this
+     * whole line of campaigns has been chasing - so the claim is tested
+     * numerically against dense sampling, not just read for plausibility.
+     *
+     * <p>Only the DRY direction is asserted, because only the DRY direction is
+     * used. "Entirely inside an ellipse" would not prove ownership:
+     * ownsDescriptorGroup also requires the group union to carry coverage, so
+     * the ellipse test is a superset of ownership rather than an equivalence.
+     */
+    private static void validateT192OwnershipBound() {
+        java.util.Random random = new java.util.Random(0x7192L);
+        int provablyDry = 0;
+        int notProvable = 0;
+        int falseSafe = 0;
+        final int trials = 40000;
+        final int samplesPerAxis = 24;
+
+        for (int trial = 0; trial < trials; trial++) {
+            // One ellipse and one cell, on the scale the field actually uses:
+            // eight world blocks per cell against lobe radii in the tens to
+            // low hundreds, with the cell placed near the boundary often
+            // enough that the interesting case dominates.
+            double centreX = random.nextDouble() * 400.0 - 200.0;
+            double centreZ = random.nextDouble() * 400.0 - 200.0;
+            double radiusX = 8.0 + random.nextDouble() * 180.0;
+            double radiusZ = 8.0 + random.nextDouble() * 180.0;
+            double cellSize = 2.0 + random.nextDouble() * 14.0;
+            double angle = random.nextDouble() * Math.PI * 2.0;
+            double reach = random.nextDouble() * 1.6;
+            double cellCentreX = centreX + Math.cos(angle) * radiusX * reach;
+            double cellCentreZ = centreZ + Math.sin(angle) * radiusZ * reach;
+            double minX = cellCentreX - cellSize * 0.5;
+            double maxX = cellCentreX + cellSize * 0.5;
+            double minZ = cellCentreZ - cellSize * 0.5;
+            double maxZ = cellCentreZ + cellSize * 0.5;
+
+            // The bound, transcribed from the shader.
+            double lowX = (minX - centreX) / radiusX;
+            double highX = (maxX - centreX) / radiusX;
+            double lowZ = (minZ - centreZ) / radiusZ;
+            double highZ = (maxZ - centreZ) / radiusZ;
+            double nearestX = (lowX <= 0.0 && 0.0 <= highX)
+                    ? 0.0 : Math.min(Math.abs(lowX), Math.abs(highX));
+            double nearestZ = (lowZ <= 0.0 && 0.0 <= highZ)
+                    ? 0.0 : Math.min(Math.abs(lowZ), Math.abs(highZ));
+            boolean claimsDry = nearestX * nearestX + nearestZ * nearestZ > 1.0;
+
+            // The reference: is any point of the cell actually owned?
+            boolean sampledOwned = false;
+            for (int ix = 0; ix <= samplesPerAxis && !sampledOwned; ix++) {
+                double x = minX + (maxX - minX) * ix / (double) samplesPerAxis;
+                for (int iz = 0; iz <= samplesPerAxis; iz++) {
+                    double z = minZ + (maxZ - minZ) * iz / (double) samplesPerAxis;
+                    double u = (x - centreX) / radiusX;
+                    double v = (z - centreZ) / radiusZ;
+                    if (u * u + v * v <= 1.0) {
+                        sampledOwned = true;
+                        break;
+                    }
+                }
+            }
+
+            if (claimsDry) {
+                provablyDry++;
+                if (sampledOwned) {
+                    falseSafe++;
+                }
+            } else {
+                notProvable++;
+            }
+        }
+
+        require(falseSafe == 0,
+                "T192 closed-form bound claimed " + falseSafe + " cells provably dry"
+                        + " that contain owned points; a false-safe claim invents rain");
+        // A bound that never proves anything would also report zero false-safe.
+        require(provablyDry > trials / 10,
+                "T192 closed-form bound proves almost nothing dry (" + provablyDry
+                        + " of " + trials + "), so it cannot be triaging anything");
+        require(notProvable > trials / 20,
+                "T192 closed-form bound proves everything dry, which means the test"
+                        + " space no longer contains the boundary case");
+
+        // The shader must use only the direction that is a proof, and must not
+        // reach for a square root where a squared inequality suffices.
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String boundBlock = functionBlock(shader, "bool paCellProvablyUnowned(");
+        require(boundBlock.contains("dot(nearest, nearest) <= 1.0"),
+                "T192 bound no longer tests the nearest point of the scaled cell box");
+        require(!boundBlock.contains("sqrt(") && !boundBlock.contains("length("),
+                "T192 bound takes a square root where a squared inequality suffices");
+        require(!boundBlock.contains("farthest") && !boundBlock.contains("SAFE_OWNED"),
+                "T192 bound claims the owned direction, which the ellipse test does"
+                        + " not prove - ownership also needs group coverage");
+        // Derived from the same descriptor geometry as the exact predicate.
+        String exact = functionBlock(shader, "bool paRainColumnOwnedExact(");
+        for (String shared : new String[] {
+                "positionHeight.xy + shearMedia.xy * 0.5",
+                "max(lifecycleRole.yz, vec2(1.0e-6))"}) {
+            require(boundBlock.contains(shared) && exact.contains(shared),
+                    "T192 bound and the exact ownership test no longer share their"
+                            + " geometry: " + shared);
+        }
+        // Triage stays in the build.
+        String generation = between(shader, "if (PaRainFieldPass == 1) {",
+                "if (paRayTraceActive()) {", "T192 generation pass");
+        require(generation.contains("paCellProvablyUnowned("),
+                "T192 triage is not applied during field generation");
+        String lookup = functionBlock(shader, "float paRainFieldSupportAt(");
+        require(!lookup.contains("paCellProvablyUnowned("),
+                "T192 moved the bound into the hot lookup");
+
+        System.out.println("T192_OWNERSHIP_BOUND trials=" + trials
+                + "|provablyDry=" + provablyDry + "|notProvable=" + notProvable
+                + "|falseSafe=" + falseSafe + "|sqrtFree=true|dryDirectionOnly=true");
+    }
+
+    /**
+     * T191. Campaign arms are loaded only while their campaign is armed.
+     *
+     * <p>Every arm ever measured used to be compiled and linked on every
+     * startup - 139 full-size fragment programs by T190 - which is minutes of
+     * compilation and enough memory pressure that one launch died in the middle
+     * of it. This keeps the accumulation from coming back:
+     *
+     * <ul>
+     *   <li>every non-production program must resolve to a registered campaign,
+     *       so a new arm cannot become one no marker can activate;</li>
+     *   <li>the two production programs must stay unconditional, so ordinary
+     *       rendering never depends on a marker file;</li>
+     *   <li>registration must remain filtered, so the loop cannot quietly go
+     *       back to loading everything.</li>
+     * </ul>
+     */
+    /**
+     * The programs a campaign's arm tables can select, resolved the same way
+     * registration resolves them so the invariant and the runtime cannot
+     * disagree about what "selectable" means.
+     */
+    private static List<CoreCostDiagnosticProgram> campaignSelectablePrograms(
+            String campaignId) {
+        List<CoreCostDiagnosticProgram> programs = new ArrayList<>();
+        for (String suffix : new String[] {"_ARMS", "_IMAGE_ARMS"}) {
+            try {
+                java.lang.reflect.Field field = StormT132AutoDriver.class
+                        .getDeclaredField(campaignId + suffix);
+                field.setAccessible(true);
+                Object value = field.get(null);
+                if (value instanceof CoreCostDiagnosticProgram[] direct) {
+                    programs.addAll(java.util.Arrays.asList(direct));
+                } else if (value != null && value.getClass().isArray()) {
+                    int length = java.lang.reflect.Array.getLength(value);
+                    for (int index = 0; index < length; index++) {
+                        Object element = java.lang.reflect.Array.get(value, index);
+                        java.lang.reflect.Method program =
+                                element.getClass().getDeclaredMethod("program");
+                        program.setAccessible(true);
+                        programs.add((CoreCostDiagnosticProgram) program.invoke(element));
+                    }
+                }
+            } catch (ReflectiveOperationException | RuntimeException absent) {
+                // Campaigns without that table contribute nothing.
+            }
+        }
+        return programs;
+    }
+
+    private static void validateT191VariantScope() {
+        List<String> unreachable = new ArrayList<>();
+        int production = 0;
+        int scoped = 0;
+        for (CoreCostDiagnosticProgram program : CoreCostDiagnosticProgram.values()) {
+            if (program.isProductionProgram()) {
+                production++;
+                require(program.campaignId() == null,
+                        "T191 production program " + program.serializedName()
+                                + " claims a campaign, so it would stop loading"
+                                + " whenever that campaign is not armed");
+                continue;
+            }
+            String campaign = program.campaignId();
+            boolean registeredCampaign = false;
+            for (StormCampaignRegistry.Campaign known
+                    : StormCampaignRegistry.CAMPAIGNS) {
+                if (known.id().equals(campaign)) {
+                    registeredCampaign = true;
+                    break;
+                }
+            }
+            if (campaign == null || !registeredCampaign) {
+                unreachable.add(program.serializedName() + " -> " + campaign);
+            } else {
+                scoped++;
+            }
+        }
+        require(production == 2,
+                "T191 expects exactly two unconditional production programs, found "
+                        + production);
+        require(unreachable.isEmpty(),
+                "T191 campaign arms that no registered campaign can load, so they"
+                        + " would be dead programs rather than scoped ones: "
+                        + String.join(", ", unreachable));
+
+        // T192 correction. Prefix scoping alone is wrong: arm matrices reuse
+        // earlier campaigns' programs as controls, and a control that is not
+        // registered can only surface as a missing program in the middle of a
+        // sweep. Every program any campaign's arms can select must therefore be
+        // registered when that campaign is armed.
+        List<String> unregisterableControls = new ArrayList<>();
+        for (StormCampaignRegistry.Campaign campaign : StormCampaignRegistry.CAMPAIGNS) {
+            for (CoreCostDiagnosticProgram program
+                    : campaignSelectablePrograms(campaign.id())) {
+                if (program.isProductionProgram()) {
+                    continue;
+                }
+                if (!campaign.id().equals(program.campaignId())) {
+                    // A cross-campaign control. It is only loadable because the
+                    // registration takes the union with the arm tables.
+                    unregisterableControls.add(
+                            campaign.id() + " selects " + program.serializedName()
+                                    + " (campaign " + program.campaignId() + ")");
+                }
+            }
+        }
+
+        String shaders = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "client/render/shader/VolumetricCloudShaders.java");
+        require(shaders.contains("programsSelectableByActiveCampaigns()")
+                        && shaders.contains("!selectable.contains(program)"),
+                "T191 registration scopes by name prefix alone, which leaves every"
+                        + " cross-campaign control unloaded: "
+                        + String.join("; ", unregisterableControls));
+        require(shaders.contains("if (!activeCampaigns.contains(program.campaignId())")
+                        && shaders.contains("&& !selectable.contains(program)) {"),
+                "T191 shader registration is no longer scoped to the active campaign,"
+                        + " so every historical arm compiles at startup again");
+        require(shaders.contains("if (program.isProductionProgram()) {"),
+                "T191 production programs are no longer registered unconditionally");
+        require(shaders.contains("T191_VARIANT_SCOPE declared={}"),
+                "T191 startup no longer reports how many programs it loaded, so a"
+                        + " regression would be invisible");
+
+        // Marker names have to agree with the driver, or arming a campaign would
+        // load nothing and the arms would report as failed compiles.
+        String driver = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/StormT132AutoDriver.java");
+        for (StormCampaignRegistry.Campaign campaign : StormCampaignRegistry.CAMPAIGNS) {
+            require(driver.contains("\"" + campaign.markerFileName() + "\""),
+                    "T191 campaign " + campaign.id() + " marker "
+                            + campaign.markerFileName()
+                            + " is not the one the driver looks for, so arming it"
+                            + " would register programs the run never selects");
+        }
+        System.out.println("T191_VARIANT_SCOPE crossCampaignControls="
+                + unregisterableControls.size()
+                + "|productionAlwaysLoaded=" + production
+                + "|campaignScoped=" + scoped + "|unreachable=0"
+                + "|ordinaryStartupPrograms=" + production);
+    }
+
+    /**
+     * T190. The field is an acceleration structure, and an acceleration
+     * structure may be fast but never wrong.
+     *
+     * <p>T189 established why that matters here: the field's per-column error
+     * was only 0.22%, but rain reachability is an existence test asked of order
+     * sixty times per ray, which amplified it to 12% false rain. A smaller
+     * approximation would still be multiplied by sixty, so the only fix that
+     * survives is removing the approximation where it cannot be proven safe.
+     *
+     * <p>This pins the shape of that fix: classification in the build, an exact
+     * fallback in the lookup, and the certainty flag carried in a channel that
+     * already existed.
+     */
+    private static void validateT190ConservativeFallback() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+
+        String lookup = functionBlock(shader, "float paRainFieldSupportAt(");
+        require(lookup.contains("if (PaRainFieldConservative == 1) {"),
+                "T190 lookup does not consult the certainty flag");
+        require(lookup.contains("if (paSafeCell.a >= 0.5) {")
+                        && lookup.contains(
+                                "return directStormRainSupportAt(\n"
+                                        + "                worldXZ, attachY,"
+                                        + " ownsDescriptorGroup);"),
+                "T190 mixed cells do not fall back to the exact evaluation, so the"
+                        + " field is still allowed to answer where it cannot be trusted");
+        require(lookup.contains("ownsDescriptorGroup = paSafeCell.b >= 0.5;"),
+                "T190 takes ownership from a different fetch than the certainty flag,"
+                        + " so the flag can vouch for a value it did not see");
+
+        // The fallback must be the production path, not a second approximation.
+        require(!lookup.contains("paRainFieldSupportAt(worldXZ"),
+                "T190 fallback recurses into the field instead of evaluating exactly");
+
+        // Classification belongs to the build. A per-query classifier would put
+        // the cost back in the loop the field exists to empty.
+        String generation = between(shader, "if (PaRainFieldPass == 1) {",
+                "if (paRayTraceActive()) {", "T190 generation pass");
+        require(generation.contains("paClassifyCellByCorners("),
+                "T190 classification is not performed during field generation");
+        // T192 extracted the corner loop into a helper so the closed-form
+        // triage could reach it; the loop and what it decides on must still be
+        // there, wherever it lives.
+        String cornerClassifier = functionBlock(shader, "float paClassifyCellByCorners(");
+        require(cornerClassifier.contains(
+                        "for (int cornerIndex = 0; cornerIndex < 4; cornerIndex++)"),
+                "T190 corner classification no longer samples the four cell corners");
+        require(cornerClassifier.contains("mixedOwn")
+                        && cornerClassifier.contains("mixedSupport")
+                        && cornerClassifier.contains("PA_FIELD_ATTACH_TOLERANCE"),
+                "T190 classification does not cover all three quantities the ray"
+                        + " decides on: ownership, the support cutoff, and attach height");
+        require(!lookup.contains("paClassifyCellByCorners(")
+                        && !lookup.contains("cornerIndex"),
+                "T190 moved classification into the hot lookup");
+
+        // The certainty flag rides in alpha, which T188 wrote as a constant
+        // marker nothing read. No new texture, no extra byte per texel.
+        require(generation.contains(
+                        "fieldSupport, fieldAttachY, fieldOwnsGroup ? 1.0 : 0.0,"
+                                + " fieldMixed);"),
+                "T190 certainty flag is not carried in the field's spare alpha channel");
+        String targets = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/VolumetricCloudRenderTargets.java");
+        require(targets.split("createFloatMap\\(size, size, GL11.GL_LINEAR\\)", -1)
+                        .length - 1 == 1,
+                "T190 expects exactly one RGBA32F field target; a second texture would"
+                        + " make the certainty flag cost storage it does not need");
+
+        // The classifier reads its cell size from the weather map because the
+        // field is this pass's own render target and sampling a bound target is
+        // undefined. That substitution is only sound while the two are the same
+        // size, which the renderer guarantees by construction.
+        require(generation.contains("textureSize(WeatherMapSampler, 0)"),
+                "T190 classification reads the cell grid from the field it is writing,"
+                        + " which is a bound render target");
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/VolumetricCloudRenderer.java");
+        require(renderer.contains("prepareRainFieldTarget(\n"
+                        + "                            profile.weatherMapSize())"),
+                "T190 field and weather map are no longer the same size, so the"
+                        + " classifier's cell grid is wrong");
+
+        // FINAL must not carry any of it.
+        String gradle = readWorkspaceSource("build.gradle");
+        require(gradle.contains("'uniform int PaRainFieldConservative;'")
+                        && gradle.contains("'const int PaRainFieldConservative = 0;'"),
+                "T190 conservative path is not compiled out of the lean programs");
+        for (String variant : new String[] {
+                "cloud_atmosphere_volume_t190_field_safe",
+                "cloud_atmosphere_volume_t190_stack_safe",
+                "cloud_atmosphere_volume_t190_rain_mask_safe"}) {
+            String block = between(gradle, "[name: '" + variant + "'", "]],",
+                    "T190 variant " + variant);
+            require(block.contains("'PaRainFieldConservative'"),
+                    "T190 variant " + variant + " does not keep the certainty uniform,"
+                            + " so it would silently measure the approximate field");
+        }
+        System.out.println("T190_CONSERVATIVE_FALLBACK classifiedAtBuild=true"
+                + "|exactFallback=true|flagInSpareAlpha=true|noNewTexture=true"
+                + "|compiledOutOfFinal=true");
+    }
+
+    /**
+     * T189. Ownership is a boolean, and T188 asked a bilinear filter for it.
+     * Thresholding the interpolated value dilated the union outward by up to
+     * half a texel - four world blocks at 512 - and produced 10.6-15.6% false
+     * rain against 0.75-1.02% missed.
+     *
+     * <p>This pins the fix in place. The default path must fetch ownership with
+     * exact integer texel coordinates, the two continuous channels must keep
+     * their filtering, and the texel rule must be the inverse of the one the
+     * generation pass writes with - a half-texel "correction" here would move
+     * the lookup to a neighbouring cell rather than fix an offset.
+     */
+    private static void validateT189DiscreteOwnership() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String lookup = functionBlock(shader, "float paRainFieldSupportAt(");
+
+        require(lookup.contains("texelFetch(RainFieldSampler, paOwnTexel, 0).b"),
+                "T189 ownership is not point-sampled; a bilinear boolean dilates the"
+                        + " ownership union and invents rain around every shaft");
+        require(lookup.contains("ivec2(floor(uv * vec2(paFieldSize)))"),
+                "T189 ownership texel is not the cell containing the column");
+        require(lookup.contains("clamp(")
+                        && lookup.contains("paFieldSize - ivec2(1)"),
+                "T189 ownership texel is not clamped to the field, so a column at the"
+                        + " domain edge reads out of bounds");
+        // The generation pass writes cell (i,j) from texCoord (i+0.5)/N, so
+        // floor(uv*N) is its exact inverse. Anything adding half a texel here
+        // would select a neighbouring cell.
+        require(!lookup.contains("uv * vec2(paFieldSize) - 0.5")
+                        && !lookup.contains("uv * vec2(paFieldSize) + 0.5"),
+                "T189 ownership lookup applies a half-texel offset, which selects a"
+                        + " different cell than the generation pass wrote");
+        require(shader.contains("WeatherOrigin + texCoord * WeatherExtent"),
+                "T189 generation pass no longer uses the mapping the lookup inverts");
+
+        // Support and attach height stay filtered. Point-sampling them would
+        // put an eight-block staircase on every rain edge, which is a different
+        // defect rather than a stricter fix.
+        require(lookup.contains("vec4 cell = texture(RainFieldSampler, uv);")
+                        && lookup.contains("attachY = cell.g;")
+                        && lookup.contains("return cell.r;"),
+                "T189 made the continuous channels discrete too, which trades"
+                        + " ownership dilation for a quantised rain edge");
+
+        // The defect has to stay reachable, or the fix has no baseline.
+        require(shader.contains("#if defined(PA_ARM_RAIN_OWN_BILINEAR)"),
+                "T189 removed the bilinear-ownership arm, so the fix cannot be"
+                        + " measured against the behaviour it replaces");
+
+        String gradle = readWorkspaceSource("build.gradle");
+        for (String variant : new String[] {
+                "cloud_atmosphere_volume_t188_field_real",
+                "cloud_atmosphere_volume_t188_rain_mask_field"}) {
+            String block = between(gradle, "[name: '" + variant + "'", "]],",
+                    "T189 baseline " + variant);
+            require(block.contains("'PA_ARM_RAIN_OWN_BILINEAR 1'"),
+                    "T189 baseline arm " + variant + " no longer carries the bilinear"
+                            + " ownership it exists to represent");
+        }
+        for (String variant : new String[] {
+                "cloud_atmosphere_volume_t189_field_nearest",
+                "cloud_atmosphere_volume_t189_rain_mask_nearest"}) {
+            String block = between(gradle, "[name: '" + variant + "'", "]],",
+                    "T189 candidate " + variant);
+            require(!block.contains("PA_ARM_RAIN_OWN_BILINEAR")
+                            && !block.contains("PA_ARM_RAIN_OWN_STRICT"),
+                    "T189 candidate " + variant + " does not use the discrete default");
+        }
+        System.out.println("T189_DISCRETE_OWNERSHIP texelFetch=true|continuousFiltered=true"
+                + "|halfTexelOffset=false|clamped=true|baselineRetained=true");
+    }
+
+    /**
+     * T188. The field is worth having only if what it stores is what the ray
+     * would have computed. The guarantee this codebase can actually hold is
+     * structural rather than numeric: the generation pass calls the SAME
+     * function the march calls, in the same program, so there is no second
+     * implementation that could drift from it.
+     *
+     * <p>That is exactly the property T172 had to prove the hard way for a CPU
+     * precompute, and the reason the field is generated here instead.
+     */
+    private static void validateT188FieldGeneratedByProduction() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+
+        // One definition. A second would be the drift this check exists to stop.
+        int definitions =
+                shader.split("float directStormRainSupportAt\\(", -1).length - 1;
+        require(definitions == 1,
+                "T188 expects exactly one directStormRainSupportAt definition, found "
+                        + definitions);
+
+        String generation = between(shader, "if (PaRainFieldPass == 1) {",
+                "if (paRayTraceActive()) {", "T188 generation pass");
+        require(generation.contains("directStormRainSupportAt("),
+                "T188 generation pass does not call directStormRainSupportAt, so the"
+                        + " field is a second implementation rather than the production one");
+        require(generation.contains("WeatherOrigin + texCoord * WeatherExtent"),
+                "T188 generation pass does not use the weather domain, so the field"
+                        + " and the lookup are on different coordinate systems");
+
+        String lookup = functionBlock(shader, "float paRainFieldSupportAt(");
+        require(lookup.contains("(worldXZ - WeatherOrigin) / WeatherExtent"),
+                "T188 lookup does not use the weather domain the generation pass wrote");
+        require(lookup.contains("directStormRainSupportAt(worldXZ, attachY,"),
+                "T188 lookup has no exact fallback outside the field domain, so a"
+                        + " column the field never covered would read a fabricated value");
+        require(lookup.contains("cell.b >= 0.5"),
+                "T188 ownership is not thresholded at half a cell, so the bilinear"
+                        + " filter biases the descriptor-ownership union");
+
+        // The march must still be able to take the exact path. A field that
+        // replaced the traversal unconditionally could not be measured against
+        // it, and could not fall back at the domain edge.
+        String support = functionBlock(shader, "float localRainSupportAt(");
+        require(support.contains("PaRainFieldEnabled == 1"),
+                "T188 field lookup is not selectable, so the exact path is gone");
+        require(support.contains("directStormRainSupportAt(worldXZ, stormBaseY,"),
+                "T188 removed the exact descriptor path from localRainSupportAt");
+
+        // Nothing else in the function may have been replaced by the field.
+        for (String preserved : new String[] {
+                "weather = sampleWeather(worldXZ);",
+                "morphology = sampleMorphology(worldXZ);",
+                "precipitation = saturate(morphology.a);",
+                "precipitation = MaxPrecipitation;"}) {
+            require(support.contains(preserved),
+                    "T188 removed behaviour the field was only supposed to accelerate: "
+                            + preserved);
+        }
+        System.out.println("T188_FIELD_SOURCE definitions=" + definitions
+                + "|generatedByProductionFunction=true|exactPathRetained=true"
+                + "|domainShared=true");
+    }
+
+    /**
+     * T188 is a campaign, not a productionization. FINAL must bake both field
+     * uniforms to zero, which removes the generation pass and the lookup branch
+     * from it entirely rather than leaving them live and unentered.
+     */
+    private static void validateT188FinalIsUnaffected() {
+        String gradle = readWorkspaceSource("build.gradle");
+        require(gradle.contains("'uniform int PaRainFieldPass;'")
+                        && gradle.contains("'const int PaRainFieldPass = 0;'"),
+                "T188 PaRainFieldPass is not baked out of the lean programs");
+        require(gradle.contains("'uniform int PaRainFieldEnabled;'")
+                        && gradle.contains("'const int PaRainFieldEnabled = 0;'"),
+                "T188 PaRainFieldEnabled is not baked out of the lean programs");
+        // The field texture must NOT be an ordinary JSON sampler. Minecraft
+        // assigns those to consecutive units from zero and tracks exactly
+        // MAX_MINECRAFT_TRACKED_UNIT + 1 of them, so a thirteenth entry in
+        // cloud_atmosphere_volume.json indexes one past the end of
+        // GlStateManager's array and throws inside ShaderInstance.apply - which
+        // disables the whole volumetric pass for the session. That is a real
+        // failure this campaign hit, not a hypothetical.
+        String shaderJson = readWorkspaceSource("src/main/resources/assets/"
+                + "projectatmosphere/shaders/core/cloud_atmosphere_volume.json");
+        require(!shaderJson.contains("RainFieldSampler"),
+                "T188 RainFieldSampler is declared as a JSON sampler; Minecraft would"
+                        + " bind it past the end of its tracked texture units");
+        int declaredSamplers =
+                shaderJson.split("\"name\": \"[A-Za-z]+Sampler\"", -1).length - 1;
+        require(declaredSamplers
+                        <= CloudTextureUnitContract.MAX_MINECRAFT_TRACKED_UNIT + 1,
+                "T188 cloud_atmosphere_volume.json declares " + declaredSamplers
+                        + " samplers, more than the "
+                        + (CloudTextureUnitContract.MAX_MINECRAFT_TRACKED_UNIT + 1)
+                        + " texture units Minecraft tracks");
+        require(CloudTextureUnitContract.RAIN_FIELD_UNIT
+                        > CloudTextureUnitContract.MAX_MINECRAFT_TRACKED_UNIT,
+                "T188 rain-field texture unit collides with the units Minecraft owns");
+
+        // The arms that DO use the field must keep both uniforms, or they would
+        // silently measure the control and report it as the candidate.
+        for (String variant : new String[] {
+                "cloud_atmosphere_volume_t188_field_real",
+                "cloud_atmosphere_volume_t188_stack_field"}) {
+            String block = between(gradle, "[name: '" + variant + "'", "]],",
+                    "T188 variant " + variant);
+            require(block.contains("'PaRainFieldPass'")
+                            && block.contains("'PaRainFieldEnabled'"),
+                    "T188 variant " + variant + " does not keep the field uniforms");
+        }
+
+        // The renderer must not issue the generation draw for a program that
+        // baked the uniform away: it would cost a full pass and write a target
+        // nothing can read.
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/VolumetricCloudRenderer.java");
+        require(renderer.contains("boolean paFieldProgram = program.rainFieldGeneration()"),
+                "T188 field generation is not gated on the program declaring it");
+        // The monolith force exists so workload counters can describe the
+        // post-field workload. It must never reach a timed arm: an anchor would
+        // then pay for a generation pass it does not run, and every ratio
+        // measured against it would be wrong in the candidate's favour.
+        require(renderer.contains("program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH")
+                        && renderer.contains(
+                                "VolumetricCloudDebugConfig.rainFieldForcedOnMonolith()"),
+                "T188 counter-capture field force is not scoped to the monolith");
+        require(renderer.contains("\"RainFieldSampler\",\n"
+                        + "                RAIN_FIELD_TEXTURE_UNIT,"),
+                "T188 rain field is not bound on a PA-owned texture unit");
+        // The GPU timer holds its last resolved result. Reporting it on a frame
+        // that built no field charges a control arm for a pass it never ran,
+        // which would understate every ratio measured against it.
+        require(renderer.contains("lastRainFieldGpuMilliseconds ="
+                        + " program.rainFieldGeneration()"),
+                "T188 field build time is not cleared for programs that build no"
+                        + " field, so a control inherits the previous arm's cost");
+        require(renderer.contains("RAIN_FIELD_TIMER.begin();")
+                        && renderer.contains("RAIN_FIELD_TIMER.end();"),
+                "T188 field generation is not timed separately, so build cost cannot"
+                        + " be weighed against the traversal it replaced");
+        System.out.println("T188_FINAL_CLEAN bakedUniforms=2|fieldNotAJsonSampler=true"
+                + "|generationGated=true|separatelyTimed=true");
+    }
+
+    /**
+     * T188 Task 0. Rain quality must be measured on rain, not on a composited
+     * frame. Every rain campaign from T183 to T186 had to report cloud SSIM
+     * because no rain mask existed; T186 said so and banked a candidate it
+     * could not gate. This checks the harness that closes that gap is real.
+     */
+    private static void validateT188RainMaskHarness() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        require(shader.contains("#ifdef PA_RAIN_MASK_OUTPUT"),
+                "T188 rain-only capture is absent from the shader");
+        require(shader.contains("paRainMassAccum += rainDensity * stepLength"
+                        + " * transmittance;"),
+                "T188 rain mask does not accumulate optical mass, so occluded rain"
+                        + " would count as visible");
+        require(shader.contains("paRainRuns += 1.0;"),
+                "T188 rain mask does not count contiguous runs, so a broken shaft"
+                        + " reads the same as a whole one");
+
+        String gradle = readWorkspaceSource("build.gradle");
+        for (String variant : new String[] {
+                "cloud_atmosphere_volume_t188_rain_mask_ref",
+                "cloud_atmosphere_volume_t188_rain_mask_field"}) {
+            String block = between(gradle, "[name: '" + variant + "'", "]],",
+                    "T188 variant " + variant);
+            require(block.contains("'PA_RAIN_MASK_OUTPUT 1'"),
+                    "T188 mask variant " + variant + " does not define the mask output");
+        }
+        // The reference must walk the descriptors and the candidate must read
+        // the field, or the pair compares nothing.
+        String refBlock = between(gradle,
+                "[name: 'cloud_atmosphere_volume_t188_rain_mask_ref'", "]],",
+                "T188 rain-mask reference");
+        require(!refBlock.contains("PaRainFieldEnabled"),
+                "T188 rain-mask reference reads the field, so it is not a reference");
+        String fieldBlock = between(gradle,
+                "[name: 'cloud_atmosphere_volume_t188_rain_mask_field'", "]],",
+                "T188 rain-mask candidate");
+        require(fieldBlock.contains("'PaRainFieldEnabled'"),
+                "T188 rain-mask candidate does not read the field");
+
+        String metrics = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/StormRainMaskMetrics.java");
+        // The metrics T186 named as missing, each present by name.
+        for (String metric : new String[] {
+                "rainIoU=", "missedRainPixels=", "falseRainPixels=",
+                "thinRainRetention=", "meanOnsetHeightError=",
+                "meanTerminationHeightError=", "shaftContinuity=", "newGapRays="}) {
+            require(metrics.contains(metric),
+                    "T188 rain metric missing from the harness: " + metric);
+        }
+        // Missed and false rain must stay separable. A single mean absolute
+        // error over the mask reports one number for two different failures.
+        require(metrics.contains("} else if (referenceHasRain) {")
+                        && metrics.contains("} else if (candidateHasRain) {"),
+                "T188 collapses missed and false rain into one figure");
+
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/VolumetricCloudRenderer.java");
+        require(renderer.contains("if (program.rainMaskCapture()) {")
+                        && renderer.contains("Math.max(paMaxPrecipitation, 0.85F)"),
+                "T188 rain-heavy fixture forcing is absent, so the mask is measured on"
+                        + " a fixture too rain-sparse for missed rain to be visible");
+        System.out.println("T188_RAIN_MASK_HARNESS maskVariants=2|metrics=8"
+                + "|missedAndFalseSeparated=true|rainHeavyFixture=true");
     }
 
     private static void validateFixedStormSilhouette() {
@@ -667,9 +1503,34 @@ public final class StormVolumetricGeometrySandbox {
                 + "shaders/core/cloud_atmosphere_volume.fsh");
         String[] lines = shader.split("\n");
         int mutations = 0;
+        int maskMutations = 0;
+        // T188. The rain-only capture accumulates inside
+        // #ifdef PA_RAIN_MASK_OUTPUT. That is a STRONGER guarantee than the
+        // runtime guard, not a weaker one: the block is not compiled into any
+        // program that does not define the macro, so it cannot affect a
+        // rendered frame even by register pressure. The define is asserted
+        // absent from production below.
+        int maskDepth = 0;
         for (int index = 0; index < lines.length; index++) {
             String line = lines[index].trim();
+            // T194 adds the slice oracle on the same reasoning: its
+            // accumulator exists only so the compiler cannot fold the
+            // slices away, and the block is absent from every program
+            // that does not define the macro.
+            if (line.startsWith("#ifdef PA_RAIN_MASK_OUTPUT")
+                    || line.startsWith("#ifdef PA_ARM_FIELD_SLICES")) {
+                maskDepth++;
+                continue;
+            }
+            if (maskDepth > 0 && line.startsWith("#endif")) {
+                maskDepth--;
+                continue;
+            }
             if (!line.matches("pa[A-Za-z]+\\s*(\\+\\+|\\+=).*")) {
+                continue;
+            }
+            if (maskDepth > 0) {
+                maskMutations++;
                 continue;
             }
             mutations++;
@@ -684,13 +1545,18 @@ public final class StormVolumetricGeometrySandbox {
                     "T123 workload counter at shader line " + (index + 1)
                             + " is not guarded by paWorkloadCaptureActive(): " + line);
         }
+        require(maskDepth == 0,
+                "T188/T194 diagnostic #ifdef blocks are unbalanced in the shader source");
         require(mutations >= 10,
                 "T123 workload counters were not found; the instrumentation check is vacuous");
         String guard = functionBlock(shader, "bool paWorkloadCaptureActive()");
+        require(guard.contains("DebugView == 24") && guard.contains("DebugView == 25"),
+                "T141's decomposition views are not covered by the workload capture guard");
         require(guard.contains("DebugView == 22") && guard.contains("DebugView == 23"),
                 "T123 workload capture guard is no longer limited to the workload debug views");
         System.out.println("PHASE4T_RESULT|T123 instrumentation only|PASSED|invariant satisfied"
-                + " guardedCounterMutations=" + mutations);
+                + " guardedCounterMutations=" + mutations
+                + " rainMaskMutations=" + maskMutations);
     }
 
     /**
@@ -982,7 +1848,12 @@ public final class StormVolumetricGeometrySandbox {
                 new StormWorkloadRuntimeCapture.WorkloadResult(
                         41L, "above", 641, 360,
                         70635847.0D, 1941080612.0D, 6714578.0D, 326863346.0D,
-                        2027767531.0D, 21318588.0D, 1488992.0D, 149382.0D);
+                        2027767531.0D, 21318588.0D, 1488992.0D, 149382.0D,
+                        // T141 decomposition channels; freshness is the capture
+                        // token, so their values are immaterial here.
+                        0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                        // T149 packed detail-octave evaluations.
+                        0.0D);
 
         require(StormPerformanceSuite.workloadFreshnessFailure(passA, 41L, "above") == null,
                 "T132 freshness rejected the capture it actually requested");
@@ -2518,6 +3389,1928 @@ public final class StormVolumetricGeometrySandbox {
      * 2.5 * sqrt(96/48) = 3.536, coarseStepCap min(112, 3.536*16) = 56.57,
      * MAX_STEPS 128, MaxRenderDistance 2000.
      */
+
+    // ------------------------------------------------------------------
+    // T098 promotion-policy sweep
+    // ------------------------------------------------------------------
+
+    /**
+     * Production density threshold, expressed on the value {@link
+     * StormDensityModel#finalDensity} returns.
+     *
+     * <p>The shader tests {@code density > 0.0008} after multiplying the eroded
+     * body by the descriptor-owned material terms (energy 0.72, condensate
+     * 0.78, precipitation 0.68 at the mid-height the waist rays cross), the
+     * 0.73 family scale and DensityMul 1.44922, which together come to 1.287.
+     * The offline model stops at the eroded body, so the equivalent cut is
+     * 0.0008 / 1.287.
+     */
+    private static final double T098_MATERIAL_CLOUD_THRESHOLD = 0.0008D / 1.287D;
+
+    /** Live capture configuration: ULTRA, stepScale 1.0, exteriorFineStep 2.5. */
+    private static final double T098_FINE_STEP = 2.5D;
+    private static final int T098_STEP_BUDGET = 96;
+    private static final int T098_MAX_STEPS = 128;
+    private static final double T098_MAX_RENDER_DISTANCE = 2000.0D;
+    private static final double T098_EXTINCTION_SCALE = 0.11499D;
+    /** Descriptor-owned material terms and family scale, as above. */
+    private static final double T098_DENSITY_SCALE = 1.287D;
+
+    /** One marched ray under one promotion policy. */
+    private record T098MarchResult(
+            String policy, String label, double factor,
+            int iterations, int emptyFineIterations, double emptyFineBlocks,
+            int densityEvaluations, int promotionProbes,
+            double firstMaterialT, int iterationsAtFirstMaterial,
+            int iterationsRemainingAtMaterial,
+            double finalTransmittance, double finalAlpha,
+            boolean stepCapped, int falseNegativeSegments, double falseNegativeBlocks,
+            double referenceFirstMaterialT, double referenceAlpha) {
+    }
+
+    /**
+     * T098 second divergence: the promotion policy spends the march budget in
+     * empty coverage envelope before any density exists.
+     *
+     * <p>Measured on the live production traces: the conservative per-descriptor
+     * clearance promotes a SIDE waist ray to sustained fine marching around
+     * t=280, the coverage envelope only becomes non-zero near t=700, and the
+     * first sample that clears the density threshold is near t=830. Between 36
+     * and 79 march iterations - a mean of 66 on waist rays - are spent taking
+     * 2.5-block steps through envelope that carries no material, and three of
+     * six traced waist rays then hit the 128-iteration cap with up to 0.55
+     * transmittance still unabsorbed.
+     *
+     * <p>This sweep runs the production march rules offline against a 1-block
+     * reference traversal and scores each candidate promotion policy on both
+     * properties that matter: it must skip no material the production fine
+     * march would have sampled, and it must reach material with enough budget
+     * left to converge.
+     */
+    private static void reportT098PromotionPolicySweep() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double centreX = 0.0D;
+        double centreZ = 0.0D;
+        for (StormLobeDescriptor lobe : lobes) {
+            centreX += lobe.centerX();
+            centreZ += lobe.centerZ();
+        }
+        centreX /= lobes.size();
+        centreZ /= lobes.size();
+        double radius = 657.8D;
+
+        System.out.println("T098_POLICY|policy|label|factor|iters|emptyFineIters|emptyFineBlocks"
+                + "|densityEvals|promoProbes|firstMaterialT|itersAtMaterial|itersLeft"
+                + "|finalTrans|finalAlpha|stepCapped|falseNegSegs|falseNegBlocks"
+                + "|refFirstT|refAlpha");
+        java.util.List<T098MarchResult> all = new ArrayList<>();
+        // production      - the shipped policy
+        // production384   - the same policy given three times the iteration
+        //                   budget, as a truth arm for what the ray should
+        //                   converge to at 128 steps (PHASE 7; MAX_STEPS is
+        //                   NOT changed in production)
+        // scan16          - candidate: probe the candidate span on the fine
+        //                   march's own lattice inside one iteration
+        // scan-coarse2    - control: the same scan at twice the fine spacing,
+        //                   included to show what losing sampling resolution
+        //                   costs rather than assuming the spacing is safe
+        // bisectOnly      - control: drop the forced fine promotion entirely
+        //                   and rely on the bracket refinement alone
+        for (String policy : new String[] {
+                "production", "production384", "scan16", "scan-coarse2", "bisectOnly"}) {
+            for (double factor : new double[] {1.12D, 1.40D, 1.70D, 1.90D, 2.60D}) {
+                all.add(simulateT098Ray(baseVolume, detailVolume, lobes, centreX, centreZ,
+                        radius, factor, 680.0D, "waist", policy));
+            }
+            all.add(simulateT098Ray(baseVolume, detailVolume, lobes, centreX, centreZ,
+                    radius, 1.70D, 300.0D, "baseControl", policy));
+            all.add(simulateT098Ray(baseVolume, detailVolume, lobes, centreX, centreZ,
+                    radius, 1.70D, 900.0D, "anvilControl", policy));
+            all.add(simulateT098Ray(baseVolume, detailVolume, lobes, centreX, centreZ,
+                    radius, 1.70D, 500.0D, "lowerTower", policy));
+            all.add(simulateT098Ray(baseVolume, detailVolume, lobes, centreX, centreZ,
+                    radius, 1.70D, 800.0D, "upperTower", policy));
+        }
+        for (T098MarchResult r : all) {
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_POLICY|%-10s|%-12s|%.2f|%4d|%5d|%9.1f|%6d|%5d|%9.1f|%5d|%5d"
+                            + "|%8.4f|%8.4f|%6s|%4d|%8.1f|%9.1f|%8.4f%n",
+                    r.policy(), r.label(), r.factor(), r.iterations(),
+                    r.emptyFineIterations(), r.emptyFineBlocks(), r.densityEvaluations(),
+                    r.promotionProbes(), r.firstMaterialT(), r.iterationsAtFirstMaterial(),
+                    r.iterationsRemainingAtMaterial(), r.finalTransmittance(),
+                    r.finalAlpha(), r.stepCapped() ? "YES" : "no",
+                    r.falseNegativeSegments(), r.falseNegativeBlocks(),
+                    r.referenceFirstMaterialT(), r.referenceAlpha());
+        }
+        T098_POLICY_RESULTS.clear();
+        T098_POLICY_RESULTS.addAll(all);
+    }
+
+    private static final java.util.List<T098MarchResult> T098_POLICY_RESULTS = new ArrayList<>();
+
+    /**
+     * Marches one ray under the production rules, with the promotion policy
+     * selected by {@code policy}, and scores it against a 1-block reference.
+     *
+     * <p>The model carries the parts of the production loop that decide the
+     * outcome: fine/coarse selection from {@code sinceHit}, the conservative
+     * per-descriptor clearance advance, the four-bisection bracket refinement a
+     * coarse step performs when it lands in material, exponential extinction
+     * with the production scale, the 0.015 transmittance floor and the
+     * 128-iteration cap. The outer weather-gated empty-space skip is not
+     * modelled; the live A/B falsified it as a factor on these rays, and it can
+     * only remove samples in empty space that this model already sees as empty.
+     */
+    private static T098MarchResult simulateT098Ray(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double centreX, double centreZ, double radius,
+            double factor, double targetY, String label, String policy) {
+        double camX = centreX + radius * factor;
+        double camY = (136.0D + 1000.0D) * 0.5D;
+        double camZ = centreZ;
+        double dirX = centreX - camX;
+        double dirY = targetY - camY;
+        double dirZ = 0.0D;
+        double dirLength = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
+        dirX /= dirLength;
+        dirY /= dirLength;
+        dirZ /= dirLength;
+
+        final int maxSteps = "production384".equals(policy) ? 384 : T098_MAX_STEPS;
+        final double t1 = T098_MAX_RENDER_DISTANCE;
+        final double fineStep = T098_FINE_STEP;
+        final double probeSpacing = "scan-coarse2".equals(policy)
+                ? T098_FINE_STEP * 2.0D
+                : T098_FINE_STEP;
+        final boolean scanning = policy.startsWith("scan");
+        final double coarseStepCap = Math.min(112.0D, fineStep * 16.0D);
+        final double baseStep = t1 / T098_STEP_BUDGET;
+        final double coarseStep = Math.max(baseStep * 1.5D, fineStep * 3.0D);
+
+        // Reference traversal at one block, and the alpha a ray that sampled
+        // every block would accumulate.
+        double referenceFirstT = -1.0D;
+        double referenceTransmittance = 1.0D;
+        java.util.List<double[]> referenceIntervals = new ArrayList<>();
+        double intervalStart = -1.0D;
+        final double referenceStep = 1.0D;
+        for (double s = 0.0D; s <= t1; s += referenceStep) {
+            double cloud = sampleRayDensity(baseVolume, detailVolume, lobes,
+                    camX + dirX * s, camY + dirY * s, camZ + dirZ * s);
+            boolean material = cloud > T098_MATERIAL_CLOUD_THRESHOLD;
+            if (material) {
+                if (referenceFirstT < 0.0D) {
+                    referenceFirstT = s;
+                }
+                if (intervalStart < 0.0D) {
+                    intervalStart = s;
+                }
+                referenceTransmittance *= Math.exp(
+                        -cloud * T098_DENSITY_SCALE * T098_EXTINCTION_SCALE * referenceStep);
+            } else if (intervalStart >= 0.0D) {
+                referenceIntervals.add(new double[] {intervalStart, s});
+                intervalStart = -1.0D;
+            }
+        }
+        if (intervalStart >= 0.0D) {
+            referenceIntervals.add(new double[] {intervalStart, t1});
+        }
+
+        double t = 0.0D;
+        int sinceHit = 100;
+        int iterations = 0;
+        int emptyFineIterations = 0;
+        double emptyFineBlocks = 0.0D;
+        int densityEvaluations = 0;
+        int promotionProbes = 0;
+        double firstMaterialT = -1.0D;
+        int iterationsAtFirstMaterial = -1;
+        int falseNegativeSegments = 0;
+        double falseNegativeBlocks = 0.0D;
+        double transmittance = 1.0D;
+        boolean lastClearValid = true;
+        double lastClearT = 0.0D;
+        boolean stepCapped = false;
+
+        for (int i = 0; i < maxSteps; i++) {
+            iterations = i + 1;
+            if (t >= t1 || transmittance < 0.015D) {
+                break;
+            }
+            boolean fine = sinceHit < 6;
+            double stepLength = fine
+                    ? fineStep
+                    : Math.min(coarseStep * (1.0D + (t / T098_MAX_RENDER_DISTANCE) * 2.2D),
+                            coarseStepCap);
+            stepLength = Math.min(stepLength, t1 - t);
+
+            if (!fine && stormSegmentMayIntersect(lobes,
+                    camX + dirX * t, camY + dirY * t, camZ + dirZ * t,
+                    camX + dirX * (t + stepLength), camY + dirY * (t + stepLength),
+                    camZ + dirZ * (t + stepLength))) {
+                promotionProbes++;
+                double clearance = Double.POSITIVE_INFINITY;
+                for (StormLobeDescriptor lobe : lobes) {
+                    clearance = Math.min(clearance,
+                            StormLobeEvaluator.signedDistanceAt(lobe,
+                                    camX + dirX * t, camY + dirY * t, camZ + dirZ * t)
+                                    - StormLobeEvaluator.edgeWidthBlocks(lobe));
+                }
+                double safeAdvance = clearance - 48.0D;
+                if (safeAdvance > fineStep) {
+                    stepLength = Math.min(Math.min(safeAdvance, coarseStepCap), t1 - t);
+                } else if ("bisectOnly".equals(policy)) {
+                    // Take the ordinary coarse stride and let the four-bisection
+                    // bracket refinement localize any material it lands in.
+                    stepLength = Math.min(Math.min(
+                            coarseStep * (1.0D + (t / T098_MAX_RENDER_DISTANCE) * 2.2D),
+                            coarseStepCap), t1 - t);
+                } else if (scanning) {
+                    // Bounded empty-span scan. Sampling at fine resolution is
+                    // required; consuming a march iteration per sample is not.
+                    // Probe forward on the SAME lattice the fine march would
+                    // have used, inside this one iteration, and cross the whole
+                    // span at once when every probe is empty.
+                    double scanSpan = Math.min(coarseStepCap, t1 - t);
+                    int probeCount = (int) Math.min(16.0D, Math.floor(scanSpan / probeSpacing));
+                    double lastEmpty = 0.0D;
+                    boolean hitMaterial = false;
+                    for (int probe = 1; probe <= probeCount; probe++) {
+                        double probeT = t + probe * probeSpacing;
+                        densityEvaluations++;
+                        double cloud = sampleRayDensity(baseVolume, detailVolume, lobes,
+                                camX + dirX * probeT, camY + dirY * probeT, camZ + dirZ * probeT);
+                        if (cloud > T098_MATERIAL_CLOUD_THRESHOLD) {
+                            hitMaterial = true;
+                            break;
+                        }
+                        lastEmpty = probe * probeSpacing;
+                    }
+                    if (hitMaterial && lastEmpty <= fineStep) {
+                        sinceHit = 0;
+                        fine = true;
+                        stepLength = Math.min(fineStep, t1 - t);
+                    } else if (lastEmpty > fineStep) {
+                        // Provably empty at the march's own sampling resolution.
+                        stepLength = Math.min(lastEmpty, t1 - t);
+                        if (hitMaterial) {
+                            // Material begins at the next probe; enter fine so
+                            // the following iterations integrate it.
+                            sinceHit = 0;
+                            fine = true;
+                        }
+                    } else {
+                        sinceHit = 0;
+                        fine = true;
+                        stepLength = Math.min(fineStep, t1 - t);
+                    }
+                } else {
+                    sinceHit = 0;
+                    fine = true;
+                    stepLength = Math.min(fineStep, t1 - t);
+                }
+            }
+
+            double segStart = t;
+            double segEnd = t + stepLength;
+            densityEvaluations++;
+            double cloud = sampleRayDensity(baseVolume, detailVolume, lobes,
+                    camX + dirX * t, camY + dirY * t, camZ + dirZ * t);
+            double density = cloud * T098_DENSITY_SCALE;
+            boolean material = cloud > T098_MATERIAL_CLOUD_THRESHOLD;
+
+            if (!material) {
+                // Any reference material inside a step the march did not sample
+                // at fine resolution is a false negative.
+                if (stepLength > fineStep * 1.001D) {
+                    double overlap = 0.0D;
+                    for (double[] interval : referenceIntervals) {
+                        overlap += Math.max(0.0D,
+                                Math.min(segEnd, interval[1]) - Math.max(segStart, interval[0]));
+                    }
+                    if (overlap > 0.0D) {
+                        falseNegativeSegments++;
+                        falseNegativeBlocks += overlap;
+                    }
+                }
+                if (fine) {
+                    emptyFineIterations++;
+                    emptyFineBlocks += stepLength;
+                }
+                lastClearT = t;
+                lastClearValid = true;
+                sinceHit++;
+                t += stepLength;
+                continue;
+            }
+
+            if (!fine) {
+                // Production's four-bisection bracket refinement.
+                double bracketLow = lastClearValid ? lastClearT : Math.max(0.0D, t - stepLength);
+                double bracketHigh = t;
+                for (int refinement = 0; refinement < 4; refinement++) {
+                    double mid = 0.5D * (bracketLow + bracketHigh);
+                    densityEvaluations++;
+                    double midCloud = sampleRayDensity(baseVolume, detailVolume, lobes,
+                            camX + dirX * mid, camY + dirY * mid, camZ + dirZ * mid);
+                    if (midCloud > T098_MATERIAL_CLOUD_THRESHOLD) {
+                        bracketHigh = mid;
+                    } else {
+                        bracketLow = mid;
+                    }
+                }
+                lastClearT = bracketLow;
+                t = 0.5D * (bracketLow + bracketHigh);
+                sinceHit = 0;
+                continue;
+            }
+
+            if (firstMaterialT < 0.0D) {
+                firstMaterialT = t;
+                iterationsAtFirstMaterial = iterations;
+            }
+            sinceHit = 0;
+            transmittance *= Math.exp(-density * T098_EXTINCTION_SCALE * stepLength);
+            t += stepLength;
+        }
+        if (iterations >= maxSteps && t < t1 && transmittance >= 0.015D) {
+            stepCapped = true;
+        }
+
+        return new T098MarchResult(policy, label, factor, iterations,
+                emptyFineIterations, emptyFineBlocks, densityEvaluations, promotionProbes,
+                firstMaterialT, iterationsAtFirstMaterial,
+                iterationsAtFirstMaterial < 0 ? 0 : iterations - iterationsAtFirstMaterial,
+                transmittance, 1.0D - transmittance, stepCapped,
+                falseNegativeSegments, falseNegativeBlocks,
+                referenceFirstT, 1.0D - referenceTransmittance);
+    }
+
+
+    /**
+     * T098 second divergence: a conservative promotion must not spend the march
+     * budget in empty coverage envelope.
+     *
+     * <p>Two properties, both required.
+     *
+     * <p><b>Conservative correctness.</b> The policy may not step over material
+     * the production fine march would have sampled. This is measured against a
+     * one-block reference traversal, and the {@code bisectOnly} control - which
+     * drops the forced fine promotion and trusts the four-bisection bracket
+     * refinement alone - is run alongside precisely because it looks reasonable
+     * and is not: it skips material on every ray in the fixture.
+     *
+     * <p><b>Bounded progress.</b> The shipped policy takes one march iteration
+     * per fine sample, so crossing the empty envelope between the coverage
+     * opening and the first material costs tens of iterations. On this fixture
+     * it leaves two of nine rays never reaching material at all inside 128
+     * iterations, and four step-capped. The replacement samples the same
+     * lattice inside one iteration, so the ray arrives at material with budget
+     * left to converge.
+     *
+     * <p>The guard fails under the old policy: it requires the shipped-policy
+     * arm to exhibit the starvation, so it cannot pass against the behaviour it
+     * was written for, and it requires the corrected arm to converge to the
+     * same alpha as a 384-iteration truth arm of the old policy without
+     * skipping material.
+     */
+    private static void validateT098PromotionBudget() {
+        require(!T098_POLICY_RESULTS.isEmpty(),
+                "the T098 promotion policy sweep produced no rays");
+
+        java.util.List<T098MarchResult> shipped = new ArrayList<>();
+        java.util.List<T098MarchResult> corrected = new ArrayList<>();
+        java.util.List<T098MarchResult> truth = new ArrayList<>();
+        java.util.List<T098MarchResult> bisectOnly = new ArrayList<>();
+        for (T098MarchResult r : T098_POLICY_RESULTS) {
+            switch (r.policy()) {
+                case "production" -> shipped.add(r);
+                case "scan16" -> corrected.add(r);
+                case "production384" -> truth.add(r);
+                case "bisectOnly" -> bisectOnly.add(r);
+                default -> {
+                }
+            }
+        }
+        require(shipped.size() == corrected.size() && shipped.size() == truth.size()
+                        && !shipped.isEmpty(),
+                "the promotion sweep arms do not cover the same rays");
+
+        // Fail-first: the shipped policy must actually exhibit the defect.
+        int shippedStepCapped = 0;
+        int shippedNeverReached = 0;
+        int shippedEmptyFine = 0;
+        for (T098MarchResult r : shipped) {
+            if (r.stepCapped()) {
+                shippedStepCapped++;
+            }
+            if (r.firstMaterialT() < 0.0D) {
+                shippedNeverReached++;
+            }
+            shippedEmptyFine += r.emptyFineIterations();
+        }
+        require(shippedStepCapped > 0,
+                "the shipped promotion policy step-caps no ray in this fixture;"
+                        + " this guard would pass against the behaviour it was written for");
+        require(shippedNeverReached > 0,
+                "the shipped promotion policy reaches material on every ray here;"
+                        + " the starvation this guard exists for is not reproduced");
+
+        // The control that looks safe and is not.
+        int bisectSkips = 0;
+        for (T098MarchResult r : bisectOnly) {
+            bisectSkips += r.falseNegativeSegments();
+        }
+        require(bisectSkips > 0,
+                "the bracket-refinement-only control skipped no material, so this"
+                        + " guard no longer demonstrates why the scan is required");
+
+        int correctedEmptyFine = 0;
+        int correctedStepCapped = 0;
+        for (T098MarchResult r : corrected) {
+            correctedEmptyFine += r.emptyFineIterations();
+            if (r.stepCapped()) {
+                correctedStepCapped++;
+            }
+            require(r.falseNegativeSegments() == 0,
+                    "the corrected promotion policy skipped " + r.falseNegativeSegments()
+                            + " material segment(s) on " + r.label() + " at "
+                            + r.factor() + "x, totalling "
+                            + String.format(java.util.Locale.ROOT, "%.1f",
+                                    r.falseNegativeBlocks()) + " blocks");
+            require(r.firstMaterialT() >= 0.0D,
+                    "the corrected promotion policy never reached material on "
+                            + r.label() + " at " + r.factor() + "x");
+        }
+        require(correctedStepCapped == 0,
+                "the corrected promotion policy still step-caps "
+                        + correctedStepCapped + " of " + corrected.size() + " rays");
+
+        // Material entry and converged opacity must agree with the truth arm,
+        // which runs the OLD policy with three times the budget.
+        double worstEntryError = 0.0D;
+        double worstAlphaError = 0.0D;
+        for (int i = 0; i < corrected.size(); i++) {
+            T098MarchResult c = corrected.get(i);
+            T098MarchResult t = truth.get(i);
+            require(c.label().equals(t.label()) && c.factor() == t.factor(),
+                    "the corrected and truth arms are not aligned ray for ray");
+            worstEntryError = Math.max(worstEntryError,
+                    Math.abs(c.firstMaterialT() - t.firstMaterialT()));
+            worstAlphaError = Math.max(worstAlphaError,
+                    Math.abs(c.finalAlpha() - t.finalAlpha()));
+        }
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_PROMOTION|rays=%d|shippedStepCapped=%d|shippedNeverReached=%d"
+                        + "|shippedEmptyFineIters=%d|correctedEmptyFineIters=%d"
+                        + "|correctedStepCapped=%d|bisectOnlySkippedSegments=%d"
+                        + "|worstEntryErrorBlocks=%.2f|worstAlphaError=%.5f%n",
+                corrected.size(), shippedStepCapped, shippedNeverReached,
+                shippedEmptyFine, correctedEmptyFine, correctedStepCapped, bisectSkips,
+                worstEntryError, worstAlphaError);
+
+        require(worstEntryError <= T098_FINE_STEP + 0.001D,
+                "the corrected policy enters material " + worstEntryError
+                        + " blocks from where the old policy does with an unbounded budget;"
+                        + " one fine step is the most the entry may move");
+        require(worstAlphaError <= 0.01D,
+                "the corrected policy converges to a different opacity than the"
+                        + " unbounded-budget truth arm; worst alpha error " + worstAlphaError);
+        require(correctedEmptyFine * 4 < shippedEmptyFine,
+                "the corrected policy does not materially reduce empty fine iterations: "
+                        + correctedEmptyFine + " against " + shippedEmptyFine);
+
+        // The production shader must actually carry the scan.
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        require(shader.contains("const int PA_EMPTY_SPAN_PROBES = 16;"),
+                "the bounded empty-span scan probe count is missing or no longer 16");
+        require(shader.contains("for (int paProbe = 1; paProbe <= PA_EMPTY_SPAN_PROBES; paProbe++)"),
+                "the empty-span scan loop is missing or no longer bounded by a constant");
+        require(shader.contains("float paProbeOffset = float(paProbe) * paScanStep;")
+                        && shader.contains("float paScanStep = fineStep"),
+                "the empty-span scan no longer probes on the fine march's own lattice");
+        require(shader.contains("const int MAX_STEPS = 128;"),
+                "MAX_STEPS is no longer 128; this correction must not buy budget");
+        require(shader.contains("PaLegacyFinePromotion != 0"),
+                "the promotion evidence arm is no longer gated by its uniform");
+        require(!VolumetricCloudDebugConfig.t098LegacyFinePromotion(),
+                "the promotion evidence arm is enabled by default");
+        String shaderJson = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.json");
+        require(shaderJson.contains(
+                        "{ \"name\": \"PaLegacyFinePromotion\", \"type\": \"int\", \"count\": 1, \"values\": [ 0 ] }"),
+                "the promotion evidence arm does not default to off");
+
+        System.out.println("PHASE4T_RESULT|T098 promotion reaches material within budget"
+                + "|PASSED|invariant satisfied");
+    }
+
+
+    // ------------------------------------------------------------------
+    // T098 ANVIL surface structure
+    // ------------------------------------------------------------------
+
+    /** Production density scale from eroded body to the shader's density. */
+    private static final double T098_ANVIL_DENSITY_SCALE = 1.287D;
+    /** Production ExtinctionScale. */
+    private static final double T098_ANVIL_EXTINCTION = 0.11499D;
+
+    /** Distribution summary for one stage of the density chain. */
+    private record T098Dist(String stage, int n, double mean, double p05, double p50,
+                            double p95, double variance, double cv, double meanGradient,
+                            double sat80, double sat90, double sat99, double zero) {
+    }
+
+    private static T098Dist summarize(String stage, double[] values, int n,
+            double[] gradients, int gradientCount) {
+        double[] v = java.util.Arrays.copyOf(values, n);
+        java.util.Arrays.sort(v);
+        double mean = 0.0D;
+        for (int i = 0; i < n; i++) {
+            mean += v[i];
+        }
+        mean /= Math.max(1, n);
+        double var = 0.0D;
+        for (int i = 0; i < n; i++) {
+            var += (v[i] - mean) * (v[i] - mean);
+        }
+        var /= Math.max(1, n);
+        double meanGradient = 0.0D;
+        for (int i = 0; i < gradientCount; i++) {
+            meanGradient += gradients[i];
+        }
+        meanGradient /= Math.max(1, gradientCount);
+        int in80 = 0;
+        int in90 = 0;
+        int in99 = 0;
+        int atZero = 0;
+        for (int i = 0; i < n; i++) {
+            if (v[i] >= 0.80D) {
+                in80++;
+            }
+            if (v[i] >= 0.90D) {
+                in90++;
+            }
+            if (v[i] >= 0.99D) {
+                in99++;
+            }
+            if (v[i] <= 0.0001D) {
+                atZero++;
+            }
+        }
+        return new T098Dist(stage, n, mean,
+                v[Math.min(n - 1, (int) (n * 0.05))], v[Math.min(n - 1, (int) (n * 0.50))],
+                v[Math.min(n - 1, (int) (n * 0.95))], var,
+                mean > 1.0E-6D ? Math.sqrt(var) / mean : 0.0D, meanGradient,
+                100.0D * in80 / Math.max(1, n), 100.0D * in90 / Math.max(1, n),
+                100.0D * in99 / Math.max(1, n), 100.0D * atZero / Math.max(1, n));
+    }
+
+    /**
+     * T098 ANVIL surface structure: where the anvil's detail amplitude is lost.
+     *
+     * <p>The anvil renders as a large smooth balloon with a uniform-looking
+     * interior. The existing erosion report already shows the offline density
+     * field is not saturated - mean 0.378 over the anvil with 15 per cent of
+     * samples below the visible floor - so "uniform density" cannot be assumed.
+     * This measures the whole chain instead: the stage distributions and their
+     * spatial gradients, the feature scale of each stage against the anvil's
+     * own size, how deep a view ray gets before the integral saturates, and
+     * whether the accumulated alpha still carries the structure the density
+     * field has.
+     *
+     * <p>Five deterministic realizations. The descriptor geometry is the shipped
+     * T134 severe fixture; each realization places it at a different world
+     * origin, which is what actually varies the noise a real storm samples.
+     */
+    private static void reportT098AnvilSurfaceStructure() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        double[][] origins = {
+                {0.0D, 0.0D}, {4096.0D, -3072.0D}, {-5120.0D, 6144.0D},
+                {9216.0D, 8192.0D}, {-7168.0D, -9216.0D}
+        };
+
+        System.out.println("T098_ANVIL|stage|role|fixture|n|mean|p05|p50|p95|variance|cv"
+                + "|meanGradPerBlock|pct>=0.80|pct>=0.90|pct>=0.99|pctZero");
+
+        String[] roleNames = {"BASE", "CORE", "TOWER", "ANVIL"};
+        for (int originIndex = 0; originIndex < origins.length; originIndex++) {
+            java.util.List<StormLobeDescriptor> lobes =
+                    severeFixtureAt(origins[originIndex][0], origins[originIndex][1]);
+            for (int role = 0; role < 4; role++) {
+                if (role == 0) {
+                    continue; // BASE is not a control for this question.
+                }
+                sampleRoleChain(baseVolume, detailVolume, lobes, role,
+                        roleNames[role], originIndex);
+            }
+        }
+
+        reportT098AnvilFeatureScale(baseVolume, detailVolume);
+        reportT098AnvilOpticalDepth(baseVolume, detailVolume);
+        reportT098AnvilAlphaField(baseVolume, detailVolume);
+        reportT098AnvilOpacitySensitivity(baseVolume, detailVolume);
+    }
+
+    /**
+     * How far the anvil is from the regime where its density structure could
+     * reach the image at all.
+     *
+     * <p>Measurement, not a proposal. The alpha field is flat because every ray
+     * saturates, so the question "how much less opaque would it have to be
+     * before the structure it already has becomes visible" has a definite
+     * answer, and the next investigation needs it. Scaling optical depth is the
+     * cleanest way to ask that without touching morphology: it holds the
+     * density field, its variance and its feature scale exactly fixed and
+     * changes only how much of the chord a ray sees.
+     */
+    private static void reportT098AnvilOpacitySensitivity(
+            byte[] baseVolume, byte[] detailVolume) {
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double centreX = 0.0D;
+        double centreZ = 0.0D;
+        double anvilMidY = 0.0D;
+        int anvilCount = 0;
+        for (StormLobeDescriptor lobe : lobes) {
+            centreX += lobe.centerX();
+            centreZ += lobe.centerZ();
+            if (lobe.role().gpuId() == 3) {
+                anvilMidY += (lobe.baseY() + lobe.topY()) * 0.5D;
+                anvilCount++;
+            }
+        }
+        centreX /= lobes.size();
+        centreZ /= lobes.size();
+        anvilMidY /= Math.max(1, anvilCount);
+
+        System.out.println("T098_ANVIL_SENSITIVITY|opticalScale|meanAlpha|alphaVariance"
+                + "|alphaCV|meanAbsNeighbourDelta|pctAbove0.97|meanSaturationDepthBlocks");
+        int gridA = 96;
+        int gridB = 48;
+        for (double scale : new double[] {1.0D, 0.5D, 0.25D, 0.12D, 0.06D, 0.03D}) {
+            double[][] alpha = new double[gridA][gridB];
+            double depthSum = 0.0D;
+            int depthCount = 0;
+            for (int a = 0; a < gridA; a++) {
+                for (int b = 0; b < gridB; b++) {
+                    double z = centreZ - 360.0D + (720.0D * a) / (gridA - 1);
+                    double y = anvilMidY - 110.0D + (220.0D * b) / (gridB - 1);
+                    double transmittance = 1.0D;
+                    double travelled = 0.0D;
+                    boolean entered = false;
+                    boolean saturated = false;
+                    for (double dx = -700.0D; dx <= 700.0D; dx += 2.5D) {
+                        double cloud = sampleRayDensity(baseVolume, detailVolume, lobes,
+                                centreX + dx, y, z);
+                        if (cloud > 0.0006D) {
+                            entered = true;
+                        }
+                        if (entered) {
+                            travelled += 2.5D;
+                        }
+                        transmittance *= Math.exp(-cloud * T098_ANVIL_DENSITY_SCALE
+                                * T098_ANVIL_EXTINCTION * scale * 2.5D);
+                        if (transmittance < 0.015D) {
+                            saturated = true;
+                            break;
+                        }
+                    }
+                    alpha[a][b] = 1.0D - transmittance;
+                    if (saturated) {
+                        depthSum += travelled;
+                        depthCount++;
+                    }
+                }
+            }
+            int n = gridA * gridB;
+            double mean = 0.0D;
+            for (double[] row : alpha) {
+                for (double v : row) {
+                    mean += v;
+                }
+            }
+            mean /= n;
+            double var = 0.0D;
+            int high = 0;
+            for (double[] row : alpha) {
+                for (double v : row) {
+                    var += (v - mean) * (v - mean);
+                    if (v > 0.97D) {
+                        high++;
+                    }
+                }
+            }
+            var /= n;
+            double delta = 0.0D;
+            int pairs = 0;
+            for (int a = 0; a + 1 < gridA; a++) {
+                for (int b = 0; b + 1 < gridB; b++) {
+                    delta += Math.abs(alpha[a][b] - alpha[a + 1][b]);
+                    delta += Math.abs(alpha[a][b] - alpha[a][b + 1]);
+                    pairs += 2;
+                }
+            }
+            delta /= Math.max(1, pairs);
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_ANVIL_SENSITIVITY|%.3f|%.4f|%.6f|%.4f|%.6f|%6.2f|%8.1f%n",
+                    scale, mean, var, mean > 1.0E-6D ? Math.sqrt(var) / mean : 0.0D,
+                    delta, 100.0D * high / n,
+                    depthCount > 0 ? depthSum / depthCount : -1.0D);
+        }
+    }
+
+    /** The shipped severe fixture, translated to a different world origin. */
+    private static java.util.List<StormLobeDescriptor> severeFixtureAt(
+            double offsetX, double offsetZ) {
+        java.util.List<StormLobeDescriptor> moved = new ArrayList<>();
+        for (StormLobeDescriptor l : severeFixture38bc5412()) {
+            moved.add(new StormLobeDescriptor(
+                    l.fieldId(), l.groupId(), l.memberIndex(), l.memberCount(), l.groupSlot(),
+                    l.role(), l.centerX() + offsetX, l.centerZ() + offsetZ,
+                    l.baseY(), l.topY(), l.majorRadius(), l.minorRadius(),
+                    l.sinOrientation(), l.cosOrientation(), l.shearX(), l.shearZ(),
+                    l.density(), l.edgeSoftness(), l.seed01(), l.lifecycleStage(),
+                    l.verticalDevelopment(), l.detailWeight()));
+        }
+        return moved;
+    }
+
+    /** Every stage of the production chain over one role's own envelope. */
+    private static void sampleRoleChain(
+            byte[] baseVolume, byte[] detailVolume,
+            java.util.List<StormLobeDescriptor> lobes, int role, String roleName,
+            int fixtureIndex) {
+        double centreX = 0.0D;
+        double centreZ = 0.0D;
+        for (StormLobeDescriptor lobe : lobes) {
+            centreX += lobe.centerX();
+            centreZ += lobe.centerZ();
+        }
+        centreX /= lobes.size();
+        centreZ /= lobes.size();
+
+        int capacity = 400000;
+        double[] envelope = new double[capacity];
+        double[] baseFieldValues = new double[capacity];
+        double[] bodyValues = new double[capacity];
+        double[] detailValues = new double[capacity];
+        double[] densityValues = new double[capacity];
+        double[] densityGradient = new double[capacity];
+        int n = 0;
+        int gradientCount = 0;
+
+        double[] baseSample = new double[4];
+        double[] detailSample = new double[4];
+        final double step = 12.0D;
+        final double lag = 4.0D;
+
+        for (double y = 136.0D; y <= 1000.0D && n < capacity - 2; y += step) {
+            for (double dx = -700.0D; dx <= 700.0D && n < capacity - 2; dx += step) {
+                for (double dz = -700.0D; dz <= 700.0D && n < capacity - 2; dz += step) {
+                    double x = centreX + dx;
+                    double z = centreZ + dz;
+                    int owner = -1;
+                    double bestEnvelope = 0.0D;
+                    for (StormLobeDescriptor lobe : lobes) {
+                        double e = StormLobeEvaluator.envelopeFromDistance(
+                                StormLobeEvaluator.signedDistanceAt(lobe, x, y, z),
+                                StormLobeEvaluator.edgeWidthBlocks(lobe),
+                                StormLobeEvaluator.envelopeStrength(lobe));
+                        if (e > bestEnvelope) {
+                            bestEnvelope = e;
+                            owner = lobe.role().gpuId();
+                        }
+                    }
+                    if (owner != role || bestEnvelope <= 0.0D) {
+                        continue;
+                    }
+                    double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+                    if (coverage <= 0.0D) {
+                        continue;
+                    }
+                    // Interior only: away from the silhouette boundary, which is
+                    // what "uniform interior" is a claim about.
+                    if (coverage < 0.60D) {
+                        continue;
+                    }
+                    double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+                    boolean embedded =
+                            StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+
+                    double[] uvw = baseDomain(x, y, z, 0.0025D);
+                    CloudNoiseFieldModel.sampleBase(baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+                    double lowFbm = StormDensityModel.lowFbm(
+                            baseSample[1], baseSample[2], baseSample[3]);
+                    double baseField = StormDensityModel.stormBaseField(
+                            StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+                    double body = StormDensityModel.stormBody(
+                            coverage, strength, baseField, embedded);
+                    double[] duvw = detailDomain(x, y, z, baseSample);
+                    CloudNoiseFieldModel.sampleDetail(
+                            detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+                    double detailFbm = StormDensityModel.detailFbm(
+                            detailSample[0], detailSample[1], detailSample[2]);
+                    double density = StormDensityModel.finalDensity(
+                            coverage, strength, baseField, detailFbm, embedded);
+
+                    envelope[n] = coverage;
+                    baseFieldValues[n] = baseField;
+                    bodyValues[n] = body;
+                    detailValues[n] = detailFbm;
+                    densityValues[n] = density;
+                    n++;
+
+                    double neighbour = sampleRayDensity(baseVolume, detailVolume, lobes,
+                            x + lag, y, z);
+                    densityGradient[gradientCount++] = Math.abs(neighbour - density) / lag;
+                }
+            }
+        }
+        if (n < 100) {
+            return;
+        }
+        double[] noGradient = new double[1];
+        for (Object[] pair : new Object[][] {
+                {"envelope", envelope}, {"baseField", baseFieldValues},
+                {"bodyAfterRemap", bodyValues}, {"detailFbm", detailValues},
+                {"finalDensity", densityValues}}) {
+            String stage = (String) pair[0];
+            double[] values = (double[]) pair[1];
+            T098Dist d = summarize(stage, values, n,
+                    "finalDensity".equals(stage) ? densityGradient : noGradient,
+                    "finalDensity".equals(stage) ? gradientCount : 0);
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_ANVIL|%-14s|%-5s|%d|%6d|%.4f|%.4f|%.4f|%.4f|%.5f|%.4f"
+                            + "|%.5f|%6.2f|%6.2f|%6.2f|%6.2f%n",
+                    d.stage(), roleName, fixtureIndex, d.n(), d.mean(), d.p05(), d.p50(),
+                    d.p95(), d.variance(), d.cv(), d.meanGradient(),
+                    d.sat80(), d.sat90(), d.sat99(), d.zero());
+        }
+    }
+
+    /**
+     * Dominant feature scale of each stage, from the normalized autocorrelation
+     * along horizontal transects through the anvil. The reported length is the
+     * lag at which correlation first falls below 1/e, which is the size of the
+     * structures a viewer would read as billows.
+     */
+    private static void reportT098AnvilFeatureScale(byte[] baseVolume, byte[] detailVolume) {
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double centreX = 0.0D;
+        double centreZ = 0.0D;
+        double anvilRadius = 0.0D;
+        double anvilMidY = 0.0D;
+        int anvilCount = 0;
+        for (StormLobeDescriptor lobe : lobes) {
+            centreX += lobe.centerX();
+            centreZ += lobe.centerZ();
+            if (lobe.role().gpuId() == 3) {
+                anvilRadius = Math.max(anvilRadius, lobe.majorRadius());
+                anvilMidY += (lobe.baseY() + lobe.topY()) * 0.5D;
+                anvilCount++;
+            }
+        }
+        centreX /= lobes.size();
+        centreZ /= lobes.size();
+        anvilMidY /= Math.max(1, anvilCount);
+
+        final double lagStep = 4.0D;
+        final int lagCount = 80;
+        String[] stages = {"baseField", "detailFbm", "finalDensity"};
+        double[][] corr = new double[stages.length][lagCount + 1];
+        long[] counts = new long[lagCount + 1];
+        double[] baseSample = new double[4];
+        double[] detailSample = new double[4];
+
+        // Accumulate over many transects so the estimate is not one line.
+        java.util.List<double[]> series = new ArrayList<>();
+        for (double dz = -300.0D; dz <= 300.0D; dz += 25.0D) {
+            for (double dy = -60.0D; dy <= 60.0D; dy += 30.0D) {
+                double[] baseFieldLine = new double[600];
+                double[] detailLine = new double[600];
+                double[] densityLine = new double[600];
+                int m = 0;
+                for (double dx = -400.0D; dx <= 400.0D && m < 600; dx += lagStep) {
+                    double x = centreX + dx;
+                    double y = anvilMidY + dy;
+                    double z = centreZ + dz;
+                    double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+                    if (coverage < 0.60D) {
+                        m = 0;
+                        break;
+                    }
+                    double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+                    boolean embedded =
+                            StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+                    double[] uvw = baseDomain(x, y, z, 0.0025D);
+                    CloudNoiseFieldModel.sampleBase(baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+                    double lowFbm = StormDensityModel.lowFbm(
+                            baseSample[1], baseSample[2], baseSample[3]);
+                    double baseField = StormDensityModel.stormBaseField(
+                            StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+                    double[] duvw = detailDomain(x, y, z, baseSample);
+                    CloudNoiseFieldModel.sampleDetail(
+                            detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+                    double detailFbm = StormDensityModel.detailFbm(
+                            detailSample[0], detailSample[1], detailSample[2]);
+                    baseFieldLine[m] = baseField;
+                    detailLine[m] = detailFbm;
+                    densityLine[m] = StormDensityModel.finalDensity(
+                            coverage, strength, baseField, detailFbm, embedded);
+                    m++;
+                }
+                if (m > 60) {
+                    series.add(java.util.Arrays.copyOf(baseFieldLine, m));
+                    series.add(java.util.Arrays.copyOf(detailLine, m));
+                    series.add(java.util.Arrays.copyOf(densityLine, m));
+                }
+            }
+        }
+        System.out.println("T098_ANVIL_SCALE|stage|transects|decorrelationBlocks"
+                + "|anvilMajorRadiusBlocks|featuresAcrossAnvil");
+        for (int stage = 0; stage < stages.length; stage++) {
+            double[] sum = new double[lagCount + 1];
+            long[] used = new long[lagCount + 1];
+            int transects = 0;
+            for (int s = stage; s < series.size(); s += stages.length) {
+                double[] line = series.get(s);
+                transects++;
+                double mean = 0.0D;
+                for (double v : line) {
+                    mean += v;
+                }
+                mean /= line.length;
+                double var = 0.0D;
+                for (double v : line) {
+                    var += (v - mean) * (v - mean);
+                }
+                var /= line.length;
+                if (var < 1.0E-9D) {
+                    continue;
+                }
+                for (int lag = 0; lag <= lagCount && lag < line.length; lag++) {
+                    double acc = 0.0D;
+                    int pairs = 0;
+                    for (int i = 0; i + lag < line.length; i++) {
+                        acc += (line[i] - mean) * (line[i + lag] - mean);
+                        pairs++;
+                    }
+                    sum[lag] += (acc / pairs) / var;
+                    used[lag]++;
+                }
+            }
+            double decorrelation = -1.0D;
+            for (int lag = 0; lag <= lagCount; lag++) {
+                if (used[lag] == 0) {
+                    continue;
+                }
+                double c = sum[lag] / used[lag];
+                if (c < 0.3679D) {
+                    decorrelation = lag * lagStep;
+                    break;
+                }
+            }
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_ANVIL_SCALE|%-12s|%5d|%18.1f|%22.1f|%20.2f%n",
+                    stages[stage], transects, decorrelation, anvilRadius,
+                    decorrelation > 0.0D ? (2.0D * anvilRadius) / decorrelation : -1.0D);
+        }
+    }
+
+    /**
+     * How deep a view ray gets into the anvil before the integral saturates.
+     * If that depth is small against the anvil's own size, the visible surface
+     * is a thin skin and interior variation cannot reach the image at all.
+     */
+    private static void reportT098AnvilOpticalDepth(byte[] baseVolume, byte[] detailVolume) {
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double centreX = 0.0D;
+        double centreZ = 0.0D;
+        double anvilRadius = 0.0D;
+        double anvilMidY = 0.0D;
+        double anvilThickness = 0.0D;
+        int anvilCount = 0;
+        for (StormLobeDescriptor lobe : lobes) {
+            centreX += lobe.centerX();
+            centreZ += lobe.centerZ();
+            if (lobe.role().gpuId() == 3) {
+                anvilRadius = Math.max(anvilRadius, lobe.majorRadius());
+                anvilMidY += (lobe.baseY() + lobe.topY()) * 0.5D;
+                anvilThickness = Math.max(anvilThickness, lobe.topY() - lobe.baseY());
+                anvilCount++;
+            }
+        }
+        centreX /= lobes.size();
+        centreZ /= lobes.size();
+        anvilMidY /= Math.max(1, anvilCount);
+
+        double[] depths = new double[4096];
+        int n = 0;
+        final double step = 2.5D;
+        for (double dz = -300.0D; dz <= 300.0D; dz += 20.0D) {
+            for (double dy = -70.0D; dy <= 70.0D; dy += 20.0D) {
+                double transmittance = 1.0D;
+                double travelled = 0.0D;
+                boolean entered = false;
+                for (double dx = -600.0D; dx <= 600.0D; dx += step) {
+                    double cloud = sampleRayDensity(baseVolume, detailVolume, lobes,
+                            centreX + dx, anvilMidY + dy, centreZ + dz);
+                    if (cloud > 0.0006D) {
+                        entered = true;
+                    }
+                    if (!entered) {
+                        continue;
+                    }
+                    travelled += step;
+                    transmittance *= Math.exp(
+                            -cloud * T098_ANVIL_DENSITY_SCALE * T098_ANVIL_EXTINCTION * step);
+                    if (transmittance < 0.015D) {
+                        break;
+                    }
+                }
+                if (entered && transmittance < 0.015D && n < depths.length) {
+                    depths[n++] = travelled;
+                }
+            }
+        }
+        java.util.Arrays.sort(depths, 0, n);
+        double mean = 0.0D;
+        for (int i = 0; i < n; i++) {
+            mean += depths[i];
+        }
+        mean /= Math.max(1, n);
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_ANVIL_OPTICAL|rays=%d|meanSaturationDepthBlocks=%.1f|p05=%.1f|p50=%.1f"
+                        + "|p95=%.1f|anvilChordBlocks=%.1f|anvilThicknessBlocks=%.1f"
+                        + "|visibleSkinFractionOfChord=%.4f%n",
+                n, mean, n > 0 ? depths[(int) (n * 0.05)] : -1.0D,
+                n > 0 ? depths[n / 2] : -1.0D, n > 0 ? depths[(int) (n * 0.95)] : -1.0D,
+                2.0D * anvilRadius, anvilThickness,
+                mean / Math.max(1.0D, 2.0D * anvilRadius));
+    }
+
+    /**
+     * PHASE 3 done offline: does the accumulated alpha still carry the structure
+     * the density field has? Marches a grid of parallel rays through the anvil
+     * from the SIDE and from ABOVE and reports the variation of the resulting
+     * unlit alpha image against the variation of the density field it came
+     * from. Lighting is deliberately excluded, so any flattening seen here is
+     * integration, not shading.
+     */
+    private static void reportT098AnvilAlphaField(byte[] baseVolume, byte[] detailVolume) {
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double centreX = 0.0D;
+        double centreZ = 0.0D;
+        double anvilMidY = 0.0D;
+        double anvilTopY = 0.0D;
+        int anvilCount = 0;
+        for (StormLobeDescriptor lobe : lobes) {
+            centreX += lobe.centerX();
+            centreZ += lobe.centerZ();
+            if (lobe.role().gpuId() == 3) {
+                anvilMidY += (lobe.baseY() + lobe.topY()) * 0.5D;
+                anvilTopY = Math.max(anvilTopY, lobe.topY());
+                anvilCount++;
+            }
+        }
+        centreX /= lobes.size();
+        centreZ /= lobes.size();
+        anvilMidY /= Math.max(1, anvilCount);
+
+        System.out.println("T098_ANVIL_ALPHA|view|rays|meanAlpha|alphaVariance|alphaCV"
+                + "|meanAbsNeighbourDelta|pctAlphaAbove0.97|pctAlphaBelow0.05");
+        for (String view : new String[] {"SIDE", "ABOVE"}) {
+            int gridA = 96;
+            int gridB = 48;
+            double[][] alpha = new double[gridA][gridB];
+            for (int a = 0; a < gridA; a++) {
+                for (int b = 0; b < gridB; b++) {
+                    double transmittance = 1.0D;
+                    if ("SIDE".equals(view)) {
+                        double z = centreZ - 360.0D + (720.0D * a) / (gridA - 1);
+                        double y = anvilMidY - 110.0D + (220.0D * b) / (gridB - 1);
+                        for (double dx = -700.0D; dx <= 700.0D; dx += 2.5D) {
+                            double cloud = sampleRayDensity(baseVolume, detailVolume, lobes,
+                                    centreX + dx, y, z);
+                            transmittance *= Math.exp(-cloud * T098_ANVIL_DENSITY_SCALE
+                                    * T098_ANVIL_EXTINCTION * 2.5D);
+                            if (transmittance < 0.0005D) {
+                                break;
+                            }
+                        }
+                    } else {
+                        double x = centreX - 480.0D + (960.0D * a) / (gridA - 1);
+                        double z = centreZ - 480.0D + (960.0D * b) / (gridB - 1);
+                        for (double y = anvilTopY + 120.0D; y >= 600.0D; y -= 2.5D) {
+                            double cloud = sampleRayDensity(baseVolume, detailVolume, lobes,
+                                    x, y, z);
+                            transmittance *= Math.exp(-cloud * T098_ANVIL_DENSITY_SCALE
+                                    * T098_ANVIL_EXTINCTION * 2.5D);
+                            if (transmittance < 0.0005D) {
+                                break;
+                            }
+                        }
+                    }
+                    alpha[a][b] = 1.0D - transmittance;
+                }
+            }
+            int n = gridA * gridB;
+            double mean = 0.0D;
+            for (double[] row : alpha) {
+                for (double v : row) {
+                    mean += v;
+                }
+            }
+            mean /= n;
+            double var = 0.0D;
+            int high = 0;
+            int low = 0;
+            for (double[] row : alpha) {
+                for (double v : row) {
+                    var += (v - mean) * (v - mean);
+                    if (v > 0.97D) {
+                        high++;
+                    }
+                    if (v < 0.05D) {
+                        low++;
+                    }
+                }
+            }
+            var /= n;
+            double delta = 0.0D;
+            int pairs = 0;
+            for (int a = 0; a + 1 < gridA; a++) {
+                for (int b = 0; b + 1 < gridB; b++) {
+                    delta += Math.abs(alpha[a][b] - alpha[a + 1][b]);
+                    delta += Math.abs(alpha[a][b] - alpha[a][b + 1]);
+                    pairs += 2;
+                }
+            }
+            delta /= Math.max(1, pairs);
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_ANVIL_ALPHA|%-5s|%5d|%.4f|%.6f|%.4f|%.6f|%6.2f|%6.2f%n",
+                    view, n, mean, var, mean > 1.0E-6D ? Math.sqrt(var) / mean : 0.0D,
+                    delta, 100.0D * high / n, 100.0D * low / n);
+        }
+    }
+
+
+    // ------------------------------------------------------------------
+    // T098 ANVIL optical surface
+    // ------------------------------------------------------------------
+
+    /**
+     * One view ray's optical-surface record: the depths at which accumulated
+     * alpha crosses each threshold, and the field values at the alpha=0.5
+     * point, which is the locus a viewer actually reads as the surface.
+     */
+    private record T098Surface(
+            boolean valid, double tFirst, double t10, double t50, double t90, double t985,
+            double tEnvelope, double envelopeAtT50, double bodyAtT50, double detailAtT50,
+            double densityAtT50, double lightOpticalDepth, int roleAtT50) {
+        static final T098Surface INVALID = new T098Surface(false, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, -1);
+    }
+
+    /** Production light direction from the frozen noon fixture. */
+    private static final double[] T098_LIGHT_DIR = {-0.60D, 0.79D, 0.12D};
+
+    /**
+     * The production light cone, modelled exactly: eight taps, 14-block first
+     * step growing by 1.42, a fixed golden-angle cone offset, and detail
+     * erosion only on the first two taps.
+     */
+    private static double t098LightOpticalDepth(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double x, double y, double z) {
+        double opticalDepth = 0.0D;
+        double stepLength = 14.0D;
+        double px = x;
+        double py = y;
+        double pz = z;
+        for (int i = 0; i < 8; i++) {
+            double ang = i * 2.399963D;
+            double spread = (i + 0.5D) * 0.28D;
+            double ox = Math.cos(ang) * spread * stepLength * 0.24D;
+            double oy = 0.35D * Math.sin(ang * 1.7D) * spread * stepLength * 0.24D;
+            double oz = Math.sin(ang) * spread * stepLength * 0.24D;
+            px += T098_LIGHT_DIR[0] * stepLength;
+            py += T098_LIGHT_DIR[1] * stepLength;
+            pz += T098_LIGHT_DIR[2] * stepLength;
+            double cloud = i < 2
+                    ? sampleRayDensity(baseVolume, detailVolume, lobes,
+                            px + ox, py + oy, pz + oz)
+                    : sampleRayBodyNoErosion(baseVolume, lobes, px + ox, py + oy, pz + oz);
+            opticalDepth += cloud * T098_ANVIL_DENSITY_SCALE * stepLength;
+            stepLength *= 1.42D;
+        }
+        return opticalDepth * T098_ANVIL_EXTINCTION;
+    }
+
+    /** The body before detail erosion, which is what light taps 2..7 sample. */
+    private static double sampleRayBodyNoErosion(
+            byte[] baseVolume, java.util.List<StormLobeDescriptor> lobes,
+            double x, double y, double z) {
+        double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+        if (coverage <= 0.0D) {
+            return 0.0D;
+        }
+        double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+        boolean embedded = StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+        double[] baseSample = new double[4];
+        double[] uvw = baseDomain(x, y, z, 0.0025D);
+        CloudNoiseFieldModel.sampleBase(baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+        double lowFbm = StormDensityModel.lowFbm(baseSample[1], baseSample[2], baseSample[3]);
+        double baseField = StormDensityModel.stormBaseField(
+                StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+        return StormDensityModel.stormBody(coverage, strength, baseField, embedded);
+    }
+
+    /**
+     * Marches one ray and returns where the accumulated alpha crosses each
+     * threshold.
+     *
+     * @param arm 0 = production, 1 = erosion disabled, 2 = envelope body only
+     */
+    private static T098Surface t098MarchSurface(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double ox, double oy, double oz, double dx, double dy, double dz,
+            double span, int arm, boolean wantLight) {
+        final double step = 2.5D;
+        double transmittance = 1.0D;
+        double tFirst = -1.0D;
+        double tEnvelope = -1.0D;
+        double t10 = -1.0D;
+        double t50 = -1.0D;
+        double t90 = -1.0D;
+        double t985 = -1.0D;
+        double envelopeAt = 0.0D;
+        double bodyAt = 0.0D;
+        double detailAt = 0.0D;
+        double densityAt = 0.0D;
+        int roleAt = -1;
+        double[] baseSample = new double[4];
+        double[] detailSample = new double[4];
+
+        for (double t = 0.0D; t <= span; t += step) {
+            double x = ox + dx * t;
+            double y = oy + dy * t;
+            double z = oz + dz * t;
+            double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+            if (tEnvelope < 0.0D && coverage >= 0.50D) {
+                tEnvelope = t;
+            }
+            double cloud = 0.0D;
+            double baseField = 0.0D;
+            double detailFbm = 1.0D;
+            double body = 0.0D;
+            if (coverage > 0.0D) {
+                double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+                boolean embedded =
+                        StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+                double[] uvw = baseDomain(x, y, z, 0.0025D);
+                CloudNoiseFieldModel.sampleBase(baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+                double lowFbm = StormDensityModel.lowFbm(
+                        baseSample[1], baseSample[2], baseSample[3]);
+                baseField = StormDensityModel.stormBaseField(
+                        StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+                body = StormDensityModel.stormBody(coverage, strength, baseField, embedded);
+                if (arm == 2) {
+                    cloud = body;
+                } else if (arm == 1) {
+                    cloud = body;
+                } else {
+                    double[] duvw = detailDomain(x, y, z, baseSample);
+                    CloudNoiseFieldModel.sampleDetail(
+                            detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+                    detailFbm = StormDensityModel.detailFbm(
+                            detailSample[0], detailSample[1], detailSample[2]);
+                    cloud = StormDensityModel.erode(body, detailFbm);
+                }
+            }
+            if (cloud > 0.0006D && tFirst < 0.0D) {
+                tFirst = t;
+            }
+            transmittance *= Math.exp(
+                    -cloud * T098_ANVIL_DENSITY_SCALE * T098_ANVIL_EXTINCTION * step);
+            double alpha = 1.0D - transmittance;
+            if (t10 < 0.0D && alpha >= 0.10D) {
+                t10 = t;
+            }
+            if (t50 < 0.0D && alpha >= 0.50D) {
+                t50 = t;
+                envelopeAt = coverage;
+                bodyAt = body;
+                detailAt = detailFbm;
+                densityAt = cloud;
+                double best = 0.0D;
+                for (StormLobeDescriptor lobe : lobes) {
+                    double e = StormLobeEvaluator.envelopeFromDistance(
+                            StormLobeEvaluator.signedDistanceAt(lobe, x, y, z),
+                            StormLobeEvaluator.edgeWidthBlocks(lobe),
+                            StormLobeEvaluator.envelopeStrength(lobe));
+                    if (e > best) {
+                        best = e;
+                        roleAt = lobe.role().gpuId();
+                    }
+                }
+            }
+            if (t90 < 0.0D && alpha >= 0.90D) {
+                t90 = t;
+            }
+            if (alpha >= 0.985D) {
+                t985 = t;
+                break;
+            }
+        }
+        if (t50 < 0.0D) {
+            return T098Surface.INVALID;
+        }
+        double light = 0.0D;
+        if (wantLight) {
+            light = t098LightOpticalDepth(baseVolume, detailVolume, lobes,
+                    ox + dx * t50, oy + dy * t50, oz + dz * t50);
+        }
+        return new T098Surface(true, tFirst, t10, t50, t90, t985, tEnvelope,
+                envelopeAt, bodyAt, detailAt, densityAt, light, roleAt);
+    }
+
+    /** RMS of a grid after removing a wide moving-average trend, plus percentiles. */
+    private static double[] t098Relief(double[][] grid, boolean[][] valid, int window) {
+        int rows = grid.length;
+        int cols = grid[0].length;
+        java.util.List<Double> residuals = new ArrayList<>();
+        double neighbourDelta = 0.0D;
+        int neighbourPairs = 0;
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (!valid[r][c]) {
+                    continue;
+                }
+                double sum = 0.0D;
+                int n = 0;
+                for (int rr = Math.max(0, r - window); rr <= Math.min(rows - 1, r + window); rr++) {
+                    for (int cc = Math.max(0, c - window);
+                            cc <= Math.min(cols - 1, c + window); cc++) {
+                        if (valid[rr][cc]) {
+                            sum += grid[rr][cc];
+                            n++;
+                        }
+                    }
+                }
+                if (n < 4) {
+                    continue;
+                }
+                residuals.add(grid[r][c] - sum / n);
+                if (c + 1 < cols && valid[r][c + 1]) {
+                    neighbourDelta += Math.abs(grid[r][c + 1] - grid[r][c]);
+                    neighbourPairs++;
+                }
+            }
+        }
+        if (residuals.size() < 16) {
+            return new double[] {0, 0, 0, 0, 0};
+        }
+        java.util.Collections.sort(residuals);
+        double mean = 0.0D;
+        for (double v : residuals) {
+            mean += v;
+        }
+        mean /= residuals.size();
+        double sq = 0.0D;
+        for (double v : residuals) {
+            sq += (v - mean) * (v - mean);
+        }
+        double rms = Math.sqrt(sq / residuals.size());
+        return new double[] {rms, residuals.get((int) (residuals.size() * 0.05)),
+                residuals.get((int) (residuals.size() * 0.95)),
+                neighbourPairs > 0 ? neighbourDelta / neighbourPairs : 0.0D,
+                residuals.size()};
+    }
+
+    /** Dominant wavelength of a grid's residual, along rows, in world blocks. */
+    private static double t098DominantWavelength(
+            double[][] grid, boolean[][] valid, double spacing, int window) {
+        int rows = grid.length;
+        int cols = grid[0].length;
+        int maxLag = Math.min(60, cols / 3);
+        double[] sum = new double[maxLag + 1];
+        int[] used = new int[maxLag + 1];
+        for (int r = 0; r < rows; r++) {
+            java.util.List<Double> line = new ArrayList<>();
+            for (int c = 0; c < cols; c++) {
+                if (!valid[r][c]) {
+                    line.clear();
+                    continue;
+                }
+                line.add(grid[r][c]);
+            }
+            if (line.size() < 40) {
+                continue;
+            }
+            double[] v = new double[line.size()];
+            for (int i = 0; i < v.length; i++) {
+                v[i] = line.get(i);
+            }
+            double[] detr = new double[v.length];
+            for (int i = 0; i < v.length; i++) {
+                int a = Math.max(0, i - window);
+                int b = Math.min(v.length - 1, i + window);
+                double s = 0.0D;
+                for (int k = a; k <= b; k++) {
+                    s += v[k];
+                }
+                detr[i] = v[i] - s / (b - a + 1);
+            }
+            double mean = 0.0D;
+            for (double d : detr) {
+                mean += d;
+            }
+            mean /= detr.length;
+            double var = 0.0D;
+            for (double d : detr) {
+                var += (d - mean) * (d - mean);
+            }
+            var /= detr.length;
+            if (var < 1.0E-12D) {
+                continue;
+            }
+            for (int lag = 1; lag <= maxLag && lag < detr.length; lag++) {
+                double acc = 0.0D;
+                int pairs = 0;
+                for (int i = 0; i + lag < detr.length; i++) {
+                    acc += (detr[i] - mean) * (detr[i + lag] - mean);
+                    pairs++;
+                }
+                sum[lag] += (acc / pairs) / var;
+                used[lag]++;
+            }
+        }
+        for (int lag = 1; lag <= maxLag; lag++) {
+            if (used[lag] > 0 && sum[lag] / used[lag] < 0.3679D) {
+                return lag * spacing;
+            }
+        }
+        return -1.0D;
+    }
+
+    /**
+     * T098: what actually controls the anvil's visible surface.
+     *
+     * <p>The anvil is opaque after about 75 blocks of a 1015-block chord, so
+     * interior density variance cannot reach the image. The shape a viewer
+     * reads is the locus where accumulated alpha first becomes significant.
+     * This measures that surface directly: where each alpha threshold is
+     * crossed, how much the alpha=0.5 surface deviates from the smooth
+     * geometric shell, how far detail erosion moves it, and how much the
+     * production light cone's optical depth varies across it.
+     */
+    private static void reportT098AnvilOpticalSurface() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double centreX = 0.0D;
+        double centreZ = 0.0D;
+        double anvilBase = 1.0E9D;
+        double anvilTop = 0.0D;
+        for (StormLobeDescriptor lobe : lobes) {
+            centreX += lobe.centerX();
+            centreZ += lobe.centerZ();
+            if (lobe.role().gpuId() == 3) {
+                anvilBase = Math.min(anvilBase, lobe.baseY());
+                anvilTop = Math.max(anvilTop, lobe.topY());
+            }
+        }
+        centreX /= lobes.size();
+        centreZ /= lobes.size();
+
+        final double spacing = 6.0D;
+        String[] armNames = {"production", "erosionOff", "bodyOnly"};
+
+        System.out.println("T098_SURFACE|view|arm|rays|meanT50|reliefRmsBlocks|reliefP05"
+                + "|reliefP95|neighbourDeltaBlocks|dominantWavelengthBlocks"
+                + "|meanRampT10toT90|meanEnvelopeToAlpha50");
+        double[] productionRelief = new double[2];
+        for (String view : new String[] {"SIDE", "ABOVE"}) {
+            for (int arm = 0; arm < armNames.length; arm++) {
+                int rows;
+                int cols;
+                if ("SIDE".equals(view)) {
+                    rows = (int) ((anvilTop + 60.0D - (anvilBase - 60.0D)) / spacing);
+                    cols = (int) (1000.0D / spacing);
+                } else {
+                    rows = (int) (1000.0D / spacing);
+                    cols = (int) (1000.0D / spacing);
+                }
+                double[][] t50 = new double[rows][cols];
+                double[][] tFirst = new double[rows][cols];
+                double[][] tEnv = new double[rows][cols];
+                double[][] t10 = new double[rows][cols];
+                double[][] t90 = new double[rows][cols];
+                boolean[][] valid = new boolean[rows][cols];
+                double rampSum = 0.0D;
+                double envelopeToAlphaSum = 0.0D;
+                int n = 0;
+                for (int r = 0; r < rows; r++) {
+                    for (int c = 0; c < cols; c++) {
+                        T098Surface s;
+                        if ("SIDE".equals(view)) {
+                            double y = anvilBase - 60.0D + r * spacing;
+                            double z = centreZ - 500.0D + c * spacing;
+                            s = t098MarchSurface(baseVolume, detailVolume, lobes,
+                                    centreX + 900.0D, y, z, -1.0D, 0.0D, 0.0D,
+                                    1800.0D, arm, false);
+                        } else {
+                            double x = centreX - 500.0D + r * spacing;
+                            double z = centreZ - 500.0D + c * spacing;
+                            s = t098MarchSurface(baseVolume, detailVolume, lobes,
+                                    x, anvilTop + 300.0D, z, 0.0D, -1.0D, 0.0D,
+                                    900.0D, arm, false);
+                        }
+                        if (!s.valid()) {
+                            continue;
+                        }
+                        valid[r][c] = true;
+                        t50[r][c] = s.t50();
+                        tFirst[r][c] = s.tFirst();
+                        tEnv[r][c] = s.tEnvelope();
+                        t10[r][c] = s.t10();
+                        t90[r][c] = s.t90();
+                        n++;
+                        if (s.t90() > 0.0D && s.t10() > 0.0D) {
+                            rampSum += s.t90() - s.t10();
+                        }
+                        if (s.tEnvelope() > 0.0D) {
+                            envelopeToAlphaSum += s.t50() - s.tEnvelope();
+                        }
+                    }
+                }
+                if (n < 100) {
+                    continue;
+                }
+                double[] relief = t098Relief(t50, valid, 6);
+                double wavelength = t098DominantWavelength(t50, valid, spacing, 6);
+                double meanT50 = 0.0D;
+                int m = 0;
+                for (int r = 0; r < rows; r++) {
+                    for (int c = 0; c < cols; c++) {
+                        if (valid[r][c]) {
+                            meanT50 += t50[r][c];
+                            m++;
+                        }
+                    }
+                }
+                meanT50 /= Math.max(1, m);
+                System.out.printf(java.util.Locale.ROOT,
+                        "T098_SURFACE|%-5s|%-11s|%6d|%8.1f|%8.3f|%8.2f|%8.2f|%8.3f"
+                                + "|%10.1f|%9.2f|%9.2f%n",
+                        view, armNames[arm], n, meanT50, relief[0], relief[1], relief[2],
+                        relief[3], wavelength, rampSum / Math.max(1, n),
+                        envelopeToAlphaSum / Math.max(1, n));
+                if (arm == 0) {
+                    productionRelief["SIDE".equals(view) ? 0 : 1] = relief[0];
+                }
+                if (arm == 0) {
+                    double[] envRelief = t098Relief(tEnv, valid, 6);
+                    double[] firstRelief = t098Relief(tFirst, valid, 6);
+                    double[] r10 = t098Relief(t10, valid, 6);
+                    double[] r90 = t098Relief(t90, valid, 6);
+                    System.out.printf(java.util.Locale.ROOT,
+                            "T098_SURFACE_STAGE|%-5s|envelope=%.3f|firstDensity=%.3f"
+                                    + "|alpha10=%.3f|alpha50=%.3f|alpha90=%.3f%n",
+                            view, envRelief[0], firstRelief[0], r10[0], relief[0], r90[0]);
+                }
+            }
+        }
+        reportT098AnvilLightResponse(baseVolume, detailVolume, lobes, centreX, centreZ,
+                anvilBase, anvilTop);
+        reportT098AnvilShadingResponse(baseVolume, detailVolume, lobes, centreX, centreZ,
+                anvilBase, anvilTop);
+        reportT098SurfaceReliefSpectrum(baseVolume, detailVolume, lobes, centreX, centreZ,
+                anvilBase, anvilTop);
+        reportT098SurfaceByRole(baseVolume, detailVolume, lobes, centreX, centreZ);
+    }
+
+    /** PHASE 7: does the production light cone respond to the surface it sits on? */
+    private static void reportT098AnvilLightResponse(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double centreX, double centreZ, double anvilBase, double anvilTop) {
+        final double spacing = 8.0D;
+        java.util.List<Double> light = new ArrayList<>();
+        java.util.List<Double> depth = new ArrayList<>();
+        double neighbour = 0.0D;
+        int pairs = 0;
+        Double previous = null;
+        for (double y = anvilBase - 40.0D; y <= anvilTop + 40.0D; y += spacing) {
+            previous = null;
+            for (double z = centreZ - 400.0D; z <= centreZ + 400.0D; z += spacing) {
+                T098Surface s = t098MarchSurface(baseVolume, detailVolume, lobes,
+                        centreX + 900.0D, y, z, -1.0D, 0.0D, 0.0D, 1800.0D, 0, true);
+                if (!s.valid()) {
+                    previous = null;
+                    continue;
+                }
+                light.add(s.lightOpticalDepth());
+                depth.add(s.t50());
+                if (previous != null) {
+                    neighbour += Math.abs(s.lightOpticalDepth() - previous);
+                    pairs++;
+                }
+                previous = s.lightOpticalDepth();
+            }
+        }
+        if (light.size() < 100) {
+            return;
+        }
+        java.util.List<Double> sorted = new ArrayList<>(light);
+        java.util.Collections.sort(sorted);
+        double mean = 0.0D;
+        for (double v : light) {
+            mean += v;
+        }
+        mean /= light.size();
+        double var = 0.0D;
+        for (double v : light) {
+            var += (v - mean) * (v - mean);
+        }
+        var /= light.size();
+        // What the shading actually is: exp(-opticalDepth) is the direct light
+        // reaching the surface point.
+        java.util.List<Double> transmit = new ArrayList<>();
+        for (double v : light) {
+            transmit.add(Math.exp(-v));
+        }
+        java.util.Collections.sort(transmit);
+        double tMean = 0.0D;
+        for (double v : transmit) {
+            tMean += v;
+        }
+        tMean /= transmit.size();
+        double tVar = 0.0D;
+        for (double v : transmit) {
+            tVar += (v - tMean) * (v - tMean);
+        }
+        tVar /= transmit.size();
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_SURFACE_LIGHT|points=%d|meanOpticalDepth=%.3f|p05=%.3f|p50=%.3f|p95=%.3f"
+                        + "|variance=%.4f|neighbourDelta=%.4f%n",
+                light.size(), mean, sorted.get((int) (sorted.size() * 0.05)),
+                sorted.get(sorted.size() / 2), sorted.get((int) (sorted.size() * 0.95)),
+                var, pairs > 0 ? neighbour / pairs : 0.0D);
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_SURFACE_LIGHT_TRANSMITTANCE|meanDirectLight=%.5f|p05=%.5f|p50=%.5f"
+                        + "|p95=%.5f|variance=%.8f|cv=%.5f|pctBelow0.01=%.2f%n",
+                tMean, transmit.get((int) (transmit.size() * 0.05)),
+                transmit.get(transmit.size() / 2),
+                transmit.get((int) (transmit.size() * 0.95)), tVar,
+                tMean > 1.0E-9D ? Math.sqrt(tVar) / tMean : 0.0D,
+                100.0D * transmit.stream().filter(v -> v < 0.01D).count() / transmit.size());
+    }
+
+
+    // Frozen-noon fixture values, read from the live capture status line:
+    // lightColor=(1.00,0.97,0.90) ambTop=(0.48,0.64,1.00) ambBot=(0.30,0.34,0.41).
+    private static final double T098_LIGHT_LUM = 0.2126 * 1.00 + 0.7152 * 0.97 + 0.0722 * 0.90;
+    private static final double T098_AMBIENT_TOP_LUM =
+            0.2126 * 0.48 + 0.7152 * 0.64 + 0.0722 * 1.00;
+    /** SIDE view direction (-1,0,0) against the fixture light direction. */
+    private static final double T098_COS_THETA = 0.60D;
+
+    private static double t098HenyeyGreenstein(double cosTheta, double g) {
+        double g2 = g * g;
+        return (1.0D - g2)
+                / (4.0D * Math.PI * Math.pow(Math.max(1.0D + g2 - 2.0D * g * cosTheta, 1.0E-4D), 1.5D));
+    }
+
+    private static double t098DualLobePhase(double cosTheta) {
+        return StormDensityModel.lerp(0.72D,
+                t098HenyeyGreenstein(cosTheta, -0.18D),
+                t098HenyeyGreenstein(cosTheta, 0.62D));
+    }
+
+    /**
+     * The production radiance for one surface point, as a luminance.
+     *
+     * <p>Reproduces {@code evaluateLightingComponents} exactly for the terms
+     * that depend on the light cone: the three-octave scatter approximation,
+     * the beer-powder term, ambient retention keyed on direct transmission, and
+     * the filmic tone curve. Storm darkening, underside shading and rain are
+     * held at their neutral values, so this isolates how much of the anvil's
+     * brightness variation the light cone can produce.
+     */
+    private static double t098SurfaceLuminance(double opticalDepth, double localDensity) {
+        double scatter = 0.0D;
+        double scatterWeight = 0.0D;
+        double a = 1.0D;
+        double b = 1.0D;
+        for (int o = 0; o < 3; o++) {
+            double phase = StormDensityModel.lerp(a, 0.0795775D, t098DualLobePhase(T098_COS_THETA));
+            scatter += b * phase * Math.exp(-opticalDepth * a);
+            scatterWeight += b;
+            a *= 0.42D;
+            b *= 0.52D;
+        }
+        scatter /= Math.max(scatterWeight, 1.0E-4D);
+        double powder = 1.0D - Math.exp(-localDensity * 24.0D);
+        double powderTerm = StormDensityModel.lerp(
+                StormDensityModel.clamp01(T098_COS_THETA * 0.5D + 0.5D) * 0.72D,
+                1.0D, StormDensityModel.clamp01(powder * 1.35D));
+        double directTransmission = Math.exp(-opticalDepth);
+        double sunTerm = T098_LIGHT_LUM * scatter * powderTerm * (4.0D * Math.PI);
+        double ambientRetention = 0.74D;
+        double ambient = T098_AMBIENT_TOP_LUM
+                * StormDensityModel.lerp(directTransmission, ambientRetention, 1.0D);
+        double radiance = sunTerm + ambient * 0.86D;
+        return 1.0D - Math.exp(-radiance * 1.30D);
+    }
+
+    /**
+     * PHASE 7: how much brightness variation the production light cone can
+     * actually produce across the anvil's optical surface.
+     */
+    private static void reportT098AnvilShadingResponse(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double centreX, double centreZ, double anvilBase, double anvilTop) {
+        final double spacing = 8.0D;
+        java.util.List<Double> luminance = new ArrayList<>();
+        java.util.List<Double> scatterOnly = new ArrayList<>();
+        double neighbour = 0.0D;
+        int pairs = 0;
+        Double previous;
+        for (double y = anvilBase - 40.0D; y <= anvilTop + 40.0D; y += spacing) {
+            previous = null;
+            for (double z = centreZ - 400.0D; z <= centreZ + 400.0D; z += spacing) {
+                T098Surface s = t098MarchSurface(baseVolume, detailVolume, lobes,
+                        centreX + 900.0D, y, z, -1.0D, 0.0D, 0.0D, 1800.0D, 0, true);
+                if (!s.valid()) {
+                    previous = null;
+                    continue;
+                }
+                double lum = t098SurfaceLuminance(s.lightOpticalDepth(), s.densityAtT50());
+                luminance.add(lum);
+                scatterOnly.add(Math.exp(-s.lightOpticalDepth() * 0.1764D));
+                if (previous != null) {
+                    neighbour += Math.abs(lum - previous);
+                    pairs++;
+                }
+                previous = lum;
+            }
+        }
+        if (luminance.size() < 100) {
+            return;
+        }
+        java.util.List<Double> sorted = new ArrayList<>(luminance);
+        java.util.Collections.sort(sorted);
+        double mean = 0.0D;
+        for (double v : luminance) {
+            mean += v;
+        }
+        mean /= luminance.size();
+        double var = 0.0D;
+        for (double v : luminance) {
+            var += (v - mean) * (v - mean);
+        }
+        var /= luminance.size();
+        double sMean = 0.0D;
+        for (double v : scatterOnly) {
+            sMean += v;
+        }
+        sMean /= scatterOnly.size();
+        double sVar = 0.0D;
+        for (double v : scatterOnly) {
+            sVar += (v - sMean) * (v - sMean);
+        }
+        sVar /= scatterOnly.size();
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_SURFACE_SHADING|points=%d|meanLuminance=%.5f|p05=%.5f|p50=%.5f|p95=%.5f"
+                        + "|variance=%.8f|cv=%.5f|neighbourDelta=%.5f|range8bit=%.2f%n",
+                luminance.size(), mean, sorted.get((int) (sorted.size() * 0.05)),
+                sorted.get(sorted.size() / 2), sorted.get((int) (sorted.size() * 0.95)),
+                var, mean > 1.0E-9D ? Math.sqrt(var) / mean : 0.0D,
+                pairs > 0 ? neighbour / pairs : 0.0D,
+                255.0D * (sorted.get((int) (sorted.size() * 0.95))
+                        - sorted.get((int) (sorted.size() * 0.05))));
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_SURFACE_SCATTER_OCTAVE|meanThirdOctave=%.5f|variance=%.8f|cv=%.5f%n",
+                sMean, sVar, sMean > 1.0E-9D ? Math.sqrt(sVar) / sMean : 0.0D);
+    }
+
+    /**
+     * Relief of the alpha=0.5 surface resolved by scale, so "rough" and
+     * "billowy" are not confused. A wide detrend window keeps large features in
+     * the residual; a narrow one keeps only fine ones.
+     */
+    private static void reportT098SurfaceReliefSpectrum(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double centreX, double centreZ, double anvilBase, double anvilTop) {
+        final double spacing = 6.0D;
+        // Interior of the canopy only, so silhouette curvature cannot masquerade
+        // as surface relief.
+        int rows = (int) ((anvilTop - 30.0D - (anvilBase + 30.0D)) / spacing);
+        int cols = (int) (600.0D / spacing);
+        double[][] t50 = new double[rows][cols];
+        boolean[][] valid = new boolean[rows][cols];
+        double[][] t50NoErosion = new double[rows][cols];
+        boolean[][] validNoErosion = new boolean[rows][cols];
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                double y = anvilBase + 30.0D + r * spacing;
+                double z = centreZ - 300.0D + c * spacing;
+                T098Surface s = t098MarchSurface(baseVolume, detailVolume, lobes,
+                        centreX + 900.0D, y, z, -1.0D, 0.0D, 0.0D, 1800.0D, 0, false);
+                if (s.valid()) {
+                    valid[r][c] = true;
+                    t50[r][c] = s.t50();
+                }
+                T098Surface e = t098MarchSurface(baseVolume, detailVolume, lobes,
+                        centreX + 900.0D, y, z, -1.0D, 0.0D, 0.0D, 1800.0D, 1, false);
+                if (e.valid()) {
+                    validNoErosion[r][c] = true;
+                    t50NoErosion[r][c] = e.t50();
+                }
+            }
+        }
+        System.out.println("T098_SURFACE_SPECTRUM|windowBlocks|reliefRmsProduction"
+                + "|reliefRmsErosionOff|erosionContributionBlocks|projectedPxAtSide");
+        // At the SIDE pose the storm's 864-block height spans about 195 px.
+        final double blocksPerPixel = 864.0D / 195.0D;
+        for (int window : new int[] {2, 4, 8, 16, 32}) {
+            double[] a = t098Relief(t50, valid, window);
+            double[] b = t098Relief(t50NoErosion, validNoErosion, window);
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_SURFACE_SPECTRUM|%12.0f|%18.3f|%18.3f|%24.3f|%17.2f%n",
+                    window * spacing, a[0], b[0], a[0] - b[0], (window * spacing) / blocksPerPixel);
+        }
+    }
+
+    /** Optical-surface relief per role, from one SIDE sweep of the whole storm. */
+    private static void reportT098SurfaceByRole(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double centreX, double centreZ) {
+        final double spacing = 6.0D;
+        String[] roleNames = {"BASE", "CORE", "TOWER", "ANVIL"};
+        java.util.List<java.util.List<double[]>> byRole = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            byRole.add(new ArrayList<>());
+        }
+        for (double y = 140.0D; y <= 1010.0D; y += spacing) {
+            java.util.List<double[]> row = new ArrayList<>();
+            for (double z = centreZ - 450.0D; z <= centreZ + 450.0D; z += spacing) {
+                T098Surface s = t098MarchSurface(baseVolume, detailVolume, lobes,
+                        centreX + 900.0D, y, z, -1.0D, 0.0D, 0.0D, 1800.0D, 0, false);
+                if (s.valid() && s.roleAtT50() >= 0) {
+                    byRole.get(s.roleAtT50()).add(new double[] {y, z, s.t50()});
+                }
+            }
+        }
+        System.out.println("T098_SURFACE_ROLE|role|points|reliefRmsBlocks|neighbourDeltaBlocks");
+        for (int role = 0; role < 4; role++) {
+            java.util.List<double[]> pts = byRole.get(role);
+            if (pts.size() < 200) {
+                continue;
+            }
+            // Relief against a local mean over neighbours within 40 blocks.
+            double sq = 0.0D;
+            int n = 0;
+            double neighbour = 0.0D;
+            int pairs = 0;
+            for (int i = 0; i < pts.size(); i++) {
+                double sum = 0.0D;
+                int m = 0;
+                for (int j = Math.max(0, i - 12); j < Math.min(pts.size(), i + 13); j++) {
+                    if (Math.abs(pts.get(j)[0] - pts.get(i)[0]) < 0.1D
+                            && Math.abs(pts.get(j)[1] - pts.get(i)[1]) <= 42.0D) {
+                        sum += pts.get(j)[2];
+                        m++;
+                    }
+                }
+                if (m < 4) {
+                    continue;
+                }
+                double residual = pts.get(i)[2] - sum / m;
+                sq += residual * residual;
+                n++;
+                if (i + 1 < pts.size() && Math.abs(pts.get(i + 1)[0] - pts.get(i)[0]) < 0.1D
+                        && Math.abs(pts.get(i + 1)[1] - pts.get(i)[1]) <= spacing + 0.1D) {
+                    neighbour += Math.abs(pts.get(i + 1)[2] - pts.get(i)[2]);
+                    pairs++;
+                }
+            }
+            if (n < 100) {
+                continue;
+            }
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_SURFACE_ROLE|%-5s|%7d|%14.3f|%18.3f%n",
+                    roleNames[role], n, Math.sqrt(sq / n),
+                    pairs > 0 ? neighbour / pairs : 0.0D);
+        }
+    }
+
     private static void reportT098MarchSimulation() {
         byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
         byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
@@ -3465,10 +6258,1288 @@ public final class StormVolumetricGeometrySandbox {
      * only discovered by launching the game, where the failure surfaces as
      * "clouds disappeared" rather than as a compile error.
      */
+    /**
+     * The uniforms T161 turns into constants for the lean FINAL program, paired
+     * with the constant declaration the generator must emit. This mirrors
+     * leanFinalConstants in build.gradle; if the two drift, the generated
+     * program stops being a faithful specialization of the shipped shader.
+     */
+    private static final String[][] LEAN_FINAL_SPECIALIZATIONS = {
+            {"PaDiagnosticStepBudget", "const int PaDiagnosticStepBudget = 0;"},
+            {"PuffDensityStage", "const int PuffDensityStage = 0;"},
+            {"PuffTierFilter", "const int PuffTierFilter = -1;"},
+            {"DebugView", "const int DebugView = 0;"},
+            {"PaDiagnosticOptimizationMode", "const int PaDiagnosticOptimizationMode = 0;"},
+            {"PaDiagnosticEvalEpsilon", "const float PaDiagnosticEvalEpsilon = 0.0;"},
+            {"PaOraclePass", "const int PaOraclePass = 0;"},
+            {"PaOracleBaseSize", "const vec2 PaOracleBaseSize = vec2(1.0);"},
+            {"StormTraceOrigin", "const vec2 StormTraceOrigin = vec2(0.0);"},
+            {"StormTraceYStart", "const float StormTraceYStart = 0.0;"},
+            {"StormTraceYInterval", "const float StormTraceYInterval = 1.0;"},
+            {"StormTraceSamples", "const int StormTraceSamples = 2;"},
+            {"StormTraceStage", "const int StormTraceStage = 0;"},
+            {"PaLegacyHitDepth", "const int PaLegacyHitDepth = 0;"},
+            {"PaLegacyFinePromotion", "const int PaLegacyFinePromotion = 0;"},
+            {"PaDiagnosticLightingMode", "const int PaDiagnosticLightingMode = 0;"},
+            {"PaRayTraceMode", "const int PaRayTraceMode = 0;"},
+            {"PaRayTraceNdc", "const vec2 PaRayTraceNdc = vec2(0.0);"},
+            {"PaRayTraceFragCoord", "const vec2 PaRayTraceFragCoord = vec2(0.0);"}
+    };
+
+    /**
+     * The generated lean FINAL program must both specialize and still compile.
+     * A generator that silently stopped substituting would emit a program
+     * identical to the monolith, keep every image check green, and quietly give
+     * back the whole cost T161 removed - so the substitution is asserted here
+     * rather than inferred from the frame time.
+     */
+    private static void validateLeanFinalShaderCompiles() {
+        String generated =
+                "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/"
+                        + "cloud_atmosphere_volume_final.fsh";
+        if (!Files.exists(workspacePath(generated))) {
+            throw new IllegalStateException(
+                    "generated lean FINAL shader is missing; run generateLeanFinalShader: "
+                            + generated);
+        }
+        String leanSource = readWorkspaceSource(generated);
+        List<String> violations = new ArrayList<>();
+        for (String[] specialization : LEAN_FINAL_SPECIALIZATIONS) {
+            String name = specialization[0];
+            if (leanSource.contains("uniform int " + name + ";")
+                    || leanSource.contains("uniform float " + name + ";")
+                    || leanSource.contains("uniform vec2 " + name + ";")) {
+                violations.add(name + " is still a uniform in the lean FINAL program");
+            }
+            if (!leanSource.contains(specialization[1])) {
+                violations.add(name + " was not specialized to " + specialization[1]);
+            }
+        }
+        require(violations.isEmpty(), "lean FINAL specialization incomplete: "
+                + String.join("; ", violations));
+        compileFragmentShader(resolveMojImports(leanSource), "lean FINAL storm shader");
+    }
+
+    /**
+     * The T140 diagnostic programs must compile, and - more importantly - the
+     * shipped FINAL program must contain none of them. The oracle is guarded by
+     * PA_T140_ORACLE, which only the diagnostic variants define; if that guard
+     * were ever removed the oracle would start executing inside FINAL, which is
+     * both a semantic and a performance change. This asserts the separation
+     * rather than trusting the #ifdef.
+     */
+    private static void validateT140OracleVariants() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        List<String> violations = new ArrayList<>();
+        if (finalSource.contains("#define PA_T140_ORACLE")) {
+            violations.add("FINAL defines PA_T140_ORACLE");
+        }
+        require(violations.isEmpty(), "T140 oracle leaked into FINAL: "
+                + String.join("; ", violations));
+
+        String[][] variants = {
+                {"cloud_atmosphere_volume_t140_pixel", "PA_T140_ORACLE"},
+                {"cloud_atmosphere_volume_t140_mask", "PA_T140_MASK"},
+                {"cloud_atmosphere_volume_t140_tile8", "PA_T140_TILE 8"},
+                {"cloud_atmosphere_volume_t140_tile16", "PA_T140_TILE 16"}
+        };
+        for (String[] variant : variants) {
+            String path = base + variant[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T140 variant missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains("#define " + variant[1]),
+                    variant[0] + " is missing #define " + variant[1]);
+            compileFragmentShader(resolveMojImports(source), variant[0]);
+        }
+    }
+
+    /**
+     * The T162 attribution arms must compile, and none of them may leak into
+     * the shipped program. The fixed-work ladder replaces main() outright and
+     * the production-context arms bake a different constant than FINAL does, so
+     * either escaping into FINAL would silently change what ships. FINAL is
+     * asserted clean rather than trusted to be.
+     */
+    private static void validateT162AttributionArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        List<String> violations = new ArrayList<>();
+        if (finalSource.contains("#define PA_T162_FIXED_WORK")) {
+            violations.add("FINAL defines PA_T162_FIXED_WORK");
+        }
+        // FINAL must still bake production lighting, not the attribution arm.
+        if (!finalSource.contains("const int PaDiagnosticLightingMode = 0;")) {
+            violations.add("FINAL no longer bakes PaDiagnosticLightingMode = 0");
+        }
+        require(violations.isEmpty(), "T162 arm leaked into FINAL: "
+                + String.join("; ", violations));
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t162_nolight", "const int PaDiagnosticLightingMode = 1;"},
+                {"cloud_atmosphere_volume_t162_norain", "#define PA_PRECIPITATION_ABSENT"},
+                {"cloud_atmosphere_volume_t162_fw1_address", "#define PA_T162_ARM 1"},
+                {"cloud_atmosphere_volume_t162_fw2_candidate", "#define PA_T162_ARM 2"},
+                {"cloud_atmosphere_volume_t162_fw3_descriptor", "#define PA_T162_ARM 3"},
+                {"cloud_atmosphere_volume_t162_fw4_shape", "#define PA_T162_ARM 4"},
+                {"cloud_atmosphere_volume_t162_fw5_nodetail", "#define PA_T162_ARM 5"},
+                {"cloud_atmosphere_volume_t162_fw6_norain", "#define PA_T162_ARM 6"},
+                {"cloud_atmosphere_volume_t162_fw7_density", "#define PA_T162_ARM 7"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T162 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+    }
+
+    /**
+     * The T166 arms must compile, must each carry the marker that makes them
+     * the arm they claim to be, and none of their guards may reach FINAL.
+     *
+     * <p>Every PA_ARM_* guard is a deliberate quality or traversal change. If
+     * one leaked into the shipped program it would alter the image and the
+     * frame time together, and no image check in this suite compares against
+     * anything but FINAL itself - so FINAL would simply become the new
+     * reference and the regression would never surface. The separation is
+     * asserted here rather than trusted to the #ifdef.
+     *
+     * <p>The arms are also required to carry PA_PRECIPITATION_ABSENT. Without
+     * it an arm is pre-T163 shaped, and its delta against today's FINAL would
+     * silently include the rain-carry cost T163 removed rather than the class
+     * the arm exists to isolate. That is the exact error this set was built to
+     * avoid, so it is a build failure rather than a review note.
+     */
+    private static void validateT166AttributionArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        List<String> violations = new ArrayList<>();
+        String[] guards = {
+                "PA_ARM_NO_DETAIL", "PA_ARM_DISTANCE_LOD", "PA_ARM_LIGHT_CHEAP",
+                "PA_ARM_LIGHT_NO_DETAIL", "PA_ARM_LIGHT_STEPS", "PA_ARM_LIGHT_STEP_WIDE",
+                "PA_ARM_LIGHT_EARLY_OUT", "PA_ARM_NO_SCENE_LIMIT", "PA_ARM_EMPTY_JUMP",
+                "PA_ARM_EARLY_TERM", "PA_ARM_DISTANCE_STEP",
+                "PA_ARM_STEP_CURVE", "PA_ARM_DESCRIPTOR_K", "PA_ARM_SCAN_LATTICE_FIXED"};
+        for (String guard : guards) {
+            if (finalSource.contains("#define " + guard)) {
+                violations.add("FINAL defines " + guard);
+            }
+        }
+        // FINAL must still bake production lighting and the production
+        // optimization mode, not an arm's constant.
+        if (!finalSource.contains("const int PaDiagnosticLightingMode = 0;")) {
+            violations.add("FINAL no longer bakes PaDiagnosticLightingMode = 0");
+        }
+        if (!finalSource.contains("const int PaDiagnosticOptimizationMode = 0;")) {
+            violations.add("FINAL no longer bakes PaDiagnosticOptimizationMode = 0");
+        }
+        require(violations.isEmpty(), "T166 arm leaked into FINAL: "
+                + String.join("; ", violations));
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t166_nolight", "const int PaDiagnosticLightingMode = 1;"},
+                {"cloud_atmosphere_volume_t166_nodetail", "#define PA_ARM_NO_DETAIL 1"},
+                {"cloud_atmosphere_volume_t166_lightnodetail", "#define PA_ARM_LIGHT_NO_DETAIL 1"},
+                {"cloud_atmosphere_volume_t166_lightsteps2", "#define PA_ARM_LIGHT_STEPS 2"},
+                {"cloud_atmosphere_volume_t166_lightwide", "#define PA_ARM_LIGHT_STEP_WIDE 1.6"},
+                {"cloud_atmosphere_volume_t166_lightearlyout", "#define PA_ARM_LIGHT_EARLY_OUT 3.0"},
+                {"cloud_atmosphere_volume_t166_lightcheap", "#define PA_ARM_LIGHT_CHEAP 1"},
+                {"cloud_atmosphere_volume_t166_diststep", "#define PA_ARM_DISTANCE_STEP 1.0"},
+                {"cloud_atmosphere_volume_t166_emptyjump", "#define PA_ARM_EMPTY_JUMP 4.0"},
+                {"cloud_atmosphere_volume_t166_distlod", "#define PA_ARM_DISTANCE_LOD 0.35"},
+                {"cloud_atmosphere_volume_t166_earlyterm", "#define PA_ARM_EARLY_TERM 0.06"},
+                {"cloud_atmosphere_volume_t166_noscenelimit", "#define PA_ARM_NO_SCENE_LIMIT 1"},
+                {"cloud_atmosphere_volume_t166_stack", "#define PA_ARM_DISTANCE_LOD 0.35"},
+                {"cloud_atmosphere_volume_t166_fw1_address", "#define PA_T162_ARM 1"},
+                {"cloud_atmosphere_volume_t166_fw2_candidate", "#define PA_T162_ARM 2"},
+                {"cloud_atmosphere_volume_t166_fw3_descriptor", "#define PA_T162_ARM 3"},
+                {"cloud_atmosphere_volume_t166_fw4_shape", "#define PA_T162_ARM 4"},
+                {"cloud_atmosphere_volume_t166_fw5_nodetail", "#define PA_T162_ARM 5"},
+                {"cloud_atmosphere_volume_t166_fw6_density", "#define PA_T162_ARM 6"},
+                {"cloud_atmosphere_volume_t166_oracle_empty",
+                 "const int PaDiagnosticOptimizationMode = 4096;"},
+                {"cloud_atmosphere_volume_t166_oracle_intervals",
+                 "const int PaDiagnosticOptimizationMode = 8192;"},
+                {"cloud_atmosphere_volume_t166_oracle_combined",
+                 "const int PaDiagnosticOptimizationMode = 28672;"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T166 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized, so its delta against"
+                            + " FINAL would include the rain-carry cost T163 removed");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+
+        // The oracle arms replay a texture FINAL provably never reads. If the
+        // generator stripped that sampler from them as it strips it from FINAL,
+        // the replay would silently read black and report a perfect oracle.
+        String[] oracleArms = {
+                "cloud_atmosphere_volume_t166_oracle_empty",
+                "cloud_atmosphere_volume_t166_oracle_intervals",
+                "cloud_atmosphere_volume_t166_oracle_combined"};
+        for (String program : oracleArms) {
+            String json = readWorkspaceSource(base + program + ".json");
+            require(json.contains("OracleIntervalSampler"),
+                    program + " lost OracleIntervalSampler; its replay would read black"
+                            + " and report a perfect oracle");
+        }
+    }
+
+    /**
+     * The T167 arms must compile and must stay out of FINAL.
+     *
+     * <p>Two of these change the shape of the storm rather than only its cost:
+     * the graded step curves resample it, and the nearest-K cap evaluates fewer
+     * descriptor owners per sample. Either leaking into the shipped program
+     * would change the image and the frame time together, and the campaign's
+     * own image comparison would then be measuring FINAL against itself.
+     *
+     * <p>The footprint curve additionally needs {@code PaOracleBaseSize} to
+     * survive as a uniform - it reads the live cloud-target height from it,
+     * because textureSize(HistorySampler) is undefined whenever history is
+     * disabled, which is every campaign matrix. A variant that lost the uniform
+     * would silently divide by a baked 1.0 and grade every sample as if the
+     * target were one pixel tall.
+     */
+    private static void validateT167RefinementArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        List<String> violations = new ArrayList<>();
+        for (String guard : new String[] {
+                "PA_ARM_STEP_CURVE", "PA_ARM_DESCRIPTOR_K", "PA_ARM_SCAN_LATTICE_FIXED",
+                "PA_ARM_FOOTPRINT"}) {
+            if (finalSource.contains("#define " + guard)) {
+                violations.add("FINAL defines " + guard);
+            }
+        }
+        require(violations.isEmpty(), "T167 arm leaked into FINAL: "
+                + String.join("; ", violations));
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t167_curve_a_late", "#define PA_ARM_STEP_CURVE 1"},
+                {"cloud_atmosphere_volume_t167_curve_b_smooth", "#define PA_ARM_STEP_CURVE 2"},
+                {"cloud_atmosphere_volume_t167_curve_c_capped", "#define PA_ARM_STEP_CURVE 3"},
+                {"cloud_atmosphere_volume_t167_curve_d_footprint", "#define PA_ARM_STEP_CURVE 4"},
+                {"cloud_atmosphere_volume_t167_curve_d_scanfixed",
+                 "#define PA_ARM_SCAN_LATTICE_FIXED 1"},
+                {"cloud_atmosphere_volume_t167_k1", "#define PA_ARM_DESCRIPTOR_K 1"},
+                {"cloud_atmosphere_volume_t167_k2", "#define PA_ARM_DESCRIPTOR_K 2"},
+                {"cloud_atmosphere_volume_t167_k3", "#define PA_ARM_DESCRIPTOR_K 3"},
+                {"cloud_atmosphere_volume_t167_k4", "#define PA_ARM_DESCRIPTOR_K 4"},
+                {"cloud_atmosphere_volume_t167_k6", "#define PA_ARM_DESCRIPTOR_K 6"},
+                {"cloud_atmosphere_volume_t167_term030", "#define PA_ARM_EARLY_TERM 0.030"},
+                {"cloud_atmosphere_volume_t167_term045", "#define PA_ARM_EARLY_TERM 0.045"},
+                {"cloud_atmosphere_volume_t167_stack_balanced",
+                 "#define PA_ARM_SCAN_LATTICE_FIXED 1"},
+                {"cloud_atmosphere_volume_t167_stack_safe", "#define PA_ARM_STEP_CURVE 1"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T167 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized, so its delta against"
+                            + " FINAL would include the rain-carry cost T163 removed");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+
+        for (String program : new String[] {
+                "cloud_atmosphere_volume_t167_curve_a_late",
+                "cloud_atmosphere_volume_t167_curve_b_smooth",
+                "cloud_atmosphere_volume_t167_curve_c_capped",
+                "cloud_atmosphere_volume_t167_curve_d_footprint",
+                "cloud_atmosphere_volume_t167_curve_d_scanfixed",
+                "cloud_atmosphere_volume_t167_stack_balanced",
+                "cloud_atmosphere_volume_t167_stack_safe"}) {
+            String source = readWorkspaceSource(base + program + ".fsh");
+            require(source.contains("uniform vec2 PaOracleBaseSize;"),
+                    program + " baked PaOracleBaseSize; its footprint grading would"
+                            + " read a constant target height instead of the live one");
+        }
+    }
+
+    /**
+     * The T168 footprint arms must compile, must stay out of FINAL, and must
+     * keep the one uniform their derivation depends on.
+     *
+     * <p>The footprint growth is derived from the live projection and the live
+     * cloud-target height, and the target height arrives only through
+     * {@code PaOracleBaseSize}. A variant that let the generator bake that to
+     * its FINAL constant would silently grade every sample as if the target
+     * were one pixel tall - which is a subtler version of exactly the failure
+     * T167 shipped, where an assumed constant made the curve degenerate into an
+     * ungraded step while still looking like it was grading.
+     */
+    private static final String DRIVER_SOURCE_PATH =
+            "src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/"
+                    + "StormT132AutoDriver.java";
+
+    /**
+     * T170 Task 0. Every registered campaign must be wired into every dispatch
+     * site it needs, or the build fails here.
+     *
+     * <p>Three campaigns in a row shipped with a missing wire. T167's pose
+     * arrival guard existed but was armed from {@code t166Run}. T169's
+     * predicate was missing from {@code performanceRunRequested()}, so the
+     * matrix was unreachable and three GPU runs measured nothing. T169's flag
+     * was missing from {@code activeEvaluationArms()}, so its arm table was
+     * dead code. Each was a hand-maintained chain drifting from a
+     * hand-maintained declaration, and each was found by a human reading logs
+     * after the fact.
+     *
+     * <p>The check is structural rather than behavioural because the driver
+     * cannot be loaded without a client: it reads the driver's own source and
+     * compares it against {@link StormCampaignRegistry}. That is enough to
+     * catch all three historical defects, which is the bar it has to clear.
+     */
+    private static void validateCampaignWiring() {
+        String driver = readWorkspaceSource(DRIVER_SOURCE_PATH);
+        List<String> violations = campaignWiringViolations(
+                driver, StormCampaignRegistry.CAMPAIGNS);
+        require(violations.isEmpty(),
+                "campaign wiring incomplete: " + String.join("; ", violations));
+        System.out.println("T170_WIRING campaigns=" + StormCampaignRegistry.CAMPAIGNS.size()
+                + "|armMatrices=" + StormCampaignRegistry.evaluationCampaigns().size()
+                + "|violations=0");
+    }
+
+    /**
+     * T170 Task 0. Proof that the invariant above actually catches an omitted
+     * wire, run against deliberately mutated copies of the real driver source
+     * rather than against a hand-written fixture.
+     *
+     * <p>Each mutation reproduces one of the defects that shipped. A check that
+     * cannot fail is not a check, so this asserts that every mutation is
+     * rejected and that the unmutated source is accepted.
+     */
+    private static void validateCampaignWiringCatchesOmissions() {
+        String driver = readWorkspaceSource(DRIVER_SOURCE_PATH);
+        require(campaignWiringViolations(driver, StormCampaignRegistry.CAMPAIGNS).isEmpty(),
+                "the unmutated driver must pass, or the negative proof means nothing");
+
+        // Defect 1, T169's second gap: the arm table exists but nothing selects
+        // it, so the campaign silently drives the default T141 arms.
+        String noArmTable = driver.replace(
+                "        if (t170Run) {\n            return T170_OPTIMIZATION_ARMS;\n        }\n",
+                "");
+        require(!noArmTable.equals(driver), "arm-table mutation did not apply");
+        requireDetected(noArmTable, "T170_OPTIMIZATION_ARMS",
+                "an arm table unreachable from activeEvaluationArms()");
+
+        // Defect 2, T169's first gap: a marker declared in the driver that no
+        // registry row claims. Under the old hand-written disjunction this is
+        // the failure that made three GPU runs measure nothing.
+        String strayMarker = driver.replace(
+                "    private static final Path T170_MARKER = Path.of(\"t170-primary-march.txt\");",
+                "    private static final Path T170_MARKER = Path.of(\"t170-primary-march.txt\");\n"
+                        + "    private static final Path T171_MARKER ="
+                        + " Path.of(\"t171-unregistered.txt\");");
+        require(!strayMarker.equals(driver), "stray-marker mutation did not apply");
+        requireDetected(strayMarker, "t171-unregistered.txt",
+                "a campaign marker declared but never registered");
+
+        // Defect 3, T167: pose guards armed from one campaign's own flag, so a
+        // new campaign inherits no guards.
+        String perCampaignGuard = driver.replace(
+                "    private static boolean poseGuardsArmed() {\n"
+                        + "        return t141EvaluationRun;\n    }",
+                "    private static boolean poseGuardsArmed() {\n"
+                        + "        return t166Run;\n    }");
+        require(!perCampaignGuard.equals(driver), "pose-guard mutation did not apply");
+        requireDetected(perCampaignGuard, "poseGuardsArmed",
+                "pose guards keyed to a single campaign's flag");
+
+        // Defect 4: the derived routing replaced by a hand-written chain again.
+        String handWrittenRouting = driver.replace(
+                "return StormCampaignRegistry.performanceMarkerPresent();",
+                "return Files.exists(T135_MARKER) || baselineRunRequested();");
+        require(!handWrittenRouting.equals(driver), "routing mutation did not apply");
+        requireDetected(handWrittenRouting, "performanceRunRequested",
+                "performance routing written out by hand instead of derived");
+
+        // A campaign latched but left out of the shared evaluation flag runs
+        // its whole sweep with the pose guards disarmed - T167 exactly.
+        // Derived, not written out. This mutation was hardcoded against the
+        // latch's exact text and went stale in T171 and again in T172, failing
+        // the build each time a campaign was added. Deriving the newest
+        // campaign from the registry means the proof keeps testing the wire
+        // most likely to be forgotten - the one just added.
+        StormCampaignRegistry.Campaign newest = StormCampaignRegistry.CAMPAIGNS
+                .get(StormCampaignRegistry.CAMPAIGNS.size() - 1);
+        String latch = evaluationRunAssignment(driver);
+        require(latch != null && latch.contains(newest.flagFieldName()),
+                "the newest campaign " + newest.id() + " is not in the evaluation latch");
+        String unguardedSweep = driver.replace(
+                latch, latch.replace("|| " + newest.flagFieldName(), ""));
+        require(!unguardedSweep.equals(driver), "evaluation-latch mutation did not apply");
+        requireDetected(unguardedSweep, newest.flagFieldName(),
+                "a campaign missing from the t141EvaluationRun latch");
+
+        System.out.println("T170_WIRING_NEGATIVE mutations=5|allDetected=true");
+    }
+
+    private static void requireDetected(String mutatedSource, String expectedMention,
+            String what) {
+        List<String> violations =
+                campaignWiringViolations(mutatedSource, StormCampaignRegistry.CAMPAIGNS);
+        require(!violations.isEmpty(), "the wiring invariant did not detect " + what);
+        boolean mentioned = false;
+        for (String violation : violations) {
+            if (violation.contains(expectedMention)) {
+                mentioned = true;
+                break;
+            }
+        }
+        require(mentioned, "the wiring invariant detected something other than " + what
+                + ": " + String.join("; ", violations));
+    }
+
+    /**
+     * The wiring check itself, as a pure function of the driver source and the
+     * registry so the negative proof can run it against mutated copies.
+     */
+    private static List<String> campaignWiringViolations(
+            String driver, List<StormCampaignRegistry.Campaign> campaigns) {
+        List<String> problems = new ArrayList<>();
+
+        // Every marker the driver declares must be a registered campaign or an
+        // explicitly listed harness marker.
+        Set<String> known = new HashSet<>(StormCampaignRegistry.HARNESS_MARKERS);
+        for (StormCampaignRegistry.Campaign campaign : campaigns) {
+            known.add(campaign.markerFileName());
+        }
+        java.util.regex.Matcher markers = java.util.regex.Pattern
+                .compile("Path\\.of\\(\"([A-Za-z0-9._-]+\\.txt)\"\\)")
+                .matcher(driver);
+        while (markers.find()) {
+            String marker = markers.group(1);
+            if (!known.contains(marker)) {
+                problems.add("marker " + marker + " is declared in the driver but is not"
+                        + " registered in StormCampaignRegistry");
+            }
+        }
+
+        // Performance routing must stay derived. This is the exact site that
+        // lost T169.
+        String routing = methodBody(driver, "performanceRunRequested");
+        if (routing == null) {
+            problems.add("performanceRunRequested() not found");
+        } else if (!routing.contains("StormCampaignRegistry.performanceMarkerPresent")) {
+            problems.add("performanceRunRequested() no longer derives from the registry;"
+                    + " a hand-written chain here is what lost T169");
+        }
+
+        // Pose guards must not be keyed to any one campaign.
+        String guard = methodBody(driver, "poseGuardsArmed");
+        if (guard == null) {
+            problems.add("poseGuardsArmed() not found");
+        } else if (!guard.replaceAll("\\s+", "").equals("returnt141EvaluationRun;")) {
+            problems.add("poseGuardsArmed() is not keyed to the shared evaluation flag;"
+                    + " arming it from one campaign's flag is what lost T167's"
+                    + " arrival guard");
+        }
+
+        String armSelector = methodBody(driver, "activeEvaluationArms");
+        if (armSelector == null) {
+            problems.add("activeEvaluationArms() not found");
+        }
+        String evaluationLatch = evaluationRunAssignment(driver);
+
+        for (StormCampaignRegistry.Campaign campaign : campaigns) {
+            if (!driver.contains("boolean " + campaign.predicateName() + "()")) {
+                problems.add("campaign " + campaign.id() + " declares predicate "
+                        + campaign.predicateName() + "() which the driver does not define");
+            }
+            if (campaign.flagFieldName() != null
+                    && !driver.contains("boolean " + campaign.flagFieldName() + ";")) {
+                problems.add("campaign " + campaign.id() + " declares flag "
+                        + campaign.flagFieldName() + " which the driver does not define");
+            }
+            if (!campaign.drivesArmMatrix()) {
+                continue;
+            }
+            if (armSelector != null && !armSelector.contains(campaign.armTableName())) {
+                problems.add("campaign " + campaign.id() + " declares arm table "
+                        + campaign.armTableName()
+                        + " which activeEvaluationArms() never returns");
+            }
+            // The shared evaluation flag arms the pose guards, so a campaign
+            // missing from it runs its sweep unguarded.
+            if (evaluationLatch != null
+                    && campaign.flagFieldName() != null
+                    && !"t141EvaluationRun".equals(campaign.flagFieldName())
+                    && !evaluationLatch.contains(campaign.flagFieldName())) {
+                problems.add("campaign " + campaign.id() + " flag "
+                        + campaign.flagFieldName() + " is missing from the"
+                        + " t141EvaluationRun latch, so its sweep would run with"
+                        + " the pose guards disarmed");
+            }
+        }
+        return problems;
+    }
+
+    /** The right-hand side of the {@code t141EvaluationRun = ...;} assignment. */
+    private static String evaluationRunAssignment(String driver) {
+        int start = driver.indexOf("t141EvaluationRun =");
+        if (start < 0) {
+            return null;
+        }
+        int end = driver.indexOf(';', start);
+        return end < 0 ? null : driver.substring(start, end);
+    }
+
+    /** The brace-matched body of a no-argument static method. */
+    private static String methodBody(String source, String methodName) {
+        int signature = source.indexOf(" " + methodName + "() {");
+        if (signature < 0) {
+            return null;
+        }
+        int open = source.indexOf('{', signature);
+        int depth = 0;
+        for (int i = open; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return source.substring(open + 1, i);
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The T170 primary-march arms must compile, must stay out of FINAL, and the
+     * attribution arms must remove exactly the stage they claim to remove.
+     */
+    /**
+     * T171. The program-identity controls must be byte-identical to FINAL.
+     *
+     * <p>The whole campaign rests on this: if `t171_dup_a` and `t171_dup_b`
+     * differ from FINAL by so much as a comment, a timing difference between
+     * them stops being evidence about linking and program identity and becomes
+     * evidence about shader source. The check is exact string equality of the
+     * generated GLSL, not a heuristic.
+     */
+    /**
+     * T172. The precomputed descriptor invariants must stay equal to what the
+     * shader would have computed.
+     *
+     * <p>This is the whole risk of the change. The march no longer derives edge
+     * width or the ownership radii; it reads values the CPU wrote when the
+     * descriptor was built. If either formula drifts on one side only, the
+     * renderer silently draws something else - no crash, no missing arm, just a
+     * different image that nothing would flag.
+     *
+     * <p>Both sides are therefore pinned by text. The GLSL constants are parsed
+     * out of the shader and compared against the Java constants, and every
+     * coefficient the transcription depends on is asserted present in both
+     * sources.
+     */
+    /** The literal value of a {@code const float} declaration in the shader. */
+    private static String shaderConstant(String shader, String name) {
+        String token = "const float " + name + " = ";
+        int start = shader.indexOf(token);
+        require(start >= 0, "shader constant missing: " + name);
+        int end = shader.indexOf(';', start + token.length());
+        require(end >= 0, "shader constant unterminated: " + name);
+        return shader.substring(start + token.length(), end).trim();
+    }
+
+    /**
+     * T175. Every workload debug view must actually be enabled by
+     * {@code paWorkloadCaptureActive()}.
+     *
+     * <p>This existed as a silent failure for two campaigns. Views 35 and 36 -
+     * T169's light and detail attribution - were emitted by the shader, plumbed
+     * through the capture, printed in the campaign log, and read zero the whole
+     * time, because the predicate that gates every counter increment listed
+     * views 22-26 and 28-34 and nobody extended it. T169's report recorded
+     * "lightConeMarches=0 tapsPerConeMarch=n/a" and drew no conclusion from it.
+     *
+     * <p>It is the omission class the registry invariant exists for, in a file
+     * that invariant does not cover: a thing declared, wired most of the way,
+     * and dead at one gate. Adding a view without enabling it now fails the
+     * build.
+     */
+    /**
+     * T182. Every consumer tag the shader assigns must have a counter that
+     * reads it, and the untagged counter must exist so the accounting can be
+     * shown to close.
+     *
+     * <p>This exists because attribution by elimination failed twice. T180
+     * assigned an untagged residual of 32% to a call site it had identified by
+     * ruling others out, and T181 showed the real figure was 4.7% and that
+     * 27.7% was still unaccounted for. A residual bucket invites that mistake;
+     * an invariant that every declared tag is counted, and that a
+     * deliberately-untagged counter exists, makes the gap visible in the log
+     * instead of inferable from a subtraction.
+     */
+    private static void validateConsumerTagsAreCounted() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+
+        java.util.regex.Matcher assigned = java.util.regex.Pattern
+                .compile("paDensityConsumer = (\\d+);").matcher(shader);
+        Set<Integer> tags = new HashSet<>();
+        while (assigned.find()) {
+            int tag = Integer.parseInt(assigned.group(1));
+            if (tag != 0) {
+                tags.add(tag);
+            }
+        }
+        require(!tags.isEmpty(), "no consumer tags are assigned anywhere");
+
+        java.util.regex.Matcher counted = java.util.regex.Pattern
+                .compile("paDensityConsumer == (\\d+) \\? 1 : 0").matcher(shader);
+        Set<Integer> read = new HashSet<>();
+        while (counted.find()) {
+            read.add(Integer.parseInt(counted.group(1)));
+        }
+
+        List<String> missing = new ArrayList<>();
+        for (Integer tag : tags) {
+            if (!read.contains(tag)) {
+                missing.add("tag " + tag);
+            }
+        }
+        require(missing.isEmpty(),
+                "consumer tags are assigned but no counter reads them, so their work"
+                        + " would land in an untagged residual exactly as it did in"
+                        + " T180: " + String.join(", ", missing));
+
+        require(read.contains(0),
+                "no counter reads consumer tag 0, so an untagged call site could not"
+                        + " be detected - that counter is what proves the accounting"
+                        + " closes rather than being assumed to");
+        require(shader.contains("int paShapeUntagged = 0;"),
+                "paShapeUntagged is gone; without it the shape-call accounting has no"
+                        + " residual term to show is zero");
+
+        System.out.println("T182_CONSUMER_TAGS assigned=" + tags.size()
+                + "|counted=" + (read.size() - 1) + "|untaggedCounterPresent=true");
+    }
+
+    private static void validateWorkloadViewsAreEnabled() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String views = readWorkspaceSource(
+                "src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/"
+                        + "VolumetricCloudRaymarchDebugView.java");
+
+        String predicate = functionBlock(shader, "bool paWorkloadCaptureActive()");
+        Set<Integer> enabled = new HashSet<>();
+        java.util.regex.Matcher single = java.util.regex.Pattern
+                .compile("DebugView == (\\d+)").matcher(predicate);
+        while (single.find()) {
+            enabled.add(Integer.parseInt(single.group(1)));
+        }
+        java.util.regex.Matcher range = java.util.regex.Pattern
+                .compile("DebugView >= (\\d+) && DebugView <= (\\d+)").matcher(predicate);
+        while (range.find()) {
+            int lo = Integer.parseInt(range.group(1));
+            int hi = Integer.parseInt(range.group(2));
+            for (int v = lo; v <= hi; v++) {
+                enabled.add(v);
+            }
+        }
+        require(!enabled.isEmpty(), "could not parse paWorkloadCaptureActive()");
+
+        // Every STORM_WORKLOAD_* view the enum declares must be in that set.
+        java.util.regex.Matcher declared = java.util.regex.Pattern
+                .compile("STORM_WORKLOAD_[A-Z_]+\\((\\d+),").matcher(views);
+        List<String> dead = new ArrayList<>();
+        int checked = 0;
+        while (declared.find()) {
+            int id = Integer.parseInt(declared.group(1));
+            checked++;
+            if (!enabled.contains(id)) {
+                dead.add("view " + id);
+            }
+        }
+        require(checked > 0, "no STORM_WORKLOAD_* views found to check");
+        require(dead.isEmpty(),
+                "workload views emitted but never enabled by paWorkloadCaptureActive(),"
+                        + " so every counter they carry reads zero: "
+                        + String.join(", ", dead));
+        System.out.println("T175_WORKLOAD_VIEWS declared=" + checked
+                + "|allEnabled=true");
+    }
+
+    private static void validateT172PrecomputeEquivalence() {
+        String shader = readWorkspaceSource(
+                "src/main/resources/assets/projectatmosphere/shaders/core/"
+                        + "cloud_atmosphere_volume.fsh");
+        String descriptor = readWorkspaceSource(
+                "src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/"
+                        + "StormLobeDescriptor.java");
+
+        // The two shared constants, parsed from the shader rather than assumed.
+        // between() returns the delimiters too, so the value is carved out here.
+        String minEdge = shaderConstant(shader, "STORM_MIN_EDGE_BLOCKS");
+        String edgeBound = shaderConstant(shader, "STORM_VERTICAL_EDGE_BOUND_FRACTION");
+        require(Float.parseFloat(minEdge.trim())
+                        == StormLobeDescriptor.STORM_MIN_EDGE_BLOCKS,
+                "STORM_MIN_EDGE_BLOCKS drifted: shader " + minEdge.trim() + " vs Java "
+                        + StormLobeDescriptor.STORM_MIN_EDGE_BLOCKS);
+        require(Float.parseFloat(edgeBound.trim())
+                        == StormLobeDescriptor.STORM_VERTICAL_EDGE_BOUND_FRACTION,
+                "STORM_VERTICAL_EDGE_BOUND_FRACTION drifted: shader " + edgeBound.trim()
+                        + " vs Java " + StormLobeDescriptor.STORM_VERTICAL_EDGE_BOUND_FRACTION);
+
+        // Every coefficient the transcription reproduces must still be the one
+        // the shader uses. A change to either side alone fails here.
+        for (String coefficient : new String[] {
+                "0.12", "1.65", "0.06", "0.66", "0.62"}) {
+            require(shader.contains("edgeSoftness * " + coefficient)
+                            || shader.contains("max(" + coefficient + ","),
+                    "the shader's edge-width coefficient " + coefficient + " is gone;"
+                            + " the CPU precompute would now write a different value");
+            require(descriptor.contains(coefficient + "F"),
+                    "the CPU precompute lost edge-width coefficient " + coefficient);
+        }
+        for (String offset : new String[] {"32.0", "28.0", "12.0", "16.0"}) {
+            require(descriptor.contains(offset + "F"),
+                    "the CPU precompute lost role vertical-bound offset " + offset);
+        }
+        require(shader.contains("roleTopY += 32.0;") && shader.contains("roleBaseY -= 28.0;")
+                        && shader.contains("roleBaseY -= 12.0;")
+                        && shader.contains("roleTopY += 16.0;"),
+                "stormDescriptorVerticalBounds changed; the CPU transcription is stale");
+        require(descriptor.contains("1.85F"),
+                "the CPU precompute lost the ownership widening factor");
+        require(shader.contains("* 1.85, vec2(1.0))"),
+                "the shader's ownership widening changed; the precompute is stale");
+
+        // The shader must read the precomputed values from the channels the CPU
+        // writes them to. A transposed channel is silent and catastrophic.
+        require(shader.contains("float lobeSoftness = lifecycleRole.x;"),
+                "the precompute edge-width arm no longer reads texel 3 channel x");
+        require(shader.contains("vec2 ownershipRadii = lifecycleRole.yz;"),
+                "the precompute ownership arm no longer reads texel 3 channels yz");
+
+        require(StormLobeDescriptor.TEXELS_PER_DESCRIPTOR == 5,
+                "the descriptor payload is no longer five texels, so the precompute"
+                        + " channels and the displaced lifecycle fields overlap."
+                        + " T178 raised this to six for a support bound that rejected"
+                        + " nothing; that texel was removed again in T179 cleanup");
+
+        // Behavioural spot-check: a descriptor built through the real writer
+        // must land its invariants in 12/13/14 and honour the documented floors.
+        float[] texels = new float[StormLobeDescriptor.FLOATS_PER_DESCRIPTOR];
+        texels[2] = 100.0F;
+        texels[3] = 400.0F;
+        texels[4] = 90.0F;
+        texels[5] = 40.0F;
+        texels[6] = 0.6F;
+        texels[7] = 0.8F;
+        texels[11] = 0.25F;
+        texels[15] = 3.0F;
+        StormLobeDescriptor.writePrecomputedInvariants(texels, 0);
+        require(texels[12] >= StormLobeDescriptor.STORM_MIN_EDGE_BLOCKS,
+                "precomputed edge width fell below the documented floor");
+        require(texels[13] >= 1.0F && texels[14] >= 1.0F,
+                "precomputed ownership radii fell below the unit floor the walk applies");
+        require(Float.isFinite(texels[12]) && Float.isFinite(texels[13])
+                        && Float.isFinite(texels[14]),
+                "precomputed invariants are not finite");
+
+        System.out.println("T172_PRECOMPUTE texels=" + StormLobeDescriptor.TEXELS_PER_DESCRIPTOR
+                + "|minEdge=" + minEdge.trim() + "|edgeBound=" + edgeBound.trim()
+                + "|channelsPinned=true");
+    }
+
+    /**
+     * The T172 arms must compile and must stay out of FINAL. The precompute is
+     * a diagnostic arm until a campaign says otherwise; FINAL keeps deriving
+     * both values until the evidence authorises the switch.
+     */
+    private static void validateT172PrecomputeArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+
+        // T174 productionized the precompute, so this assertion is inverted
+        // from T172's: FINAL must now DEFINE it. T172 proved the substitution
+        // bit-identical and T173 measured it at 1.133x on the binding pose, so
+        // the shipped program is expected to consume the precomputed fields -
+        // and a FINAL that quietly stopped would be a silent 13% regression at
+        // SIDE that nothing else would catch.
+        require(finalSource.contains("#define PA_ARM_DESC_PRECOMPUTE 1"),
+                "FINAL no longer defines PA_ARM_DESC_PRECOMPUTE; the shipped march would"
+                        + " go back to deriving edge width and the ownership radii once"
+                        + " per descriptor per density sample");
+        // The isolated halves stay diagnostic: FINAL takes the combined define,
+        // never one side of it, or the two paths could disagree.
+        for (String define : new String[] {
+                "PA_ARM_DESC_PRECOMPUTE_EDGE", "PA_ARM_DESC_PRECOMPUTE_OWNER"}) {
+            require(!finalSource.contains("#define " + define),
+                    "FINAL defines the isolated " + define + " rather than the combined"
+                            + " precompute");
+        }
+        // The T140 oracle family renders production frames and is documented as
+        // bit-for-bit equivalent to FINAL, so it must carry the same
+        // specialization.
+        for (String oracle : new String[] {
+                "cloud_atmosphere_volume_t140_pixel", "cloud_atmosphere_volume_t140_mask",
+                "cloud_atmosphere_volume_t140_tile8",
+                "cloud_atmosphere_volume_t140_tile16"}) {
+            require(readWorkspaceSource(base + oracle + ".fsh")
+                            .contains("#define PA_ARM_DESC_PRECOMPUTE 1"),
+                    oracle + " lost the precompute that FINAL carries; the oracle family"
+                            + " is no longer equivalent to the program it guards");
+        }
+        // The A/B control must NOT have it, or the productionized path cannot
+        // be measured against itself.
+        require(!readWorkspaceSource(base + "cloud_atmosphere_volume_t174_no_precompute.fsh")
+                        .contains("#define PA_ARM_DESC_PRECOMPUTE"),
+                "the T174 control carries the precompute, so it can no longer isolate it");
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t172_pre_edge",
+                        "#define PA_ARM_DESC_PRECOMPUTE_EDGE 1"},
+                {"cloud_atmosphere_volume_t172_pre_owner",
+                        "#define PA_ARM_DESC_PRECOMPUTE_OWNER 1"},
+                {"cloud_atmosphere_volume_t172_pre_both",
+                        "#define PA_ARM_DESC_PRECOMPUTE 1"},
+                {"cloud_atmosphere_volume_t172_stack_pre",
+                        "#define PA_ARM_DESC_PRECOMPUTE 1"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T172 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+
+        // The isolated arms must isolate. pre_edge must not also take the
+        // ownership path, or the attribution in the campaign is meaningless.
+        String edgeOnly = readWorkspaceSource(
+                base + "cloud_atmosphere_volume_t172_pre_edge.fsh");
+        require(!edgeOnly.contains("#define PA_ARM_DESC_PRECOMPUTE_OWNER")
+                        && !edgeOnly.contains("#define PA_ARM_DESC_PRECOMPUTE 1"),
+                "the edge-width arm also enables the ownership precompute");
+        String ownerOnly = readWorkspaceSource(
+                base + "cloud_atmosphere_volume_t172_pre_owner.fsh");
+        require(!ownerOnly.contains("#define PA_ARM_DESC_PRECOMPUTE_EDGE")
+                        && !ownerOnly.contains("#define PA_ARM_DESC_PRECOMPUTE 1"),
+                "the ownership arm also enables the edge-width precompute");
+
+        // The shippable arm must carry the validated T169 stack unchanged, or it
+        // measures a different configuration than the one it claims to extend.
+        String stack = readWorkspaceSource(
+                base + "cloud_atmosphere_volume_t172_stack_pre.fsh");
+        for (String define : new String[] {
+                "#define PA_ARM_FOOTPRINT 0.75", "#define PA_ARM_FOOTPRINT_MAX 4.0",
+                "#define PA_ARM_EARLY_TERM 0.045", "#define PA_ARM_DETAIL_FOOTPRINT 1.0",
+                "#define PA_ARM_LIGHT_STEPS 4"}) {
+            require(stack.contains(define),
+                    "t172_stack_pre no longer carries the banked T169 stack: missing "
+                            + define);
+        }
+    }
+
+    private static void validateT171ProgramIdentityControls() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        for (String duplicate : new String[] {
+                "cloud_atmosphere_volume_t171_dup_a",
+                "cloud_atmosphere_volume_t171_dup_b"}) {
+            String path = base + duplicate + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T171 control missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.equals(finalSource),
+                    duplicate + " is not byte-identical to FINAL; a timing difference"
+                            + " between them would no longer isolate program identity");
+            compileFragmentShader(resolveMojImports(source), duplicate);
+        }
+        require(!finalSource.contains("t171_dup"),
+                "FINAL references a T171 control program");
+        System.out.println("T171_CONTROLS duplicates=2|byteIdenticalToFinal=true");
+    }
+
+    /**
+     * T171. The sampler must not record a GPU timing twice.
+     *
+     * <p>The timer resolves asynchronously, so {@code lastGpuMilliseconds()}
+     * holds the most recently completed timestamp pair - frequently the same
+     * value it held last frame. Recording it once per sampled frame without
+     * checking freshness mixes distinct measurements with duplicates, and the
+     * duplicate rate depends on the phase between the frame loop and query
+     * resolution. That is a per-arm, per-run quantity, which is exactly the
+     * shape of T170's unexplained 13%.
+     *
+     * <p>{@code VolumetricCloudRenderer.lastGpuTimingSample()} was written for
+     * this, documented as identifying a fresh result without a frame-time proxy,
+     * and never called - the same omission class the T170 registry invariant
+     * exists to catch, in a file that invariant does not cover.
+     */
+    private static void validateGpuSampleFreshnessGating() {
+        String profile = readWorkspaceSource(
+                "src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/"
+                        + "StormT135PerformanceProfile.java");
+        require(profile.contains("VolumetricCloudRenderer.lastGpuTimingSample()"),
+                "the performance profile no longer consults the GPU timing serial;"
+                        + " it would record the same GPU interval on consecutive frames");
+        require(profile.contains("duplicateSamplesRejected++"),
+                "the duplicate-sample counter is gone, so a cell can no longer report"
+                        + " how much of its sample array was re-recorded");
+        require(profile.contains("standardDeviation(cloud)")
+                        && profile.contains("coefficientOfVariation(cloud)"),
+                "the cell no longer reports dispersion, which is the only thing that"
+                        + " distinguishes a real speedup from harness noise");
+
+        String renderer = readWorkspaceSource(
+                "src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/"
+                        + "VolumetricCloudRenderer.java");
+        require(renderer.contains("static long lastGpuTimingSample()"),
+                "lastGpuTimingSample() is gone; the profile's freshness gate has no source");
+        System.out.println("T171_SAMPLING freshnessGate=wired|duplicateCounter=wired"
+                + "|dispersion=wired");
+    }
+
+    private static void validateT170PrimaryMarchArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        for (String define : new String[] {
+                "PA_ARM_DESC_CONST_FETCH", "PA_ARM_DESC_CONST_EDGE",
+                "PA_ARM_DESC_CHEAP_OWNERSHIP", "PA_ARM_DESC_NO_EXACT_SDF",
+                "PA_ARM_DESC_HARD_UNION", "PA_ARM_DESC_HOIST"}) {
+            require(!finalSource.contains("#define " + define),
+                    "FINAL defines " + define + "; every T170 attribution arm is"
+                            + " visually invalid and must never reach a shipped frame");
+        }
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t170_fpmax3", "#define PA_ARM_FOOTPRINT_MAX 3.0"},
+                {"cloud_atmosphere_volume_t170_stack3", "#define PA_ARM_FOOTPRINT_MAX 3.0"},
+                {"cloud_atmosphere_volume_t170_stack_hoist", "#define PA_ARM_DESC_HOIST 1"},
+                {"cloud_atmosphere_volume_t170_fpmax4", "#define PA_ARM_FOOTPRINT_MAX 4.0"},
+                {"cloud_atmosphere_volume_t170_fpmax5", "#define PA_ARM_FOOTPRINT_MAX 5.0"},
+                {"cloud_atmosphere_volume_t170_fpmax6", "#define PA_ARM_FOOTPRINT_MAX 6.0"},
+                {"cloud_atmosphere_volume_t170_fpmax8", "#define PA_ARM_FOOTPRINT_MAX 8.0"},
+                {"cloud_atmosphere_volume_t170_desc_constfetch",
+                        "#define PA_ARM_DESC_CONST_FETCH 1"},
+                {"cloud_atmosphere_volume_t170_desc_constedge",
+                        "#define PA_ARM_DESC_CONST_EDGE 1"},
+                {"cloud_atmosphere_volume_t170_desc_cheapowner",
+                        "#define PA_ARM_DESC_CHEAP_OWNERSHIP 1"},
+                {"cloud_atmosphere_volume_t170_desc_nosdf",
+                        "#define PA_ARM_DESC_NO_EXACT_SDF 1"},
+                {"cloud_atmosphere_volume_t170_desc_hardunion",
+                        "#define PA_ARM_DESC_HARD_UNION 1"},
+                {"cloud_atmosphere_volume_t170_desc_hoist", "#define PA_ARM_DESC_HOIST 1"},
+                {"cloud_atmosphere_volume_t170_stack", "#define PA_ARM_FOOTPRINT_MAX 6.0"},
+                {"cloud_atmosphere_volume_t170_stack8", "#define PA_ARM_FOOTPRINT_MAX 8.0"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T170 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+
+        // Each arm's implementation must still exist behind its guard. The
+        // generated sources keep both branches of every #ifdef - the GLSL
+        // preprocessor resolves them at compile time, not the generator - so a
+        // text search cannot prove an arm removed work. What it can prove is
+        // that the guarded implementation was not deleted while the define
+        // stayed, which would silently turn an arm into a second anchor and
+        // report a ceiling of zero.
+        String armSource = readWorkspaceSource(
+                base + "cloud_atmosphere_volume_t170_desc_constfetch.fsh");
+        require(armSource.contains("#ifdef PA_ARM_DESC_CONST_FETCH")
+                        && armSource.contains("vec4 positionHeight = paDescCached0;"),
+                "the fetch oracle's cached-payload path is gone; the arm would"
+                        + " measure the anchor and report a fetch ceiling of zero");
+        // Guard form, not preprocessor keyword: T172 inserted a higher-priority
+        // branch ahead of this one, which is a legitimate edit. What must not
+        // change is that the T170 ceiling still has a path of its own.
+        require(armSource.contains("defined(PA_ARM_DESC_CONST_EDGE)"
+                        + " || defined(PA_ARM_DESC_HOIST)"),
+                "the edge-width hoist path is gone");
+        require(armSource.contains("#ifdef PA_ARM_DESC_NO_EXACT_SDF")
+                        && armSource.contains("float lobeDistance = verticalLowerBound;"),
+                "the exact-SDF arm's substitute path is gone");
+        require(armSource.contains("#ifdef PA_ARM_DESC_HARD_UNION"),
+                "the hard-union arm's path is gone");
+
+        // The attribution arms must not carry a footprint or termination
+        // change as well, or their deltas would not be attributable to the
+        // descriptor stage they name.
+        for (String arm : new String[] {"constfetch", "constedge", "cheapowner",
+                "nosdf", "hardunion", "hoist"}) {
+            String source = readWorkspaceSource(
+                    base + "cloud_atmosphere_volume_t170_desc_" + arm + ".fsh");
+            require(!source.contains("#define PA_ARM_FOOTPRINT ")
+                            && !source.contains("#define PA_ARM_EARLY_TERM "),
+                    "T170 attribution arm " + arm + " also changes the march;"
+                            + " its delta would not be attributable to the descriptor"
+                            + " stage it names");
+        }
+
+        // The clamp sweep must move only the ceiling. If a sweep arm also
+        // changed the footprint target the comparison would confound two levers.
+        for (String arm : new String[] {"fpmax3", "fpmax4", "fpmax5", "fpmax6", "fpmax8"}) {
+            String source = readWorkspaceSource(
+                    base + "cloud_atmosphere_volume_t170_" + arm + ".fsh");
+            require(source.contains("#define PA_ARM_FOOTPRINT 0.75"),
+                    "T170 clamp sweep arm " + arm + " moved the footprint target as well"
+                            + " as the ceiling; the sweep would confound two levers");
+        }
+    }
+
+    private static void validateT169LightingDetailArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        require(!finalSource.contains("#define PA_ARM_DETAIL_FOOTPRINT"),
+                "FINAL defines PA_ARM_DETAIL_FOOTPRINT");
+        require(!finalSource.contains("#define PA_ARM_LIGHT_STEPS"),
+                "FINAL defines PA_ARM_LIGHT_STEPS");
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t169_lightsteps5", "#define PA_ARM_LIGHT_STEPS 5"},
+                {"cloud_atmosphere_volume_t169_lightsteps4", "#define PA_ARM_LIGHT_STEPS 4"},
+                {"cloud_atmosphere_volume_t169_lightearlyout2",
+                        "#define PA_ARM_LIGHT_EARLY_OUT 2.0"},
+                {"cloud_atmosphere_volume_t169_detailfp_conservative",
+                        "#define PA_ARM_DETAIL_FOOTPRINT 0.5"},
+                {"cloud_atmosphere_volume_t169_detailfp_balanced",
+                        "#define PA_ARM_DETAIL_FOOTPRINT 1.0"},
+                {"cloud_atmosphere_volume_t169_detailfp_aggressive",
+                        "#define PA_ARM_DETAIL_FOOTPRINT 1.5"},
+                {"cloud_atmosphere_volume_t169_nodetail", "#define PA_ARM_NO_DETAIL 1"},
+                {"cloud_atmosphere_volume_t169_stack_safe", "#define PA_ARM_FOOTPRINT 0.35"},
+                {"cloud_atmosphere_volume_t169_stack_fast", "#define PA_ARM_FOOTPRINT 0.75"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T169 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+
+        // The detail cut exists to be cheaper than the T149 graded path it
+        // competes with. That path calls paProjectedFeaturePixels, which costs
+        // a length(), a textureSize() and a division at every detail
+        // evaluation; this one must stay a squared compare against a hoisted
+        // constant or it has no reason to exist.
+        String balanced = readWorkspaceSource(
+                base + "cloud_atmosphere_volume_t169_detailfp_balanced.fsh");
+        require(balanced.contains("uniform vec2 PaOracleBaseSize;"),
+                "the detail footprint arm baked PaOracleBaseSize; it would read a"
+                        + " constant target height instead of the live one");
+        require(balanced.contains("paDetailCutoffDistSq"),
+                "the detail footprint arm no longer compares a hoisted squared cutoff");
+        require(!balanced.contains("paProjectedFeaturePixels(p, 22.7)"),
+                "the detail footprint arm calls paProjectedFeaturePixels, reintroducing"
+                        + " the per-evaluation division it exists to avoid");
+    }
+
+    private static void validateT168FootprintArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        require(!finalSource.contains("#define PA_ARM_FOOTPRINT"),
+                "FINAL defines PA_ARM_FOOTPRINT");
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t168_fp_conservative", "#define PA_ARM_FOOTPRINT 0.35"},
+                {"cloud_atmosphere_volume_t168_fp_balanced", "#define PA_ARM_FOOTPRINT 0.50"},
+                {"cloud_atmosphere_volume_t168_fp_aggressive", "#define PA_ARM_FOOTPRINT 0.75"},
+                {"cloud_atmosphere_volume_t168_stack", "#define PA_ARM_EARLY_TERM 0.045"},
+                {"cloud_atmosphere_volume_t168_stack_balanced", "#define PA_ARM_EARLY_TERM 0.045"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T168 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized");
+            require(source.contains("uniform vec2 PaOracleBaseSize;"),
+                    arm[0] + " baked PaOracleBaseSize; its footprint derivation would"
+                            + " read a constant target height instead of the live one");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+
+        // The whole point of the T168 form is that the reciprocal is hoisted.
+        // A division reintroduced into the march loop is the T167 regression.
+        String balanced = readWorkspaceSource(
+                base + "cloud_atmosphere_volume_t168_fp_balanced.fsh");
+        require(balanced.contains("paFootprintCoefficient * t"),
+                "the footprint arm no longer multiplies a hoisted coefficient by t;"
+                        + " the per-step division T167 measured at 27% may be back");
+        require(balanced.contains("float paFootprintCoefficient = paFootprintGrowthCoefficient("),
+                "the footprint coefficient is no longer hoisted out of the march loop");
+    }
+
+    /**
+     * FINAL must be built without the unreachable precipitation branch, and the
+     * programs that have to match FINAL bit for bit must be built the same way.
+     *
+     * <p>This is the regression this gate exists for. The branch is dead at
+     * runtime either way, so restoring it to FINAL would change no pixel and
+     * pass every image check while silently giving back the ~1.5x T163
+     * measured. Nothing else in the suite would notice, so the specialization
+     * is asserted directly.
+     *
+     * <p>The complementary assertion matters just as much: the programs that
+     * genuinely need precipitation-capable cloudDensity must NOT be specialized,
+     * or the T162 ladder would stop measuring what it claims to.
+     */
+    /**
+     * T183. Rain rendering must NOT be gated on {@code PA_PRECIPITATION_ABSENT}.
+     *
+     * <p>T182 measured the rain-segment reachability test at 36% of
+     * directStormShape calls at SIDE and 57% at FAR, and the obvious reading -
+     * that FINAL already declares precipitation absent, so the test is dead
+     * work - is wrong. {@code PA_PRECIPITATION_ABSENT} removes precipitation
+     * from {@code cloudDensity}'s internal term only. Rain still renders,
+     * through {@code rainShaftDensityOverSegment}, which the march calls
+     * directly and gates on {@code localRainSegment} - the flag
+     * {@code rainSegmentMayContribute} exists to compute. T163's own comment
+     * says this in the source: "Rain itself is unaffected: it renders through
+     * rainShaftDensityOverSegment, which the march calls directly."
+     *
+     * <p>So compiling the reachability test out under that define would set
+     * {@code localRainSegment} permanently false and delete rain from the
+     * shipped program. This invariant fails the build if that is attempted.
+     */
+    private static void validateRainRenderSurvivesPrecipitationSpecialization() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String[] specialized = {
+                "cloud_atmosphere_volume_final",
+                "cloud_atmosphere_volume_t140_pixel",
+                "cloud_atmosphere_volume_t140_mask"
+        };
+        List<String> violations = new ArrayList<>();
+        for (String program : specialized) {
+            String path = base + program + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated program missing; run generateLeanFinalShader: " + path);
+            }
+            String generated = readWorkspaceSource(path);
+            if (!generated.contains("rainShaftDensityOverSegment(p, segmentEnd")) {
+                violations.add(program + " no longer renders rain: the march's"
+                        + " rainShaftDensityOverSegment call is gone, so precipitation"
+                        + " cannot reach the frame");
+            }
+            if (!generated.contains("rainSegmentMayContribute(")) {
+                violations.add(program + " lost rainSegmentMayContribute, which"
+                        + " computes the localRainSegment flag that gates rain"
+                        + " rendering - removing it disables rain, it does not"
+                        + " remove dead work");
+            }
+        }
+        require(violations.isEmpty(),
+                "rain rendering was specialized away: " + String.join("; ", violations));
+        System.out.println("T183_RAIN_RENDER programs=" + specialized.length
+                + "|rainReachablePostSpecialization=true");
+    }
+
+    private static void validateT163PrecipitationSpecialization() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String marker = "#define PA_PRECIPITATION_ABSENT";
+        List<String> violations = new ArrayList<>();
+
+        // FINAL, and everything required to be bit-identical to it.
+        String[] specialized = {
+                "cloud_atmosphere_volume_final",
+                "cloud_atmosphere_volume_t140_pixel",
+                "cloud_atmosphere_volume_t140_mask",
+                "cloud_atmosphere_volume_t140_tile8",
+                "cloud_atmosphere_volume_t140_tile16"
+        };
+        for (String program : specialized) {
+            String path = base + program + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated program missing; run generateLeanFinalShader: " + path);
+            }
+            if (!readWorkspaceSource(path).contains(marker)) {
+                violations.add(program + " lost the precipitation specialization");
+            }
+        }
+
+        // Programs that must retain the capability.
+        String[] capable = {
+                "cloud_atmosphere_volume_t163_withrain",
+                "cloud_atmosphere_volume_t162_fw7_density"
+        };
+        for (String program : capable) {
+            String path = base + program + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated program missing; run generateLeanFinalShader: " + path);
+            }
+            if (readWorkspaceSource(path).contains(marker)) {
+                violations.add(program + " must keep precipitation-capable cloudDensity");
+            }
+        }
+
+        require(violations.isEmpty(), "T163 precipitation specialization broken: "
+                + String.join("; ", violations));
+
+        // The measurement baseline has to build too, or the optimization cannot
+        // be compared against the program it replaced.
+        compileFragmentShader(
+                resolveMojImports(readWorkspaceSource(
+                        base + "cloud_atmosphere_volume_t163_withrain.fsh")),
+                "cloud_atmosphere_volume_t163_withrain");
+    }
+
     private static void validateProductionShaderCompiles() {
-        String fragmentSource = resolveMojImports(readWorkspaceSource(
+        compileFragmentShader(resolveMojImports(readWorkspaceSource(
                 "src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh"
-        ));
+        )), "production storm shader");
+    }
+
+    private static void compileFragmentShader(String fragmentSource, String label) {
         if (!GLFW.glfwInit()) {
             throw new IllegalStateException("GLFW could not initialize for the shader compile check");
         }
@@ -3489,7 +7560,7 @@ public final class StormVolumetricGeometrySandbox {
             GL20.glShaderSource(shader, fragmentSource);
             GL20.glCompileShader(shader);
             if (GL20.glGetShaderi(shader, GL20.GL_COMPILE_STATUS) != GL11.GL_TRUE) {
-                throw new IllegalStateException("production storm shader failed to compile: "
+                throw new IllegalStateException(label + " failed to compile: "
                         + oneLine(GL20.glGetShaderInfoLog(shader)));
             }
         } finally {
@@ -3703,6 +7774,384 @@ public final class StormVolumetricGeometrySandbox {
                     role == StormLobeDescriptor.Role.ANVIL ? 150.0F : 82.0F,
                     role == StormLobeDescriptor.Role.ANVIL ? 48.0F : 68.0F));
         }
+    }
+
+
+    /**
+     * T143 fail-first. The march hoists storm reachability out of its per-step
+     * loop: a column further from a lobe's stored centre than
+     * {@code StormLobeEvaluator.horizontalReachBlocks} skips the candidate
+     * walk, the group unions, the per-descriptor segment test and the
+     * all-descriptor base loop the rain probe runs twice per step.
+     *
+     * <p>That is only sound if the bound never excludes a column the exact
+     * evaluation would have given a contribution to. This sweeps the claim
+     * directly: for every lobe and every probe outside the bound, the exact
+     * signed distance must exceed the lobe's own edge softness plus the maximum
+     * blend, which together are how far past the surface the coverage envelope
+     * and the smooth union's webbing can reach.
+     *
+     * <p>Required result: zero false negatives at every role, eccentricity,
+     * shear and probe direction.
+     */
+    private static void validateT143ReachabilityGuard() {
+        StormLobeDescriptor.Role[] roles = StormLobeDescriptor.Role.values();
+        int probes = 0;
+        int falseNegatives = 0;
+        double worstMargin = Double.POSITIVE_INFINITY;
+        String worstLabel = "";
+        int insideWithMaterial = 0;
+
+        for (int roleIndex = 0; roleIndex < roles.length; roleIndex++) {
+            StormLobeDescriptor.Role role = roles[roleIndex];
+            for (int majorStep = 0; majorStep < 6; majorStep++) {
+                double major = 24.0D + majorStep * 96.0D;
+                for (int ratioStep = 0; ratioStep < 5; ratioStep++) {
+                    // Eccentricity from circular to 5:1, which is where the
+                    // ellipse-to-blocks conversion is least exact.
+                    double minor = major / (1.0D + ratioStep);
+                    for (int heightStep = 0; heightStep < 3; heightStep++) {
+                        float base = 120.0F + heightStep * 90.0F;
+                        float top = base + 80.0F + heightStep * 260.0F;
+                        StormLobeDescriptor lobe = descriptor(
+                                group(0x7143L + roleIndex), 0, 1, role,
+                                17.0D * roleIndex, -31.0D * majorStep,
+                                base, top, (float) major, (float) minor);
+                        double reach = StormLobeEvaluator.horizontalReachBlocks(lobe);
+                        double guardBand = StormLobeEvaluator.edgeWidthBlocks(lobe) + 48.0D;
+
+                        for (int angleStep = 0; angleStep < 24; angleStep++) {
+                            double angle = angleStep * (Math.PI / 12.0D);
+                            for (int outStep = 0; outStep < 5; outStep++) {
+                                // Immediately outside the bound is the binding
+                                // case; further out can only be safer.
+                                double radius = reach + 0.05D + outStep * 37.0D;
+                                double x = lobe.centerX() + Math.cos(angle) * radius;
+                                double z = lobe.centerZ() + Math.sin(angle) * radius;
+                                for (int yStep = 0; yStep <= 8; yStep++) {
+                                    double y = base - 140.0D
+                                            + yStep * ((top - base) + 280.0D) / 8.0D;
+                                    double distance =
+                                            StormLobeEvaluator.signedDistanceAt(lobe, x, y, z);
+                                    double margin = distance - guardBand;
+                                    probes++;
+                                    if (!(margin > 0.0D)) {
+                                        falseNegatives++;
+                                    }
+                                    if (margin < worstMargin) {
+                                        worstMargin = margin;
+                                        worstLabel = role + " major=" + major
+                                                + " minor=" + minor + " radius=" + radius
+                                                + " y=" + y;
+                                    }
+                                }
+                            }
+                        }
+
+                        // The bound must not be vacuous: a column at the lobe's
+                        // own centre has to be inside it and carry material.
+                        if (StormLobeEvaluator.signedDistanceAt(
+                                lobe, lobe.centerX(), (base + top) * 0.5D, lobe.centerZ())
+                                    <= guardBand) {
+                            insideWithMaterial++;
+                        }
+                    }
+                }
+            }
+        }
+
+        System.out.println("T143_REACH_GUARD|probes=" + probes
+                + "|falseNegatives=" + falseNegatives
+                + "|worstMargin=" + String.format(java.util.Locale.ROOT, "%.3f", worstMargin)
+                + " blocks at " + worstLabel
+                + "|nonVacuousCentres=" + insideWithMaterial);
+
+        require(probes >= 100000,
+                "T143 reachability sweep is too small to be evidence: " + probes);
+        require(falseNegatives == 0,
+                "T143 reachability bound excluded a column the exact evaluation reaches:"
+                        + " falseNegatives=" + falseNegatives + " worst=" + worstLabel);
+        require(insideWithMaterial >= 60,
+                "T143 reachability sweep is vacuous: no lobe centre carried material");
+        System.out.println(
+                "PHASE4T_RESULT|T143 reachability bound has no false negatives"
+                        + "|PASSED|invariant satisfied");
+    }
+
+    /**
+     * T143 keeps one source for the reach bound. The shader cannot call the
+     * Java evaluator, so this asserts the GLSL builds the same expression from
+     * the same terms and that the gate publishes a real clearance rather than
+     * the miss sentinel - returning 1.0e9 there would let the march's safe
+     * advance step over material that lies just past the bound.
+     */
+    private static void validateT143ShaderReachabilityShape() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String build = functionBlock(shader, "void paBuildStormReachability()");
+        require(build.contains("stormRoleRadialProfileRange(role, profileMin, profileMax)"),
+                "T143 reach bound does not take the role's whole profile range");
+        require(build.contains("role == 3 ? 1.56 : 1.0"),
+                "T143 reach bound omits the anvil short-axis widening");
+        require(build.contains("1.08 + guard / (0.9 * min(narrowest.x, narrowest.y))"),
+                "T143 reach bound does not divide the guard band by the narrow radius;"
+                        + " an additive band is unsound for eccentric lobes");
+        require(build.contains("length(shearMedia.xy)"),
+                "T143 reach bound omits the shear magnitude");
+        require(build.contains("STORM_MIN_EDGE_BLOCKS"),
+                "T143 reach bound omits the cap-rounding fillet");
+        require(build.contains("profileMin"),
+                "T143 reach bound omits the narrow end of the role profile");
+        require(build.contains("softness"),
+                "T143 reach bound omits the lobe edge softness");
+        require(build.contains("STORM_MAX_BLEND_BLOCKS"),
+                "T143 reach bound omits the maximum blend");
+
+        String shape = functionBlock(shader, "float directStormShape(");
+        require(shape.contains("minDescriptorClearance = paOutsideReach;"),
+                "T143 gate does not publish the distance to the bound as its clearance");
+        require(!shape.contains("minDescriptorClearance = 1.0e9;\n        return 0.0;"),
+                "T143 gate published the miss sentinel instead of a real clearance");
+        System.out.println(
+                "PHASE4T_RESULT|T143 reach bound and gate keep one derivation"
+                        + "|PASSED|invariant satisfied");
+    }
+
+
+    /**
+     * T145 fail-first. The per-step rain probe is gated on two conservative
+     * conditions before it may enter descriptor traversal, and both must be
+     * supersets of what the exact path would have accepted.
+     *
+     * <p><b>Vertical.</b> Rain contributes only where {@code p.y < attachY}.
+     * When a column is descriptor-owned, {@code attachY} is
+     * {@code directStormLocalBaseAt}'s support-weighted mean of the BASE
+     * descriptors' own base heights - a convex combination, so it can never
+     * exceed their maximum. The gate uses that maximum, so a probe it rejects
+     * could not have satisfied the height test.
+     *
+     * <p><b>Horizontal.</b> Ownership is the ellipse test
+     * {@code length((p.xz - centre) / radii) <= 1} with
+     * {@code radii = max(extent * 1.85, 1)}. The gate bounds that ellipse by
+     * its larger semi-axis, so every point the ellipse accepts the disc accepts
+     * too.
+     */
+    private static void validateT145RainLocalityGate() {
+        int verticalProbes = 0;
+        int verticalFalseNegatives = 0;
+        int ellipseProbes = 0;
+        int ellipseFalseNegatives = 0;
+        int ownedInside = 0;
+
+        for (int caseIndex = 0; caseIndex < 240; caseIndex++) {
+            // Deterministic pseudo-random BASE sets: the attachment height the
+            // shader bounds is a mean over however many are resident.
+            int members = 1 + (caseIndex % 5);
+            double[] bases = new double[members];
+            double maximumBase = Double.NEGATIVE_INFINITY;
+            double weightedSum = 0.0D;
+            double weightTotal = 0.0D;
+            for (int member = 0; member < members; member++) {
+                double base = 90.0D + ((caseIndex * 37 + member * 53) % 400);
+                double weight = 0.05D + ((caseIndex * 17 + member * 29) % 100) / 100.0D;
+                bases[member] = base;
+                maximumBase = Math.max(maximumBase, base);
+                weightedSum += base * weight;
+                weightTotal += weight;
+            }
+            double attachY = weightedSum / weightTotal;
+            verticalProbes++;
+            if (attachY > maximumBase + 1.0E-9D) {
+                verticalFalseNegatives++;
+            }
+
+            // Ownership ellipse against the bounding disc it is replaced by.
+            double major = 20.0D + (caseIndex % 12) * 45.0D;
+            double minor = major / (1.0D + (caseIndex % 5));
+            double angle = caseIndex * 0.2617993878D;
+            double cos = Math.cos(angle);
+            double sin = Math.sin(angle);
+            double extentX = Math.hypot(major * cos, minor * sin);
+            double extentZ = Math.hypot(major * sin, minor * cos);
+            double radiusX = Math.max(extentX * 1.85D, 1.0D);
+            double radiusZ = Math.max(extentZ * 1.85D, 1.0D);
+            double disc = Math.max(radiusX, radiusZ);
+            for (int probeAngle = 0; probeAngle < 36; probeAngle++) {
+                double theta = probeAngle * (Math.PI / 18.0D);
+                for (int step = 0; step < 8; step++) {
+                    double radius = disc * (0.2D + step * 0.18D);
+                    double dx = Math.cos(theta) * radius;
+                    double dz = Math.sin(theta) * radius;
+                    boolean owned = Math.hypot(dx / radiusX, dz / radiusZ) <= 1.0D;
+                    boolean insideDisc = Math.hypot(dx, dz) <= disc;
+                    ellipseProbes++;
+                    if (owned && !insideDisc) {
+                        ellipseFalseNegatives++;
+                    }
+                    if (owned) {
+                        ownedInside++;
+                    }
+                }
+            }
+        }
+
+        System.out.println("T145_RAIN_GATE|verticalProbes=" + verticalProbes
+                + "|verticalFalseNegatives=" + verticalFalseNegatives
+                + "|ellipseProbes=" + ellipseProbes
+                + "|ellipseFalseNegatives=" + ellipseFalseNegatives
+                + "|ownedProbes=" + ownedInside);
+
+        require(ellipseProbes >= 50000,
+                "T145 ownership sweep is too small to be evidence: " + ellipseProbes);
+        require(verticalFalseNegatives == 0,
+                "T145 attachment-height bound was exceeded by a weighted mean:"
+                        + " falseNegatives=" + verticalFalseNegatives);
+        require(ellipseFalseNegatives == 0,
+                "T145 ownership disc rejected a column the ellipse accepts:"
+                        + " falseNegatives=" + ellipseFalseNegatives);
+        require(ownedInside >= 1000,
+                "T145 ownership sweep is vacuous: no probe was ever owned");
+
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String build = functionBlock(shader, "void paBuildRainLocality()");
+        require(build.contains("role == 0"),
+                "T145 attachment bound is not restricted to BASE descriptors");
+        require(build.contains("* 1.85"),
+                "T145 ownership bound does not use the ownership ellipse's own factor");
+        String support = functionBlock(shader, "float localRainSupportAt(");
+        require(support.contains("precipitation <= 0.02")
+                        && support.indexOf("paT145RainLocality()")
+                            < support.indexOf("directStormRainSupportAt("),
+                "T145 ownership gate does not precede the descriptor traversal");
+        String segment = functionBlock(shader, "bool rainSegmentMayContribute(");
+        require(segment.contains("max(paWeatherBaseY, paRainAttachTop)"),
+                "T145 vertical gate does not take the larger of the two attachment bounds");
+        System.out.println(
+                "PHASE4T_RESULT|T145 rain locality gate is conservative"
+                        + "|PASSED|invariant satisfied");
+    }
+
+
+    /**
+     * T150 fail-first. Three measurement runs have been corrupted by a pose
+     * that held its descriptors and still rendered an empty sky, and each was
+     * only caught by reading counters afterwards. This pins the guard that
+     * rejects such a pose before it can produce a cell.
+     *
+     * <p>The regression case is the real one: at T134 severe scale the fixture
+     * radius is about 670 blocks, so the shipped {@code PLAY_NEAR} pose at four
+     * radii puts the storm's near edge past the 2000-block cloud render
+     * distance while {@code PLAY_VIS_NEAR} at 1.6 radii sits well inside it.
+     */
+    private static void validateT150StormVisibilityGuard() {
+        final double centreX = 0.0D;
+        final double centreZ = 0.0D;
+        final double baseY = 136.0D;
+        final double topY = 1000.0D;
+        final double radius = 670.0D;
+        final double renderDistance = 2000.0D;
+        final double fov = 70.0D;
+        final double centreY = (baseY + topY) * 0.5D;
+
+        // Camera on +X looking back along -X, the framing every severe pose uses.
+        final double yaw = 90.0D;
+
+        // 1. The corrupted case. PLAY_NEAR at 4.0 radii is beyond the cloud
+        //    render distance even though the descriptors are resident.
+        double playNearX = centreX + radius * 4.0D;
+        double playNearPitch = -Math.toDegrees(
+                Math.atan2(centreY - 120.0D, Math.abs(playNearX - centreX)));
+        StormFixtureVisibility.Verdict playNear = StormFixtureVisibility.evaluate(
+                10, centreX, centreZ, baseY, topY, radius,
+                playNearX, 120.0D, centreZ, yaw, playNearPitch, fov, renderDistance);
+        require(!playNear.valid(),
+                "T150 accepted PLAY_NEAR, whose storm is past the cloud render distance: "
+                        + playNear.format());
+        require("beyond_render_distance".equals(playNear.reason()),
+                "T150 rejected PLAY_NEAR for the wrong reason: " + playNear.reason());
+        require(playNear.descriptorsPresent(),
+                "T150's regression case must have descriptors, or it does not"
+                        + " reproduce the defect: " + playNear.format());
+
+        // 2. The corrected pose must pass.
+        double visNearX = centreX + radius * 1.6D;
+        double visNearPitch = -Math.toDegrees(
+                Math.atan2(centreY - 120.0D, Math.abs(visNearX - centreX)));
+        StormFixtureVisibility.Verdict visNear = StormFixtureVisibility.evaluate(
+                10, centreX, centreZ, baseY, topY, radius,
+                visNearX, 120.0D, centreZ, yaw, visNearPitch, fov, renderDistance);
+        require(visNear.valid(), "T150 rejected PLAY_VIS_NEAR, which is in range and in frame: "
+                + visNear.format());
+
+        // 3. Every shipped severe pose must pass, at its own framing.
+        record Pose(String name, double factor, double y) {
+        }
+        Pose[] poses = {
+                new Pose("PLAY_VIS_NEAR", 1.6D, 120.0D),
+                new Pose("PLAY_VIS_MID", 2.4D, 120.0D),
+                new Pose("SIDE", 1.7D, centreY),
+                new Pose("FAR", 2.6D, centreY),
+                new Pose("NEAR_EDGE", 1.12D, baseY + (topY - baseY) * 0.55D)
+        };
+        for (Pose pose : poses) {
+            double x = centreX + radius * pose.factor();
+            double pitch = -Math.toDegrees(Math.atan2(centreY - pose.y(), Math.abs(x - centreX)));
+            StormFixtureVisibility.Verdict verdict = StormFixtureVisibility.evaluate(
+                    10, centreX, centreZ, baseY, topY, radius,
+                    x, pose.y(), centreZ, yaw, pitch, fov, renderDistance);
+            require(verdict.valid(),
+                    "T150 rejected the shipped pose " + pose.name() + ": " + verdict.format());
+        }
+        // ABOVE and BELOW look down and up the column from outside it.
+        StormFixtureVisibility.Verdict above = StormFixtureVisibility.evaluate(
+                10, centreX, centreZ, baseY, topY, radius,
+                centreX + radius * 0.6D, topY + 200.0D, centreZ, yaw, 60.0D, fov, renderDistance);
+        require(above.valid(), "T150 rejected ABOVE: " + above.format());
+        StormFixtureVisibility.Verdict below = StormFixtureVisibility.evaluate(
+                10, centreX, centreZ, baseY, topY, radius,
+                centreX, 70.0D, centreZ, yaw, -80.0D, fov, renderDistance);
+        require(below.valid(), "T150 rejected BELOW: " + below.format());
+
+        // 4. Each individual condition must be able to fail on its own.
+        require(!StormFixtureVisibility.evaluate(
+                        0, centreX, centreZ, baseY, topY, radius,
+                        visNearX, 120.0D, centreZ, yaw, visNearPitch, fov, renderDistance).valid(),
+                "T150 accepted a pose with no descriptors");
+        StormFixtureVisibility.Verdict lookingAway = StormFixtureVisibility.evaluate(
+                10, centreX, centreZ, baseY, topY, radius,
+                visNearX, 120.0D, centreZ, yaw + 180.0D, 0.0D, fov, renderDistance);
+        require(!lookingAway.valid() && "outside_frustum".equals(lookingAway.reason()),
+                "T150 accepted a camera facing away from the storm: " + lookingAway.format());
+        // Genuinely small in both axes: a 4-block radius over a 10-block span.
+        // A thin but tall column is not a token footprint - its height alone
+        // subtends most of the frame - so the case has to shrink both.
+        StormFixtureVisibility.Verdict tiny = StormFixtureVisibility.evaluate(
+                10, centreX, centreZ, 500.0D, 510.0D, 4.0D,
+                centreX + 1900.0D, 505.0D, centreZ, yaw, 0.0D, fov, renderDistance);
+        require(!tiny.valid() && "projected_footprint_too_small".equals(tiny.reason()),
+                "T150 accepted a storm that occupies a token footprint: " + tiny.format());
+
+        // 5. The authoritative half separates the measured cases by a wide
+        //    margin: the corrupted cells reported exactly zero density calls
+        //    and the thinnest passing pose reported 4.88 per pixel.
+        int pixels = 480 * 270;
+        require(!StormFixtureVisibility.renderedStormConfirmed(0.0D, pixels),
+                "T150 confirmed a render that produced no density samples at all");
+        require(StormFixtureVisibility.renderedStormConfirmed(4.88D * pixels, pixels),
+                "T150 refused FAR, the thinnest pose that actually renders the storm");
+        require(!StormFixtureVisibility.renderedStormConfirmed(1000.0D, 0),
+                "T150 confirmed a render with no marched pixels");
+
+        System.out.println("T150_VISIBILITY_GUARD|playNear=" + playNear.reason()
+                + "|playVisNear=" + visNear.reason()
+                + "|playNearNearestDistance="
+                + String.format(java.util.Locale.ROOT, "%.1f", playNear.nearestDistanceBlocks())
+                + "|playVisNearNearestDistance="
+                + String.format(java.util.Locale.ROOT, "%.1f", visNear.nearestDistanceBlocks()));
+        System.out.println(
+                "PHASE4T_RESULT|T150 storm visibility guard rejects stormless benchmark poses"
+                        + "|PASSED|invariant satisfied");
     }
 
     private static StormLobeDescriptor descriptor(
