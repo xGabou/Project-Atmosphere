@@ -1435,6 +1435,9 @@ tasks.register('stormVolumetricGeometrySandbox', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormVolumetricGeometrySandbox'
     workingDir = project.rootDir
+    // T195. The fourteen T098 report sections assert nothing and cost most of
+    // the sandbox's three minutes; they run only when asked for.
+    systemProperty 'sandbox.t098Reports', project.hasProperty('t098Reports') ? 'true' : 'false'
 }
 
 tasks.register('stormT160UpperEnvelopeSandbox', JavaExec) {
@@ -1549,6 +1552,20 @@ tasks.named('check').configure {
     dependsOn 'stormMorphologySandbox'
     dependsOn 'stormMaterialContinuityDiagnosticsSandbox'
     dependsOn 'stormVolumetricGeometrySandbox'
+}
+
+// T195. The gate a diagnostic-campaign commit needs: the code compiles, every
+// generated variant exists, and the storm renderer invariants hold - the
+// campaign wiring, the variant scope, the counter guards, the workload views,
+// and every arm compiling and staying out of FINAL. The morphology and
+// topology sandboxes, the unit tests and the jar/reobf packaging say nothing
+// about a campaign and stay on `check build`, which remains the gate before a
+// merge.
+tasks.register('campaignGate') {
+    group = 'project atmosphere'
+    description = 'Fast gate for diagnostic-campaign changes: compile, generated shader variants, storm renderer invariants.'
+    dependsOn 'compileJava', 'compileTestJava', 'generateLeanFinalShader',
+            'architectureBoundaryCheck', 'stormVolumetricGeometrySandbox'
 }
 
 // Release assembly is intentionally separate from the long-running validation campaign.

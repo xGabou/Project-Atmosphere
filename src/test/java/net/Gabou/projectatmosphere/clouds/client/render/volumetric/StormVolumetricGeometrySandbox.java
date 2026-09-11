@@ -43,55 +43,73 @@ public final class StormVolumetricGeometrySandbox {
 
     public static void main(String[] args) {
         long sandboxStarted = System.nanoTime();
-        validateDescriptorPackingAndProfiles();
-        validateCoherentStormMorphology();
-        validateGroupSelectionAndCandidatePacking();
-        validateDirtyAndAdoptionContracts();
-        validateCoalescingAndSaturationContracts();
-        StormPerformanceSuite.selfCheckStateMachine();
-        validateT132AuthoritativeControlSeparation();
-        validateT133ProductionDefaultUnchanged();
-        validateT123InstrumentationOnly();
-        validateT143ReachabilityGuard();
-        validateT143ShaderReachabilityShape();
-        validateT145RainLocalityGate();
-        validateT150StormVisibilityGuard();
-        validateT121VerticalBoundIsConservative();
-        validateT121Float32BoundaryMargin();
-        validateT121GuardAdmitsNoUnionContribution();
-        validateT121SoftnessBoundary();
-        validateT121T122ShaderGuards();
-        StormWorkloadRuntimeCapture.selfCheckFreshnessContract();
-        StormReferenceImageCapture.selfCheckHistoryRestoration();
-        validateT132WorkloadCaptureFreshness();
-        validateT132DeterministicImageComparator();
-        validateT132RepeatedSamplingMedian();
-        validateT132Attribution();
-        reportT098CarrierDistribution();
-        reportT098ErosionVersusBody();
-        reportT098AnvilSurfaceStructure();
-        reportT098AnvilOpticalSurface();
-        reportT098VerticalWidthProfile();
-        reportT098TransitionCandidates();
-        reportT098PercolationWidth();
-        reportT098AnvilSkirt();
-        reportT098AnvilSoftnessSweep();
-        reportT098SoftnessVersusHeight();
-        validateT098EnvelopeBoundedByExtent();
-        reportT098OpticalProfile();
-        reportT098WebbingExcess();
-        reportT098MarchSimulation();
-        reportT098PromotionPolicySweep();
-        validateT098PromotionBudget();
-        validateT098MarchReachesMaterial();
-        validateT098CloudHitDepthNeverSaturates();
-        System.out.println("SANDBOX_TIMING|main-level validations and T098 reports|elapsedMs="
+        timed("validateDescriptorPackingAndProfiles", StormVolumetricGeometrySandbox::validateDescriptorPackingAndProfiles);
+        timed("validateCoherentStormMorphology", StormVolumetricGeometrySandbox::validateCoherentStormMorphology);
+        timed("validateGroupSelectionAndCandidatePacking", StormVolumetricGeometrySandbox::validateGroupSelectionAndCandidatePacking);
+        timed("validateDirtyAndAdoptionContracts", StormVolumetricGeometrySandbox::validateDirtyAndAdoptionContracts);
+        timed("validateCoalescingAndSaturationContracts", StormVolumetricGeometrySandbox::validateCoalescingAndSaturationContracts);
+        timed("StormPerformanceSuite.selfCheckStateMachine", StormPerformanceSuite::selfCheckStateMachine);
+        timed("validateT132AuthoritativeControlSeparation", StormVolumetricGeometrySandbox::validateT132AuthoritativeControlSeparation);
+        timed("validateT133ProductionDefaultUnchanged", StormVolumetricGeometrySandbox::validateT133ProductionDefaultUnchanged);
+        timed("validateT123InstrumentationOnly", StormVolumetricGeometrySandbox::validateT123InstrumentationOnly);
+        timed("validateT143ReachabilityGuard", StormVolumetricGeometrySandbox::validateT143ReachabilityGuard);
+        timed("validateT143ShaderReachabilityShape", StormVolumetricGeometrySandbox::validateT143ShaderReachabilityShape);
+        timed("validateT145RainLocalityGate", StormVolumetricGeometrySandbox::validateT145RainLocalityGate);
+        timed("validateT150StormVisibilityGuard", StormVolumetricGeometrySandbox::validateT150StormVisibilityGuard);
+        timed("validateT121VerticalBoundIsConservative", StormVolumetricGeometrySandbox::validateT121VerticalBoundIsConservative);
+        timed("validateT121Float32BoundaryMargin", StormVolumetricGeometrySandbox::validateT121Float32BoundaryMargin);
+        timed("validateT121GuardAdmitsNoUnionContribution", StormVolumetricGeometrySandbox::validateT121GuardAdmitsNoUnionContribution);
+        timed("validateT121SoftnessBoundary", StormVolumetricGeometrySandbox::validateT121SoftnessBoundary);
+        timed("validateT121T122ShaderGuards", StormVolumetricGeometrySandbox::validateT121T122ShaderGuards);
+        timed("StormWorkloadRuntimeCapture.selfCheckFreshnessContract", StormWorkloadRuntimeCapture::selfCheckFreshnessContract);
+        timed("StormReferenceImageCapture.selfCheckHistoryRestoration", StormReferenceImageCapture::selfCheckHistoryRestoration);
+        timed("validateT132WorkloadCaptureFreshness", StormVolumetricGeometrySandbox::validateT132WorkloadCaptureFreshness);
+        timed("validateT132DeterministicImageComparator", StormVolumetricGeometrySandbox::validateT132DeterministicImageComparator);
+        timed("validateT132RepeatedSamplingMedian", StormVolumetricGeometrySandbox::validateT132RepeatedSamplingMedian);
+        timed("validateT132Attribution", StormVolumetricGeometrySandbox::validateT132Attribution);
+        if (Boolean.getBoolean("sandbox.t098Reports")) {
+            timed("reportT098CarrierDistribution", StormVolumetricGeometrySandbox::reportT098CarrierDistribution);
+            timed("reportT098ErosionVersusBody", StormVolumetricGeometrySandbox::reportT098ErosionVersusBody);
+            timed("reportT098AnvilSurfaceStructure", StormVolumetricGeometrySandbox::reportT098AnvilSurfaceStructure);
+            timed("reportT098AnvilOpticalSurface", StormVolumetricGeometrySandbox::reportT098AnvilOpticalSurface);
+            timed("reportT098VerticalWidthProfile", StormVolumetricGeometrySandbox::reportT098VerticalWidthProfile);
+            timed("reportT098TransitionCandidates", StormVolumetricGeometrySandbox::reportT098TransitionCandidates);
+            timed("reportT098PercolationWidth", StormVolumetricGeometrySandbox::reportT098PercolationWidth);
+            timed("reportT098AnvilSkirt", StormVolumetricGeometrySandbox::reportT098AnvilSkirt);
+            timed("reportT098AnvilSoftnessSweep", StormVolumetricGeometrySandbox::reportT098AnvilSoftnessSweep);
+            timed("reportT098SoftnessVersusHeight", StormVolumetricGeometrySandbox::reportT098SoftnessVersusHeight);
+            timed("reportT098OpticalProfile", StormVolumetricGeometrySandbox::reportT098OpticalProfile);
+            timed("reportT098WebbingExcess", StormVolumetricGeometrySandbox::reportT098WebbingExcess);
+            timed("reportT098MarchSimulation", StormVolumetricGeometrySandbox::reportT098MarchSimulation);
+        } else {
+            // T195 infrastructure. These thirteen T098 reports are report-only -
+            // none carries an assertion - and were the bulk of the 2m52s this
+            // sandbox cost on every gate. They stay one property away.
+            System.out.println("SANDBOX_T098_REPORTS|skipped|report-only, no assertions;"
+                    + " run with -Pt098Reports to include them");
+        }
+        timed("validateT098EnvelopeBoundedByExtent", StormVolumetricGeometrySandbox::validateT098EnvelopeBoundedByExtent);
+        // The sweep is the budget check's input, so it is not one of the
+        // optional reports.
+        timed("reportT098PromotionPolicySweep", StormVolumetricGeometrySandbox::reportT098PromotionPolicySweep);
+        timed("validateT098PromotionBudget", StormVolumetricGeometrySandbox::validateT098PromotionBudget);
+        timed("validateT098MarchReachesMaterial", StormVolumetricGeometrySandbox::validateT098MarchReachesMaterial);
+        timed("validateT098CloudHitDepthNeverSaturates", StormVolumetricGeometrySandbox::validateT098CloudHitDepthNeverSaturates);
+        System.out.println("SANDBOX_TIMING|main-level validations|elapsedMs="
                 + (System.nanoTime() - sandboxStarted) / 1_000_000L);
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
             runPhase4RCorrected();
         }
+    }
+
+    /** A main-level validation with its elapsed time, so the gate can be trimmed on evidence. */
+    private static void timed(String name, Runnable validation) {
+        long started = System.nanoTime();
+        validation.run();
+        System.out.println("SANDBOX_TIMING|" + name + "|elapsedMs="
+                + (System.nanoTime() - started) / 1_000_000L);
     }
 
 
@@ -995,7 +1013,7 @@ public final class StormVolumetricGeometrySandbox {
                         + " classifier's cell grid is wrong");
 
         // FINAL must not carry any of it.
-        String gradle = readWorkspaceSource("build.gradle");
+        String gradle = readGradleSource();
         require(gradle.contains("'uniform int PaRainFieldConservative;'")
                         && gradle.contains("'const int PaRainFieldConservative = 0;'"),
                 "T190 conservative path is not compiled out of the lean programs");
@@ -1064,7 +1082,7 @@ public final class StormVolumetricGeometrySandbox {
                 "T189 removed the bilinear-ownership arm, so the fix cannot be"
                         + " measured against the behaviour it replaces");
 
-        String gradle = readWorkspaceSource("build.gradle");
+        String gradle = readGradleSource();
         for (String variant : new String[] {
                 "cloud_atmosphere_volume_t188_field_real",
                 "cloud_atmosphere_volume_t188_rain_mask_field"}) {
@@ -1157,7 +1175,7 @@ public final class StormVolumetricGeometrySandbox {
      * from it entirely rather than leaving them live and unentered.
      */
     private static void validateT188FinalIsUnaffected() {
-        String gradle = readWorkspaceSource("build.gradle");
+        String gradle = readGradleSource();
         require(gradle.contains("'uniform int PaRainFieldPass;'")
                         && gradle.contains("'const int PaRainFieldPass = 0;'"),
                 "T188 PaRainFieldPass is not baked out of the lean programs");
@@ -1252,7 +1270,7 @@ public final class StormVolumetricGeometrySandbox {
                 "T188 rain mask does not count contiguous runs, so a broken shaft"
                         + " reads the same as a whole one");
 
-        String gradle = readWorkspaceSource("build.gradle");
+        String gradle = readGradleSource();
         for (String variant : new String[] {
                 "cloud_atmosphere_volume_t188_rain_mask_ref",
                 "cloud_atmosphere_volume_t188_rain_mask_field"}) {
@@ -7684,6 +7702,17 @@ public final class StormVolumetricGeometrySandbox {
 
     private static Path workspacePath(String relative) {
         return Path.of(System.getProperty("user.dir", ".")).resolve(relative);
+    }
+
+    /**
+     * build.gradle with the variant-map keys normalised to {@code key: }.
+     * An IDE reformat aligned the keys ({@code [name        : ...}) on
+     * Forge-1.20.1, which is a layout choice and not a change to any
+     * variant; the textual invariants below must not depend on it.
+     */
+    private static String readGradleSource() {
+        return readWorkspaceSource("build.gradle")
+                .replaceAll("\\b(name|defines|keepUniforms|overrides)\\s+:", "$1:");
     }
 
     private static String readWorkspaceSource(String relative) {
