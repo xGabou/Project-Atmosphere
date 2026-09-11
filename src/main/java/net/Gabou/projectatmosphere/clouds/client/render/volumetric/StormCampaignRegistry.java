@@ -260,7 +260,10 @@ public final class StormCampaignRegistry {
                     "T193_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
             new Campaign("T194", "t194-shared-field-pricing.txt",
                     "sharedFieldPricingRunRequested", "t194Run",
-                    "T194_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "T194_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            new Campaign("T195", "t195-shared-field-lookup.txt",
+                    "sharedFieldLookupRunRequested", "t195Run",
+                    "T195_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.
@@ -275,7 +278,10 @@ public final class StormCampaignRegistry {
             // Arms the autorun driver at all; present for every campaign.
             "t132-autorun.txt",
             // Requests the standalone ray trace, which is not a timing sweep.
-            "t098-raytrace.txt");
+            "t098-raytrace.txt",
+            // T195. Stops the client after T132_AUTORUN_FINISHED so the launch
+            // returns when the campaign does; selects nothing.
+            "t132-autorun-exit.txt");
 
     /**
      * The marker path for one campaign, resolved the way the driver resolves

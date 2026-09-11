@@ -42,6 +42,7 @@ public final class StormVolumetricGeometrySandbox {
     }
 
     public static void main(String[] args) {
+        long sandboxStarted = System.nanoTime();
         validateDescriptorPackingAndProfiles();
         validateCoherentStormMorphology();
         validateGroupSelectionAndCandidatePacking();
@@ -84,6 +85,8 @@ public final class StormVolumetricGeometrySandbox {
         validateT098PromotionBudget();
         validateT098MarchReachesMaterial();
         validateT098CloudHitDepthNeverSaturates();
+        System.out.println("SANDBOX_TIMING|main-level validations and T098 reports|elapsedMs="
+                + (System.nanoTime() - sandboxStarted) / 1_000_000L);
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
@@ -1517,8 +1520,13 @@ public final class StormVolumetricGeometrySandbox {
             // accumulator exists only so the compiler cannot fold the
             // slices away, and the block is absent from every program
             // that does not define the macro.
+            // T195 adds the lookup stand-in on the same reasoning: its
+            // fetch sink exists only so the compiler cannot fold the
+            // fetches away, and it reaches the march through a uniform
+            // uploaded as exactly zero.
             if (line.startsWith("#ifdef PA_RAIN_MASK_OUTPUT")
-                    || line.startsWith("#ifdef PA_ARM_FIELD_SLICES")) {
+                    || line.startsWith("#ifdef PA_ARM_FIELD_SLICES")
+                    || line.startsWith("#ifdef PA_ARM_FIELD_LOOKUP")) {
                 maskDepth++;
                 continue;
             }
@@ -1546,7 +1554,7 @@ public final class StormVolumetricGeometrySandbox {
                             + " is not guarded by paWorkloadCaptureActive(): " + line);
         }
         require(maskDepth == 0,
-                "T188/T194 diagnostic #ifdef blocks are unbalanced in the shader source");
+                "T188/T194/T195 diagnostic #ifdef blocks are unbalanced in the shader source");
         require(mutations >= 10,
                 "T123 workload counters were not found; the instrumentation check is vacuous");
         String guard = functionBlock(shader, "bool paWorkloadCaptureActive()");
@@ -7649,9 +7657,13 @@ public final class StormVolumetricGeometrySandbox {
     }
 
     private static void runCorrected(String name, Regression regression) {
+        long started = System.nanoTime();
         try {
             regression.run();
-            System.out.println("PHASE4R_RESULT|" + name + "|PASSED|invariant satisfied");
+            // T195 infrastructure: elapsed time per invariant, so the gate
+            // can be trimmed on evidence rather than guessed at.
+            System.out.println("PHASE4R_RESULT|" + name + "|PASSED|invariant satisfied"
+                    + " elapsedMs=" + (System.nanoTime() - started) / 1_000_000L);
         } catch (Exception exception) {
             throw new IllegalStateException("PHASE4R_RESULT|" + name + "|FAILED|"
                     + oneLine(exception.getMessage()), exception);

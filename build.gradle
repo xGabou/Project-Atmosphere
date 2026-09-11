@@ -916,6 +916,21 @@ def leanProgramVariants = [
                    'PA_ARM_FIELD_SLICES 64'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
 
+        // T195. The lookup side of the shared field, priced without building
+        // one. Light and probe descriptor traversal are removed exactly as
+        // t194_noboth removes them, and each consumer then pays one trilinear
+        // fetch from a stand-in 8 MB volume per density it would have
+        // computed - the light fetch feeding the production scatter chain,
+        // the probe fetches on the scan lattice, 13 per scan event, which is
+        // at or above production's measured 11.3-12.5. PaDiagnosticEvalEpsilon
+        // stays a uniform so the probe fetches cannot be folded away: it is
+        // uploaded as exactly zero and multiplies the fetch sink into the
+        // march advance.
+        [name: 'cloud_atmosphere_volume_t195_lookup',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_NO_PROBE 1', 'PA_ARM_FIELD_LOOKUP 13'],
+         keepUniforms: ['PaDiagnosticEvalEpsilon']],
+
         // T192. The closed-form ownership bound as classification triage.
         // Three arms only, and the campaign-scoped loading T191 added means
         // they cost nothing on an ordinary startup.

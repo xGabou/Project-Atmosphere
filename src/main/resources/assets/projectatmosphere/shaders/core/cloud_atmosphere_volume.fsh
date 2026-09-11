@@ -5819,6 +5819,37 @@ float dualLobePhase(float cosTheta) {
     return mix(henyeyGreenstein(cosTheta, -0.18), henyeyGreenstein(cosTheta, 0.62), 0.72);
 }
 
+#ifdef PA_ARM_FIELD_LOOKUP
+// T195 Task 7. The lookup side of a shared 3D storm field, priced without
+// building one.
+//
+// T194 measured what generating a field costs and what removing light and
+// probe descriptor traversal is worth; the term between them - what reading
+// the field back costs on the ray - was estimated, not measured, and T170's
+// "descriptor fetches are cheap" was measured on a 64 KB descriptor texture,
+// not on a multi-megabyte volume with different cache behaviour.
+//
+// This arm keeps the light cone and the probe scan's surrounding control flow
+// and replaces the density each would have computed with one trilinear fetch
+// from a stand-in volume: the resident 128^3 RGBA8 base-noise texture, 8 MB,
+// the same footprint as the 256x256x32 RG16F candidate, addressed over the
+// weather domain and the slab exactly as a field would be. The contents are
+// noise, so the image is invalid; the fetch count, the addressing pattern and
+// the cache footprint are the ones a real field would pay, which is what is
+// being priced. The light fetch feeds the production scatter chain, so the
+// arm also restores the term the no-light ceiling removed and a field would
+// not: everything downstream of the optical depth.
+vec3 paFieldStandInCoord(vec3 p) {
+    vec2 xz01 = (p.xz - WeatherOrigin) / WeatherExtent;
+    float y01 = (p.y - SlabBaseY) / max(SlabTopY - SlabBaseY, 1.0);
+    return vec3(xz01.x, y01, xz01.y);
+}
+
+vec2 paFieldStandInFetch(vec3 p) {
+    return texture(BaseNoiseSampler, paFieldStandInCoord(p), 0.0).rg;
+}
+#endif
+
 float lightMarchOpticalDepth(
         vec3 p,
         float localDensity,
@@ -5970,7 +6001,14 @@ float lightMarchOpticalDepth(
 #endif
         paLightTapOrdinal = i + 1;
         paDensityConsumer = 2;
+#ifdef PA_ARM_FIELD_LOOKUP
+        // T195 Task 7. One fetch where the tap would have walked the
+        // descriptors, the base noise and - on the first two taps - the
+        // detail octaves. The loop, its weights and the early-out stay.
+        float density = paFieldStandInFetch(pos + offset).r * DensityMul;
+#else
         float density = cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
+#endif
         paDensityConsumer = 0;
         paLightTapOrdinal = 0;
 #ifdef PA_ARM_LIGHT_CHEAP
@@ -7802,6 +7840,27 @@ void main() {
                     }
                     paLastEmptyOffset = paProbeOffset;
                 }
+#ifdef PA_ARM_FIELD_LOOKUP
+                // T195 Task 7. The probe scan's lookup cost, on the flow the
+                // no-probe ceiling already bounds. A field-driven scan would
+                // take one fetch per probe on the lattice above and stop at
+                // material; production averages 11.3 (SIDE) to 12.5 (FAR)
+                // probes per scan event, so PA_ARM_FIELD_LOOKUP fetches per
+                // event, bounded by the span exactly as the probes are, is
+                // at or above what a real field would pay. The sink reaches
+                // the march through a uniform uploaded as exactly zero, so
+                // the fetches are executed and the advance is unchanged.
+                float paStandInSink = 0.0;
+                for (int paStandIn = 1; paStandIn <= PA_ARM_FIELD_LOOKUP; paStandIn++) {
+                    float paStandInOffset = float(paStandIn) * paScanStep;
+                    if (paStandInOffset > paScanSpan) {
+                        break;
+                    }
+                    paStandInSink += paFieldStandInFetch(
+                        CameraPos + rayDir * (t + paStandInOffset)).g;
+                }
+                paLastEmptyOffset += paStandInSink * PaDiagnosticEvalEpsilon;
+#endif
                 if (paCap) {
                     paMrScanProbes = paScanProbeCount;
                     paMrScanAdvance = paLastEmptyOffset;

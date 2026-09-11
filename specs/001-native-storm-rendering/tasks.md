@@ -2541,6 +2541,63 @@ implementation, while visual polish remains independently active.
   variants** - both ceilings already existed, and T193 owning no programs of its own makes it the
   clean test of T192's cross-campaign registration fix (`registered=2 crossCampaignControls=3`).
   Evidence in `validation/performance-production-attribution.md`.
+- [X] T194 [PERFORMANCE] [US3] Price the shared 3D storm field before building it: combined
+  light+probe ceiling, semantics audit, build oracle.
+  **Pricing only - no field was built and nothing was wired into the renderer.** **Combined
+  ceiling measured, not inferred**: FAR `t194_noboth` **1.7450 accepted** (2.92% spread,
+  removable 8.73 ms of 20.45); SIDE 1.9981 on one block (1.9351 / 1.9518 on the two others,
+  rejected on anchor drift of 3.01% and 3.21% against a 3.00% tolerance - so
+  `REJECTED_insufficient_blocks`, not established to protocol). T193's two single-consumer
+  ratios multiply to 1.551; the measured combined ratio is 1.745-1.998, so the consumers are
+  **superadditive** and inferring would have understated the budget by 13-29%. **Build oracle**:
+  each fragment of the 512x512 weather-domain pass sweeps N slab heights through production
+  `cloudDensity` (no detail, no precipitation) on the field clock - 16/32/64 slices measured
+  **1.6835 / 3.2683 / 6.4679 ms** at SIDE, 0.4014-0.3855 ns/voxel, linear over a 4x range, march
+  ratio 1.01 throughout so the build lands entirely in its own column. **Semantics**: light taps
+  accumulate `density * stepLength * tapWeight` over four taps with detail on the first two only
+  and mip bias `i*0.6` - they need an unbiased estimate; the probe is `density > 0.0008` with
+  one-sided error - it needs a conservative upper bound. One field, two channels: R mean, G max,
+  RG16F, 4 bytes/voxel. **Domain**: `WeatherExtent` 4096 blocks, slab ~866 blocks for the fixture;
+  candidates 256x256x32 (2.1M voxels, 8.4 MB, 0.84 ms derived) to 512x512x64 (16.8M, 67 MB, 6.72
+  ms). Break-even before lookup **1.904x SIDE / 1.645x FAR** at 256x256x32. Left open: lookup cost
+  (estimated, not measured), update frequency (not audited), the SIDE ceiling to protocol, and
+  whether the max channel can be a true bound at one evaluation per voxel. Four variants added,
+  all campaign-scoped (`declared=146 registered=4 skipped=142`). Evidence in
+  `validation/performance-shared-field-pricing.md`.
+- [X] T195 [PERFORMANCE] [US3] Finish the shared-field price: SIDE ceiling to protocol, lookup
+  measured, update frequency audited, gate decided.
+  **Recovery, not restart**: T194's variants, matrix, registry row and evidence were intact at
+  `47fd756`; its `tasks.md` entry, gate log and evidence directory were missing, its marker was
+  still armed, and its report had left the SIDE ceiling on one block, the lookup estimated, and
+  the rebuild cadence unaudited. Branch merged with `origin/Forge-1.20.1` (`8e22da4`, PR #101/#102)
+  as `21758ee` first. **Combined ceiling established**: SIDE `t194_noboth` **1.8595 accepted**
+  (four blocks, 1.02% spread, removable **14.04 ms** of 30.36); FAR 1.6353 rejected on 7.00%
+  spread (arm cells wandered, anchors held), so T194's accepted FAR 1.7450 stands. **Lookup
+  measured**: `t195_lookup` pays one trilinear fetch per light tap into the production scatter
+  chain and 13 fetches per scan event from a stand-in 8 MB volume (the 128^3 base noise addressed
+  over the weather domain and slab) - **1.8178 accepted** at SIDE (1.94%), so reading the field
+  back costs **0.41 ms** at SIDE and 0.27 ms at FAR, 2.9% of what it removes, and that includes
+  the scatter chain the no-light ceiling had been generous by. **Update frequency audited in
+  code**: `WorldTime` reaches only the funnel swirl and the rain shaft; the body noise is a static
+  function of `p - MaterialOffset`, so the field needs no clock, only dirty state - which, because
+  the weather bake, descriptor upload and material advection all refresh every frame while a storm
+  moves, is every frame in practice, and is what the break-even already charges. **Semantics
+  re-verified** and one gap closed: a single evaluation per voxel is a point sample, not a bound,
+  so the probe's max channel needs a closed-form bound or a directional super-sample, and the
+  probe must read it `NEAREST`. **Break-even on measured values**: net SIDE = 30.43 / (16.74 +
+  build): **1.731x at 256x256x32** (0.84 ms, 8.4 MB), 1.513x at 512x512x32, 1.296x at 512x512x64;
+  a full 2x2x2 max super-sample at 256x256x32 (16.8M evaluations, the 512x512x64 arm's count,
+  6.47 ms measured) still gives 1.296x SIDE but **1.081x FAR** - the only term that can still
+  close the architecture, and the first decision of the implementation. Break-even voxel count
+  27.2M SIDE / 15.9M FAR. **GATE: PASS.** No real field exists; the next task is the max-channel
+  bound, then the quality harness, then a 256x256x32 `(mean, max)` RG16F field. One variant
+  added (147 -> 148), campaign-scoped (`registered=2 skipped=145 crossCampaignControls=3`).
+  **Campaign infrastructure**: the T194 client idled 30 of its 45 minutes after
+  `T132_AUTORUN_FINISHED`, the unused T098 capture set took 3.5 minutes, and the 44-stage
+  production-context counter capture took 7-9 s of every 11 s cell while being identical for every
+  cell of a pose; the driver now stops the client on `run/t132-autorun-exit.txt`, finishes
+  program-arm campaigns after their report, and captures counters once per pose. Evidence in
+  `validation/performance-shared-field-lookup.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

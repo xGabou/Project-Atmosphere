@@ -666,7 +666,17 @@ public enum CoreCostDiagnosticProgram {
     T194_SLICES32("t194_slices32"),
 
     /** T194 build oracle: 512x512x64. */
-    T194_SLICES64("t194_slices64");
+    T194_SLICES64("t194_slices64"),
+
+    // -----------------------------------------------------------------------
+    // T195. The lookup side of the shared field. Light and probe traversal
+    // removed as T194_NO_BOTH removes them, and each consumer then pays one
+    // stand-in volume fetch per density it would have computed, so the
+    // ratio against the anchor is the net ray-side gain a field can keep.
+    // -----------------------------------------------------------------------
+
+    /** T195: light AND probe traversal removed, stand-in field fetches paid. */
+    T195_LOOKUP("t195_lookup");
 
 
     private final String serializedName;
