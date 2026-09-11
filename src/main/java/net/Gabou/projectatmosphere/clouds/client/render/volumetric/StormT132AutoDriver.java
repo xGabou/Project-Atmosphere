@@ -291,6 +291,9 @@ final class StormT132AutoDriver {
      * block.
      */
     private static final Path T195_MARKER = Path.of("t195-shared-field-lookup.txt");
+
+    /** T196. The shared 3D storm field, built and measured. */
+    private static final Path T196_MARKER = Path.of("t196-shared-field.txt");
     /**
      * T152 marker. The run drives the deterministic moving-camera route twice -
      * once without temporal accumulation and once with it - and measures
@@ -1594,6 +1597,78 @@ final class StormT132AutoDriver {
         return Files.exists(T195_MARKER);
     }
 
+    /** SIDE binds the budget; FAR secondary. */
+    private static final String[] T196_POSES = {"SIDE", "FAR"};
+
+    private static boolean t196Run;
+    private static boolean t196OriginalHistoryEnabled;
+
+    /**
+     * T196. Per pose, which counter capture is next: 0 the production
+     * workload with the monolith unforced, 1 the post-field workload with
+     * the field forced onto the monolith and the soundness oracle requested
+     * for the same frame, 2 done. Both captures sit beside the same anchors.
+     */
+    private static int t196CounterPhase;
+
+    /**
+     * The T196 matrix. Every arm builds the field; generate_only reads
+     * nothing and so prices the build alone, light and probe each add one
+     * consumer, and both is the production candidate. Each is bracketed by
+     * anchors, three repeats, so the report can separate build, light lookup,
+     * probe lookup and the combined net.
+     */
+    private static final T166Arm[] T196_ARMS = buildT196Arms();
+
+    private static T166Arm[] buildT196Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        for (int repeat = 1; repeat <= 3; repeat++) {
+            for (CoreCostDiagnosticProgram arm : new CoreCostDiagnosticProgram[] {
+                    CoreCostDiagnosticProgram.T196_GENERATE_ONLY,
+                    CoreCostDiagnosticProgram.T196_FIELD_LIGHT,
+                    CoreCostDiagnosticProgram.T196_FIELD_PROBE,
+                    CoreCostDiagnosticProgram.T196_FIELD_BOTH,
+                    CoreCostDiagnosticProgram.T196_FIELD_HYBRID}) {
+                arms.add(new T166Arm(arm, "r" + repeat, 60));
+                arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                        String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+            }
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t196Arm() {
+        return T196_ARMS[Math.max(0, Math.min(T196_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T196_OPTIMIZATION_ARMS =
+            buildT196OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT196OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T196_ARMS.length];
+        for (int i = 0; i < T196_ARMS.length; i++) {
+            modes[i] = T196_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /** The quality harness runs on each consumer alone and on both together. */
+    private static final CoreCostDiagnosticProgram[] T196_IMAGE_ARMS = {
+            CoreCostDiagnosticProgram.T196_FIELD_LIGHT,
+            CoreCostDiagnosticProgram.T196_FIELD_PROBE,
+            CoreCostDiagnosticProgram.T196_FIELD_BOTH,
+            CoreCostDiagnosticProgram.T196_FIELD_HYBRID
+    };
+
+    /** T196 marker predicate. */
+    private static boolean sharedFieldRunRequested() {
+        return Files.exists(T196_MARKER);
+    }
+
     private static T166Arm[] buildT193Arms() {
         java.util.List<T166Arm> arms = new java.util.ArrayList<>();
         int anchor = 0;
@@ -2780,7 +2855,7 @@ final class StormT132AutoDriver {
                 || t178Run || t179Run || t180Run || t181Run || t182Run
                 || t184Run || t185Run || t186Run || t187Run || t188Run
                 || t189Run || t190Run || t192Run || t193Run || t194Run
-                || t195Run;
+                || t195Run || t196Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -3038,7 +3113,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t195Run ? t195Arm()
+            T166Arm arm = t196Run ? t196Arm()
+                    : t195Run ? t195Arm()
                     : t194Run ? t194Arm()
                     : t193Run ? t193Arm()
                     : t192Run ? t192Arm()
@@ -3145,6 +3221,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t196Run) {
+            return t196Arm().label();
+        }
         if (t195Run) {
             return t195Arm().label();
         }
@@ -3257,6 +3336,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t196Run) {
+            return T196_OPTIMIZATION_ARMS;
+        }
         if (t195Run) {
             return T195_OPTIMIZATION_ARMS;
         }
@@ -3500,6 +3582,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t196Run) {
+            return T196_POSES;
+        }
         if (t195Run) {
             return T195_POSES;
         }
@@ -3972,6 +4057,10 @@ final class StormT132AutoDriver {
                 t194OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t195Run = sharedFieldLookupRunRequested();
                 t195OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t196Run = sharedFieldRunRequested();
+                t196OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t196CounterPhase = 0;
+                VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
                 // T188 Task 3 and Task 11. Counters come from the monolith, so
                 // the monolith has to be using the field for them to describe
                 // the post-field workload rather than the one it replaced.
@@ -4037,7 +4126,8 @@ final class StormT132AutoDriver {
                                 || t192Run
                                 || t193Run
                                 || t194Run
-                                || t195Run;
+                                || t195Run
+                                || t196Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -4051,7 +4141,7 @@ final class StormT132AutoDriver {
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
                             && !t171Run && !t172Run && !t173Run && !t174Run
                             && !t175Run && !t176Run && !t177Run && !t178Run
-                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run) {
+                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -4061,7 +4151,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t195Run ? "T195_SHARED_FIELD_LOOKUP"
+                            t196Run ? "T196_SHARED_FIELD"
+                                    : t195Run ? "T195_SHARED_FIELD_LOOKUP"
                                     : t194Run ? "T194_SHARED_FIELD_PRICING"
                                     : t193Run ? "T193_PRODUCTION_ATTRIBUTION"
                                     : t192Run ? "T192_RAIN_FIELD_BOUND"
@@ -4428,7 +4519,8 @@ final class StormT132AutoDriver {
                         || (t192Run && t192Arm().program().fixedWork())
                         || (t193Run && t193Arm().program().fixedWork())
                         || (t194Run && t194Arm().program().fixedWork())
-                        || (t195Run && t195Arm().program().fixedWork())) {
+                        || (t195Run && t195Arm().program().fixedWork())
+                        || (t196Run && t196Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -4442,6 +4534,18 @@ final class StormT132AutoDriver {
                 }
                 if (!t135CountersRequested) {
                     t135CountersRequested = true;
+                    if (t196Run) {
+                        // Two captures per pose on the same monolith: the
+                        // production workload first, then the post-field one
+                        // with the field forced on and the soundness oracle
+                        // run in that same frame.
+                        if (t196CounterPhase == 1) {
+                            VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(3);
+                            VolumetricCloudDebugConfig.requestStormFieldSoundness();
+                        } else {
+                            VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
+                        }
+                    }
                     // The workload counters live behind debug views 22/23, which
                     // every lean and oracle program bakes off. Releasing the pin
                     // lets the capture link the diagnostic monolith, so the
@@ -4479,8 +4583,19 @@ final class StormT132AutoDriver {
                 String line = VolumetricCloudFrameDiagnostics.stormWorkloadResultLine();
                 if (line != null) {
                     ProjectAtmosphere.LOGGER.info("T136_COUNTERS cell={} {}",
-                            t135CounterLabel, line);
-                    t135CountersCapturedPose = sweepPose();
+                            t135CounterLabel + (t196Run
+                                    ? (t196CounterPhase == 0 ? "|production" : "|field")
+                                    : ""), line);
+                    if (t196Run && t196CounterPhase == 0) {
+                        // The pose stays open for its post-field capture.
+                        t196CounterPhase = 1;
+                    } else {
+                        t135CountersCapturedPose = sweepPose();
+                        if (t196Run) {
+                            t196CounterPhase = 0;
+                            VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
+                        }
+                    }
                 }
                 if (t153OracleRun) {
                     StormWorkloadRuntimeCapture.WorkloadResult workload =
@@ -4577,6 +4692,15 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
+                }
+                if (t196Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT196FieldReport());
+                    VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(
+                            t196OriginalHistoryEnabled);
                 }
                 if (t195Run) {
                     ProjectAtmosphere.LOGGER.info(buildT195LookupReport());
@@ -5512,6 +5636,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t196Run) {
+            return T196_IMAGE_ARMS;
+        }
         if (t195Run) {
             return T195_IMAGE_ARMS;
         }
@@ -6108,6 +6235,16 @@ final class StormT132AutoDriver {
     }
 
     /**
+     * T196. The built field, arm by arm. The block ratio is march-only; the
+     * net ratio charges the field build on its own clock against the anchor,
+     * which is the number the implementation gate is judged on.
+     */
+    private static String buildT196FieldReport() {
+        return buildBracketedPricingReport("T196", "T196_FIELD_DECISION",
+                T196_POSES, T196_ARMS, CoreCostDiagnosticProgram.T196_GENERATE_ONLY);
+    }
+
+    /**
      * Anchor-bracketed blocks and per-arm verdicts for a pricing matrix.
      * {@code blockLead} is the program whose cell opens a new block, so the
      * block index in the log lines up with the repeat.
@@ -6147,14 +6284,18 @@ final class StormT132AutoDriver {
                 double drift = Math.abs(before.cloudP50() - after.cloudP50())
                         / Math.max(1.0e-6D, baseline);
                 double ratio = baseline / cell.cloudP50();
+                // T196. The build is timed on its own clock and never inside
+                // cloudP50, so the net ratio adds it back before dividing.
+                double netRatio = baseline
+                        / (cell.cloudP50() + Math.max(0.0D, cell.rainFieldP50()));
                 out.append(String.format(Locale.ROOT,
                         "%n%s_BLOCK pose=%s block=%d arm=%s anchorBefore=%.4f"
                                 + " anchorAfter=%.4f anchorDrift=%.4f cloudP50=%.4f"
                                 + " cloudP95=%.4f fieldP50=%.4f fieldP95=%.4f"
-                                + " localRatio=%.4f blockVerdict=%s",
+                                + " localRatio=%.4f netRatio=%.4f blockVerdict=%s",
                         tag, pose, block, arm.label(), before.cloudP50(), after.cloudP50(),
                         drift, cell.cloudP50(), cell.cloudP95(),
-                        cell.rainFieldP50(), cell.rainFieldP95(), ratio,
+                        cell.rainFieldP50(), cell.rainFieldP95(), ratio, netRatio,
                         drift <= T171_REPEAT_TOLERANCE ? "accepted"
                                 : "REJECTED_anchor_drift"));
                 if (drift > T171_REPEAT_TOLERANCE) {
@@ -6163,7 +6304,8 @@ final class StormT132AutoDriver {
                 byProgram.computeIfAbsent(arm.program().serializedName(),
                         key -> new java.util.ArrayList<>())
                         .add(new double[] {ratio, cell.cloudP50(), cell.cloudP95(),
-                                cell.rainFieldP50(), cell.rainFieldP95(), baseline});
+                                cell.rainFieldP50(), cell.rainFieldP95(), baseline,
+                                netRatio});
             }
             for (java.util.Map.Entry<String, java.util.List<double[]>> entry
                     : byProgram.entrySet()) {
@@ -6176,7 +6318,13 @@ final class StormT132AutoDriver {
                 double sumField = 0.0D;
                 double maxFieldP95 = 0.0D;
                 double sumAnchor = 0.0D;
+                double sumNet = 0.0D;
+                double minNet = Double.MAX_VALUE;
+                double maxNet = 0.0D;
                 for (double[] b : blocks) {
+                    sumNet += b[6];
+                    minNet = Math.min(minNet, b[6]);
+                    maxNet = Math.max(maxNet, b[6]);
                     minRatio = Math.min(minRatio, b[0]);
                     maxRatio = Math.max(maxRatio, b[0]);
                     sumRatio += b[0];
@@ -6200,10 +6348,12 @@ final class StormT132AutoDriver {
                                 + " sessionLocalP50=%.4f sessionLocalP95=%.4f"
                                 + " fieldBuildP50=%.4f fieldBuildP95=%.4f"
                                 + " productionAnchorP50=%.4f removableMs=%.4f"
+                                + " netRatioMin=%.4f netRatioMax=%.4f netRatioMean=%.4f"
                                 + " verdict=%s",
                         tag, pose, entry.getKey(), blocks.size(), minRatio, maxRatio,
                         meanRatio, spread, sumP50 / blocks.size(), maxP95,
                         meanField, maxFieldP95, meanAnchor, removableMs,
+                        minNet, maxNet, sumNet / blocks.size(),
                         blocks.size() >= 2 && spread <= T171_REPEAT_TOLERANCE
                                 ? "accepted"
                                 : blocks.size() < 2 ? "REJECTED_insufficient_blocks"

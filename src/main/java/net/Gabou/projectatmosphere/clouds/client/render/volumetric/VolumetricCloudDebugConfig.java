@@ -68,6 +68,41 @@ public final class VolumetricCloudDebugConfig {
     public static void setRainFieldForcedOnMonolith(boolean forced) {
         rainFieldForcedOnMonolith = forced;
     }
+
+    /**
+     * T196. The shared storm field forced onto the monolith, on T188's
+     * reasoning: the monolith is the only program that counts, so it has to
+     * read the field for the counters to describe the post-field workload -
+     * the collapsed light and probe walks, the fetches, and the probe audit.
+     * Bits as PaStormFieldEnabled: 1 light, 2 probe. Never applied to a timed
+     * arm.
+     */
+    private static volatile int stormFieldForcedOnMonolith;
+
+    /**
+     * T196. One frame's soundness oracle: the next field build writes the
+     * node floor beside a dense reference floor and the renderer reads the
+     * pair back and reports it, then the ordinary build runs.
+     */
+    private static volatile boolean stormFieldSoundnessRequested;
+
+    public static int stormFieldForcedOnMonolith() {
+        return stormFieldForcedOnMonolith;
+    }
+
+    public static void setStormFieldForcedOnMonolith(int enabledBits) {
+        stormFieldForcedOnMonolith = enabledBits;
+    }
+
+    public static void requestStormFieldSoundness() {
+        stormFieldSoundnessRequested = true;
+    }
+
+    public static boolean consumeStormFieldSoundnessRequest() {
+        boolean requested = stormFieldSoundnessRequested;
+        stormFieldSoundnessRequested = false;
+        return requested;
+    }
     private static volatile boolean sceneRayLimitEnabled = true;
     // Uniform ray probes can miss narrow world-space cloud footprints and cut
     // complete horizontal bands from an otherwise valid volume. Keep the A/B

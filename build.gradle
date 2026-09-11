@@ -300,7 +300,11 @@ def leanFinalConstants = [
         // every program that does not opt in, so the mixed-cell branch
         // is absent rather than merely unentered.
         'uniform int PaRainFieldConservative;'     : 'const int PaRainFieldConservative = 0;',
-        'uniform int PaRainFieldClosedForm;'       : 'const int PaRainFieldClosedForm = 0;'
+        'uniform int PaRainFieldClosedForm;'       : 'const int PaRainFieldClosedForm = 0;',
+        // T196. The shared storm field: neither the build pass nor either
+        // consumer's lookup is compiled into a program that does not opt in.
+        'uniform int PaStormFieldPass;'            : 'const int PaStormFieldPass = 0;',
+        'uniform int PaStormFieldEnabled;'         : 'const int PaStormFieldEnabled = 0;'
 ]
 
 // The oracle interval texture is read only by the T153 ground-truth replay,
@@ -931,6 +935,40 @@ def leanProgramVariants = [
                    'PA_ARM_NO_PROBE 1', 'PA_ARM_FIELD_LOOKUP 13'],
          keepUniforms: ['PaDiagnosticEvalEpsilon']],
 
+        // T196. The shared 3D storm field, built. PaStormFieldPass stays live
+        // so the renderer can run the build pass and then render with the
+        // same program; which consumers read the field is baked per arm, so
+        // the timed march carries no runtime branch on it. Every arm builds:
+        // generate_only prices the build alone, the other three add one or
+        // both lookups, and both is the production candidate.
+        [name: 'cloud_atmosphere_volume_t196_generate_only',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 0;']],
+        [name: 'cloud_atmosphere_volume_t196_field_light',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 1;']],
+        [name: 'cloud_atmosphere_volume_t196_field_probe',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 2;']],
+        [name: 'cloud_atmosphere_volume_t196_field_both',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 3;']],
+        // Both consumers, first two light taps exact: prices buying the
+        // shadow pockets back with half the light gain.
+        [name: 'cloud_atmosphere_volume_t196_field_hybrid',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 7;']],
+
         // T192. The closed-form ownership bound as classification triage.
         // Three arms only, and the campaign-scoped loading T191 added means
         // they cost nothing on an ordinary startup.
@@ -1351,6 +1389,16 @@ tasks.named('processResources', ProcessResources).configure {
             mod_description        : mod_description,
             mod_logo_file          : logo_file,
             mod_mixins             : mod_mixins,
+            // T196. Simple Clouds is mandatory for the release (0.9.3.1) but
+            // is compileOnly in the dev runtime unless runSimpleClouds is
+            // used, and FML rejects a mod whose mandatory dependency is
+            // missing before its mixin config can be read. A campaign launch
+            // passes -PsimpleCloudsMandatory=false so the dev client boots as
+            // every campaign since T166 has, without Simple Clouds; the
+            // shipped jar keeps the release value.
+            simpleclouds_mandatory : project.hasProperty('simpleCloudsMandatory')
+                    ? project.property('simpleCloudsMandatory').toString()
+                    : 'true',
     ]
     inputs.properties replaceProps
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {

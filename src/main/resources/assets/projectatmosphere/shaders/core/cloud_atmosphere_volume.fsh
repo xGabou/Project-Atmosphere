@@ -270,6 +270,53 @@ uniform int PaRainFieldConservative;
  */
 uniform int PaRainFieldClosedForm;
 /**
+ * T196. The shared 3D storm field. 0 renders; 1 is the node build pass, one
+ * fragment per node of the 256x256x32 atlas; 2 is the soundness oracle, which
+ * writes the node floor beside a dense reference floor instead of a field.
+ * Baked to 0 in every program that neither builds nor reads the field, so
+ * neither pass is compiled into them.
+ */
+uniform int PaStormFieldPass;
+/**
+ * T196. Which consumers read the field: bit 1 the light cone, bit 2 the
+ * empty-span probe. Baked per program: 0 in FINAL and every control.
+ */
+uniform int PaStormFieldEnabled;
+/**
+ * T196. Headroom on the dual-cell half-diagonal the probe floor dilates by.
+ * The union distance is not proved 1-Lipschitz, so the dilation carries a
+ * multiplier the soundness oracle calibrates; 1.0 would be exact Lipschitz.
+ */
+const float PA_STORM_FIELD_DILATION = 1.25;
+/**
+ * T196. The lobe pseudo-distance is not isotropically Lipschitz: horizontally
+ * it is a first-order ellipse distance (about 1), but vertically the role
+ * profile radius changes with height, so |d(d)/dy| is |dR/dy| and reaches
+ * several blocks per block where a tower flares into its anvil. The first
+ * oracle run measured 11,667 underestimates with an isotropic dilation; the
+ * dilation is therefore split by axis, each with its own measured constant.
+ */
+// Per node rather than global: the walk publishes, for the lobes it visited,
+// the largest vertical slope (the role profile's maximum height derivative -
+// 2.0 base, 1.9 core, 2.3 tower, 3.5 anvil, measured on the profiles - times
+// the lobe's radius over its height) and the largest ellipse aspect, which
+// bounds the horizontal constant of the gradient-normalised distance. The
+// second oracle run measured 2.09 horizontally and 8.30 vertically on this
+// fixture, the latter on the anvil flare alone; a global constant at those
+// values would dilate every node by 140 blocks. Both carry this headroom.
+const float PA_STORM_FIELD_LIPSCHITZ_HEADROOM = 1.2;
+// T196. Bound manually on the rain-field unit - the two fields are never
+// resident in the same program - for the reason RainFieldSampler is.
+uniform sampler2D StormFieldSampler;
+// T196. The field grid: 256x256 nodes over WeatherExtent, 32 over the slab,
+// stored as an 8x4 atlas of 256x256 tiles.
+const int PA_STORM_FIELD_XZ = 256;
+const int PA_STORM_FIELD_Y = 32;
+const int PA_STORM_FIELD_TILES_X = 8;
+const int PA_STORM_FIELD_TILES_Y = 4;
+const float PA_STORM_FIELD_BODY_GAIN = 1.65;
+const float PA_STORM_FIELD_UNCOVERED = -10.0;
+/**
  * T190. The support level below which localRainSupportAt returns no rain, so
  * the side of it a column falls on is a decision rather than a magnitude.
  * Matches the cutoff that function applies to localSupport.
@@ -709,6 +756,38 @@ int paShapeCamera = 0;
 int paShapeLightForward = 0;
 int paShapeUntagged = 0;
 
+// T196. The shared storm field's counters. Fetches served per consumer, the
+// probe's two field verdicts, and - on the monolith only, where production is
+// also evaluated beside the field - the probe decision audit.
+int paStormFieldLightFetches = 0;
+int paStormFieldProbeFetches = 0;
+int paStormFieldProbeProvablyEmpty = 0;
+int paStormFieldProbeFallback = 0;
+int paStormFieldFalseEmpty = 0;
+int paStormFieldFalseOccupied = 0;
+int paStormFieldAgreeEmpty = 0;
+int paStormFieldAgreeOccupied = 0;
+// T196. Published by directStormShape for the node build: the softness range
+// of the groups that entered the union, which the dilated envelope needs and
+// the coverage value alone does not carry.
+float paLastStormMinSoftness = 1.0e9;
+float paLastStormMaxSoftness = 0.0;
+float paLastStormUnionDistance = 1.0e9;
+float paLastStormMaxVerticalSlope = 1.0;
+float paLastStormMaxAspect = 1.0;
+// T196 oracle: how far outside the dilated envelope the last node floor
+// believed itself to be, in blocks; 1e9 when no group entered.
+float paLastStormFieldSlack = 1.0e9;
+// T196. True while a field node is being built, which lifts the T143 reach
+// early-out: a node just outside the reach circle still has to walk, because
+// the dual cell it bounds may reach inside it.
+bool paStormFieldBuildNode = false;
+// T196. In build mode, T121's vertical rejection judges a lobe against the
+// whole dual cell rather than the node: a lobe that is provably clear of the
+// node by less than the cell's vertical half-extent may still reach a point
+// of the cell. Zero outside the build, so production rejects exactly as before.
+float paStormFieldRejectMargin = 0.0;
+
 /**
  * T184. Rain-support recomputation.
  *
@@ -827,7 +906,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 66);
+        || (DebugView >= 28 && DebugView <= 69);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -1832,6 +1911,38 @@ float directStormLobeDistanceFromData(
     if (role == 3) {
         radii.y *= 1.56;
     }
+    if (paStormFieldBuildNode) {
+        // T196. The field build's Lipschitz bounds for this lobe: the wall
+        // distance is about |o| - R(h), so its vertical drop per block is
+        // |dR/dy| = profile slope * base radius / height, and its horizontal
+        // constant is bounded by the ellipse aspect.
+        vec2 paBaseRadii = max(radiusRotation.xy, vec2(1.0));
+        if (role == 3) {
+            paBaseRadii.y *= 1.56;
+        }
+        // The profile's slope over this cell's own height band rather than
+        // its global maximum: the anvil flares at 3.5 for a third of its
+        // height and is nearly flat above, and a global 3.5 dilated every
+        // anvil node by 130 blocks. The band is the cell's vertical
+        // half-extent in profile units; the finite difference over it is
+        // widened by half again for curvature inside the band, and a band
+        // that reaches a cap sees the cap's steep rise from the clamp.
+        float paBand = max(paStormFieldRejectMargin / height, 0.002);
+        float paRadiusBelow;
+        float paRadiusAbove;
+        float paShapeUnused;
+        float paShearUnused;
+        stormRoleProfile(clamp(height01 - paBand, 0.0, 1.0), role,
+            paRadiusBelow, paShapeUnused, paShearUnused);
+        stormRoleProfile(clamp(height01 + paBand, 0.0, 1.0), role,
+            paRadiusAbove, paShapeUnused, paShearUnused);
+        float paLocalSlope = max(abs(paRadiusAbove - profileRadius),
+            abs(profileRadius - paRadiusBelow)) / paBand * 1.5;
+        paLastStormMaxVerticalSlope = max(paLastStormMaxVerticalSlope,
+            max(paLocalSlope, 0.25) * max(paBaseRadii.x, paBaseRadii.y) / height);
+        paLastStormMaxAspect = max(paLastStormMaxAspect,
+            max(paBaseRadii.x, paBaseRadii.y) / min(paBaseRadii.x, paBaseRadii.y));
+    }
     float radial = length(oriented / radii);
     float groupOffset = float(max(groupSlot, 0)) * 997.0;
     vec3 morphologyWarp = lowFrequencyDomainWarp(
@@ -2606,10 +2717,14 @@ void directStormGroupField(
         // T141 arm: the same comparison against a strictly tighter lower
         // bound. max() of two valid lower bounds is a valid lower bound, so
         // the arm can only reject more, never differently.
-        float verticalLowerBound = paT141BoxBound()
+        // T196: in build mode the bound is judged against the whole dual
+        // cell, so the cell's vertical half-extent comes off it here; the
+        // margin is zero everywhere else.
+        float verticalLowerBound = (paT141BoxBound()
             ? stormLobeDistanceLowerBound(
                 p, positionHeight, radiusRotation, shearMedia, lobeRole)
-            : stormVerticalDistanceLowerBound(p, positionHeight, lobeRole);
+            : stormVerticalDistanceLowerBound(p, positionHeight, lobeRole))
+            - paStormFieldRejectMargin;
         // A smooth minimum is exactly unchanged once the incoming distance is
         // more than its blend radius beyond the current union.  The global
         // maximum is used here instead of a guessed local value.  Requiring
@@ -2930,10 +3045,15 @@ float directStormShape(
     int groupEntryOrdinalClearance = 0;
 #endif
     float paOutsideReach = paStormColumnOutside(p.xz);
-    if (paOutsideReach > 0.0) {
+    if (paOutsideReach > 0.0 && !paStormFieldBuildNode) {
         minDescriptorClearance = paOutsideReach;
         return 0.0;
     }
+    paLastStormMinSoftness = 1.0e9;
+    paLastStormMaxSoftness = 0.0;
+    paLastStormUnionDistance = 1.0e9;
+    paLastStormMaxVerticalSlope = 1.0;
+    paLastStormMaxAspect = 1.0;
     if (paWorkloadCaptureActive()) {
         paDirectStormShapeCalls++;
     }
@@ -3000,6 +3120,12 @@ float directStormShape(
         return stormEnvelopeFromDistance(rgDistance, rgSoftness, rgStrength);
     }
 #endif
+    // T196. A field node's dual cell is exactly its candidate tile: both
+    // grids share WeatherOrigin and 16-block spacing, and the node sits at
+    // the tile's centre. A probe anywhere in the cell walks this tile, so the
+    // node's floor needs no other. (The oracle's third run traced its last
+    // misses to lattice samples placed exactly on the tile boundary, which
+    // belong to the neighbouring node; it now samples strictly inside.)
     vec4 candidates = stormCandidatesAt(p.xz);
     for (int rank = 0; rank < STORM_CANDIDATES_PER_TILE; rank++) {
         int witnessIndex = decodeStormCandidate(candidates, rank);
@@ -3076,6 +3202,8 @@ float directStormShape(
             nearestGroupDistance = groupDistance;
             dominantHeight01 = groupHeight01;
         }
+        paLastStormMinSoftness = min(paLastStormMinSoftness, groupSoftness);
+        paLastStormMaxSoftness = max(paLastStormMaxSoftness, groupSoftness);
         if (!started) {
             stormDistance = groupDistance;
             stormStrength = groupStrength;
@@ -3144,6 +3272,7 @@ float directStormShape(
     }
     envelopeStrength = stormStrength;
     unionDistanceBlocks = stormDistance;
+    paLastStormUnionDistance = stormDistance;
     return stormEnvelopeFromDistance(stormDistance, stormSoftness, stormStrength);
 }
 
@@ -5807,6 +5936,236 @@ float cloudDensity(
 }
 
 // ---------------------------------------------------------------------------
+// T196. The shared 3D storm field.
+//
+// One coarse volume over the weather domain and the slab, 256x256x32 nodes,
+// built once per frame by a fullscreen pass over a 2048x1024 atlas (8x4 tiles
+// of 256x256, one per slice) and read by the two consumers T193 attributed
+// 43% of descriptor traversal to:
+//
+//   R  detail-free production density at the node  - the light cone reads it
+//      trilinearly, four taps as before, one fetch pair per tap instead of a
+//      descriptor walk;
+//   G  the probe floor: a lower bound on the storm body's noise threshold
+//      over every point nearer to this node than to any other (its dual
+//      cell). The probe fetches the nearest node, evaluates the base noise at
+//      its own point exactly - one 3D fetch - and answers "material possible"
+//      iff baseField(p) > floor. 1.0 means provably empty; -10 means the
+//      field does not cover this region (a weather-map family or a funnel)
+//      and the probe must assume material.
+//
+// Why the floor is sound. For a descriptor storm,
+//   density > 0  <=>  stormBody > 0  <=>  baseField(p) > L(p),
+//   L = 1 - coverage * (1 + fill),  coverage = E * strength,
+//   E = 1 - smoothstep(-soft, soft, d),  d = the smooth-union distance.
+// strength * (1 + fill(strength)) is at most 1.45 without convective overlap
+// and at most 1.65 with it (fill grows as strength falls, and the product is
+// bounded), so L(p) >= 1 - 1.65 * E(p) everywhere. E falls with d, and d at
+// any point of the dual cell is at least d(node) - rho with rho the cell's
+// half-diagonal, up to the Lipschitz headroom PA_STORM_FIELD_DILATION
+// carries. So floor = 1 - 1.65 * E(d(node) - rho * headroom) <= L(p) for every
+// p in the cell, with the softness that maximises E over the cell. Erosion is
+// subtractive and the material terms are positive scalings, so neither can
+// make production positive where stormBody is zero. The soundness oracle
+// (pass 2) checks the inequality against a dense reference on every node.
+// ---------------------------------------------------------------------------
+
+
+float paStormFieldVoxelXZ() {
+    return WeatherExtent / float(PA_STORM_FIELD_XZ);
+}
+
+float paStormFieldVoxelY() {
+    return max(SlabTopY - SlabBaseY, 1.0) / float(PA_STORM_FIELD_Y);
+}
+
+// Continuous node coordinates: node (i, k, j) sits at (i + 0.5, k + 0.5, j + 0.5).
+vec3 paStormFieldCoord(vec3 p) {
+    return vec3(
+        (p.x - WeatherOrigin.x) / paStormFieldVoxelXZ(),
+        (p.y - SlabBaseY) / paStormFieldVoxelY(),
+        (p.z - WeatherOrigin.y) / paStormFieldVoxelXZ()
+    );
+}
+
+// Atlas uv of in-tile texel coordinates (x, z) on slice k, clamped half a
+// texel inside the tile so bilinear filtering never reads a neighbouring slice.
+vec2 paStormFieldAtlasUv(float x, float z, int k) {
+    float edge = float(PA_STORM_FIELD_XZ);
+    x = clamp(x, 0.5, edge - 0.5);
+    z = clamp(z, 0.5, edge - 0.5);
+    float tx = float(k - (k / PA_STORM_FIELD_TILES_X) * PA_STORM_FIELD_TILES_X);
+    float ty = float(k / PA_STORM_FIELD_TILES_X);
+    return vec2(
+        (tx * edge + x) / (edge * float(PA_STORM_FIELD_TILES_X)),
+        (ty * edge + z) / (edge * float(PA_STORM_FIELD_TILES_Y))
+    );
+}
+
+// Light: manual trilinear over the R channel - bilinear on the two slices
+// that bracket p, blended in Y. Zero outside the slab, which bounds every
+// cloud the frame can contain.
+float paStormFieldDensityAt(vec3 p) {
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y > float(PA_STORM_FIELD_Y)) {
+        return 0.0;
+    }
+    float ky = clamp(c.y - 0.5, 0.0, float(PA_STORM_FIELD_Y - 1));
+    int k0 = int(floor(ky));
+    int k1 = min(k0 + 1, PA_STORM_FIELD_Y - 1);
+    float t = ky - float(k0);
+    if (paWorkloadCaptureActive()) {
+        paStormFieldLightFetches++;
+    }
+    float d0 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k0)).r;
+    float d1 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k1)).r;
+    return mix(d0, d1, t);
+}
+
+// The storm body's noise input at p, exactly as cloudDensity forms it for a
+// descriptor-owned storm at mip 0: one base-noise fetch.
+float paStormBaseFieldAt(vec3 p) {
+    vec3 samplePos = p;
+    samplePos.xz -= MaterialOffset;
+    vec4 baseNoise = texture(
+        BaseNoiseSampler, baseNoiseDomain(samplePos, STORM_BASE_NOISE_SCALE), 0.0);
+    float lowFbm = baseNoise.g * 0.625 + baseNoise.b * 0.25 + baseNoise.a * 0.125;
+    float baseCarrier = saturate(remap(baseNoise.r, -(1.0 - lowFbm), 1.0, 0.0, 1.0));
+    return stormBaseField(baseCarrier);
+}
+
+// Probe: nearest node's floor, then the exact noise at p.
+bool paStormFieldMaterialPossible(vec3 p) {
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y >= float(PA_STORM_FIELD_Y)) {
+        // Outside the slab the field says nothing; the march rarely asks.
+        if (paWorkloadCaptureActive()) {
+            paStormFieldProbeFallback++;
+        }
+        return true;
+    }
+    int k = int(c.y);
+    ivec2 tile = ivec2(
+        k - (k / PA_STORM_FIELD_TILES_X) * PA_STORM_FIELD_TILES_X,
+        k / PA_STORM_FIELD_TILES_X) * PA_STORM_FIELD_XZ;
+    ivec2 xz = clamp(ivec2(floor(c.xz)), ivec2(0), ivec2(PA_STORM_FIELD_XZ - 1));
+    if (paWorkloadCaptureActive()) {
+        paStormFieldProbeFetches++;
+    }
+    float floorL = texelFetch(StormFieldSampler, tile + xz, 0).g;
+    if (floorL >= 1.0) {
+        if (paWorkloadCaptureActive()) {
+            paStormFieldProbeProvablyEmpty++;
+        }
+        return false;
+    }
+    if (floorL <= PA_STORM_FIELD_UNCOVERED * 0.5) {
+        if (paWorkloadCaptureActive()) {
+            paStormFieldProbeFallback++;
+        }
+        return true;
+    }
+    return paStormBaseFieldAt(p) > floorL;
+}
+
+// A weather-map family could carry material anywhere its raster is painted;
+// the field does not model those families, so any coverage or morphology in
+// the 3x3 weather texels around the node (8-block texels; the dual cell is
+// +-8 blocks) marks the node uncovered. Descriptor-owned storms suppress their
+// member rasters, so this does not fire inside them.
+bool paStormFieldNonStormPossible(vec2 nodeXZ) {
+    ivec2 size = textureSize(WeatherMapSampler, 0);
+    ivec2 centre = ivec2(floor((nodeXZ - WeatherOrigin) / WeatherExtent * vec2(size)));
+    for (int dz = -1; dz <= 1; dz++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            ivec2 texel = clamp(centre + ivec2(dx, dz), ivec2(0), size - ivec2(1));
+            if (texelFetch(WeatherMapSampler, texel, 0).r * CoverageMul > 0.002) {
+                return true;
+            }
+            if (hasMorphologyCategory(texelFetch(MorphologyMapSampler, texel, 0).r)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// The node's floor, from one exact walk at the node and the dilated envelope.
+// The dilation is the largest drop the union distance can take between the
+// node and any point of its dual cell: the horizontal half-diagonal at the
+// horizontal constant plus the vertical half-extent at the vertical one, by
+// the triangle inequality over an XZ move followed by a Y move.
+float paStormFieldDilationBlocks() {
+    float halfXZ = 0.5 * paStormFieldVoxelXZ();
+    float halfY = 0.5 * paStormFieldVoxelY();
+    return (length(vec2(halfXZ, halfXZ)) * paLastStormMaxAspect
+        + halfY * paLastStormMaxVerticalSlope) * PA_STORM_FIELD_LIPSCHITZ_HEADROOM;
+}
+
+// The node's floor from the walk cloudDensity has just done at the node -
+// the build pays one walk per node for both channels. 1.0 when no group
+// entered the union.
+float paStormFieldFloorFromWalk() {
+    paLastStormFieldSlack = 1.0e9;
+    if (paLastStormUnionDistance > 1.0e8) {
+        return 1.0;
+    }
+    float dilated = paLastStormUnionDistance - paStormFieldDilationBlocks();
+    // E grows with softness outside the surface and shrinks with it inside,
+    // so the softness that maximises E over the cell is the max there and
+    // the min here.
+    float softness = max(dilated >= 0.0 ? paLastStormMaxSoftness : paLastStormMinSoftness,
+        STORM_MIN_EDGE_BLOCKS);
+    paLastStormFieldSlack = dilated - softness;
+    float envelope = 1.0 - smoothstep(-softness, softness, dilated);
+    return 1.0 - PA_STORM_FIELD_BODY_GAIN * envelope;
+}
+
+// Both channels of one node: the detail-free production density, and the
+// floor from the same walk. Uncovered where a weather-map family or a funnel
+// could carry material the field does not model.
+vec2 paStormFieldNodeAt(vec3 node, out float unionDistanceOut) {
+    paLastStormUnionDistance = 1.0e9;
+    paStormFieldBuildNode = true;
+    paStormFieldRejectMargin = 0.5 * paStormFieldVoxelY();
+    float density = cloudDensity(node, 0.0, false, false, false);
+    paStormFieldBuildNode = false;
+    paStormFieldRejectMargin = 0.0;
+    unionDistanceOut = paLastStormUnionDistance;
+    float floorL;
+    if (FunnelCount > 0 || paStormFieldNonStormPossible(node.xz)) {
+        floorL = PA_STORM_FIELD_UNCOVERED;
+    } else if (StormLobeCount <= 0) {
+        floorL = 1.0;
+    } else {
+        floorL = paStormFieldFloorFromWalk();
+    }
+    return vec2(density, floorL);
+}
+
+// The exact threshold production applies at one point, for the oracle: L
+// where the descriptor path can produce material, else 1.
+float paStormFieldReferenceFloorAt(vec3 q, out float unionDistanceOut) {
+    bool owns;
+    float height01;
+    float strength;
+    int roleMask;
+    float unionDistance;
+    float clearance;
+    // Exactly production's walk at q - its reach early-out, its own tile's
+    // candidates, its vertical rejection - because that is what the probe
+    // would have computed there and what the floor must not sit above.
+    paStormFieldBuildNode = false;
+    paStormFieldRejectMargin = 0.0;
+    float coverage = directStormShape(q, owns, height01, strength, roleMask, unionDistance, clearance);
+    unionDistanceOut = unionDistance;
+    if (!owns || coverage <= 0.001) {
+        return 1.0;
+    }
+    return stormCoverageLowerBound(coverage, strength, (roleMask & 7) == 7);
+}
+
+// ---------------------------------------------------------------------------
 // Lighting
 // ---------------------------------------------------------------------------
 
@@ -6007,7 +6366,15 @@ float lightMarchOpticalDepth(
         // detail octaves. The loop, its weights and the early-out stay.
         float density = paFieldStandInFetch(pos + offset).r * DensityMul;
 #else
-        float density = cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
+        // T196. The shared field serves the tap: same four taps, same
+        // weights, same early-out, one trilinear read instead of a walk.
+        // Bit 4 keeps the first two taps - the ones that carry detail and sit
+        // within a voxel of the sample - on the exact walk, so the field
+        // serves only the far half of the cone.
+        float density = (PaStormFieldEnabled & 1) != 0
+                && !((PaStormFieldEnabled & 4) != 0 && i < 2)
+            ? paStormFieldDensityAt(pos + offset)
+            : cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
 #endif
         paDensityConsumer = 0;
         paLightTapOrdinal = 0;
@@ -6990,6 +7357,87 @@ void main() {
     // survives inside the loop; and PaRainFieldPass is baked to 0 in every
     // program that does not generate, so the branch is not compiled into them
     // at all.
+    // T196. The shared storm field's build pass. One fragment per node of
+    // the 2048x1024 atlas; pass 2 writes the oracle pair instead.
+    if (PaStormFieldPass != 0) {
+        ivec2 paNodeFrag = ivec2(gl_FragCoord.xy);
+        ivec2 paNodeTile = paNodeFrag / PA_STORM_FIELD_XZ;
+        int paNodeSlice = paNodeTile.y * PA_STORM_FIELD_TILES_X + paNodeTile.x;
+        ivec2 paNodeXZ = paNodeFrag - paNodeTile * PA_STORM_FIELD_XZ;
+        float paNodeVoxelXZ = paStormFieldVoxelXZ();
+        float paNodeVoxelY = paStormFieldVoxelY();
+        vec3 paNode = vec3(
+            WeatherOrigin.x + (float(paNodeXZ.x) + 0.5) * paNodeVoxelXZ,
+            SlabBaseY + (float(paNodeSlice) + 0.5) * paNodeVoxelY,
+            WeatherOrigin.y + (float(paNodeXZ.y) + 0.5) * paNodeVoxelXZ);
+        float paNodeUnionDistance;
+        vec2 paNodeValue = paStormFieldNodeAt(paNode, paNodeUnionDistance);
+        float paNodeFloor = paNodeValue.y;
+        float paNodeSlack = paLastStormFieldSlack;
+        if (PaStormFieldPass == 2) {
+            // Soundness oracle. The dense reference is the exact production
+            // threshold at 27 lattice points of the dual cell - its corners,
+            // edge and face centres and centre - plus 16 hashed points, and
+            // the pair (floor, reference minimum) is written for the CPU to
+            // count every node whose floor sits above its reference.
+            // Beside the floor check, the union distance's observed drop per
+            // block from the node to each sample, split by axis on the
+            // lattice points that move along one axis only: the constants the
+            // dilation assumes are measured rather than assumed.
+            float paRefMin = 1.0;
+            float paRefMaterial = 0.0;
+            float paLipschitzXZ = 0.0;
+            float paLipschitzY = 0.0;
+            // Strictly inside the cell: a point on the cell's boundary is the
+            // neighbouring node's, and the probe reads that node for it.
+            vec3 paHalf = vec3(0.5 * paNodeVoxelXZ, 0.5 * paNodeVoxelY, 0.5 * paNodeVoxelXZ)
+                * 0.999;
+            for (int paOz = -1; paOz <= 1; paOz++) {
+                for (int paOy = -1; paOy <= 1; paOy++) {
+                    for (int paOx = -1; paOx <= 1; paOx++) {
+                        vec3 paQ = paNode + vec3(float(paOx), float(paOy), float(paOz)) * paHalf;
+                        float paRefDistance;
+                        float paRef = paStormFieldReferenceFloorAt(paQ, paRefDistance);
+                        paRefMin = min(paRefMin, paRef);
+                        paRefMaterial = paRefMaterial + (paRef < 1.0 ? 1.0 : 0.0);
+                        if (paNodeUnionDistance < 1.0e8 && paRefDistance < 1.0e8) {
+                            float paDrop = paNodeUnionDistance - paRefDistance;
+                            if (paOy == 0 && (paOx != 0 || paOz != 0)) {
+                                paLipschitzXZ = max(paLipschitzXZ,
+                                    paDrop / length(vec2(float(paOx), float(paOz)) * paHalf.xz));
+                            }
+                            if (paOx == 0 && paOz == 0 && paOy != 0) {
+                                paLipschitzY = max(paLipschitzY, paDrop / paHalf.y);
+                            }
+                        }
+                    }
+                }
+            }
+            for (int paJ = 0; paJ < 16; paJ++) {
+                vec3 paSeed = vec3(paNodeFrag, paJ) * vec3(0.1031, 0.1030, 0.0973);
+                paSeed = fract(paSeed);
+                paSeed = paSeed + dot(paSeed, paSeed.yxz + 33.33);
+                vec3 paJitter = fract((paSeed.xxy + paSeed.yxx) * paSeed.zyx) * 2.0 - 1.0;
+                vec3 paQ = paNode + paJitter * paHalf;
+                float paRefDistance;
+                float paRef = paStormFieldReferenceFloorAt(paQ, paRefDistance);
+                paRefMin = min(paRefMin, paRef);
+                paRefMaterial = paRefMaterial + (paRef < 1.0 ? 1.0 : 0.0);
+            }
+            // A packs the material-sample count (integer thousands) with the
+            // vertical constant, so four channels carry five numbers exactly.
+            fragColor = vec4(
+                paNodeFloor,
+                paRefMin,
+                paNodeSlack,
+                paRefMaterial * 1000.0 + min(paLipschitzY, 998.0));
+            gl_FragDepth = 0.0;
+            return;
+        }
+        fragColor = vec4(paNodeValue.x, paNodeFloor, 0.0, 1.0);
+        gl_FragDepth = 0.0;
+        return;
+    }
     if (PaRainFieldPass == 1) {
         vec2 fieldWorldXZ = WeatherOrigin + texCoord * WeatherExtent;
         float fieldAttachY;
@@ -7814,7 +8262,40 @@ void main() {
                     float paProbeT = t + paProbeOffset;
                     paScanProbeCount = float(paProbe);
                     paDensityConsumer = 3;
-                    float paProbeDensity = cloudDensity(
+                    float paProbeDensity;
+                    if ((PaStormFieldEnabled & 2) != 0) {
+                        // T196. The probe asks the field. The verdict is a
+                        // sound over-approximation of production's, so the
+                        // scan can never advance over material production
+                        // would have found; the audit below, monolith only
+                        // and capture only, counts the two disagreement
+                        // classes against production evaluated beside it.
+                        vec3 paProbePoint = CameraPos + rayDir * paProbeT;
+                        bool paProbePossible = paStormFieldMaterialPossible(paProbePoint);
+                        paProbeDensity = paProbePossible ? 1.0 : 0.0;
+                        // Only the audit view pays for production here, so
+                        // every other view sees the field workload alone and
+                        // the probe attribution measures what the ray runs.
+                        if (paWorkloadCaptureActive() && DebugView == 67) {
+                            float paProbeProduction = cloudDensity(
+                                paProbePoint, 0.0, DetailQuality > 0,
+                                paProbeT < 220.0 && !cameraInsideCloud, false);
+                            bool paProbeMaterial = paProbeProduction > 0.0008;
+                            if (paWorkloadCaptureActive()) {
+                                paStormFieldFalseEmpty += (!paProbePossible && paProbeMaterial) ? 1 : 0;
+                            }
+                            if (paWorkloadCaptureActive()) {
+                                paStormFieldFalseOccupied += (paProbePossible && !paProbeMaterial) ? 1 : 0;
+                            }
+                            if (paWorkloadCaptureActive()) {
+                                paStormFieldAgreeEmpty += (!paProbePossible && !paProbeMaterial) ? 1 : 0;
+                            }
+                            if (paWorkloadCaptureActive()) {
+                                paStormFieldAgreeOccupied += (paProbePossible && paProbeMaterial) ? 1 : 0;
+                            }
+                        }
+                    } else {
+                    paProbeDensity = cloudDensity(
                         CameraPos + rayDir * paProbeT,
                         0.0,
 #ifdef PA_ARM_PROBE_NO_DETAIL
@@ -7833,6 +8314,7 @@ void main() {
                         paProbeT < 220.0 && !cameraInsideCloud,
                         false
                     );
+                    }
                     paDensityConsumer = 0;
                     if (paProbeDensity > 0.0008) {
                         paScanFoundMaterial = true;
@@ -9254,6 +9736,55 @@ void main() {
             float(paDescriptorGroupsEntered - paFieldGroupBefore),
             float(paLobesVisited - paFieldLobeBefore),
             float(paLobeExactSdf - paFieldSdfBefore)
+        );
+        return;
+    }
+    // T196. The shared field's counters. 67: the probe decision audit,
+    // monolith only. 68: what building one node costs, evaluated for the node
+    // this fragment maps to. 69: fetches served and the probe's field verdicts.
+    if (DebugView == 67) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paStormFieldFalseEmpty),
+            float(paStormFieldFalseOccupied),
+            float(paStormFieldAgreeEmpty),
+            float(paStormFieldAgreeOccupied)
+        );
+        return;
+    }
+    if (DebugView == 68) {
+        gl_FragDepth = 1.0;
+        int paNodeShapeBefore = paDirectStormShapeCalls;
+        int paNodeGroupBefore = paDescriptorGroupsEntered;
+        int paNodeLobeBefore = paLobesVisited;
+        int paNodeSdfBefore = paLobeExactSdf;
+        // The fragment grid is mapped onto the node grid so the sampled nodes
+        // tile the field rather than one slice of it.
+        vec3 paNodeCoord = vec3(
+            texCoord.x * float(PA_STORM_FIELD_XZ),
+            fract(texCoord.y * 7.0) * float(PA_STORM_FIELD_Y),
+            texCoord.y * float(PA_STORM_FIELD_XZ));
+        vec3 paNodeSample = vec3(
+            WeatherOrigin.x + (floor(paNodeCoord.x) + 0.5) * paStormFieldVoxelXZ(),
+            SlabBaseY + (floor(paNodeCoord.y) + 0.5) * paStormFieldVoxelY(),
+            WeatherOrigin.y + (floor(paNodeCoord.z) + 0.5) * paStormFieldVoxelXZ());
+        float paNodeSampleDistance;
+        paStormFieldNodeAt(paNodeSample, paNodeSampleDistance);
+        fragColor = vec4(
+            float(paDirectStormShapeCalls - paNodeShapeBefore),
+            float(paDescriptorGroupsEntered - paNodeGroupBefore),
+            float(paLobesVisited - paNodeLobeBefore),
+            float(paLobeExactSdf - paNodeSdfBefore)
+        );
+        return;
+    }
+    if (DebugView == 69) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paStormFieldLightFetches),
+            float(paStormFieldProbeFetches),
+            float(paStormFieldProbeProvablyEmpty),
+            float(paStormFieldProbeFallback)
         );
         return;
     }

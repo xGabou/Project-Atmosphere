@@ -676,7 +676,27 @@ public enum CoreCostDiagnosticProgram {
     // -----------------------------------------------------------------------
 
     /** T195: light AND probe traversal removed, stand-in field fetches paid. */
-    T195_LOOKUP("t195_lookup");
+    T195_LOOKUP("t195_lookup"),
+
+    // -----------------------------------------------------------------------
+    // T196. The shared 3D storm field, built. Every arm builds the field on
+    // its own clock; they differ in which consumers read it.
+    // -----------------------------------------------------------------------
+
+    /** T196: builds the field, nothing reads it - the build cost alone. */
+    T196_GENERATE_ONLY("t196_generate_only"),
+
+    /** T196: the light cone reads the field; probes walk as before. */
+    T196_FIELD_LIGHT("t196_field_light"),
+
+    /** T196: the empty-span probe reads the field; light walks as before. */
+    T196_FIELD_PROBE("t196_field_probe"),
+
+    /** T196: both consumers read the field - the production candidate. */
+    T196_FIELD_BOTH("t196_field_both"),
+
+    /** T196: both consumers, but the first two light taps stay exact. */
+    T196_FIELD_HYBRID("t196_field_hybrid");
 
 
     private final String serializedName;
@@ -754,6 +774,28 @@ public enum CoreCostDiagnosticProgram {
      * does not: it pays the build and still walks the descriptors, which is
      * what makes it the ground truth the field is measured against.
      */
+    /**
+     * T196. True for the arms whose program keeps {@code PaStormFieldPass}
+     * live: the renderer issues the field build before the timed draw only
+     * for these.
+     */
+    public boolean stormFieldGeneration() {
+        return this == T196_GENERATE_ONLY || this == T196_FIELD_LIGHT
+                || this == T196_FIELD_PROBE || this == T196_FIELD_BOTH
+                || this == T196_FIELD_HYBRID;
+    }
+
+    /** T196. The consumers this arm's program bakes in: 1 light, 2 probe. */
+    public int stormFieldEnabledBits() {
+        return switch (this) {
+            case T196_FIELD_LIGHT -> 1;
+            case T196_FIELD_PROBE -> 2;
+            case T196_FIELD_BOTH -> 3;
+            case T196_FIELD_HYBRID -> 7;
+            default -> 0;
+        };
+    }
+
     public boolean rainFieldLookup() {
         return this == T188_FIELD_REAL || this == T188_STACK_FIELD
                 || this == T188_RAIN_MASK_FIELD

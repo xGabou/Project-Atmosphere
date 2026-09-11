@@ -181,6 +181,41 @@ public final class VolumetricCloudRenderTargets {
         return rainFieldTarget;
     }
 
+    /** T196. 256x256x32 nodes as an 8x4 atlas of 256x256 tiles. */
+    public static final int STORM_FIELD_ATLAS_WIDTH = 2048;
+    public static final int STORM_FIELD_ATLAS_HEIGHT = 1024;
+    private static RenderTarget stormFieldTarget;
+    private static RenderTarget stormFieldOracleTarget;
+
+    /**
+     * T196. The shared storm field: RG16F, four bytes a node, 8.4 MB.
+     * LINEAR for the light cone's bilinear reads within a tile; the probe
+     * reads it with texelFetch and is unaffected.
+     */
+    public static RenderTarget prepareStormFieldTarget() {
+        if (stormFieldTarget == null) {
+            stormFieldTarget = createRg16fMap(
+                    STORM_FIELD_ATLAS_WIDTH, STORM_FIELD_ATLAS_HEIGHT, GL11.GL_LINEAR);
+        }
+        return stormFieldTarget;
+    }
+
+    /** T196. The soundness oracle's pair, full float so the CPU can compare exactly. */
+    public static RenderTarget prepareStormFieldOracleTarget() {
+        if (stormFieldOracleTarget == null) {
+            stormFieldOracleTarget = createFloatMap(
+                    STORM_FIELD_ATLAS_WIDTH, STORM_FIELD_ATLAS_HEIGHT, GL11.GL_NEAREST);
+        }
+        return stormFieldOracleTarget;
+    }
+
+    public static void releaseStormFieldOracleTarget() {
+        if (stormFieldOracleTarget != null) {
+            stormFieldOracleTarget.destroyBuffers();
+            stormFieldOracleTarget = null;
+        }
+    }
+
     public static RenderTarget weatherTargetOrNull() {
         return weatherTarget;
     }
@@ -364,6 +399,11 @@ public final class VolumetricCloudRenderTargets {
             rainFieldTarget.destroyBuffers();
             rainFieldTarget = null;
         }
+        if (stormFieldTarget != null) {
+            stormFieldTarget.destroyBuffers();
+            stormFieldTarget = null;
+        }
+        releaseStormFieldOracleTarget();
         if (visibleVolumeOracleTarget != null) {
             visibleVolumeOracleTarget.destroyBuffers();
             visibleVolumeOracleTarget = null;
@@ -393,6 +433,24 @@ public final class VolumetricCloudRenderTargets {
 
     static long resolutionGeneration() {
         return resolutionGeneration;
+    }
+
+    /** T196. A two-channel half-float target, for the storm field's (density, floor). */
+    private static RenderTarget createRg16fMap(int width, int height, int filterMode) {
+        RenderTarget target = new TextureTarget(width, height, false, Minecraft.ON_OSX);
+        target.setFilterMode(filterMode);
+        configureClamp(target.getColorTextureId());
+        int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        try {
+            RenderSystem.bindTexture(target.getColorTextureId());
+            GlStateManager._texImage2D(
+                    GL11.GL_TEXTURE_2D, 0, GL30.GL_RG16F, width, height, 0,
+                    GL30.GL_RG, GL30.GL_HALF_FLOAT, null);
+        } finally {
+            RenderSystem.bindTexture(previousTexture);
+        }
+        target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        return target;
     }
 
     private static RenderTarget createFloatMap(int width, int height, int filterMode) {

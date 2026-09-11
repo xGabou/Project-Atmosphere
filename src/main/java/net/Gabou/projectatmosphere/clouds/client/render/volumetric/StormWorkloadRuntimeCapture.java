@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 44;
+    private static final int STAGES = 47;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -134,6 +134,9 @@ final class StormWorkloadRuntimeCapture {
             case 41 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_D;
             case 42 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_E;
             case 43 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_F;
+            case 44 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_A;
+            case 45 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_B;
+            case 46 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_C;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -261,7 +264,8 @@ final class StormWorkloadRuntimeCapture {
                     values[38][2], values[38][3],
                     values[39][0], values[39][1], values[39][2], values[39][3],
                     FieldProbe.of(values[40], values[41]),
-                    FieldCertainty.of(values[42], values[43]));
+                    FieldCertainty.of(values[42], values[43]),
+                    StormField.of(values[44], values[45], values[46]));
         }
     }
 
@@ -308,6 +312,35 @@ final class StormWorkloadRuntimeCapture {
             return new FieldCertainty(
                     why[0], why[1], why[2], why[3],
                     census[0], census[1], census[2], census[3]);
+        }
+    }
+
+    /**
+     * T196. The shared storm field: the probe decision audit, the per-node
+     * build cost and the fetches served.
+     */
+    record StormField(
+            double probeFalseEmpty,
+            double probeFalseOccupied,
+            double probeAgreeEmpty,
+            double probeAgreeOccupied,
+            double nodeShapeCalls,
+            double nodeGroupWalks,
+            double nodeLobeVisits,
+            double nodeExactSdf,
+            double lightFetches,
+            double probeFetches,
+            double probeProvablyEmpty,
+            double probeFallback
+    ) {
+        static final StormField ZERO = new StormField(
+                0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+
+        static StormField of(double[] audit, double[] node, double[] fetches) {
+            return new StormField(
+                    audit[0], audit[1], audit[2], audit[3],
+                    node[0], node[1], node[2], node[3],
+                    fetches[0], fetches[1], fetches[2], fetches[3]);
         }
     }
 
@@ -404,7 +437,9 @@ final class StormWorkloadRuntimeCapture {
             FieldProbe fieldProbe,
             // T190. Why columns disagree, and how much of the field the
             // build could prove safe.
-            FieldCertainty fieldCertainty
+            FieldCertainty fieldCertainty,
+            // T196. The shared storm field's audit, build cost and fetches.
+            StormField stormField
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -457,7 +492,9 @@ final class StormWorkloadRuntimeCapture {
                     // T189 field probe, likewise absent.
                     FieldProbe.ZERO,
                     // T190 certainty census, likewise absent.
-                    FieldCertainty.ZERO);
+                    FieldCertainty.ZERO,
+                    // T196 storm field, likewise absent.
+                    StormField.ZERO);
         }
 
         private static String ratio(double numerator, double denominator) {
@@ -822,7 +859,34 @@ final class StormWorkloadRuntimeCapture {
                     + " fallbackFraction="
                     + ratio(rainFieldMixedFallbacks,
                             Math.max(1.0D, rainFieldSafeHits + rainFieldMixedFallbacks))
-                    + " fallbacksPerPixel=" + perPixel(rainFieldMixedFallbacks);
+                    + " fallbacksPerPixel=" + perPixel(rainFieldMixedFallbacks)
+                    // T196. The probe audit is the soundness figure on the ray:
+                    // falseEmpty must be a strict zero. The node cost is what
+                    // one field node pays in the ray's own counters, so the
+                    // build can be compared with the traversal it removes.
+                    + " stormFieldProbeFalseEmpty=" + fmt(stormField.probeFalseEmpty())
+                    + " stormFieldProbeFalseOccupied=" + fmt(stormField.probeFalseOccupied())
+                    + " stormFieldProbeAgreeEmpty=" + fmt(stormField.probeAgreeEmpty())
+                    + " stormFieldProbeAgreeOccupied=" + fmt(stormField.probeAgreeOccupied())
+                    + " stormFieldProbeFalseOccupiedFraction="
+                    + ratio(stormField.probeFalseOccupied(),
+                            Math.max(1.0D, stormField.probeFalseEmpty()
+                                    + stormField.probeFalseOccupied()
+                                    + stormField.probeAgreeEmpty()
+                                    + stormField.probeAgreeOccupied()))
+                    + " stormFieldNodeShapeCalls=" + fmt(stormField.nodeShapeCalls())
+                    + " stormFieldNodeGroupWalks=" + fmt(stormField.nodeGroupWalks())
+                    + " stormFieldNodeLobeVisits=" + fmt(stormField.nodeLobeVisits())
+                    + " stormFieldNodeExactSdf=" + fmt(stormField.nodeExactSdf())
+                    + " stormFieldNodeShapeCallsPerPixel=" + perPixel(stormField.nodeShapeCalls())
+                    + " stormFieldNodeGroupWalksPerPixel=" + perPixel(stormField.nodeGroupWalks())
+                    + " stormFieldNodeExactSdfPerPixel=" + perPixel(stormField.nodeExactSdf())
+                    + " stormFieldLightFetches=" + fmt(stormField.lightFetches())
+                    + " stormFieldProbeFetches=" + fmt(stormField.probeFetches())
+                    + " stormFieldLightFetchesPerPixel=" + perPixel(stormField.lightFetches())
+                    + " stormFieldProbeFetchesPerPixel=" + perPixel(stormField.probeFetches())
+                    + " stormFieldProbeProvablyEmpty=" + fmt(stormField.probeProvablyEmpty())
+                    + " stormFieldProbeFallback=" + fmt(stormField.probeFallback());
         }
 
         double oraclePostOpacityDistance() {

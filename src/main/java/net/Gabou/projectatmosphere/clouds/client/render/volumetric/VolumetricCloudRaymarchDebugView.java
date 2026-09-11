@@ -173,7 +173,20 @@ public enum VolumetricCloudRaymarchDebugView {
     STORM_WORKLOAD_RAIN_FIELD_E(65, "storm_workload_rain_field_e"),
 
     /** T190. The mixed-cell census, sampled off the field the build wrote. */
-    STORM_WORKLOAD_RAIN_FIELD_F(66, "storm_workload_rain_field_f");
+    STORM_WORKLOAD_RAIN_FIELD_F(66, "storm_workload_rain_field_f"),
+
+    /**
+     * T196. The shared storm field's probe audit: the field's verdict against
+     * production's at every probe, in the four agreement classes. Only this
+     * view evaluates production beside the field.
+     */
+    STORM_WORKLOAD_STORM_FIELD_A(67, "storm_workload_storm_field_a"),
+
+    /** T196. What building one field node costs, in the ray's own counters. */
+    STORM_WORKLOAD_STORM_FIELD_B(68, "storm_workload_storm_field_b"),
+
+    /** T196. Fetches the field served, and the probe's two field-only verdicts. */
+    STORM_WORKLOAD_STORM_FIELD_C(69, "storm_workload_storm_field_c");
 
     private final int shaderId;
     private final String serializedName;

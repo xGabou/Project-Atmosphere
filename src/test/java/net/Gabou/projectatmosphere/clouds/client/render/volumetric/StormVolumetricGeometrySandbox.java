@@ -659,6 +659,8 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT191VariantScope);
         runCorrected("T192 the closed-form ownership bound never claims a cell falsely",
                 StormVolumetricGeometrySandbox::validateT192OwnershipBound);
+        runCorrected("T196 the shared storm field arms compile and FINAL carries no field",
+                StormVolumetricGeometrySandbox::validateT196StormFieldArms);
     }
 
     /**
@@ -675,6 +677,47 @@ public final class StormVolumetricGeometrySandbox {
      * ownsDescriptorGroup also requires the group union to carry coverage, so
      * the ellipse test is a superset of ownership rather than an equivalence.
      */
+    /**
+     * T196. The four field arms compile in a real GL context before a GPU
+     * campaign is spent on them; each keeps the build-pass uniform live and
+     * bakes its consumer bits; and FINAL bakes both to zero, so neither the
+     * build pass nor either lookup exists in the shipped program. The field
+     * sampler must stay a manual binding, for T188's texture-unit reason.
+     */
+    private static void validateT196StormFieldArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        require(finalSource.contains("const int PaStormFieldPass = 0;")
+                        && finalSource.contains("const int PaStormFieldEnabled = 0;"),
+                "FINAL does not bake the storm field out");
+        String shaderJson = readWorkspaceSource("src/main/resources/assets/"
+                + "projectatmosphere/shaders/core/cloud_atmosphere_volume.json");
+        require(!shaderJson.contains("StormFieldSampler"),
+                "T196 StormFieldSampler is declared as a JSON sampler; Minecraft would"
+                        + " bind it past the end of its tracked texture units");
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t196_generate_only", "const int PaStormFieldEnabled = 0;"},
+                {"cloud_atmosphere_volume_t196_field_light", "const int PaStormFieldEnabled = 1;"},
+                {"cloud_atmosphere_volume_t196_field_probe", "const int PaStormFieldEnabled = 2;"},
+                {"cloud_atmosphere_volume_t196_field_both", "const int PaStormFieldEnabled = 3;"},
+                {"cloud_atmosphere_volume_t196_field_hybrid", "const int PaStormFieldEnabled = 7;"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T196 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("uniform int PaStormFieldPass;"),
+                    arm[0] + " bakes PaStormFieldPass, so the renderer could not run its build");
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+    }
+
     private static void validateT192OwnershipBound() {
         java.util.Random random = new java.util.Random(0x7192L);
         int provablyDry = 0;

@@ -34,6 +34,8 @@ public final class VolumetricCloudRenderer {
      * which resets the sampler uniforms Minecraft knows about.
      */
     private static int rainFieldTextureId;
+    /** T196. Bound on the rain-field unit; the two are never resident together. */
+    private static int stormFieldTextureId;
     private static final int REQUIRED_FRAGMENT_TEXTURE_UNITS =
             CloudTextureUnitContract.REQUIRED_FRAGMENT_TEXTURE_UNITS;
     private static final CloudGpuTimer GPU_TIMER = new CloudGpuTimer();
@@ -363,6 +365,9 @@ public final class VolumetricCloudRenderer {
         lastRainFieldGpuMilliseconds = program.rainFieldGeneration()
                 || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
                     && VolumetricCloudDebugConfig.rainFieldForcedOnMonolith())
+                // T196. The storm field builds on the same clock, so the
+                // campaign report's field column is its build cost.
+                || stormFieldProgram(program)
                 ? RAIN_FIELD_TIMER.getLastMilliseconds()
                 : 0.0F;
         float stepScale = GOVERNOR.update(lastGpuMilliseconds);
@@ -460,6 +465,7 @@ public final class VolumetricCloudRenderer {
         shader.setSampler("OracleIntervalSampler", 0);
         // T188. Not a JSON sampler; see bindManualTextures.
         rainFieldTextureId = 0;
+        stormFieldTextureId = 0;
 
         lastCloudProjection.set(projection);
         lastViewRotation.set(viewRotation);
@@ -710,6 +716,48 @@ public final class VolumetricCloudRenderer {
             }
         }
 
+        // T196. Uniform state persists on a program between frames, so the
+        // monolith must be told every frame whether it reads the field: the
+        // first campaign run's FAR production capture kept the previous
+        // forced frame's lookups enabled against no field at all.
+        shader.safeGetUniform("PaStormFieldPass").set(0);
+        shader.safeGetUniform("PaStormFieldEnabled").set(0);
+        // T196. The shared storm field. One draw over the 2048x1024 atlas -
+        // 256x256x32 nodes, each a detail-free production density and the
+        // probe floor - before the timed draw, on the field clock. The
+        // monolith runs it too when the campaign forces the field onto it,
+        // so the counters describe the post-field workload.
+        if (stormFieldProgram(program)) {
+            RenderTarget stormFieldTarget =
+                    VolumetricCloudRenderTargets.prepareStormFieldTarget();
+            if (stormFieldTarget != null) {
+                int enabledBits = program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                        ? VolumetricCloudDebugConfig.stormFieldForcedOnMonolith()
+                        : program.stormFieldEnabledBits();
+                if (VolumetricCloudDebugConfig.consumeStormFieldSoundnessRequest()) {
+                    runStormFieldSoundnessOracle(shader, puffCandidateTarget);
+                }
+                VolumetricCloudRenderTargets.clearAndBind(stormFieldTarget);
+                shader.safeGetUniform("PaStormFieldPass").set(1);
+                shader.safeGetUniform("PaStormFieldEnabled").set(0);
+                shader.apply();
+                PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
+                bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
+                RAIN_FIELD_TIMER.begin();
+                try {
+                    FullscreenQuad.draw(shader);
+                } finally {
+                    RAIN_FIELD_TIMER.end();
+                    unbindManualTextures();
+                    shader.clear();
+                }
+                VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
+                stormFieldTextureId = stormFieldTarget.getColorTextureId();
+                shader.safeGetUniform("PaStormFieldPass").set(0);
+                shader.safeGetUniform("PaStormFieldEnabled").set(enabledBits);
+            }
+        }
+
         lastProgram = program;
         shader.apply();
         PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
@@ -901,6 +949,14 @@ public final class VolumetricCloudRenderer {
                 RAIN_FIELD_TEXTURE_UNIT,
                 rainFieldTextureId
         );
+        // T196. Shares the rain-field unit: no program keeps both fields, and
+        // bind2dSampler skips a zero texture id, so whichever is resident wins.
+        bind2dSampler(
+                program,
+                "StormFieldSampler",
+                RAIN_FIELD_TEXTURE_UNIT,
+                stormFieldTextureId
+        );
         bind3dSampler(
                 program,
                 "BaseNoiseSampler",
@@ -943,6 +999,179 @@ public final class VolumetricCloudRenderer {
         GlStateManager._activeTexture(GL13.GL_TEXTURE0 + unit);
         GL11.glBindTexture(GL12.GL_TEXTURE_3D, textureId);
         GL20.glUniform1i(location, unit);
+    }
+
+    /** T196. Programs that build the field this frame. */
+    private static boolean stormFieldProgram(CoreCostDiagnosticProgram program) {
+        return program.stormFieldGeneration()
+                || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                    && VolumetricCloudDebugConfig.stormFieldForcedOnMonolith() != 0);
+    }
+
+    /**
+     * T196 Task 2. The probe floor's soundness, measured on every node. The
+     * shader writes (floor, dense reference minimum, fraction of reference
+     * samples that could carry material) per node into a float target; this
+     * reads it back once and counts. A node whose floor exceeds its reference
+     * is an underestimate - a probe there could declare empty where production
+     * finds material - and the count must be zero.
+     */
+    private static void runStormFieldSoundnessOracle(
+            ShaderInstance shader, RenderTarget puffCandidateTarget) {
+        RenderTarget oracle = VolumetricCloudRenderTargets.prepareStormFieldOracleTarget();
+        if (oracle == null) {
+            return;
+        }
+        try {
+            VolumetricCloudRenderTargets.clearAndBind(oracle);
+            shader.safeGetUniform("PaStormFieldPass").set(2);
+            shader.safeGetUniform("PaStormFieldEnabled").set(0);
+            shader.apply();
+            PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
+            bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
+            try {
+                FullscreenQuad.draw(shader);
+            } finally {
+                unbindManualTextures();
+                shader.clear();
+            }
+            int width = oracle.width;
+            int height = oracle.height;
+            java.nio.FloatBuffer pixels =
+                    org.lwjgl.BufferUtils.createFloatBuffer(width * height * 4);
+            int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+            try {
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, oracle.getColorTextureId());
+                GL11.glGetTexImage(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, GL11.GL_FLOAT, pixels);
+            } finally {
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, previousTexture);
+            }
+            long nodes = 0L;
+            long uncovered = 0L;
+            long fieldEmpty = 0L;
+            long referenceEmpty = 0L;
+            long boundary = 0L;
+            long underestimates = 0L;
+            long boundaryUnderestimates = 0L;
+            double worstUnderestimate = 0.0D;
+            long usefulEmpty = 0L;
+            long[] overestimateHistogram = new long[8];
+            double overestimateSum = 0.0D;
+            long overestimateSamples = 0L;
+            // The union distance's measured drop per block, by axis, over
+            // every node that walked: the constants the dilation assumes
+            // have to sit above the whole distribution.
+            double maxLipschitzY = 0.0D;
+            long[] lipschitzYHistogram = new long[10];
+            long lipschitzSamples = 0L;
+            long binaryMisses = 0L;
+            long[] binaryMissSlack = new long[8];
+            double worstBinarySlack = 0.0D;
+            for (int index = 0; index < width * height; index++) {
+                float floor = pixels.get(index * 4);
+                float reference = pixels.get(index * 4 + 1);
+                float slack = pixels.get(index * 4 + 2);
+                float packed = pixels.get(index * 4 + 3);
+                float materialCount = (float) Math.floor(packed / 1000.0F);
+                float lipschitzY = packed - materialCount * 1000.0F;
+                float materialFraction = materialCount / 43.0F;
+                nodes++;
+                if (floor > -5.0F && floor < 1.0F - 1.0e-6F) {
+                    // Only nodes whose walk entered a group carry a drop.
+                    lipschitzSamples++;
+                    maxLipschitzY = Math.max(maxLipschitzY, lipschitzY);
+                    lipschitzYHistogram[(int) Math.max(0.0D, Math.min(9.0D,
+                            Math.floor(lipschitzY / 0.5D)))]++;
+                }
+                if (floor <= -5.0F) {
+                    uncovered++;
+                    continue;
+                }
+                boolean mixed = materialFraction > 0.0F && materialFraction < 1.0F;
+                if (mixed) {
+                    boundary++;
+                }
+                if (floor >= 1.0F) {
+                    fieldEmpty++;
+                }
+                if (reference >= 1.0F) {
+                    referenceEmpty++;
+                    if (floor >= 1.0F) {
+                        usefulEmpty++;
+                    }
+                }
+                double gap = floor - reference;
+                if (gap > 1.0e-4D) {
+                    underestimates++;
+                    if (mixed) {
+                        boundaryUnderestimates++;
+                    }
+                    worstUnderestimate = Math.max(worstUnderestimate, gap);
+                    if (floor >= 1.0F) {
+                        // A binary miss: the node believed the whole cell was
+                        // outside the envelope. How far outside it believed
+                        // itself is the margin that would have covered it.
+                        binaryMisses++;
+                        int bucket = slack > 1.0e8F ? 7
+                                : (int) Math.max(0.0D, Math.min(6.0D,
+                                        Math.floor(Math.log(Math.max(slack, 1.0F)) / Math.log(2.0D))));
+                        binaryMissSlack[bucket]++;
+                        worstBinarySlack = Math.max(worstBinarySlack,
+                                slack > 1.0e8F ? -1.0D : slack);
+                    }
+                } else if (reference < 1.0F) {
+                    // How far below the true threshold the floor sits where
+                    // material is possible: the price of the bound.
+                    double over = Math.max(0.0D, -gap);
+                    overestimateSum += over;
+                    overestimateSamples++;
+                    int bucket = (int) Math.max(0.0D, Math.min(7.0D, Math.floor(over / 0.1D)));
+                    overestimateHistogram[bucket]++;
+                }
+            }
+            StringBuilder histogram = new StringBuilder();
+            for (int bucket = 0; bucket < overestimateHistogram.length; bucket++) {
+                histogram.append(bucket == 0 ? "" : ",").append(overestimateHistogram[bucket]);
+            }
+            StringBuilder lipschitzY = new StringBuilder();
+            for (int bucket = 0; bucket < lipschitzYHistogram.length; bucket++) {
+                lipschitzY.append(bucket == 0 ? "" : ",").append(lipschitzYHistogram[bucket]);
+            }
+            StringBuilder missSlack = new StringBuilder();
+            for (int bucket = 0; bucket < binaryMissSlack.length; bucket++) {
+                missSlack.append(bucket == 0 ? "" : ",").append(binaryMissSlack[bucket]);
+            }
+            ProjectAtmosphere.LOGGER.info(
+                    "T196_SOUNDNESS nodes={} uncovered={} covered={} boundaryNodes={}"
+                            + " referenceSamplesPerNode=43 underestimates={}"
+                            + " boundaryUnderestimates={} worstUnderestimate={}"
+                            + " fieldEmpty={} referenceEmpty={} usefulEmptyRetained={}"
+                            + " usefulEmptyFraction={} overestimateSamples={}"
+                            + " overestimateMean={} overestimateHistogram0.1={}"
+                            + " lipschitzNodes={} maxLipschitzY={} lipschitzYHistogram0.5={}"
+                            + " binaryMisses={} binaryMissSlackLog2={} worstBinarySlack={}",
+                    nodes, uncovered, nodes - uncovered, boundary, underestimates,
+                    boundaryUnderestimates,
+                    String.format(java.util.Locale.ROOT, "%.5f", worstUnderestimate),
+                    fieldEmpty, referenceEmpty, usefulEmpty,
+                    String.format(java.util.Locale.ROOT, "%.4f",
+                            referenceEmpty == 0L ? 0.0D
+                                    : (double) usefulEmpty / (double) referenceEmpty),
+                    overestimateSamples,
+                    String.format(java.util.Locale.ROOT, "%.4f",
+                            overestimateSamples == 0L ? 0.0D
+                                    : overestimateSum / (double) overestimateSamples),
+                    histogram, lipschitzSamples,
+                    String.format(java.util.Locale.ROOT, "%.3f", maxLipschitzY),
+                    lipschitzY, binaryMisses, missSlack,
+                    String.format(java.util.Locale.ROOT, "%.2f", worstBinarySlack));
+        } catch (RuntimeException failure) {
+            // A diagnostic must never take the renderer down with it: the
+            // campaign that asked for it still has a sweep to run.
+            ProjectAtmosphere.LOGGER.error("T196_SOUNDNESS failed; the field build continues", failure);
+        } finally {
+            VolumetricCloudRenderTargets.releaseStormFieldOracleTarget();
+        }
     }
 
     private static void unbindManualTextures() {

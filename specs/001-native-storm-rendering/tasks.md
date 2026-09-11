@@ -2598,6 +2598,48 @@ implementation, while visual polish remains independently active.
   cell of a pose; the driver now stops the client on `run/t132-autorun-exit.txt`, finishes
   program-arm campaigns after their report, and captures counters once per pose. Evidence in
   `validation/performance-shared-field-lookup.md`.
+- [X] T196 [PERFORMANCE] [US3] Build the shared 3D storm field for light taps and empty-span
+  probes, prove the probe floor sound, and measure it net of its build.
+  **Built, sound, and 2.06x net at SIDE.** One 256x256x32 field over `WeatherExtent` and the slab,
+  an 8x4 atlas in a single 2048x1024 **RG16F** target (8.4 MB), one fullscreen draw before the
+  timed march on the field clock: R the detail-free production density (the light cone reads it
+  bilinearly across two slices, four taps unchanged), G the **probe floor** - a lower bound on the
+  storm body's noise threshold over the node's dual cell, from `L >= 1 - 1.65 E` (the
+  strength-fill product is bounded) and `E` at the node's union distance dilated by the largest
+  drop the distance can take across the cell: horizontal half-diagonal times the lobes' ellipse
+  aspect plus vertical half-extent times the profile's **cell-local** height slope, both published
+  by the walk `cloudDensity` already does, so **one walk per node** serves both channels against
+  the rejected 2x2x2's eight. The probe fetches the nearest node and tests the exact base noise at
+  its point: one texel and one noise fetch. **Soundness oracle** (pass 2, 2,097,152 nodes x 43
+  production-exact reference samples, CPU readback): six launches took the floor from 11,667
+  underestimates (isotropic dilation) to **0 at both poses** - the lobe pseudo-distance's vertical
+  Lipschitz constant is `|dR/dy|` and reaches **8.6** on the anvil flare, the T121 vertical
+  rejection needs the cell's half-extent as margin, and the last "misses" were the oracle
+  sampling the tile boundary that belongs to the neighbouring node. Useful empty retained
+  **98.5% / 99.0%**. On the ray: `stormFieldProbeFalseEmpty=0` at both poses, false-occupied
+  69,245 against 11,498 true (the bound's price, paid in fine steps). **Build 1.77 ms SIDE /
+  1.65 FAR** (twice T195's projection: no reach early-out, vertical margin, nine weather texels
+  per node). **Net, three accepted blocks each**: SIDE `field_both` **2.0570x** (0.11% spread,
+  29.42 -> 12.69 + 1.61 ms), FAR **1.5489x** (1.22%); light alone 1.14x / 1.05x, probe alone
+  1.10x / 1.06x; the pair beats T195's 1.8595x removal ceiling because the field probe keeps the
+  scan's empty-span skipping that the ceiling arm lost, and fewer primary steps mean fewer light
+  cones. **Workload**: `shapeLight` 1,181,752 -> 0, `shapeProbe` 745,951 -> 0, exact SDFs
+  **-45.2%**, shape calls -26.6%, `shapeUntagged=0`, residual 274 of 3.4M; the new largest
+  consumer is the rain segment at 67.7%, then the primary march at 22.6% (grown by the probe's
+  conservativeness). **Quality**: the light channel keeps what rejected light3 - dark-interior
+  retention **0.956** (light3 0.072), self-shadow contrast 0.938, silhouette IoU 1.000 - and loses
+  a third of the shadow pockets (**0.704**) and a tenth of valley depth, which is what a 16-block
+  node does to an envelope edge; the probe channel is near-lossless (SSIM 0.966, IoU 0.992, 0.6%
+  changed pixels). A hybrid arm (first two taps exact) costs half the gain (1.32x) and does not
+  restore the pockets (0.723) - closed. **Verdict: performance and soundness pass; light quality
+  is a conditional pass on the pocket metric, and the resolution question is now about quality,
+  not economics** - 512x512x32 would still net about 1.48x. Next: XZ resolution for the pockets, a
+  tighter floor (86% of "possible" verdicts are false), dirty-state reuse measured on a moving
+  fixture (the frozen fixture would have hidden the build), then production wiring. Five variants
+  (147 -> 152), three workload views (47), a T196 sandbox invariant that compiles every field
+  program and proves FINAL bakes the field out; `mods.toml` expands `simpleclouds_mandatory` so
+  the dev client boots without Simple Clouds after Forge-1.20.1 made it mandatory. Each launch
+  six minutes, self-exiting. Evidence in `validation/performance-shared-field.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
