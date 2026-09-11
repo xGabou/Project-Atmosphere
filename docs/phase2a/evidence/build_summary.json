@@ -1,0 +1,10 @@
+{
+  "project": "PA",
+  "status": "PASS",
+  "productionCommit": "1296044e9255f1097e9c76a73301d17ff040720c",
+  "sourceMainTree": "7c44018bd30135a7bbc045e1c89224a21f44a4e5",
+  "log": "phase2a-build-final-resumed.log",
+  "logSha256": "3ea420bf8683497c96409b882d828c9c22266fc1796f7f4efbc3900b0c19b80e",
+  "durationSeconds": 62,
+  "reusedSuccessfulBuild": true
+}
