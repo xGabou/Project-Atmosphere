@@ -726,6 +726,12 @@ public final class VolumetricCloudRenderer {
         // frame, from the same value the atlas below is allocated for.
         int stormFieldXZ = VolumetricCloudDebugConfig.stormFieldXZ();
         shader.safeGetUniform("PaStormFieldXZ").set(stormFieldXZ);
+        // T198. The audit's selectors ride with the field uniforms; only the
+        // audit program declares them.
+        shader.safeGetUniform("PaLightAuditVariant").set(
+                VolumetricCloudDebugConfig.lightAuditVariant());
+        shader.safeGetUniform("PaLightAuditOutput").set(
+                VolumetricCloudDebugConfig.lightAuditOutput());
         // T196. The shared storm field. One draw over the atlas - XZ-square
         // by 32 nodes, each a detail-free production density and the probe
         // floor - before the timed draw, on the field clock. The monolith
@@ -737,6 +743,10 @@ public final class VolumetricCloudRenderer {
             if (stormFieldTarget != null) {
                 int enabledBits = program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
                         ? VolumetricCloudDebugConfig.stormFieldForcedOnMonolith()
+                        : program.lightAuditCapture()
+                        // T198. The audit measures whichever lookup the
+                        // campaign selects; its consumer bits are live.
+                        ? VolumetricCloudDebugConfig.lightAuditFieldBits()
                         : program.stormFieldEnabledBits();
                 if (VolumetricCloudDebugConfig.consumeStormFieldSoundnessRequest()) {
                     runStormFieldSoundnessOracle(shader, puffCandidateTarget, stormFieldXZ);

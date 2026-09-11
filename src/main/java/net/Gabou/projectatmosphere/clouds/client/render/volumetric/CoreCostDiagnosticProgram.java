@@ -696,7 +696,26 @@ public enum CoreCostDiagnosticProgram {
     T196_FIELD_BOTH("t196_field_both"),
 
     /** T196: both consumers, but the first two light taps stay exact. */
-    T196_FIELD_HYBRID("t196_field_hybrid");
+    T196_FIELD_HYBRID("t196_field_hybrid"),
+
+    // -----------------------------------------------------------------------
+    // T198. The light field's extinction bias. One program: the field serves
+    // the light cone as t196_field_light does, and every tap also evaluates
+    // the exact density beside it; the fragment output is an accumulator of
+    // their difference, selected per capture, not a frame.
+    // -----------------------------------------------------------------------
+
+    /** T198: light-tap audit output. Field build live, consumer bits live. */
+    T198_LIGHT_AUDIT("t198_light_audit"),
+
+    /**
+     * T198: the light cone reads the field's threshold and height and
+     * evaluates the noise, detail and erosion at the tap; probes walk.
+     */
+    T198_FIELD_LIGHT_EXACT("t198_field_light_exact"),
+
+    /** T198: both consumers, the light through the exact-noise lookup - the candidate. */
+    T198_FIELD_BOTH_EXACT("t198_field_both_exact");
 
 
     private final String serializedName;
@@ -782,16 +801,19 @@ public enum CoreCostDiagnosticProgram {
     public boolean stormFieldGeneration() {
         return this == T196_GENERATE_ONLY || this == T196_FIELD_LIGHT
                 || this == T196_FIELD_PROBE || this == T196_FIELD_BOTH
-                || this == T196_FIELD_HYBRID;
+                || this == T196_FIELD_HYBRID || this == T198_LIGHT_AUDIT
+                || this == T198_FIELD_LIGHT_EXACT || this == T198_FIELD_BOTH_EXACT;
     }
 
     /** T196. The consumers this arm's program bakes in: 1 light, 2 probe. */
     public int stormFieldEnabledBits() {
         return switch (this) {
-            case T196_FIELD_LIGHT -> 1;
+            case T196_FIELD_LIGHT, T198_LIGHT_AUDIT -> 1;
             case T196_FIELD_PROBE -> 2;
             case T196_FIELD_BOTH -> 3;
             case T196_FIELD_HYBRID -> 7;
+            case T198_FIELD_LIGHT_EXACT -> 9;
+            case T198_FIELD_BOTH_EXACT -> 11;
             default -> 0;
         };
     }
@@ -835,6 +857,15 @@ public enum CoreCostDiagnosticProgram {
      * nothing else, so the harness must not measure them against the RGB
      * anchor every other arm uses.
      */
+    /**
+     * T198. True for the program whose fragment output is a light-tap audit
+     * accumulator rather than a frame; its captures are joined on the CPU and
+     * are comparable to nothing else.
+     */
+    public boolean lightAuditCapture() {
+        return this == T198_LIGHT_AUDIT;
+    }
+
     public boolean rainMaskCapture() {
         return this == T188_RAIN_MASK_REF || this == T188_RAIN_MASK_FIELD
                 || this == T189_RAIN_MASK_NEAREST

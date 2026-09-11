@@ -663,6 +663,72 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT196StormFieldArms);
         runCorrected("T197 the field resolution derives one geometry and covers one extent",
                 StormVolumetricGeometrySandbox::validateT197FieldResolution);
+        runCorrected("T198 the light-tap audit compiles and FINAL carries none of it",
+                StormVolumetricGeometrySandbox::validateT198LightAudit);
+    }
+
+    /**
+     * T198. The audit program compiles in a real GL context with the audit
+     * defined, the field build and the two selectors live and the light
+     * consumer baked on; FINAL and the T196 field arms define no audit and
+     * bake both selectors to 0; and the audit's variants are all reachable in
+     * the shader source, so a decomposition line cannot describe a toggle
+     * that does not exist.
+     */
+    private static void validateT198LightAudit() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String shader = readWorkspaceSource("src/main/resources/assets/"
+                + "projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh");
+        String path = base + "cloud_atmosphere_volume_t198_light_audit.fsh";
+        if (!Files.exists(workspacePath(path))) {
+            throw new IllegalStateException(
+                    "generated T198 audit program missing; run generateLeanFinalShader: " + path);
+        }
+        String audit = readWorkspaceSource(path);
+        require(audit.contains("#define PA_LIGHT_AUDIT"), "the audit program does not define PA_LIGHT_AUDIT");
+        require(audit.contains("uniform int PaStormFieldPass;")
+                        && audit.contains("uniform int PaStormFieldXZ;")
+                        && audit.contains("uniform int PaLightAuditVariant;")
+                        && audit.contains("uniform int PaLightAuditOutput;"),
+                "the audit program bakes a selector it must keep live");
+        require(audit.contains("uniform int PaStormFieldEnabled;"),
+                "the audit program bakes its consumer bits; it must audit both lookups");
+        compileFragmentShader(resolveMojImports(audit), "cloud_atmosphere_volume_t198_light_audit");
+        // The correction arms: the exact-noise light lookup, alone and with
+        // the probe, both compiled and both baked to their consumer bits.
+        String[][] corrections = {
+                {"t198_field_light_exact", "const int PaStormFieldEnabled = 9;"},
+                {"t198_field_both_exact", "const int PaStormFieldEnabled = 11;"}};
+        for (String[] arm : corrections) {
+            String source = readWorkspaceSource(base + "cloud_atmosphere_volume_" + arm[0] + ".fsh");
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("uniform int PaStormFieldPass;")
+                            && source.contains("uniform int PaStormFieldXZ;"),
+                    arm[0] + " bakes a field uniform the renderer needs live");
+            require(!source.contains("#define PA_LIGHT_AUDIT"), arm[0] + " defines the audit");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+        require(shader.contains("float paStormFieldLightDensityAt(vec3 p, bool detailTap)")
+                        && shader.contains("(PaStormFieldEnabled & 8) != 0"),
+                "the exact-noise light lookup is not selected by consumer bit 8");
+        for (String name : new String[] {"final", "t196_field_light", "t196_field_both"}) {
+            String source = readWorkspaceSource(base + "cloud_atmosphere_volume_" + name + ".fsh");
+            require(!source.contains("#define PA_LIGHT_AUDIT"),
+                    name + " defines the light audit");
+            require(source.contains("const int PaLightAuditVariant = 0;")
+                            && source.contains("const int PaLightAuditOutput = 0;"),
+                    name + " keeps an audit selector live");
+        }
+        for (int variant = 1; variant <= 7; variant++) {
+            require(shader.contains("paLightAuditExactVariant == " + variant)
+                            || (variant == 6 && shader.contains("PaLightAuditVariant == 6")),
+                    "audit variant " + variant + " has no toggle in the shader");
+        }
+        require(StormLightTapErrorReport.VARIANT_NAMES.length == StormLightTapErrorReport.VARIANTS
+                        && StormLightTapErrorReport.OUTPUT_NAMES.length == StormLightTapErrorReport.OUTPUTS,
+                "the audit report names do not match its capture counts");
+        System.out.println("T198_LIGHT_AUDIT program=1|variants=" + StormLightTapErrorReport.VARIANTS
+                + "|outputs=" + StormLightTapErrorReport.OUTPUTS + "|finalClean=true");
     }
 
     /**
@@ -723,12 +789,16 @@ public final class StormVolumetricGeometrySandbox {
             require(StormFieldGeometry.atlasWidth(xz) == xz * 8
                             && StormFieldGeometry.atlasHeight(xz) == xz * 4,
                     "atlas is not 8x4 tiles of xz at " + xz);
-            require(StormFieldGeometry.bytes(xz) == StormFieldGeometry.nodes(xz) * 4L,
-                    "RG16F bytes at " + xz);
+            require(StormFieldGeometry.bytes(xz)
+                            == StormFieldGeometry.nodes(xz) * StormFieldGeometry.BYTES_PER_NODE,
+                    "field bytes at " + xz);
             summary.append('|').append(StormFieldGeometry.describe(xz));
         }
-        require(Math.abs(StormFieldGeometry.bytes(256) - 8_388_608L) == 0L,
-                "256 is not T196's 8.4 MB");
+        // T198 widened the node to RGBA16F (threshold, floor, height, density):
+        // 16 MiB at 256 against T196's 8.
+        require(StormFieldGeometry.bytes(256) == 16_777_216L
+                        && StormFieldGeometry.BYTES_PER_NODE == 8,
+                "256 is not 16 MiB of RGBA16F");
         // The soundness argument's premise, by resolution: cells nest in the
         // 16-block candidate tiles at 256 and 512 and straddle them at 384.
         require(StormFieldGeometry.nestsInCandidateTiles(256)

@@ -119,6 +119,43 @@ public final class VolumetricCloudDebugConfig {
     public static void setStormFieldXZ(int xz) {
         stormFieldXZ = StormFieldGeometry.supported(xz) ? xz : StormFieldGeometry.DEFAULT_XZ;
     }
+
+    /**
+     * T198. The light-tap audit's selectors, uploaded every frame: which
+     * decomposition variant the exact side evaluates (0-7) and which
+     * accumulator the audit program writes (0-7). Read only by
+     * t198_light_audit.
+     */
+    private static volatile int lightAuditVariant;
+    private static volatile int lightAuditOutput;
+
+    public static int lightAuditVariant() {
+        return lightAuditVariant;
+    }
+
+    public static int lightAuditOutput() {
+        return lightAuditOutput;
+    }
+
+    public static void setLightAudit(int variant, int output) {
+        lightAuditVariant = Math.max(0, Math.min(7, variant));
+        lightAuditOutput = Math.max(0, Math.min(7, output));
+    }
+
+    /**
+     * T198. Which light lookup the audit program measures: 1 the T196 node
+     * density, 9 the exact-noise lookup. The audit program keeps the consumer
+     * bits live so one program serves both.
+     */
+    private static volatile int lightAuditFieldBits = 1;
+
+    public static int lightAuditFieldBits() {
+        return lightAuditFieldBits;
+    }
+
+    public static void setLightAuditFieldBits(int bits) {
+        lightAuditFieldBits = bits;
+    }
     private static volatile boolean sceneRayLimitEnabled = true;
     // Uniform ray probes can miss narrow world-space cloud footprints and cut
     // complete horizontal bands from an otherwise valid volume. Keep the A/B

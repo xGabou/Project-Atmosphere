@@ -198,7 +198,8 @@ public final class VolumetricCloudRenderTargets {
     }
 
     /**
-     * T196. The shared storm field: RG16F, four bytes a node.
+     * T196. The shared storm field: RG16F, four bytes a node; T198 widened
+     * it to RGBA16F (threshold, floor, height, density), eight.
      * LINEAR for the light cone's bilinear reads within a tile; the probe
      * reads it with texelFetch and is unaffected.
      */
@@ -208,13 +209,15 @@ public final class VolumetricCloudRenderTargets {
             stormFieldTarget = null;
         }
         if (stormFieldTarget == null) {
-            stormFieldTarget = createRg16fMap(
+            // T198. RGBA16F: threshold, floor, height, density.
+            stormFieldTarget = createHalfFloatMap(
                     StormFieldGeometry.atlasWidth(xz), StormFieldGeometry.atlasHeight(xz),
                     GL11.GL_LINEAR);
             stormFieldTargetXZ = xz;
             // The memory the report quotes is what was actually allocated.
             net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
-                    "T197_FIELD_ALLOC format=RG16F {}", StormFieldGeometry.describe(xz));
+                    "T197_FIELD_ALLOC format={} {}", StormFieldGeometry.FORMAT,
+                    StormFieldGeometry.describe(xz));
         }
         return stormFieldTarget;
     }
@@ -473,6 +476,16 @@ public final class VolumetricCloudRenderTargets {
         } finally {
             RenderSystem.bindTexture(previousTexture);
         }
+        target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        return target;
+    }
+
+    /** T198. A four-channel half-float target, for the storm field. */
+    private static RenderTarget createHalfFloatMap(int width, int height, int filterMode) {
+        RenderTarget target = new TextureTarget(width, height, false, Minecraft.ON_OSX);
+        target.setFilterMode(filterMode);
+        configureClamp(target.getColorTextureId());
+        upgradeColorToRgba16f(target.getColorTextureId(), width, height);
         target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
         return target;
     }

@@ -2669,6 +2669,139 @@ implementation, while visual polish remains independently active.
   separately a detail-aware R channel measured with the pocket diagnostic. Gate 28 s, check
   build 57 s. Evidence in `validation/performance-shared-field-resolution.md` and
   `validation/t197-campaign/`.
+- [X] T198 [PERFORMANCE] [US3] Find and remove the light field's extinction bias so the shared
+  field's light channel is production-quality: shadow-pocket retention from ~0.705 to >=0.90
+  (>=0.85 with visual support) at 256x256x32, dark-interior retention kept, probe soundness
+  unchanged, net SIDE >=1.20x (bands: >=1.50x excellent, 1.30-1.50x major, 1.20-1.30x strong).
+  **Done: PASS, the field is ready to productionize.** A light-tap audit program
+  (`t198_light_audit`, `PA_LIGHT_AUDIT`; exact production density evaluated beside every field
+  tap, eight accumulators x eight decomposition variants captured per pose through the
+  reference-image path and joined with the anchor's pixel classes by `StormLightTapErrorReport`)
+  measured the T196 field at SIDE pockets: taps 0-1 **+0.25 density a tap, 95% over**; taps
+  2-3 -0.04 / -0.07 mean with **0.21 / 0.25 RMS**; cone optical depth +4.2 of 68 (+6.2%), and
+  per pixel that cone error drives the pocket luminance error (r = -0.63 SIDE, -0.67 FAR).
+  Decomposition: **erosion stage +9.18** (the near taps' missing bite), detail noise 0.37 of
+  that, mip bias **0.000** (the sampler carries no mip), weather 0, morphology 0, build-mode
+  walk 0, **interpolation -4.99** - and the interpolation term is aliasing: the base noise's
+  texel is 3.1 blocks against 16-block nodes, which is why T197 found the loss invariant in
+  XZ. The T196 hybrid removed the erosion term on taps 0-1 and left the aliasing on taps 2-3.
+  **Correction**: R becomes the storm body's exact threshold L at the node and B its height01
+  (from the same walk), and the tap interpolates those two envelope quantities and evaluates
+  the base noise, the detail and the erosion at its own point - the probe's architecture
+  applied to the light; RGBA16F (A keeps the T196 density), 16 MiB, consumer bit 8, two arms
+  (`t198_field_light_exact` 9, `t198_field_both_exact` 11). **Quality** (light alone): pockets
+  **0.644 -> 0.880 SIDE, 0.739 -> 0.923 FAR** (regions 0.90 / 0.96), both consumers 0.625 ->
+  0.861 / 0.705 -> 0.874; wall displacement 1.01 -> 0.13 px, walls beyond reach 701 -> 14, 211
+  of 279 lost pockets recovered; SSIM 0.925 -> 0.941, changed pixels halved, dark interior
+  0.974 / 0.913, contrast 1.26 (the residual is now a slight under-extinction). After
+  correction taps 0-1 RMS 0.30 -> 0.07; taps 2-3 keep a one-sided -0.04 / -0.06 at the
+  storm's top rim - the vertical envelope, the named remaining error. **Performance**: net
+  SIDE **2.151x** (control 2.204x, spread-rejected), FAR 1.580x (1.579x); march +0.27 ms,
+  build +0.004 ms, +13 noise + 6.9 detail fetches / px. **Probe unchanged**: oracle 0
+  underestimates on the corrected build, false-empty 0, attribution identical (rain 62.3%,
+  primary 26.5%). Three programs added (155 declared, 5 registered), gate 41 s, check build
+  86 s, two launches of ~7 min. Next: productionize the field into FINAL (bits 11), then a
+  fresh FINAL baseline with the audit on the far taps. Evidence in
+  `validation/performance-shared-field-light-bias.md` and `validation/t198-campaign/`.
+  Sub-tasks T198a-T198h below, in order; the campaign is one launch after T198f. Evidence goes to
+  `specs/001-native-storm-rendering/validation/performance-shared-field-light-bias.md` and
+  `specs/001-native-storm-rendering/validation/t198-campaign/`. Constraints from the brief: no
+  resolution change (256 only; no 384/512/Y/extent), no probe change (defer the tighter floor),
+  no second field campaign on a hunch after a FAIL, no merge. [SC-005, SC-021]
+- [X] T198a [US3] Task 0 recovery: inspect and record, in the report's section 1, the exact
+  light path the field replaces - the four-tap loop in
+  `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh`
+  (production tap `cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false)`: per-tap
+  mip bias 0.6 i, detail on taps 0-1 only, T149 detail grading `paLightingDetailWeight`, the
+  early-out and weights), the node build `paStormFieldNodeAt` (`cloudDensity(node, 0.0, false,
+  false, false)`: mip 0, no detail, build-mode walk with the reach early-out lifted and the
+  vertical reject margin), `paStormFieldDensityAt` (bilinear in tile, linear across two slices),
+  and inside `cloudDensity` the order of weather modulation, morphology, descriptor union,
+  erosion and detail. Record what the T196 hybrid (`PaStormFieldEnabled` bit 4) actually did:
+  taps 0-1 on the exact walk with detail and their mip bias, taps 2-3 on the field - so it
+  restored the near taps entirely and left the far taps' bias untouched. Verify the baseline:
+  `StormFieldGeometry.DEFAULT_XZ == 256`, `VolumetricCloudDebugConfig.stormFieldXZ()` reset to
+  it at campaign start, no `run/t197-*` marker present. No code change in this sub-task.
+- [X] T198b [US3] Tap-level error capture (Task 1): add a light-tap audit to
+  `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` behind
+  a new uniform `PaLightAudit` (baked 0 in every program by the `build.gradle` override map,
+  live only in the monolith). When non-zero and the field's light bit is on, every light tap
+  evaluates both `paStormFieldDensityAt(pos + offset)` and the exact production
+  `cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false)` (the field value still
+  drives the render), and accumulates per pixel per tap i: sum(field - exact), sum|.|, sum(.)^2,
+  count, over/under counts. Expose them as three workload debug views (next free ids after 69;
+  register in `VolumetricCloudRaymarchDebugView.java`, `StormWorkloadRuntimeCapture.java` and the
+  T175 view list): per-tap mean signed error (RGBA = taps 0-3), per-tap mean |error|, per-tap
+  count with over/under packed. Add `StormLightTapErrorReport.java` (package
+  `net.Gabou.projectatmosphere.clouds.client.render.volumetric`) that joins the three captures
+  with the anchor frame's pixel classes from `StormImageQualityMetrics` (reference shadow
+  pockets via `pocketDiagnostics().refPocket()`, dark interior = darkest quartile of interior,
+  normal interior, edge band) and prints `T198_TAP_ERROR pose=.. tap=.. region=..` lines with
+  mean, median, RMS, p95 |error|, sign bias, over/under-estimate fractions and sample counts.
+- [X] T198c [US3] Decomposition (Task 2): extend the audit with `PaLightAuditVariant` (uniform,
+  baked 0 elsewhere) selecting what the "exact" side evaluates at the same tap point: 0
+  production; 1 detail off; 2 erosion off; 3 mip bias 0; 4 weather modulation off; 5 morphology
+  off; 6 the field's own node equation evaluated directly at the tap (build-mode
+  `paStormFieldBuildNode`, mip 0, no detail) - so 6 minus production is the representation error
+  and the texture value minus 6 is the interpolation/discretization error. Each toggle is a
+  branch inside `cloudDensity` (or its callees) guarded by `PaLightAuditVariant` and must be
+  compiled out of FINAL (sandbox check). In `StormT132AutoDriver.java` sequence one audit
+  capture per variant per pose on the monolith with the field forced on
+  (`setStormFieldForcedOnMonolith(1)`), and have `StormLightTapErrorReport` print, per tap and
+  region, the contribution of each term as the difference between variant errors. Report which
+  pair carries the ~-0.0065 pocket bias.
+- [X] T198d [US3] Hypothesis verification (Task 3): in `StormLightTapErrorReport.java` compute,
+  over light samples inside reference pocket regions and separately outside, the Pearson
+  correlation and regression slope between the missing term identified in T198c (e.g. exact
+  with detail minus exact without detail, per tap) and the field error (field minus exact), and
+  print `T198_BIAS_CAUSALITY region=.. r=.. slope=.. explainedFraction=..`. State in the report
+  whether omitting that term explains the pocket bias (explained fraction and sign), or does
+  not; if the direct-equation variant (6) already carries the bias, say the representation is
+  incomplete; if only the texture does, say discretization/interpolation is responsible.
+- [X] T198e [US3] Minimum correction oracle (Task 4), chosen only from T198c/T198d: implement
+  the cheapest form that restores the identified term as `PaStormFieldEnabled` bits 8 and, if
+  two candidates survive, 16, in the shader and as at most two campaign-scoped variants in
+  `build.gradle` (`cloud_atmosphere_volume_t198_<name>`, `PA_PRECIPITATION_ABSENT 1`,
+  `PA_ARM_DESC_PRECOMPUTE 1`, keepUniforms `PaStormFieldPass`, `PaStormFieldXZ`) plus enum
+  constants and `stormFieldEnabledBits()` in `CoreCostDiagnosticProgram.java`. Candidates: (A)
+  field for the walk on all four taps plus the cheap missing term evaluated at each tap (detail
+  fetch / erosion / mip-matched base noise), (B) the term baked into R in `paStormFieldNodeAt`
+  during the build, (C) a correction scalar in a third channel (RGB16F target in
+  `VolumetricCloudRenderTargets.java`; report the memory), (D) an analytic bias term only if
+  T198d shows a stable one. Write in the report why the candidate differs from the T196 hybrid
+  before measuring: it keeps the field's walk on every tap and adds only the missing term on
+  every tap, including the far taps the hybrid left biased.
+- [X] T198f [US3] Campaign T198: add `new Campaign("T198", "t198-light-field-bias.txt",
+  "lightFieldBiasRunRequested", "t198Run", "T198_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP)`
+  to `StormCampaignRegistry.java`; in `StormT132AutoDriver.java` the marker, predicate, flag,
+  `T198_POSES = {SIDE, FAR}`, `T198_ARMS` (LEAN_FINAL anchors; `T196_FIELD_BOTH` at 256 as the
+  control; each T198 correction arm; three repeats, 60 samples), `T198_OPTIMIZATION_ARMS`,
+  `T198_IMAGE_ARMS` (light-only and both for the control and each correction, with
+  `t197ReportPockets`-style pocket diagnostics against the control), counter phases (production,
+  field control, each correction with `requestStormFieldSoundness()` so `T196_SOUNDNESS`
+  proves the probe unchanged), the T198c audit captures, and `buildT198Report()` via
+  `buildBracketedPricingReport("T198", "T198_LIGHT_BIAS_DECISION", ...)` with the control's
+  arm key as block lead. Wire every `t197Run` dispatch site for `t198Run`.
+- [X] T198g [US3] Invariants in
+  `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`:
+  FINAL bakes `PaLightAudit`, `PaLightAuditVariant` and the correction bits to 0 and carries no
+  audit view code; every T198 program compiles in the GL context with its bits baked; the new
+  workload views are enabled (T175 count updated); the campaign wiring check passes for the
+  registry's newest row. Run `./gradlew.bat campaignGate` (tens of seconds; inspect elapsedMs
+  first if slow).
+- [X] T198h [US3] Run the campaign once (`run/t198-light-field-bias.txt`, keep
+  `run/t132-autorun.txt` and `run/t132-autorun-exit.txt`, `./gradlew.bat runClient --offline
+  -PsimpleCloudsMandatory=false`, one GPU campaign at a time), retire the marker, extract the
+  `T198_*`, `T196_SOUNDNESS`, `T136_COUNTERS`, `T166_IMAGE_AB` and `T197_POCKETS` lines to
+  `validation/t198-campaign/t198-run.log` with the pocket mask/diff PNGs, run `./gradlew.bat
+  check build` once, and write `validation/performance-shared-field-light-bias.md` with the
+  55-item final report: tap error per tap and region, decomposition contributions (envelope,
+  weather, morphology, erosion, detail, mip bias, interpolation), root cause, the T196 hybrid
+  contrast, the correction's added fetches / build cost / memory, quality before/after (pockets,
+  pocket error, wall displacement, dark interior, contrast, valley, SSIMs, IoU, RMS), field /
+  ray / combined p50-p95, SIDE and FAR net with spreads, PASS/FAIL against Task 9, and the exact
+  next task (PASS: productionize the field into FINAL; FAIL: the remaining tap-level error).
+  Add the `[X]` summary to this file, commit with the session attribution, do not merge.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

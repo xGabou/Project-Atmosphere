@@ -81,6 +81,8 @@
     { "name": "PaStormFieldPass", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaStormFieldEnabled", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaStormFieldXZ", "type": "int", "count": 1, "values": [ 256 ] },
+    { "name": "PaLightAuditVariant", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PaLightAuditOutput", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaRainFieldConservative", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaRainFieldClosedForm", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "StormTraceOrigin", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },

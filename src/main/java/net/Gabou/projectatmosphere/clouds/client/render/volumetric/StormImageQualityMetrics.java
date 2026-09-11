@@ -878,4 +878,68 @@ final class StormImageQualityMetrics {
     private static int abgr(int r, int g, int b) {
         return (255 << 24) | ((b & 255) << 16) | ((g & 255) << 8) | (r & 255);
     }
+    // -----------------------------------------------------------------------
+    // T198 Task 1. Pixel classes for the light-tap audit, from the reference
+    // frame alone, with the same definitions the metrics above use: edge is
+    // cloud that is not interior, dark interior is the darkest quartile of the
+    // interior, a pocket is the 3x3 around a reference local minimum. Pocket
+    // wins over dark, dark over interior, interior over edge.
+    // -----------------------------------------------------------------------
+
+    static final int CLASS_NONE = 0;
+    static final int CLASS_EDGE = 1;
+    static final int CLASS_INTERIOR = 2;
+    static final int CLASS_DARK_INTERIOR = 3;
+    static final int CLASS_POCKET = 4;
+    static final String[] CLASS_NAMES = {"none", "edge", "interior", "darkInterior", "pocket"};
+
+    static int[] pixelClasses(float[] a, int width, int height) {
+        int n = width * height;
+        double[] la = new double[n];
+        boolean[] cloud = new boolean[n];
+        boolean[] interior = new boolean[n];
+        int interiorCount = 0;
+        for (int i = 0; i < n; i++) {
+            la[i] = luminance(a, i);
+            cloud[i] = alpha(a, i) > CLOUD_ALPHA;
+            interior[i] = alpha(a, i) >= INTERIOR_ALPHA;
+            if (interior[i]) {
+                interiorCount++;
+            }
+        }
+        double darkThreshold = Double.NEGATIVE_INFINITY;
+        if (interiorCount >= 4) {
+            double[] values = new double[interiorCount];
+            int w = 0;
+            for (int i = 0; i < n; i++) {
+                if (interior[i]) {
+                    values[w++] = la[i];
+                }
+            }
+            Arrays.sort(values);
+            darkThreshold = values[interiorCount / 4];
+        }
+        int[] classes = new int[n];
+        for (int i = 0; i < n; i++) {
+            if (interior[i]) {
+                classes[i] = la[i] <= darkThreshold ? CLASS_DARK_INTERIOR : CLASS_INTERIOR;
+            } else if (cloud[i]) {
+                classes[i] = CLASS_EDGE;
+            }
+        }
+        for (int y = 2; y < height - 2; y++) {
+            for (int x = 2; x < width - 2; x++) {
+                int i = y * width + x;
+                if (!interior[i] || !isLocalMinimum(la, width, x, y)) {
+                    continue;
+                }
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dx = -1; dx <= 1; dx++) {
+                        classes[i + dy * width + dx] = CLASS_POCKET;
+                    }
+                }
+            }
+        }
+        return classes;
+    }
 }

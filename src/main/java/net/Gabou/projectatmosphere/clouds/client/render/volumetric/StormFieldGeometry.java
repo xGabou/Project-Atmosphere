@@ -22,8 +22,12 @@ public final class StormFieldGeometry {
     public static final int Y = 32;
     public static final int TILES_X = 8;
     public static final int TILES_Y = 4;
-    /** RG16F: two half floats a node. */
-    public static final int BYTES_PER_NODE = 4;
+    /**
+     * RGBA16F since T198: threshold, probe floor, height and the T196
+     * density, four half floats a node (T196 and T197 measured RG16F, 4).
+     */
+    public static final int BYTES_PER_NODE = 8;
+    public static final String FORMAT = "RGBA16F";
     /** The candidate-tile edge the node walk reads, in blocks. */
     public static final float CANDIDATE_TILE_BLOCKS =
             CloudWeatherMapRenderer.WEATHER_EXTENT / PuffLobeSpatialIndex.GRID_SIZE;

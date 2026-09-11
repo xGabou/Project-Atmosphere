@@ -1799,6 +1799,135 @@ final class StormT132AutoDriver {
         return Files.exists(T197_MARKER);
     }
 
+    // -----------------------------------------------------------------------
+    // T198. The light field's extinction bias. The field at 256 (T197's
+    // choice) is the control; the light-tap audit program captures, per
+    // decomposition variant, eight accumulators per pose, which the CPU joins
+    // with the anchor's pixel classes; correction arms, once the cause is
+    // known, are timed and imaged against the same control.
+    // -----------------------------------------------------------------------
+
+    private static final Path T198_MARKER = Path.of("t198-light-field-bias.txt");
+
+    private static final String[] T198_POSES = {"SIDE", "FAR"};
+
+    private static boolean t198Run;
+    private static boolean t198OriginalHistoryEnabled;
+
+    /**
+     * T198. Per pose: 0 the production workload, 1 the field control (bits
+     * 3) with the soundness oracle, 2 the correction (bits 11) with the
+     * oracle again - the probe channel is untouched and the oracle proves
+     * it on the corrected build - then done.
+     */
+    private static int t198CounterPhase;
+    private static final int[] T198_COUNTER_BITS = {0, 3, 11};
+    private static final String[] T198_COUNTER_LABELS = {"|production", "|field", "|fieldExact"};
+
+    /**
+     * T198 Task 4. The correction, timed: the field carries the descriptor
+     * traversal and the tap evaluates the noise, detail and erosion itself,
+     * both consumers on - the production candidate.
+     */
+    private static final CoreCostDiagnosticProgram[] T198_CORRECTION_ARMS = {
+            CoreCostDiagnosticProgram.T198_FIELD_BOTH_EXACT};
+
+    private static final T166Arm[] T198_ARMS = buildT198Arms();
+
+    private static T166Arm[] buildT198Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        for (int repeat = 1; repeat <= 3; repeat++) {
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.T196_FIELD_BOTH,
+                    "r" + repeat, 60, StormFieldGeometry.DEFAULT_XZ));
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                    String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+            for (CoreCostDiagnosticProgram correction : T198_CORRECTION_ARMS) {
+                arms.add(new T166Arm(correction, "r" + repeat, 60,
+                        StormFieldGeometry.DEFAULT_XZ));
+                arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                        String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+            }
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t198Arm() {
+        return T198_ARMS[Math.max(0, Math.min(T198_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T198_OPTIMIZATION_ARMS =
+            buildT198OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT198OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T198_ARMS.length];
+        for (int i = 0; i < T198_ARMS.length; i++) {
+            modes[i] = T198_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /**
+     * T198. An image arm: a frame capture of a program, or one audit capture
+     * (variant, output) of the audit program.
+     */
+    private record T198ImageArm(CoreCostDiagnosticProgram program, int variant, int output,
+            int fieldBits) {
+        boolean audit() {
+            return program.lightAuditCapture();
+        }
+
+        String label() {
+            return audit()
+                    ? program.serializedName() + "@f" + fieldBits + "v" + variant + "o" + output
+                    : program.serializedName() + "@x" + StormFieldGeometry.DEFAULT_XZ;
+        }
+    }
+
+    /**
+     * The control's light-only and both-consumer frames first (the pocket
+     * baselines), the audit of the T196 lookup, the correction's light-only
+     * and both-consumer frames, then the audit of the corrected lookup.
+     */
+    private static final T198ImageArm[] T198_IMAGE_ARMS = buildT198ImageArms();
+
+    private static T198ImageArm[] buildT198ImageArms() {
+        java.util.List<T198ImageArm> arms = new java.util.ArrayList<>();
+        arms.add(new T198ImageArm(CoreCostDiagnosticProgram.T196_FIELD_LIGHT, 0, 0, 1));
+        arms.add(new T198ImageArm(CoreCostDiagnosticProgram.T196_FIELD_BOTH, 0, 0, 3));
+        addT198Audit(arms, 1);
+        arms.add(new T198ImageArm(CoreCostDiagnosticProgram.T198_FIELD_LIGHT_EXACT, 0, 0, 9));
+        arms.add(new T198ImageArm(CoreCostDiagnosticProgram.T198_FIELD_BOTH_EXACT, 0, 0, 11));
+        addT198Audit(arms, 9);
+        return arms.toArray(new T198ImageArm[0]);
+    }
+
+    private static void addT198Audit(java.util.List<T198ImageArm> arms, int fieldBits) {
+        for (int variant = 0; variant < StormLightTapErrorReport.VARIANTS; variant++) {
+            for (int output = 0; output < StormLightTapErrorReport.OUTPUTS; output++) {
+                arms.add(new T198ImageArm(CoreCostDiagnosticProgram.T198_LIGHT_AUDIT,
+                        variant, output, fieldBits));
+            }
+        }
+    }
+
+    /** T198. The audit captures of the current pose, [variant][output]. */
+    private static final StormReferenceImageComparison.Reference[][] T198_AUDIT_CAPTURES =
+            new StormReferenceImageComparison.Reference[StormLightTapErrorReport.VARIANTS]
+                    [StormLightTapErrorReport.OUTPUTS];
+    /** T198. The control's light-only frame of the current pose, for the luminance link. */
+    private static StormReferenceImageComparison.Reference t198FieldLightImage;
+    /** T198. The correction's light-only frame of the current pose. */
+    private static StormReferenceImageComparison.Reference t198FieldLightExactImage;
+
+    /** T198 marker predicate. */
+    private static boolean lightFieldBiasRunRequested() {
+        return Files.exists(T198_MARKER);
+    }
+
     private static T166Arm[] buildT193Arms() {
         java.util.List<T166Arm> arms = new java.util.ArrayList<>();
         int anchor = 0;
@@ -2985,7 +3114,7 @@ final class StormT132AutoDriver {
                 || t178Run || t179Run || t180Run || t181Run || t182Run
                 || t184Run || t185Run || t186Run || t187Run || t188Run
                 || t189Run || t190Run || t192Run || t193Run || t194Run
-                || t195Run || t196Run || t197Run;
+                || t195Run || t196Run || t197Run || t198Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -3243,7 +3372,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t197Run ? t197Arm()
+            T166Arm arm = t198Run ? t198Arm()
+                    : t197Run ? t197Arm()
                     : t196Run ? t196Arm()
                     : t195Run ? t195Arm()
                     : t194Run ? t194Arm()
@@ -3356,6 +3486,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t198Run) {
+            return t198Arm().label();
+        }
         if (t197Run) {
             return t197Arm().label();
         }
@@ -3474,6 +3607,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t198Run) {
+            return T198_OPTIMIZATION_ARMS;
+        }
         if (t197Run) {
             return T197_OPTIMIZATION_ARMS;
         }
@@ -3723,6 +3859,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t198Run) {
+            return T198_POSES;
+        }
         if (t197Run) {
             return T197_POSES;
         }
@@ -4210,6 +4349,16 @@ final class StormT132AutoDriver {
                 t197CounterPhase = 0;
                 T197_POCKET_BASELINE.clear();
                 VolumetricCloudDebugConfig.setStormFieldXZ(StormFieldGeometry.DEFAULT_XZ);
+                t198Run = lightFieldBiasRunRequested();
+                t198OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t198CounterPhase = 0;
+                t198FieldLightImage = null;
+                t198FieldLightExactImage = null;
+                for (StormReferenceImageComparison.Reference[] row : T198_AUDIT_CAPTURES) {
+                    java.util.Arrays.fill(row, null);
+                }
+                VolumetricCloudDebugConfig.setLightAudit(0, 0);
+                VolumetricCloudDebugConfig.setLightAuditFieldBits(1);
                 // T188 Task 3 and Task 11. Counters come from the monolith, so
                 // the monolith has to be using the field for them to describe
                 // the post-field workload rather than the one it replaced.
@@ -4277,7 +4426,8 @@ final class StormT132AutoDriver {
                                 || t194Run
                                 || t195Run
                                 || t196Run
-                                || t197Run;
+                                || t197Run
+                                || t198Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -4291,7 +4441,7 @@ final class StormT132AutoDriver {
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
                             && !t171Run && !t172Run && !t173Run && !t174Run
                             && !t175Run && !t176Run && !t177Run && !t178Run
-                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run && !t197Run) {
+                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run && !t197Run && !t198Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -4301,7 +4451,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t197Run ? "T197_SHARED_FIELD_RESOLUTION"
+                            t198Run ? "T198_LIGHT_FIELD_BIAS"
+                                    : t197Run ? "T197_SHARED_FIELD_RESOLUTION"
                                     : t196Run ? "T196_SHARED_FIELD"
                                     : t195Run ? "T195_SHARED_FIELD_LOOKUP"
                                     : t194Run ? "T194_SHARED_FIELD_PRICING"
@@ -4672,7 +4823,8 @@ final class StormT132AutoDriver {
                         || (t194Run && t194Arm().program().fixedWork())
                         || (t195Run && t195Arm().program().fixedWork())
                         || (t196Run && t196Arm().program().fixedWork())
-                        || (t197Run && t197Arm().program().fixedWork())) {
+                        || (t197Run && t197Arm().program().fixedWork())
+                        || (t198Run && t198Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -4709,6 +4861,19 @@ final class StormT132AutoDriver {
                             VolumetricCloudDebugConfig.requestStormFieldSoundness();
                         } else {
                             VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
+                        }
+                    }
+                    if (t198Run) {
+                        // Production, the field control, the correction -
+                        // the last two with the soundness oracle, which
+                        // proves the probe channel unchanged under the
+                        // corrected build.
+                        VolumetricCloudDebugConfig.setStormFieldXZ(
+                                StormFieldGeometry.DEFAULT_XZ);
+                        VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(
+                                T198_COUNTER_BITS[t198CounterPhase]);
+                        if (t198CounterPhase >= 1) {
+                            VolumetricCloudDebugConfig.requestStormFieldSoundness();
                         }
                     }
                     // The workload counters live behind debug views 22/23, which
@@ -4753,6 +4918,8 @@ final class StormT132AutoDriver {
                                     : t197Run
                                     ? (t197CounterPhase == 0 ? "|production"
                                             : "|field@x" + T197_XZ[t197CounterPhase - 1])
+                                    : t198Run
+                                    ? T198_COUNTER_LABELS[t198CounterPhase]
                                     : ""), line);
                     if (t196Run && t196CounterPhase == 0) {
                         // The pose stays open for its post-field capture.
@@ -4760,6 +4927,8 @@ final class StormT132AutoDriver {
                     } else if (t197Run && t197CounterPhase < T197_XZ.length) {
                         // The pose stays open for the next resolution.
                         t197CounterPhase++;
+                    } else if (t198Run && t198CounterPhase < T198_COUNTER_BITS.length - 1) {
+                        t198CounterPhase++;
                     } else {
                         t135CountersCapturedPose = sweepPose();
                         if (t196Run) {
@@ -4771,6 +4940,10 @@ final class StormT132AutoDriver {
                             VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
                             VolumetricCloudDebugConfig.setStormFieldXZ(
                                     StormFieldGeometry.DEFAULT_XZ);
+                        }
+                        if (t198Run) {
+                            t198CounterPhase = 0;
+                            VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
                         }
                     }
                 }
@@ -4869,6 +5042,16 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
+                }
+                if (t198Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT198LightBiasReport());
+                    VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
+                    VolumetricCloudDebugConfig.setLightAudit(0, 0);
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(
+                            t198OriginalHistoryEnabled);
                 }
                 if (t197Run) {
                     ProjectAtmosphere.LOGGER.info(buildT197ResolutionReport());
@@ -5823,6 +6006,14 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t198Run) {
+            CoreCostDiagnosticProgram[] programs =
+                    new CoreCostDiagnosticProgram[T198_IMAGE_ARMS.length];
+            for (int i = 0; i < programs.length; i++) {
+                programs[i] = T198_IMAGE_ARMS[i].program();
+            }
+            return programs;
+        }
         if (t197Run) {
             CoreCostDiagnosticProgram[] programs =
                     new CoreCostDiagnosticProgram[T197_IMAGE_ARMS.length];
@@ -5956,12 +6147,23 @@ final class StormT132AutoDriver {
         // T197. The image arm carries its resolution; the capture name and
         // the report label carry it too, so two captures of one program at
         // different grids can never be confused.
-        String armLabel = t197Run ? T197_IMAGE_ARMS[index].label() : arm.serializedName();
+        String armLabel = t197Run ? T197_IMAGE_ARMS[index].label()
+                : t198Run ? T198_IMAGE_ARMS[index].label()
+                : arm.serializedName();
         if ((t166ImageStep - 2) % 2 == 0) {
             VolumetricCloudDebugConfig.setFinalProgramOverride(arm);
             if (t197Run) {
                 VolumetricCloudDebugConfig.setStormFieldXZ(
                         T197_IMAGE_ARMS[index].stormFieldXZ());
+            }
+            if (t198Run) {
+                // T198. The audit's selectors are part of the arm; a frame
+                // arm leaves them at zero, which the audit program alone reads.
+                T198ImageArm t198Arm = T198_IMAGE_ARMS[index];
+                VolumetricCloudDebugConfig.setStormFieldXZ(StormFieldGeometry.DEFAULT_XZ);
+                VolumetricCloudDebugConfig.setLightAudit(t198Arm.variant(), t198Arm.output());
+                VolumetricCloudDebugConfig.setLightAuditFieldBits(
+                        t198Arm.audit() ? t198Arm.fieldBits() : 1);
             }
             if (StormReferenceImageCapture.request("t166_" + armLabel + "_" + pose)
                     .startsWith("acquiring")) {
@@ -5982,6 +6184,31 @@ final class StormT132AutoDriver {
             t188RainMaskAnchor = captured;
             ProjectAtmosphere.LOGGER.info(
                     "T188_RAIN_MASK pose={} reference {}", pose, captured.format());
+        } else if (t198Run && arm.lightAuditCapture()) {
+            // T198. Not a comparison: one accumulator of the audit, joined
+            // with the others of its pose once the last one has landed.
+            T198ImageArm t198Arm = T198_IMAGE_ARMS[index];
+            String expectedView = "t166_" + armLabel + "_" + pose;
+            boolean fresh = expectedView.equals(captured.view());
+            T198_AUDIT_CAPTURES[t198Arm.variant()][t198Arm.output()] = fresh ? captured : null;
+            ProjectAtmosphere.LOGGER.info(
+                    "T198_AUDIT_CAPTURE pose={} arm={} capturedView={} captureFresh={} digest={}",
+                    pose, armLabel, captured.view(), fresh, captured.digest());
+            boolean last = t198Arm.variant() == StormLightTapErrorReport.VARIANTS - 1
+                    && t198Arm.output() == StormLightTapErrorReport.OUTPUTS - 1;
+            if (last) {
+                // The luminance link uses the frame of the lookup under audit.
+                StormReferenceImageComparison.Reference lightFrame = t198Arm.fieldBits() == 9
+                        ? t198FieldLightExactImage : t198FieldLightImage;
+                for (String line : StormLightTapErrorReport.report(
+                        pose + " lookup=" + (t198Arm.fieldBits() == 9 ? "t198_exact" : "t196_density"),
+                        t166AnchorImage, lightFrame, T198_AUDIT_CAPTURES)) {
+                    ProjectAtmosphere.LOGGER.info(line);
+                }
+                for (StormReferenceImageComparison.Reference[] row : T198_AUDIT_CAPTURES) {
+                    java.util.Arrays.fill(row, null);
+                }
+            }
         } else if (arm.rainMaskCapture()) {
             // The capture's own view name is checked against the request. Three
             // mask arms are captured back to back, and a comparison that
@@ -6006,7 +6233,28 @@ final class StormT132AutoDriver {
                     StormArmQualityMetrics.compare(t166AnchorImage, captured).format(),
                     t166AnchorImage.digest().equals(captured.digest()));
             if (t197Run) {
-                t197ReportPockets(pose, T197_IMAGE_ARMS[index], captured);
+                T197ImageArm t197Arm = T197_IMAGE_ARMS[index];
+                t197ReportPockets(pose, t197Arm.label(), t197Arm.stormFieldXZ(),
+                        pose + "|" + arm.serializedName(),
+                        t197Arm.stormFieldXZ() == T197_XZ[0], "versus256", captured);
+            }
+            if (t198Run) {
+                // T198. The control's light-only and both-consumer frames are
+                // the pocket baselines; a correction arm is classed against
+                // the one whose consumer set it shares.
+                boolean control = arm == CoreCostDiagnosticProgram.T196_FIELD_LIGHT
+                        || arm == CoreCostDiagnosticProgram.T196_FIELD_BOTH;
+                boolean lightOnly = arm.stormFieldEnabledBits() == 1
+                        || (arm.stormFieldEnabledBits() & 2) == 0;
+                if (arm == CoreCostDiagnosticProgram.T196_FIELD_LIGHT) {
+                    t198FieldLightImage = captured;
+                }
+                if (arm == CoreCostDiagnosticProgram.T198_FIELD_LIGHT_EXACT) {
+                    t198FieldLightExactImage = captured;
+                }
+                t197ReportPockets(pose, armLabel, StormFieldGeometry.DEFAULT_XZ,
+                        pose + "|" + (lightOnly ? "light" : "both"), control,
+                        "versusControl", captured);
             }
         }
         t166ImageStep++;
@@ -6020,34 +6268,34 @@ final class StormT132AutoDriver {
      * newly lost. A mask and a difference image of the pocket neighbourhoods
      * go beside the log so the mechanism can be seen, not only counted.
      */
-    private static void t197ReportPockets(String pose, T197ImageArm arm,
+    private static void t197ReportPockets(String pose, String label, int xz,
+            String baselineKey, boolean isBaseline, String versusTag,
             StormReferenceImageComparison.Reference captured) {
         StormImageQualityMetrics.PocketDiagnostics pockets =
                 StormImageQualityMetrics.pocketDiagnostics(
                         t166AnchorImage.pixels(), captured.pixels(),
                         captured.width(), captured.height());
-        String baselineKey = pose + "|" + arm.program().serializedName();
         StormImageQualityMetrics.PocketDiagnostics baseline = T197_POCKET_BASELINE.get(baselineKey);
-        if (arm.stormFieldXZ() == T197_XZ[0]) {
+        if (isBaseline) {
             T197_POCKET_BASELINE.put(baselineKey, pockets);
             baseline = null;
         }
         ProjectAtmosphere.LOGGER.info("T197_POCKETS pose={} arm={} xz={} {} {}",
-                pose, arm.label(), arm.stormFieldXZ(), pockets.format(),
-                baseline == null ? "versus256=n/a"
-                        : pockets.formatAgainst(baseline, "versus256"));
+                pose, label, xz, pockets.format(),
+                baseline == null ? versusTag + "=n/a"
+                        : pockets.formatAgainst(baseline, versusTag));
         try {
             Path directory = Path.of("t197-pockets");
             Files.createDirectories(directory);
             StormImageQualityMetrics.writePocketImages(
                     t166AnchorImage.pixels(), captured.pixels(),
                     captured.width(), captured.height(), pockets, baseline,
-                    directory.resolve(pose + "_" + arm.label()));
+                    directory.resolve(pose + "_" + label));
         } catch (java.io.IOException | RuntimeException failure) {
             // Evidence, not machinery: a capture that cannot be written must
             // not stop the sweep.
             ProjectAtmosphere.LOGGER.warn("T197_POCKETS image not written for {} {}",
-                    pose, arm.label(), failure);
+                    pose, label, failure);
         }
     }
 
@@ -6494,6 +6742,17 @@ final class StormT132AutoDriver {
      * build on its own clock, and the net ratio the decision is judged on.
      * The 256 arm opens each block, so the block index is the repeat.
      */
+    /**
+     * T198. The field control and each correction at 256, anchor bracketed;
+     * the control opens each block.
+     */
+    private static String buildT198LightBiasReport() {
+        return buildBracketedPricingReport("T198", "T198_LIGHT_BIAS_DECISION",
+                T198_POSES, T198_ARMS,
+                CoreCostDiagnosticProgram.T196_FIELD_BOTH.serializedName() + "@x"
+                        + StormFieldGeometry.DEFAULT_XZ);
+    }
+
     private static String buildT197ResolutionReport() {
         StringBuilder out = new StringBuilder(buildBracketedPricingReport(
                 "T197", "T197_RESOLUTION_DECISION", T197_POSES, T197_ARMS,

@@ -280,6 +280,9 @@ uniform int PaStormFieldPass;
 /**
  * T196. Which consumers read the field: bit 1 the light cone, bit 2 the
  * empty-span probe. Baked per program: 0 in FINAL and every control.
+ * T198. Bit 8: the light cone reads the field's threshold and height (R, B)
+ * and evaluates the base noise, the detail and the erosion at the tap itself,
+ * instead of the node density in A. Bit 4 (T196 hybrid) is unchanged.
  */
 uniform int PaStormFieldEnabled;
 /**
@@ -319,6 +322,22 @@ uniform sampler2D StormFieldSampler;
 // 8x4 tiles and the vertical margin is unchanged between resolutions.
 uniform int PaStormFieldXZ;
 const int PA_STORM_FIELD_Y = 32;
+/**
+ * T198 Task 1. The light-tap audit, compiled only into the t198_light_audit
+ * program (PA_LIGHT_AUDIT). At every light tap the program evaluates the
+ * field's density and the exact production density at the same point and
+ * accumulates their difference per tap; the fragment output is one of the
+ * accumulators (PaLightAuditOutput) rather than a frame. PaLightAuditVariant
+ * selects what the exact side evaluates so the error can be decomposed term
+ * by term: 0 production; 1 detail noise at its mean (erosion keeps its mean
+ * bite); 2 erosion stage off; 3 mip bias 0; 4 weather neutral; 5 morphology
+ * neutral; 6 the field's own node equation at the tap (build-mode walk, mip
+ * 0, no detail) - so 6 minus 0 is the representation error and the texture
+ * minus 6 the interpolation error; 7 erosion off and mip 0 on the ordinary
+ * walk, so 6 minus 7 is the build-mode walk alone. Baked 0 everywhere else.
+ */
+uniform int PaLightAuditVariant;
+uniform int PaLightAuditOutput;
 const int PA_STORM_FIELD_TILES_X = 8;
 const int PA_STORM_FIELD_TILES_Y = 4;
 const float PA_STORM_FIELD_BODY_GAIN = 1.65;
@@ -532,6 +551,24 @@ int paRainFieldFallbacks = 0;
 // the build could not prove uniform and so paid the exact traversal for.
 int paRainFieldSafeHits = 0;
 int paRainFieldMixedFallbacks = 0;
+#ifdef PA_LIGHT_AUDIT
+// T198 Task 1. Per-tap accumulators over every light tap this pixel's march
+// evaluates: signed error (field - exact), its magnitude and square, the
+// sample count, the over- and under-estimate counts, and both sides' sums.
+// Guarded by a define for T188's reason: the arm under audit is a lean
+// program, and only a program can carry an output the monolith does not.
+float paLaSumErr[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaSumAbs[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaSumSq[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaCount[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaOver[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaUnder[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaExactSum[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaFieldSum[4] = float[4](0.0, 0.0, 0.0, 0.0);
+// The variant the exact side is being evaluated under, set around that one
+// call only, so the primary march and the field build are untouched.
+int paLightAuditExactVariant = 0;
+#endif
 #ifdef PA_RAIN_MASK_OUTPUT
 // T188 Task 0. The rain-only capture. Rain and cloud are composited in the
 // rendered frame, so no mask can be recovered from it after the fact; these
@@ -782,6 +819,13 @@ float paLastStormMaxSoftness = 0.0;
 float paLastStormUnionDistance = 1.0e9;
 float paLastStormMaxVerticalSlope = 1.0;
 float paLastStormMaxAspect = 1.0;
+// T198. Published by cloudDensity in build mode: the exact storm-body
+// threshold at the node (stormCoverageLowerBound of the walk's coverage,
+// strength and overlap class; 1 where nothing is owned) and the walk's
+// height01, which the material terms read. Both are envelope quantities the
+// light tap interpolates instead of the node's aliased noise sample.
+float paLastStormLowerBound = 1.0;
+float paLastStormHeight01 = 0.0;
 // T196 oracle: how far outside the dilated envelope the last node floor
 // believed itself to be, in blocks; 1e9 when no group entered.
 float paLastStormFieldSlack = 1.0e9;
@@ -5340,6 +5384,17 @@ float cloudDensity(
         mipBias += 2.0;
     }
 #endif
+#ifdef PA_LIGHT_AUDIT
+    // T198 Task 2. The exact side under decomposition: 2 and 7 skip the
+    // erosion stage (detail fetch and bite), 3 and 7 read the base noise at
+    // mip 0 as the field build does.
+    if (paLightAuditExactVariant == 2 || paLightAuditExactVariant == 7) {
+        useDetail = false;
+    }
+    if (paLightAuditExactVariant == 3 || paLightAuditExactVariant == 7) {
+        mipBias = 0.0;
+    }
+#endif
 #ifdef PA_ARM_DETAIL_FOOTPRINT
     // T169 Task 4A. Once the packed detail wavelength projects below the
     // configured pixel count the fetch resolves structure the target cannot
@@ -5422,6 +5477,17 @@ float cloudDensity(
     }
     vec4 weather = sampleWeather(p.xz);
     vec4 morphology = sampleMorphology(p.xz);
+#ifdef PA_LIGHT_AUDIT
+    // T198 Task 2. Variants 4 and 5 remove the raster inputs from the exact
+    // side; a descriptor-owned storm is expected to read neither, and the
+    // audit measures that rather than assuming it.
+    if (paLightAuditExactVariant == 4) {
+        weather = vec4(0.0);
+    }
+    if (paLightAuditExactVariant == 5) {
+        morphology = vec4(0.0);
+    }
+#endif
     // Weather-map coverage already includes the cloudlet density. Its normal
     // spawned-field range is roughly 0.08..0.35; treating 0.92 as the full
     // point erased those clouds before the raymarch ever saw them.
@@ -5491,6 +5557,15 @@ float cloudDensity(
     // tile is never authority for unrelated or incomplete groups.
     bool directStormAvailable = directStormOwned;
     stormProfile = stormProfile || directStormAvailable;
+    if (paStormFieldBuildNode) {
+        // T198. The threshold the body is formed against at STAGE 5, from the
+        // same walk: what the exact-noise light lookup needs from the node.
+        paLastStormLowerBound = directStormAvailable && directStormCoverage > 0.001
+            ? stormCoverageLowerBound(directStormCoverage, directStormStrength,
+                (directStormActiveRoleMask & 7) == 7)
+            : 1.0;
+        paLastStormHeight01 = directStormHeight01;
+    }
 
     if (paTraceCapture) {
         paCdFlags = PA_CD_ENTERED
@@ -5796,6 +5871,13 @@ float cloudDensity(
                     );
                 }
             }
+#ifdef PA_LIGHT_AUDIT
+            // T198 Task 2. Variant 1: the detail noise at its mean, so the
+            // erosion stage keeps its mean bite and only the noise is removed.
+            if (paLightAuditExactVariant == 1) {
+                detailFbm = 0.5;
+            }
+#endif
             float erosion = profileId == 3 ? 0.14 : 0.26;
             if (profileId == 1 || profileId == 5) {
                 erosion = 0.10;
@@ -5951,9 +6033,18 @@ float cloudDensity(
 // slice and read by the two consumers T193 attributed
 // 43% of descriptor traversal to:
 //
-//   R  detail-free production density at the node  - the light cone reads it
-//      trilinearly, four taps as before, one fetch pair per tap instead of a
-//      descriptor walk;
+//   A  detail-free production density at the node  - the T196 light cone
+//      reads it trilinearly, four taps as before, one fetch pair per tap
+//      instead of a descriptor walk. T198 measured it: the node's base-noise
+//      sample aliases a noise whose texel is 3 blocks, so the interpolated
+//      density is 25-35% RMS off the exact one at every tap, and the near
+//      taps miss the erosion stage (+0.26 a tap). Kept for that arm.
+//   R  the storm body's exact threshold at the node (T198), 1 where nothing
+//      is owned, -10 where the field does not cover; and B the walk's
+//      height01. The T198 light lookup interpolates these two envelope
+//      quantities and evaluates the base noise, the detail and the erosion
+//      at the tap point itself - the probe's own architecture applied to the
+//      light: the field carries the descriptor traversal, never the noise.
 //   G  the probe floor: a lower bound on the storm body's noise threshold
 //      over every point nearer to this node than to any other (its dual
 //      cell). The probe fetches the nearest node, evaluates the base noise at
@@ -6025,9 +6116,61 @@ float paStormFieldDensityAt(vec3 p) {
     if (paWorkloadCaptureActive()) {
         paStormFieldLightFetches++;
     }
-    float d0 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k0)).r;
-    float d1 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k1)).r;
+    float d0 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k0)).a;
+    float d1 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k1)).a;
     return mix(d0, d1, t);
+}
+
+// T198. Light: the field's threshold and height at p, then the exact base
+// noise at p - one 3D fetch - forms the body exactly as cloudDensity's STAGE
+// 5 does; a detail tap adds the detail fetch and the erosion bite; the
+// material terms follow with the descriptor constants cloudDensity uses.
+// A node the field does not cover (R at the sentinel) falls back to the
+// node density in A.
+float paStormFieldLightDensityAt(vec3 p, bool detailTap) {
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y > float(PA_STORM_FIELD_Y)) {
+        return 0.0;
+    }
+    float ky = clamp(c.y - 0.5, 0.0, float(PA_STORM_FIELD_Y - 1));
+    int k0 = int(floor(ky));
+    int k1 = min(k0 + 1, PA_STORM_FIELD_Y - 1);
+    float t = ky - float(k0);
+    if (paWorkloadCaptureActive()) {
+        paStormFieldLightFetches++;
+    }
+    vec4 f0 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k0));
+    vec4 f1 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k1));
+    if (min(f0.r, f1.r) <= PA_STORM_FIELD_UNCOVERED * 0.5) {
+        return mix(f0.a, f1.a, t);
+    }
+    float lowerBound = mix(f0.r, f1.r, t);
+    if (lowerBound >= 0.999) {
+        return 0.0;
+    }
+    vec3 samplePos = p;
+    samplePos.xz -= MaterialOffset;
+    vec4 baseNoise = texture(
+        BaseNoiseSampler, baseNoiseDomain(samplePos, STORM_BASE_NOISE_SCALE), 0.0);
+    float lowFbm = baseNoise.g * 0.625 + baseNoise.b * 0.25 + baseNoise.a * 0.125;
+    float baseCarrier = saturate(remap(baseNoise.r, -(1.0 - lowFbm), 1.0, 0.0, 1.0));
+    float cloud = saturate((stormBaseField(baseCarrier) - lowerBound)
+        / max(1.0 - lowerBound, 0.0001));
+    if (detailTap && cloud > 0.003) {
+        vec3 detailPos = detailNoiseDomain(samplePos) + (baseNoise.gbr - 0.5) * 0.18;
+        vec4 detail = texture(DetailNoiseSampler, detailPos, 0.0);
+        if (paWorkloadCaptureActive()) {
+            paDetailOctaveEvaluations += 3;
+            paDetailFetchLight++;
+        }
+        float detailFbm = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
+        cloud = max(cloud - (1.0 - detailFbm) * STORM_EROSION, 0.0);
+    }
+    float height01 = saturate(mix(f0.b, f1.b, t));
+    cloud *= mix(1.0, 1.18, 0.72 * (1.0 - height01) * 0.6);
+    cloud *= mix(0.90, 1.10, 0.78);
+    cloud *= 1.0 + 0.68 * (1.0 - height01) * 0.32;
+    return max(cloud, 0.0) * 0.73 * DensityMul;
 }
 
 // The storm body's noise input at p, exactly as cloudDensity forms it for a
@@ -6133,8 +6276,12 @@ float paStormFieldFloorFromWalk() {
 // Both channels of one node: the detail-free production density, and the
 // floor from the same walk. Uncovered where a weather-map family or a funnel
 // could carry material the field does not model.
-vec2 paStormFieldNodeAt(vec3 node, out float unionDistanceOut) {
+// T198: (threshold, floor, height01, density) - the threshold and height
+// come from the same walk, published by cloudDensity in build mode.
+vec4 paStormFieldNodeAt(vec3 node, out float unionDistanceOut) {
     paLastStormUnionDistance = 1.0e9;
+    paLastStormLowerBound = 1.0;
+    paLastStormHeight01 = 0.0;
     paStormFieldBuildNode = true;
     paStormFieldRejectMargin = 0.5 * paStormFieldVoxelY();
     float density = cloudDensity(node, 0.0, false, false, false);
@@ -6142,14 +6289,17 @@ vec2 paStormFieldNodeAt(vec3 node, out float unionDistanceOut) {
     paStormFieldRejectMargin = 0.0;
     unionDistanceOut = paLastStormUnionDistance;
     float floorL;
+    float threshold = paLastStormLowerBound;
     if (FunnelCount > 0 || paStormFieldNonStormPossible(node.xz)) {
         floorL = PA_STORM_FIELD_UNCOVERED;
+        threshold = PA_STORM_FIELD_UNCOVERED;
     } else if (StormLobeCount <= 0) {
         floorL = 1.0;
+        threshold = 1.0;
     } else {
         floorL = paStormFieldFloorFromWalk();
     }
-    return vec2(density, floorL);
+    return vec4(threshold, floorL, paLastStormHeight01, density);
 }
 
 // The exact threshold production applies at one point, for the oracle: L
@@ -6380,10 +6530,48 @@ float lightMarchOpticalDepth(
         // Bit 4 keeps the first two taps - the ones that carry detail and sit
         // within a voxel of the sample - on the exact walk, so the field
         // serves only the far half of the cone.
+#ifdef PA_LIGHT_AUDIT
+        // T198 Task 1. The field serves the tap exactly as t196_field_light
+        // does, and the exact production density is evaluated beside it at
+        // the same point with the same tap state (mip bias, detail flag, T149
+        // grading) - or, for variant 6, the field's own node equation there.
+        float density = (PaStormFieldEnabled & 8) != 0
+            ? paStormFieldLightDensityAt(pos + offset, detailTap)
+            : paStormFieldDensityAt(pos + offset);
+        {
+            vec3 paLaPoint = pos + offset;
+            float paLaExact;
+            if (PaLightAuditVariant == 6) {
+                paStormFieldBuildNode = true;
+                paStormFieldRejectMargin = 0.5 * paStormFieldVoxelY();
+                paLaExact = cloudDensity(paLaPoint, 0.0, false, false, false);
+                paStormFieldBuildNode = false;
+                paStormFieldRejectMargin = 0.0;
+            } else {
+                paLightAuditExactVariant = PaLightAuditVariant;
+                paLaExact = cloudDensity(paLaPoint, float(i) * 0.6, detailTap, false, false);
+                paLightAuditExactVariant = 0;
+            }
+            if (i < 4) {
+                float paLaErr = density - paLaExact;
+                paLaSumErr[i] += paLaErr;
+                paLaSumAbs[i] += abs(paLaErr);
+                paLaSumSq[i] += paLaErr * paLaErr;
+                paLaCount[i] += 1.0;
+                paLaOver[i] += paLaErr > 1.0e-6 ? 1.0 : 0.0;
+                paLaUnder[i] += paLaErr < -1.0e-6 ? 1.0 : 0.0;
+                paLaExactSum[i] += paLaExact;
+                paLaFieldSum[i] += density;
+            }
+        }
+#else
         float density = (PaStormFieldEnabled & 1) != 0
                 && !((PaStormFieldEnabled & 4) != 0 && i < 2)
-            ? paStormFieldDensityAt(pos + offset)
+            ? ((PaStormFieldEnabled & 8) != 0
+                ? paStormFieldLightDensityAt(pos + offset, detailTap)
+                : paStormFieldDensityAt(pos + offset))
             : cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
+#endif
 #endif
         paDensityConsumer = 0;
         paLightTapOrdinal = 0;
@@ -7380,7 +7568,7 @@ void main() {
             SlabBaseY + (float(paNodeSlice) + 0.5) * paNodeVoxelY,
             WeatherOrigin.y + (float(paNodeXZ.y) + 0.5) * paNodeVoxelXZ);
         float paNodeUnionDistance;
-        vec2 paNodeValue = paStormFieldNodeAt(paNode, paNodeUnionDistance);
+        vec4 paNodeValue = paStormFieldNodeAt(paNode, paNodeUnionDistance);
         float paNodeFloor = paNodeValue.y;
         float paNodeSlack = paLastStormFieldSlack;
         if (PaStormFieldPass == 2) {
@@ -7443,7 +7631,7 @@ void main() {
             gl_FragDepth = 0.0;
             return;
         }
-        fragColor = vec4(paNodeValue.x, paNodeFloor, 0.0, 1.0);
+        fragColor = paNodeValue;
         gl_FragDepth = 0.0;
         return;
     }
@@ -9427,6 +9615,29 @@ void main() {
     }
     float resultDepthDerivative = currentCloudHit ? fwidth(resultDepth) : 0.0;
 
+#ifdef PA_LIGHT_AUDIT
+    // T198 Task 1. One accumulator per capture, taps 0-3 in RGBA; the CPU
+    // joins the captures and classes the pixels from the anchor frame.
+    gl_FragDepth = 1.0;
+    if (PaLightAuditOutput == 1) {
+        fragColor = vec4(paLaSumAbs[0], paLaSumAbs[1], paLaSumAbs[2], paLaSumAbs[3]);
+    } else if (PaLightAuditOutput == 2) {
+        fragColor = vec4(paLaSumSq[0], paLaSumSq[1], paLaSumSq[2], paLaSumSq[3]);
+    } else if (PaLightAuditOutput == 3) {
+        fragColor = vec4(paLaCount[0], paLaCount[1], paLaCount[2], paLaCount[3]);
+    } else if (PaLightAuditOutput == 4) {
+        fragColor = vec4(paLaOver[0], paLaOver[1], paLaOver[2], paLaOver[3]);
+    } else if (PaLightAuditOutput == 5) {
+        fragColor = vec4(paLaUnder[0], paLaUnder[1], paLaUnder[2], paLaUnder[3]);
+    } else if (PaLightAuditOutput == 6) {
+        fragColor = vec4(paLaExactSum[0], paLaExactSum[1], paLaExactSum[2], paLaExactSum[3]);
+    } else if (PaLightAuditOutput == 7) {
+        fragColor = vec4(paLaFieldSum[0], paLaFieldSum[1], paLaFieldSum[2], paLaFieldSum[3]);
+    } else {
+        fragColor = vec4(paLaSumErr[0], paLaSumErr[1], paLaSumErr[2], paLaSumErr[3]);
+    }
+    return;
+#endif
 #ifdef PA_RAIN_MASK_OUTPUT
     // T188 Task 0. R = rain optical mass, G = onset height, B = termination
     // height, A = contiguous rain runs. Zero mass is "no rain here", which is
