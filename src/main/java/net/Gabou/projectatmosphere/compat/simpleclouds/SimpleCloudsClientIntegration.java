@@ -29,8 +29,8 @@ public final class SimpleCloudsClientIntegration {
                 TornadoManager::removeClientTornado,
                 SimpleCloudsClientIntegration::syncTornadoes,
                 ClientHurricaneStateCache::applySnapshots
+
         );
-        MinecraftForge.EVENT_BUS.register(SimpleCloudsWhiteoutFogHandler.class);
     }
 
     private static void spawnTornado(TornadoSpawn spawn) {
