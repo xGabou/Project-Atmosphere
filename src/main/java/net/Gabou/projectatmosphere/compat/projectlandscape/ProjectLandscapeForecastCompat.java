@@ -11,7 +11,7 @@ import net.minecraftforge.fml.ModList;
 /** Optional bridge to Project Landscape's forecast-only API. No Landscape classes are linked here. */
 public final class ProjectLandscapeForecastCompat {
     private static final String MOD_ID = "projectlandscape";
-    private static final int API_VERSION = 1;
+    private static final int API_VERSION = 2;
     private static final String API_CLASS = "com.gabou.projectlandscape.api.atmosphere.LandscapeAtmosphereApi";
     private static final AtomicBoolean UNAVAILABLE_LOGGED = new AtomicBoolean();
 
@@ -32,7 +32,7 @@ public final class ProjectLandscapeForecastCompat {
             if (!Boolean.TRUE.equals(supports.invoke(null, level))) {
                 return Optional.empty();
             }
-            Method sample = api.getMethod("sampleForAtmosphere", ServerLevel.class, int.class, int.class);
+            Method sample = api.getMethod("runtimeBiome", ServerLevel.class, int.class, int.class);
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Using Project Landscape forecast API v{} for {}.", API_VERSION,
                     level.dimension().location());
             return Optional.of(new Sampler(level, sample));
@@ -69,14 +69,10 @@ public final class ProjectLandscapeForecastCompat {
             }
             try {
                 Object result = this.sample.invoke(null, this.level, x, z);
-                if (!(result instanceof Optional<?> optional) || optional.isEmpty()) {
-                    return Optional.empty();
-                }
-                Object forecastSample = optional.get();
-                if (this.biomeId == null) {
-                    this.biomeId = forecastSample.getClass().getMethod("biomeId");
-                }
-                Object biome = this.biomeId.invoke(forecastSample);
+                Object state = result == null ? null : result.getClass().getMethod("state").invoke(result);
+                if (!"READY".equals(String.valueOf(state))) return Optional.empty();
+                Object biome = result.getClass().getMethod("biomeId").invoke(result);
+                if (biome instanceof Optional<?> optional && optional.isPresent()) biome=optional.get();
                 return biome instanceof ResourceLocation location ? Optional.of(location) : Optional.empty();
             } catch (ReflectiveOperationException | LinkageError failure) {
                 this.failed = true;

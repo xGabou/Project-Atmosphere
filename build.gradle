@@ -4,7 +4,7 @@ plugins {
     id 'idea'
     id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
     id 'org.spongepowered.mixin' version '0.7.+'
-    id 'com.matthewprenger.cursegradle' version '1.4.0' // CurseForge uploader
+    id 'com.hypherionmc.modutils.modpublisher' version '2.2.1' // CurseForge uploader
     id "com.modrinth.minotaur" version "2.8.10" // Modrinth uploader
     id 'maven-publish'
 }
@@ -343,8 +343,8 @@ def leanProgramVariants = [
         // The define also removes the old derivation: the two are #if/#else
         // branches, so the recomputation is not compiled into FINAL at all
         // rather than being left live alongside the read.
-        [name: leanFinalShaderName,
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : leanFinalShaderName,
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: []],
         // The T140 oracle family must stay bit-for-bit equivalent to FINAL, so
         // it takes the same specialization - including the precompute, because
@@ -352,49 +352,49 @@ def leanProgramVariants = [
         [name: 'cloud_atmosphere_volume_t140_pixel',
          defines: ['PA_T140_ORACLE 1', 'PA_PRECIPITATION_ABSENT 1',
                    'PA_ARM_DESC_PRECOMPUTE 1'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t140_mask',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_MASK 1', 'PA_PRECIPITATION_ABSENT 1',
-                   'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t140_mask',
+         defines     : ['PA_T140_ORACLE 1', 'PA_T140_MASK 1', 'PA_PRECIPITATION_ABSENT 1',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t140_tile8',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 8', 'PA_PRECIPITATION_ABSENT 1',
-                   'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t140_tile8',
+         defines     : ['PA_T140_ORACLE 1', 'PA_T140_TILE 8', 'PA_PRECIPITATION_ABSENT 1',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t140_tile16',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 16', 'PA_PRECIPITATION_ABSENT 1',
-                   'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t140_tile16',
+         defines     : ['PA_T140_ORACLE 1', 'PA_T140_TILE 16', 'PA_PRECIPITATION_ABSENT 1',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
         // T174 control: FINAL with the precompute explicitly off. This is the
         // only way to A/B the productionized path against itself, and it is
         // what proves FINAL actually consumes the precomputed fields rather
         // than merely declaring the define.
-        [name: 'cloud_atmosphere_volume_t174_no_precompute',
+        [name   : 'cloud_atmosphere_volume_t174_no_precompute',
          defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
         // The pre-T163 FINAL, kept so the optimization can be measured and
         // compared against back to back rather than against a remembered number.
         [name: 'cloud_atmosphere_volume_t163_withrain', defines: [], keepUniforms: []],
         // T162 production-context attribution arms. These render the real
         // raymarch; only one cost class is compiled out of each.
-        [name: 'cloud_atmosphere_volume_t162_nolight', defines: [], keepUniforms: [],
+        [name     : 'cloud_atmosphere_volume_t162_nolight', defines: [], keepUniforms: [],
          overrides: ['uniform int PaDiagnosticLightingMode;':
-                     'const int PaDiagnosticLightingMode = 1;']],
-        [name: 'cloud_atmosphere_volume_t162_norain',
+                             'const int PaDiagnosticLightingMode = 1;']],
+        [name   : 'cloud_atmosphere_volume_t162_norain',
          defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
         // T162 fixed-work ladder. Every arm evaluates the same 64 points per
         // fragment, so the deltas between them are attributable.
-        [name: 'cloud_atmosphere_volume_t162_fw1_address',
+        [name   : 'cloud_atmosphere_volume_t162_fw1_address',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 1'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t162_fw2_candidate',
+        [name   : 'cloud_atmosphere_volume_t162_fw2_candidate',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 2'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t162_fw3_descriptor',
+        [name   : 'cloud_atmosphere_volume_t162_fw3_descriptor',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 3'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t162_fw4_shape',
+        [name   : 'cloud_atmosphere_volume_t162_fw4_shape',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 4'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t162_fw5_nodetail',
+        [name   : 'cloud_atmosphere_volume_t162_fw5_nodetail',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 5'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t162_fw6_norain',
+        [name   : 'cloud_atmosphere_volume_t162_fw6_norain',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 6'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t162_fw7_density',
+        [name   : 'cloud_atmosphere_volume_t162_fw7_density',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 7'], keepUniforms: []],
 
         // ------------------------------------------------------------------
@@ -408,21 +408,21 @@ def leanProgramVariants = [
         // ------------------------------------------------------------------
 
         // Production-context cost attribution.
-        [name: 'cloud_atmosphere_volume_t166_nolight',
-         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: [],
+        [name     : 'cloud_atmosphere_volume_t166_nolight',
+         defines  : ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: [],
          overrides: ['uniform int PaDiagnosticLightingMode;':
-                     'const int PaDiagnosticLightingMode = 1;']],
-        [name: 'cloud_atmosphere_volume_t166_nodetail',
+                             'const int PaDiagnosticLightingMode = 1;']],
+        [name   : 'cloud_atmosphere_volume_t166_nodetail',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_NO_DETAIL 1'], keepUniforms: []],
 
         // PM idea C - cheaper lighting density, one lever per arm.
-        [name: 'cloud_atmosphere_volume_t166_lightnodetail',
+        [name   : 'cloud_atmosphere_volume_t166_lightnodetail',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_NO_DETAIL 1'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_lightsteps2',
+        [name   : 'cloud_atmosphere_volume_t166_lightsteps2',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEPS 2'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_lightwide',
+        [name   : 'cloud_atmosphere_volume_t166_lightwide',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEP_WIDE 1.6'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_lightearlyout',
+        [name   : 'cloud_atmosphere_volume_t166_lightearlyout',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_EARLY_OUT 3.0'], keepUniforms: []],
         // The combined PMWeather-shaped lighting evaluator.
         [name: 'cloud_atmosphere_volume_t166_lightcheap',
@@ -431,15 +431,15 @@ def leanProgramVariants = [
                    'PA_ARM_LIGHT_EARLY_OUT 3.0'], keepUniforms: []],
 
         // PM ideas A, B, D, E, F.
-        [name: 'cloud_atmosphere_volume_t166_diststep',
+        [name   : 'cloud_atmosphere_volume_t166_diststep',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DISTANCE_STEP 1.0'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_emptyjump',
+        [name   : 'cloud_atmosphere_volume_t166_emptyjump',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_EMPTY_JUMP 4.0'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_distlod',
+        [name   : 'cloud_atmosphere_volume_t166_distlod',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DISTANCE_LOD 0.35'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_earlyterm',
+        [name   : 'cloud_atmosphere_volume_t166_earlyterm',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_EARLY_TERM 0.06'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_noscenelimit',
+        [name   : 'cloud_atmosphere_volume_t166_noscenelimit',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_NO_SCENE_LIMIT 1'], keepUniforms: []],
 
         // Stacking arm. The only way to measure overlap rather than assume it.
@@ -452,23 +452,23 @@ def leanProgramVariants = [
         // Post-T163 fixed-work ladder. Identical control flow to the T162
         // ladder, but with the rain branch compiled out so the rungs describe
         // the density call production actually makes today.
-        [name: 'cloud_atmosphere_volume_t166_fw1_address',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 1'],
+        [name        : 'cloud_atmosphere_volume_t166_fw1_address',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_fw2_candidate',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 2'],
+        [name        : 'cloud_atmosphere_volume_t166_fw2_candidate',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 2'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_fw3_descriptor',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 3'],
+        [name        : 'cloud_atmosphere_volume_t166_fw3_descriptor',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 3'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_fw4_shape',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 4'],
+        [name        : 'cloud_atmosphere_volume_t166_fw4_shape',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 4'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_fw5_nodetail',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 5'],
+        [name        : 'cloud_atmosphere_volume_t166_fw5_nodetail',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 5'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_fw6_density',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 6'],
+        [name        : 'cloud_atmosphere_volume_t166_fw6_density',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 6'],
          keepUniforms: []],
 
         // T153 empty-space oracle, re-derived on a lean program. The historical
@@ -476,24 +476,24 @@ def leanProgramVariants = [
         // current. These keep the oracle selector, its base size and its
         // interval sampler, because the capture pass and the timed replay both
         // run on this one program exactly as the monolith runs them.
-        [name: 'cloud_atmosphere_volume_t166_oracle_empty',
-         defines: ['PA_PRECIPITATION_ABSENT 1'],
+        [name        : 'cloud_atmosphere_volume_t166_oracle_empty',
+         defines     : ['PA_PRECIPITATION_ABSENT 1'],
          keepUniforms: ['PaOraclePass', 'PaOracleBaseSize'],
          keepSamplers: ['OracleIntervalSampler'],
-         overrides: ['uniform int PaDiagnosticOptimizationMode;':
-                     'const int PaDiagnosticOptimizationMode = 4096;']],
-        [name: 'cloud_atmosphere_volume_t166_oracle_intervals',
-         defines: ['PA_PRECIPITATION_ABSENT 1'],
+         overrides   : ['uniform int PaDiagnosticOptimizationMode;':
+                                'const int PaDiagnosticOptimizationMode = 4096;']],
+        [name        : 'cloud_atmosphere_volume_t166_oracle_intervals',
+         defines     : ['PA_PRECIPITATION_ABSENT 1'],
          keepUniforms: ['PaOraclePass', 'PaOracleBaseSize'],
          keepSamplers: ['OracleIntervalSampler'],
-         overrides: ['uniform int PaDiagnosticOptimizationMode;':
-                     'const int PaDiagnosticOptimizationMode = 8192;']],
-        [name: 'cloud_atmosphere_volume_t166_oracle_combined',
-         defines: ['PA_PRECIPITATION_ABSENT 1'],
+         overrides   : ['uniform int PaDiagnosticOptimizationMode;':
+                                'const int PaDiagnosticOptimizationMode = 8192;']],
+        [name        : 'cloud_atmosphere_volume_t166_oracle_combined',
+         defines     : ['PA_PRECIPITATION_ABSENT 1'],
          keepUniforms: ['PaOraclePass', 'PaOracleBaseSize'],
          keepSamplers: ['OracleIntervalSampler'],
-         overrides: ['uniform int PaDiagnosticOptimizationMode;':
-                     'const int PaDiagnosticOptimizationMode = 28672;']],
+         overrides   : ['uniform int PaDiagnosticOptimizationMode;':
+                                'const int PaDiagnosticOptimizationMode = 28672;']],
 
         // ------------------------------------------------------------------
         // T167. Three independent questions, measured separately before any
@@ -508,43 +508,43 @@ def leanProgramVariants = [
         // Task 1. Graded exterior fine-step curves. Each keeps PaOracleBaseSize
         // as a uniform because the footprint curve needs the live cloud-target
         // height, and the renderer uploads it on every frame.
-        [name: 'cloud_atmosphere_volume_t167_curve_a_late',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 1'],
+        [name        : 'cloud_atmosphere_volume_t167_curve_a_late',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 1'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t167_curve_b_smooth',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 2'],
+        [name        : 'cloud_atmosphere_volume_t167_curve_b_smooth',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 2'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t167_curve_c_capped',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 3'],
+        [name        : 'cloud_atmosphere_volume_t167_curve_c_capped',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 3'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t167_curve_d_footprint',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 4'],
+        [name        : 'cloud_atmosphere_volume_t167_curve_d_footprint',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 4'],
          keepUniforms: ['PaOracleBaseSize']],
         // The same footprint curve with the empty-span scan held at production
         // spacing, to separate scan-lattice misses from coarser integration as
         // the source of the thin-material loss.
-        [name: 'cloud_atmosphere_volume_t167_curve_d_scanfixed',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 4',
-                   'PA_ARM_SCAN_LATTICE_FIXED 1'],
+        [name        : 'cloud_atmosphere_volume_t167_curve_d_scanfixed',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 4',
+                        'PA_ARM_SCAN_LATTICE_FIXED 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // Task 2. Nearest-K descriptor owner cap.
-        [name: 'cloud_atmosphere_volume_t167_k1',
+        [name   : 'cloud_atmosphere_volume_t167_k1',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 1'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t167_k2',
+        [name   : 'cloud_atmosphere_volume_t167_k2',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 2'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t167_k3',
+        [name   : 'cloud_atmosphere_volume_t167_k3',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 3'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t167_k4',
+        [name   : 'cloud_atmosphere_volume_t167_k4',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 4'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t167_k6',
+        [name   : 'cloud_atmosphere_volume_t167_k6',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 6'], keepUniforms: []],
 
         // Task 3. Safer early-termination thresholds. Production is 0.015 and
         // T166 measured 0.06; these fill the interval.
-        [name: 'cloud_atmosphere_volume_t167_term030',
+        [name   : 'cloud_atmosphere_volume_t167_term030',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_EARLY_TERM 0.030'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t167_term045',
+        [name   : 'cloud_atmosphere_volume_t167_term045',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_EARLY_TERM 0.045'], keepUniforms: []],
 
         // Task 4. The combined stacks. Descriptor nearest-K is deliberately
@@ -555,15 +555,15 @@ def leanProgramVariants = [
         // empty-span scan at production spacing, which is where most of the
         // thin-material loss was traced to, and adds the safer termination
         // floor.
-        [name: 'cloud_atmosphere_volume_t167_stack_balanced',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 4',
-                   'PA_ARM_SCAN_LATTICE_FIXED 1', 'PA_ARM_EARLY_TERM 0.045'],
+        [name        : 'cloud_atmosphere_volume_t167_stack_balanced',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 4',
+                        'PA_ARM_SCAN_LATTICE_FIXED 1', 'PA_ARM_EARLY_TERM 0.045'],
          keepUniforms: ['PaOracleBaseSize']],
         // SAFE takes the late-ramp curve, which recovered essentially all thin
         // material, and the same termination floor.
-        [name: 'cloud_atmosphere_volume_t167_stack_safe',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 1',
-                   'PA_ARM_EARLY_TERM 0.045'],
+        [name        : 'cloud_atmosphere_volume_t167_stack_safe',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 1',
+                        'PA_ARM_EARLY_TERM 0.045'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // ------------------------------------------------------------------
@@ -573,27 +573,27 @@ def leanProgramVariants = [
         // PaOracleBaseSize carries the live cloud-target height the derivation
         // needs and must survive specialization.
         // ------------------------------------------------------------------
-        [name: 'cloud_atmosphere_volume_t168_fp_conservative',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.35',
-                   'PA_ARM_FOOTPRINT_MAX 4.0'],
+        [name        : 'cloud_atmosphere_volume_t168_fp_conservative',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.35',
+                        'PA_ARM_FOOTPRINT_MAX 4.0'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t168_fp_balanced',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.50',
-                   'PA_ARM_FOOTPRINT_MAX 4.0'],
+        [name        : 'cloud_atmosphere_volume_t168_fp_balanced',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.50',
+                        'PA_ARM_FOOTPRINT_MAX 4.0'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t168_fp_aggressive',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0'],
+        [name        : 'cloud_atmosphere_volume_t168_fp_aggressive',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0'],
          keepUniforms: ['PaOracleBaseSize']],
         // Combined stacks: a footprint curve plus the reconfirmed termination
         // floor. Two, so the winning curve is not guessed before the run.
-        [name: 'cloud_atmosphere_volume_t168_stack',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.35',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
+        [name        : 'cloud_atmosphere_volume_t168_stack',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.35',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t168_stack_balanced',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.50',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
+        [name        : 'cloud_atmosphere_volume_t168_stack_balanced',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.50',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // ------------------------------------------------------------------
@@ -605,48 +605,48 @@ def leanProgramVariants = [
         // 6 -> 2 cut was fast and visibly flattened self-shadowing, so 5 and 4
         // are measured separately instead of repeating it.
         // ------------------------------------------------------------------
-        [name: 'cloud_atmosphere_volume_t169_lightsteps5',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEPS 5'],
+        [name        : 'cloud_atmosphere_volume_t169_lightsteps5',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEPS 5'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t169_lightsteps4',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEPS 4'],
+        [name        : 'cloud_atmosphere_volume_t169_lightsteps4',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEPS 4'],
          keepUniforms: []],
         // Cone early-out at the validated transmittance floor rather than the
         // 28.0 optical depth no exterior cone ever reaches.
-        [name: 'cloud_atmosphere_volume_t169_lightearlyout2',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_EARLY_OUT 2.0'],
+        [name        : 'cloud_atmosphere_volume_t169_lightearlyout2',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_EARLY_OUT 2.0'],
          keepUniforms: []],
 
         // Detail gated by projected footprint - the T168 relation applied to
         // the detail wavelength. PaOracleBaseSize carries the live target
         // height the derivation needs and must survive specialization.
-        [name: 'cloud_atmosphere_volume_t169_detailfp_conservative',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DETAIL_FOOTPRINT 0.5'],
+        [name        : 'cloud_atmosphere_volume_t169_detailfp_conservative',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DETAIL_FOOTPRINT 0.5'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t169_detailfp_balanced',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DETAIL_FOOTPRINT 1.0'],
+        [name        : 'cloud_atmosphere_volume_t169_detailfp_balanced',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DETAIL_FOOTPRINT 1.0'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t169_detailfp_aggressive',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DETAIL_FOOTPRINT 1.5'],
+        [name        : 'cloud_atmosphere_volume_t169_detailfp_aggressive',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DETAIL_FOOTPRINT 1.5'],
          keepUniforms: ['PaOracleBaseSize']],
         // Ceiling: all detail removed. Not shippable, it bounds what any
         // detail LOD can return.
-        [name: 'cloud_atmosphere_volume_t169_nodetail',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_NO_DETAIL 1'],
+        [name        : 'cloud_atmosphere_volume_t169_nodetail',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_NO_DETAIL 1'],
          keepUniforms: []],
 
         // Task 5 stacks. Both carry the T168 winners plus the lighting and
         // detail candidates, so the combination is measured rather than
         // multiplied out of the independent arms.
-        [name: 'cloud_atmosphere_volume_t169_stack_safe',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.35',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 5'],
+        [name        : 'cloud_atmosphere_volume_t169_stack_safe',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.35',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 5'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t169_stack_fast',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
+        [name        : 'cloud_atmosphere_volume_t169_stack_fast',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // ------------------------------------------------------------------
@@ -668,40 +668,40 @@ def leanProgramVariants = [
         // identical images - the clamp no longer binds above ~5 - while max4,
         // where it does bind, was 41% faster at FAR than any of them. The
         // ceiling was never the limit; the step growth itself is.
-        [name: 'cloud_atmosphere_volume_t170_fpmax3',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 3.0', 'PA_ARM_EARLY_TERM 0.045'],
+        [name        : 'cloud_atmosphere_volume_t170_fpmax3',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 3.0', 'PA_ARM_EARLY_TERM 0.045'],
          keepUniforms: ['PaOracleBaseSize']],
         // Ceiling, not a candidate: PA_ARM_DESC_HOIST substitutes a constant
         // edge width and so renders an invalid image. A real hoist computes
         // the same value once per descriptor per frame and is image-identical.
         // This measures whether the stack plus a perfect hoist reaches budget.
-        [name: 'cloud_atmosphere_volume_t170_stack_hoist',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_HOIST 1'],
+        [name        : 'cloud_atmosphere_volume_t170_stack_hoist',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_HOIST 1'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t170_stack3',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 3.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
+        [name        : 'cloud_atmosphere_volume_t170_stack3',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 3.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t170_fpmax4',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
+        [name        : 'cloud_atmosphere_volume_t170_fpmax4',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t170_fpmax5',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 5.0', 'PA_ARM_EARLY_TERM 0.045'],
+        [name        : 'cloud_atmosphere_volume_t170_fpmax5',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 5.0', 'PA_ARM_EARLY_TERM 0.045'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t170_fpmax6',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 6.0', 'PA_ARM_EARLY_TERM 0.045'],
+        [name        : 'cloud_atmosphere_volume_t170_fpmax6',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 6.0', 'PA_ARM_EARLY_TERM 0.045'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t170_fpmax8',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 8.0', 'PA_ARM_EARLY_TERM 0.045'],
+        [name        : 'cloud_atmosphere_volume_t170_fpmax8',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 8.0', 'PA_ARM_EARLY_TERM 0.045'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // Tasks 2/3/4 - attribution of what a primary density sample pays per
@@ -712,33 +712,33 @@ def leanProgramVariants = [
         // Every one of these is visually invalid by construction. They bound
         // cost; none is a production candidate, and the sandbox invariant
         // keeps all of them out of FINAL.
-        [name: 'cloud_atmosphere_volume_t170_desc_constfetch',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_CONST_FETCH 1'],
+        [name        : 'cloud_atmosphere_volume_t170_desc_constfetch',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_CONST_FETCH 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t170_desc_constedge',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_CONST_EDGE 1'],
+        [name        : 'cloud_atmosphere_volume_t170_desc_constedge',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_CONST_EDGE 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t170_desc_cheapowner',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_CHEAP_OWNERSHIP 1'],
+        [name        : 'cloud_atmosphere_volume_t170_desc_cheapowner',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_CHEAP_OWNERSHIP 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t170_desc_nosdf',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_NO_EXACT_SDF 1'],
+        [name        : 'cloud_atmosphere_volume_t170_desc_nosdf',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_NO_EXACT_SDF 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t170_desc_hardunion',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_HARD_UNION 1'],
+        [name        : 'cloud_atmosphere_volume_t170_desc_hardunion',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_HARD_UNION 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t170_desc_hoist',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_HOIST 1'],
+        [name        : 'cloud_atmosphere_volume_t170_desc_hoist',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_HOIST 1'],
          keepUniforms: []],
 
         // Task 6 stacks. T169's stack_fast carried forward unchanged except
         // for the clamp, so the campaign's own lever is the only difference
         // from the banked configuration. Two, so the clamp is not guessed
         // before the sweep reports.
-        [name: 'cloud_atmosphere_volume_t170_stack',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 6.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
+        [name        : 'cloud_atmosphere_volume_t170_stack',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 6.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
          keepUniforms: ['PaOracleBaseSize']],
         // ------------------------------------------------------------------
         // T171 program-identity controls. Exactly FINAL's defines and
@@ -786,68 +786,68 @@ def leanProgramVariants = [
         // including the productionized precompute, so they differ from the
         // shipped program only in the lighting lever each names.
         // ------------------------------------------------------------------
-        [name: 'cloud_atmosphere_volume_t176_nolight',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t176_nolight',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: [],
-         overrides: ['uniform int PaDiagnosticLightingMode;':
-                     'const int PaDiagnosticLightingMode = 1;']],
-        [name: 'cloud_atmosphere_volume_t176_light3',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_LIGHT_STEPS 3'],
+         overrides   : ['uniform int PaDiagnosticLightingMode;':
+                                'const int PaDiagnosticLightingMode = 1;']],
+        [name        : 'cloud_atmosphere_volume_t176_light3',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_LIGHT_STEPS 3'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t176_light2',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_LIGHT_STEPS 2'],
-         keepUniforms: []],
-
-        [name: 'cloud_atmosphere_volume_t175_density_every2',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_DENSITY_EVERY_2 1'],
-         keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t175_clearance_first_group',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_CLEARANCE_FIRST_GROUP 1'],
+        [name        : 'cloud_atmosphere_volume_t176_light2',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_LIGHT_STEPS 2'],
          keepUniforms: []],
 
-        [name: 'cloud_atmosphere_volume_t174_first_group_only',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_FIRST_GROUP_ONLY 1'],
+        [name        : 'cloud_atmosphere_volume_t175_density_every2',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_DENSITY_EVERY_2 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t174_group2_no_sdf',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_GROUP2_NO_SDF 1'],
+        [name        : 'cloud_atmosphere_volume_t175_clearance_first_group',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_CLEARANCE_FIRST_GROUP 1'],
          keepUniforms: []],
 
-        [name: 'cloud_atmosphere_volume_t173_boxbound',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_BOX_BOUND 1'],
+        [name        : 'cloud_atmosphere_volume_t174_first_group_only',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_FIRST_GROUP_ONLY 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t173_boxbound_pre',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_BOX_BOUND 1',
-                   'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t174_group2_no_sdf',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_GROUP2_NO_SDF 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t173_stack_boxbound_pre',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_BOX_BOUND 1'],
+
+        [name        : 'cloud_atmosphere_volume_t173_boxbound',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_BOX_BOUND 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t173_boxbound_pre',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_BOX_BOUND 1',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t173_stack_boxbound_pre',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_BOX_BOUND 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
-        [name: 'cloud_atmosphere_volume_t172_pre_edge',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE_EDGE 1'],
+        [name        : 'cloud_atmosphere_volume_t172_pre_edge',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE_EDGE 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t172_pre_owner',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE_OWNER 1'],
+        [name        : 'cloud_atmosphere_volume_t172_pre_owner',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE_OWNER 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t172_pre_both',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t172_pre_both',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: []],
         // The validated T169 stack with the precompute added, which is the
         // configuration that would actually ship.
-        [name: 'cloud_atmosphere_volume_t172_stack_pre',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t172_stack_pre',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // T176 Task 8. The stack bakes PA_ARM_LIGHT_STEPS 4, which the
@@ -855,19 +855,19 @@ def leanProgramVariants = [
         // light reduction at all. These price the light march ON the stack,
         // because the brief forbids inferring stack speedups by multiplying
         // anchor-relative ratios.
-        [name: 'cloud_atmosphere_volume_t176_stack_nolight',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t176_stack_nolight',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize'],
-         overrides: ['uniform int PaDiagnosticLightingMode;':
-                     'const int PaDiagnosticLightingMode = 1;']],
-        [name: 'cloud_atmosphere_volume_t176_stack_light3',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
-                   'PA_ARM_DESC_PRECOMPUTE 1'],
+         overrides   : ['uniform int PaDiagnosticLightingMode;':
+                                'const int PaDiagnosticLightingMode = 1;']],
+        [name        : 'cloud_atmosphere_volume_t176_stack_light3',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
         // T188 Task 0. The rain-only capture pair. These render the rain
         // contribution alone - optical mass, onset and termination height, and
@@ -879,12 +879,12 @@ def leanProgramVariants = [
         // behind a define rather than a DebugView because every lean program
         // bakes DebugView to 0, so a runtime view could only ever be rendered
         // by the monolith - and the arms are exactly what has to be measured.
-        [name: 'cloud_atmosphere_volume_t188_rain_mask_ref',
-         defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+        [name        : 'cloud_atmosphere_volume_t188_rain_mask_ref',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t188_rain_mask_field',
-         defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
-                   'PA_ARM_RAIN_OWN_BILINEAR 1'],
+        [name        : 'cloud_atmosphere_volume_t188_rain_mask_field',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                        'PA_ARM_RAIN_OWN_BILINEAR 1'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
 
         // T194. Pricing only: no field is built and nothing is wired into the
@@ -897,23 +897,23 @@ def leanProgramVariants = [
         // is no PA_ARM_NO_LIGHT define; the probe is removed by its own define.
         // Composing the two exactly as their single-consumer arms do is what
         // makes this ceiling comparable to T193's.
-        [name: 'cloud_atmosphere_volume_t194_noboth',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_NO_PROBE 1'],
+        [name        : 'cloud_atmosphere_volume_t194_noboth',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_PROBE 1'],
          keepUniforms: [],
-         overrides: ['uniform int PaDiagnosticLightingMode;':
-                     'const int PaDiagnosticLightingMode = 1;']],
-        [name: 'cloud_atmosphere_volume_t194_slices16',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_FIELD_SLICES 16'],
+         overrides   : ['uniform int PaDiagnosticLightingMode;':
+                                'const int PaDiagnosticLightingMode = 1;']],
+        [name        : 'cloud_atmosphere_volume_t194_slices16',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_FIELD_SLICES 16'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
-        [name: 'cloud_atmosphere_volume_t194_slices32',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_FIELD_SLICES 32'],
+        [name        : 'cloud_atmosphere_volume_t194_slices32',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_FIELD_SLICES 32'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
-        [name: 'cloud_atmosphere_volume_t194_slices64',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_FIELD_SLICES 64'],
+        [name        : 'cloud_atmosphere_volume_t194_slices64',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_FIELD_SLICES 64'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
 
         // T195. The lookup side of the shared field, priced without building
@@ -934,20 +934,20 @@ def leanProgramVariants = [
         // T192. The closed-form ownership bound as classification triage.
         // Three arms only, and the campaign-scoped loading T191 added means
         // they cost nothing on an ordinary startup.
-        [name: 'cloud_atmosphere_volume_t192_field_bound',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t192_field_bound',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled',
                         'PaRainFieldConservative', 'PaRainFieldClosedForm']],
-        [name: 'cloud_atmosphere_volume_t192_stack_bound',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t192_stack_bound',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize', 'PaRainFieldPass',
                         'PaRainFieldEnabled', 'PaRainFieldConservative',
                         'PaRainFieldClosedForm']],
-        [name: 'cloud_atmosphere_volume_t192_rain_mask_bound',
-         defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+        [name        : 'cloud_atmosphere_volume_t192_rain_mask_bound',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled',
                         'PaRainFieldConservative', 'PaRainFieldClosedForm']],
 
@@ -956,19 +956,19 @@ def leanProgramVariants = [
         // those cells are answered by the exact evaluation instead. Three arms
         // only - the field, its stack, and the rain-only capture - because the
         // variant count is already near the level that failed a shader load.
-        [name: 'cloud_atmosphere_volume_t190_field_safe',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t190_field_safe',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled',
                         'PaRainFieldConservative']],
-        [name: 'cloud_atmosphere_volume_t190_stack_safe',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t190_stack_safe',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize', 'PaRainFieldPass',
                         'PaRainFieldEnabled', 'PaRainFieldConservative']],
-        [name: 'cloud_atmosphere_volume_t190_rain_mask_safe',
-         defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+        [name        : 'cloud_atmosphere_volume_t190_rain_mask_safe',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled',
                         'PaRainFieldConservative']],
 
@@ -976,26 +976,26 @@ def leanProgramVariants = [
         // attach height keep their filtering. This is the candidate; the two
         // T188 arms above are the same field with the bilinear ownership that
         // produced 10.6-15.6% false rain, kept so the fix has a baseline.
-        [name: 'cloud_atmosphere_volume_t189_field_nearest',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t189_field_nearest',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
-        [name: 'cloud_atmosphere_volume_t189_stack_nearest',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t189_stack_nearest',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize', 'PaRainFieldPass',
                         'PaRainFieldEnabled']],
-        [name: 'cloud_atmosphere_volume_t189_rain_mask_nearest',
-         defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+        [name        : 'cloud_atmosphere_volume_t189_rain_mask_nearest',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
         // Task 5 diagnostic: the erosion side of the same trade, so dilation
         // and erosion are priced against each other rather than one being
         // assumed worse. Never a production candidate - a threshold is a tuning
         // knob standing in for a type error.
-        [name: 'cloud_atmosphere_volume_t189_rain_mask_strict',
-         defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
-                   'PA_ARM_RAIN_OWN_STRICT 1'],
+        [name        : 'cloud_atmosphere_volume_t189_rain_mask_strict',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                        'PA_ARM_RAIN_OWN_STRICT 1'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
 
         // T188. The REAL rain-support field. The generation pass and the
@@ -1005,21 +1005,21 @@ def leanProgramVariants = [
         //
         // Both are campaign variants, not production programs: FINAL bakes
         // PaRainFieldPass and PaRainFieldEnabled to 0 and is unchanged.
-        [name: 'cloud_atmosphere_volume_t188_field_real',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_RAIN_OWN_BILINEAR 1'],
+        [name        : 'cloud_atmosphere_volume_t188_field_real',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_OWN_BILINEAR 1'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
         // The exactness arm. It generates the field and still marches the exact
         // descriptor path, so one frame carries both the ground truth and the
         // field that has to reproduce it.
-        [name: 'cloud_atmosphere_volume_t188_field_generate_only',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t188_field_generate_only',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaRainFieldPass']],
-        [name: 'cloud_atmosphere_volume_t188_stack_field',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t188_stack_field',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize', 'PaRainFieldPass',
                         'PaRainFieldEnabled']],
 
@@ -1027,15 +1027,15 @@ def leanProgramVariants = [
         // inside localRainSupportAt becomes free, which is the most any
         // precomputed field could achieve since a real lookup costs more than
         // nothing. Image-invalid by construction; a bound, not a candidate.
-        [name: 'cloud_atmosphere_volume_t187_field_oracle',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_RAIN_FIELD_ORACLE 1'],
+        [name        : 'cloud_atmosphere_volume_t187_field_oracle',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_FIELD_ORACLE 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t187_stack_field',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_FIELD_ORACLE 1'],
+        [name        : 'cloud_atmosphere_volume_t187_stack_field',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_FIELD_ORACLE 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // T186. One rain-support sample per coarse segment instead of two.
@@ -1043,23 +1043,23 @@ def leanProgramVariants = [
         // true into false - it can miss rain, never invent it. The midpoint is
         // the least biased single probe; the two Gauss nodes bound the bias
         // either way.
-        [name: 'cloud_atmosphere_volume_t186_one_mid',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_RAIN_ONE_MID 1'],
+        [name        : 'cloud_atmosphere_volume_t186_one_mid',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_ONE_MID 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t186_one_a',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_RAIN_ONE_A 1'],
+        [name        : 'cloud_atmosphere_volume_t186_one_a',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_ONE_A 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t186_one_b',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_RAIN_ONE_B 1'],
+        [name        : 'cloud_atmosphere_volume_t186_one_b',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_ONE_B 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t186_stack_one_mid',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_ONE_MID 1'],
+        [name        : 'cloud_atmosphere_volume_t186_stack_one_mid',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_ONE_MID 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // T185. The rain ownership prune. The shipped envelope stacks three
@@ -1067,85 +1067,85 @@ def leanProgramVariants = [
         // circumcircle - and the tight arm removes the last two while keeping
         // the same guarantee. The exact arm bounds what any geometric prune
         // could return.
-        [name: 'cloud_atmosphere_volume_t185_tight_prune',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_RAIN_TIGHT_PRUNE 1'],
+        [name        : 'cloud_atmosphere_volume_t185_tight_prune',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_TIGHT_PRUNE 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t185_exact_prune',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_RAIN_EXACT_PRUNE 1'],
+        [name        : 'cloud_atmosphere_volume_t185_exact_prune',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_EXACT_PRUNE 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t185_stack_tight',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_TIGHT_PRUNE 1'],
+        [name        : 'cloud_atmosphere_volume_t185_stack_tight',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_TIGHT_PRUNE 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // T184. A one-entry cache on localRainSupportAt keyed on exact XZ
         // equality. Exact by construction: the function is a pure function of
         // worldXZ within a frame, so an identical XZ must yield an identical
         // result. Rain rendering is untouched.
-        [name: 'cloud_atmosphere_volume_t184_reuse_exact',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_RAIN_REUSE_EXACT 1'],
+        [name        : 'cloud_atmosphere_volume_t184_reuse_exact',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_REUSE_EXACT 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t184_stack_reuse',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_REUSE_EXACT 1'],
+        [name        : 'cloud_atmosphere_volume_t184_stack_reuse',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_REUSE_EXACT 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // T182. The rain-segment reachability test runs on every coarse step
         // and, past its MaxPrecipitation gate, performs two full storm
         // traversals. Removing it uniformly prices the class the T180/T181
         // residual was hiding in.
-        [name: 'cloud_atmosphere_volume_t182_norainseg',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_NO_RAIN_SEGMENT 1'],
+        [name        : 'cloud_atmosphere_volume_t182_norainseg',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_RAIN_SEGMENT 1'],
          keepUniforms: []],
         // Task 8: the best measured probe cap, composed with the stack.
-        [name: 'cloud_atmosphere_volume_t182_stack_probe4',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_CAP 4'],
+        [name        : 'cloud_atmosphere_volume_t182_stack_probe4',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_CAP 4'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t182_stack_probe4_norainseg',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_CAP 4',
-                   'PA_ARM_NO_RAIN_SEGMENT 1'],
+        [name        : 'cloud_atmosphere_volume_t182_stack_probe4_norainseg',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_CAP 4',
+                        'PA_ARM_NO_RAIN_SEGMENT 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // T181. Uniform compile-time caps on the empty-span scan. The loop
         // already exits on material or span end, so these only bind on scans
         // that would have run longer - which is the thing being measured.
-        [name: 'cloud_atmosphere_volume_t181_probe8',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_PROBE_CAP 8'],
+        [name        : 'cloud_atmosphere_volume_t181_probe8',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_PROBE_CAP 8'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t181_probe4',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_PROBE_CAP 4'],
+        [name        : 'cloud_atmosphere_volume_t181_probe4',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_PROBE_CAP 4'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t181_probe2',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_PROBE_CAP 2'],
+        [name        : 'cloud_atmosphere_volume_t181_probe2',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_PROBE_CAP 2'],
          keepUniforms: []],
         // Mandatory: the refinement is 32% of group walks and has never been
         // priced. Removing it leaves no clearance to advance on.
-        [name: 'cloud_atmosphere_volume_t181_norefine',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_NO_REFINE 1'],
+        [name        : 'cloud_atmosphere_volume_t181_norefine',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_REFINE 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t181_stack_probe8',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_CAP 8'],
+        [name        : 'cloud_atmosphere_volume_t181_stack_probe8',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_CAP 8'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // T180. The empty-span probe scan and the bracket bisection are the
@@ -1153,26 +1153,26 @@ def leanProgramVariants = [
         // only whether density exceeds 0.0008, and both are removed here
         // uniformly at compile time - the shape T179 showed is the only one that
         // pays - to bound what each class is worth.
-        [name: 'cloud_atmosphere_volume_t180_noprobe',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_NO_PROBE 1'],
+        [name        : 'cloud_atmosphere_volume_t180_noprobe',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_PROBE 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t180_nobracket',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_NO_BRACKET 1'],
+        [name        : 'cloud_atmosphere_volume_t180_nobracket',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_BRACKET 1'],
          keepUniforms: []],
         // The cheaper-query candidate: probes keep running but drop the
         // subtractive detail erosion, which can only raise the value they test
         // and so can never let the scan advance over material.
-        [name: 'cloud_atmosphere_volume_t180_probe_nodetail',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_PROBE_NO_DETAIL 1'],
+        [name        : 'cloud_atmosphere_volume_t180_probe_nodetail',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_PROBE_NO_DETAIL 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t180_stack_probe',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_NO_DETAIL 1'],
+        [name        : 'cloud_atmosphere_volume_t180_stack_probe',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_NO_DETAIL 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // T179. Dominance pruning. The rejection threshold drops from the
@@ -1180,41 +1180,41 @@ def leanProgramVariants = [
         // union will use for this pair, which is what stormSmoothMinimum's
         // h == 1 condition actually requires. No new payload, no division, no
         // ranking - the blend is hoisted from the union below and reused.
-        [name: 'cloud_atmosphere_volume_t179_dom_exact',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_DOMINANCE_EXACT 1'],
+        [name        : 'cloud_atmosphere_volume_t179_dom_exact',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_DOMINANCE_EXACT 1'],
          keepUniforms: []],
         // The family ceiling: no blend margin at all. Rejects lobes that do move
         // the union through the blend band, so it is image-invalid by
         // construction and bounds the idea rather than implementing it.
-        [name: 'cloud_atmosphere_volume_t179_dom_aggressive',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_DOMINANCE_AGGRESSIVE 1'],
+        [name        : 'cloud_atmosphere_volume_t179_dom_aggressive',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_DOMINANCE_AGGRESSIVE 1'],
          keepUniforms: []],
         // Task 9's fresh stack: the validated components, no light3.
-        [name: 'cloud_atmosphere_volume_t179_stack_dom',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
-                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_DOMINANCE_EXACT 1'],
+        [name        : 'cloud_atmosphere_volume_t179_stack_dom',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_DOMINANCE_EXACT 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // T177. Hard primary-to-light group reuse, alone and on the stack.
-        [name: 'cloud_atmosphere_volume_t177_reuse_hard',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_LIGHT_REUSE_HARD 1'],
+        [name        : 'cloud_atmosphere_volume_t177_reuse_hard',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_LIGHT_REUSE_HARD 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t177_stack_reuse_hard',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
-                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_LIGHT_REUSE_HARD 1'],
+        [name        : 'cloud_atmosphere_volume_t177_stack_reuse_hard',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_LIGHT_REUSE_HARD 1'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t176_stack_light2',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 2',
-                   'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t176_stack_light2',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 2',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
         // These must track FINAL's specialization exactly - including the
@@ -1222,17 +1222,17 @@ def leanProgramVariants = [
         // identity and start measuring a shader difference instead. The T171
         // invariant asserts byte-identity and caught this the moment FINAL
         // changed.
-        [name: 'cloud_atmosphere_volume_t171_dup_a',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t171_dup_a',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t171_dup_b',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+        [name        : 'cloud_atmosphere_volume_t171_dup_b',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: []],
 
-        [name: 'cloud_atmosphere_volume_t170_stack8',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 8.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
+        [name        : 'cloud_atmosphere_volume_t170_stack8',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 8.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
          keepUniforms: ['PaOracleBaseSize']]
 ]
 
@@ -1308,8 +1308,8 @@ tasks.register('generateLeanFinalShader') {
                             + '// Dormant diagnostic selectors are constants here, so the driver\n'
                             + '// eliminates those paths before allocating registers.\n'
                             + (variant.defines.isEmpty()
-                                ? ''
-                                : '// Variant defines: ' + variant.defines.join(', ') + '\n')
+                            ? ''
+                            : '// Variant defines: ' + variant.defines.join(', ') + '\n')
                             + variantSource,
                     'UTF-8')
 
@@ -1551,6 +1551,12 @@ tasks.named('check').configure {
     dependsOn 'stormVolumetricGeometrySandbox'
 }
 
+// Release assembly is intentionally separate from the long-running validation campaign.
+// Invoke `check` explicitly when shader and cloud sandboxes are wanted.
+tasks.named('build').configure {
+    setDependsOn([tasks.named('assemble')])
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.compilerArgs += [
@@ -1616,25 +1622,40 @@ if (modrinthToken) {
     tasks.matching { it.name.toLowerCase().contains("modrinth") }.configureEach { enabled = false }
 }
 def curseForgeToken = System.getenv("CURSEFORGE_TOKEN")?.trim()
-if (curseForgeToken) {
-    curseforge {
-        apiKey = curseForgeToken
+def hasCurseForgeToken = curseForgeToken != null && !curseForgeToken.isEmpty()
 
-        project {
-            id = "1258344"
-            changelog = rootProject.file("PAchangelog.md")
-            releaseType = "release" // options: alpha, beta, release
-            addGameVersion "1.20.1"
-            addGameVersion "Forge"
-            mainArtifact(releaseJarFile.get().asFile) {
-                displayName = "Forge-${version}"
-            }
+if (hasCurseForgeToken) {
+    publisher {
+        apiKeys {
+            curseforge curseForgeToken
         }
+
+        setCurseID("1258344")
+        setVersionType("release")
+        setChangelog(rootProject.file("PAchangelog.md"))
+        setDisplayName("Forge-${project.version}")
+        setGameVersions("1.20.1")
+        setLoaders("forge")
+        setCurseEnvironment("both")
+        getJavaVersions().set([JavaVersion.VERSION_17])
+
+        setArtifact(releaseJarFile.get().asFile)
+
+        setDebug(
+                providers.gradleProperty("publisherDebug")
+                        .map { it.toBoolean() }
+                        .orElse(false)
+                        .get()
+        )
     }
 } else {
     logger.lifecycle("CURSEFORGE_TOKEN not set; CurseForge upload tasks will be disabled.")
-    tasks.matching { it.name.toLowerCase().contains("curseforge") }.configureEach { enabled = false }
+
+    tasks.named("publishCurseforge").configure {
+        enabled = false
+    }
 }
+
 publishing {
     publications {
         mavenJava(MavenPublication) {

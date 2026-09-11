@@ -1,3 +1,13 @@
+# Project Atmosphere 0.9.3.1
+## Compat with Project Landscape
+* Fixed a stall bug when loading world with PA and Project Landscape.
+---
+# Project Atmosphere 0.9.3
+## Compat with Project Landscape
+* Added a new compatibility layer for Project Landscape, which allows for better integration of weather and landscape features.
+* Removed the old fog created when entering a cloud.
+* [Project Landscape](https://github.com/Project-Landscape/Project-Landscape)
+
 # Project Atmosphere 0.9.2
 
 ## Small Fixes And Compatibility

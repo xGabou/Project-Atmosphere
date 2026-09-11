@@ -5,7 +5,9 @@ import net.Gabou.projectatmosphere.api.common.cloud.region.ScAPICloudRegionTorna
 import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.util.ICloudRegionId;
+import net.Gabou.projectatmosphere.compat.projectlandscape.ProjectLandscapeForecastCompat;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -14,6 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.phys.Vec2;
 import org.spongepowered.asm.mixin.Mixin;
@@ -188,7 +191,22 @@ public abstract class CloudRegionMixin implements ICloudRegionId, ITornadoRegion
     @Unique
     private void projectatmosphere$applyBiomeDynamics(Level level) {
         BlockPos pos = BlockPos.containing(this.getWorldX(), level.getSeaLevel(), this.getWorldZ());
-        Biome biome = level.getBiome(pos).value();
+        Biome biome;
+        if (level instanceof ServerLevel server) {
+            // Pending PL preparation is a deliberate no-op for this tick. Do not call
+            // level.getBiome(), which would synchronously enter PL world generation.
+            var landscape = ProjectLandscapeForecastCompat.open(server).orElse(null);
+            if (landscape != null) {
+                var id = landscape.biomeId(pos.getX(), pos.getZ()).orElse(null);
+                if (id == null) return;
+                biome = server.registryAccess().registryOrThrow(Registries.BIOME).get(id);
+                if (biome == null) return;
+            } else {
+                biome = level.getBiome(pos).value();
+            }
+        } else {
+            biome = level.getBiome(pos).value();
+        }
         float humidity = biome.getModifiedClimateSettings().downfall();
         float temperature = Mth.clamp(biome.getBaseTemperature() * 50.0F, -20.0F, 50.0F);
         if (!this.projectatmosphere$hasAccumulatedBiomeMinutes(pos, humidity)) {

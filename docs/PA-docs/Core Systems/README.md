@@ -4,6 +4,10 @@ This folder is the main reference point for weather, cloud, storm, and renderer-
 
 ## Start Here
 
+For the forecast engine and non-cloud atmosphere simulation: `forecast-and-atmosphere-internals.md`.
+It explains the forecast baseline, persistent live state, simulated variables, current limits, and
+which weather systems are still partial or compatibility-bound.
+
 For cloud rendering specifically: `Clouds/CLOUD_RENDERING_OVERVIEW.md` — current as of 2026-08-15,
 verified against a live client. It supersedes the reading list that used to be here; those planning
 docs (`cloud_backend_start_here.md`, `cloud_render_data_contract.md`,
