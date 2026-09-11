@@ -181,30 +181,54 @@ public final class VolumetricCloudRenderTargets {
         return rainFieldTarget;
     }
 
-    /** T196. 256x256x32 nodes as an 8x4 atlas of 256x256 tiles. */
-    public static final int STORM_FIELD_ATLAS_WIDTH = 2048;
-    public static final int STORM_FIELD_ATLAS_HEIGHT = 1024;
+    /**
+     * T196. The field atlas: 8x4 tiles of one slice each, XZ nodes square.
+     * T197. Sized from the resolution the campaign selects, so 256 is a
+     * 2048x1024 atlas (8.4 MB), 384 is 3072x1536 (18.9 MB) and 512 is
+     * 4096x2048 (33.6 MB); a change of resolution reallocates both targets.
+     */
     private static RenderTarget stormFieldTarget;
+    private static int stormFieldTargetXZ;
     private static RenderTarget stormFieldOracleTarget;
+    private static int stormFieldOracleTargetXZ;
+
+    /** T197. The resolution the resident field atlas was allocated for, 0 when none. */
+    public static int stormFieldTargetXZ() {
+        return stormFieldTarget == null ? 0 : stormFieldTargetXZ;
+    }
 
     /**
-     * T196. The shared storm field: RG16F, four bytes a node, 8.4 MB.
+     * T196. The shared storm field: RG16F, four bytes a node.
      * LINEAR for the light cone's bilinear reads within a tile; the probe
      * reads it with texelFetch and is unaffected.
      */
-    public static RenderTarget prepareStormFieldTarget() {
+    public static RenderTarget prepareStormFieldTarget(int xz) {
+        if (stormFieldTarget != null && stormFieldTargetXZ != xz) {
+            stormFieldTarget.destroyBuffers();
+            stormFieldTarget = null;
+        }
         if (stormFieldTarget == null) {
             stormFieldTarget = createRg16fMap(
-                    STORM_FIELD_ATLAS_WIDTH, STORM_FIELD_ATLAS_HEIGHT, GL11.GL_LINEAR);
+                    StormFieldGeometry.atlasWidth(xz), StormFieldGeometry.atlasHeight(xz),
+                    GL11.GL_LINEAR);
+            stormFieldTargetXZ = xz;
+            // The memory the report quotes is what was actually allocated.
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T197_FIELD_ALLOC format=RG16F {}", StormFieldGeometry.describe(xz));
         }
         return stormFieldTarget;
     }
 
     /** T196. The soundness oracle's pair, full float so the CPU can compare exactly. */
-    public static RenderTarget prepareStormFieldOracleTarget() {
+    public static RenderTarget prepareStormFieldOracleTarget(int xz) {
+        if (stormFieldOracleTarget != null && stormFieldOracleTargetXZ != xz) {
+            releaseStormFieldOracleTarget();
+        }
         if (stormFieldOracleTarget == null) {
             stormFieldOracleTarget = createFloatMap(
-                    STORM_FIELD_ATLAS_WIDTH, STORM_FIELD_ATLAS_HEIGHT, GL11.GL_NEAREST);
+                    StormFieldGeometry.atlasWidth(xz), StormFieldGeometry.atlasHeight(xz),
+                    GL11.GL_NEAREST);
+            stormFieldOracleTargetXZ = xz;
         }
         return stormFieldOracleTarget;
     }

@@ -103,6 +103,22 @@ public final class VolumetricCloudDebugConfig {
         stormFieldSoundnessRequested = false;
         return requested;
     }
+
+    /**
+     * T197. The field's horizontal node count, {@code PaStormFieldXZ}. The
+     * renderer allocates the atlas from it and uploads it every frame, so
+     * the Java allocation and the shader's node mapping cannot disagree; the
+     * campaign sets it per arm. Y is fixed; see {@link StormFieldGeometry}.
+     */
+    private static volatile int stormFieldXZ = StormFieldGeometry.DEFAULT_XZ;
+
+    public static int stormFieldXZ() {
+        return stormFieldXZ;
+    }
+
+    public static void setStormFieldXZ(int xz) {
+        stormFieldXZ = StormFieldGeometry.supported(xz) ? xz : StormFieldGeometry.DEFAULT_XZ;
+    }
     private static volatile boolean sceneRayLimitEnabled = true;
     // Uniform ray probes can miss narrow world-space cloud footprints and cut
     // complete horizontal bands from an otherwise valid volume. Keep the A/B

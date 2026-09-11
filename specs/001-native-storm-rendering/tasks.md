@@ -2640,6 +2640,35 @@ implementation, while visual polish remains independently active.
   program and proves FINAL bakes the field out; `mods.toml` expands `simpleclouds_mandatory` so
   the dev client boots without Simple Clouds after Forge-1.20.1 made it mandatory. Each launch
   six minutes, self-exiting. Evidence in `validation/performance-shared-field.md`.
+- [X] T197 [PERFORMANCE] [US3] Measure the shared field at 384 and 512 XZ nodes against 256 for
+  shadow-pocket recovery, probe soundness and net cost, and select a resolution.
+  **XZ resolution does not recover the pockets; 256 stays and the resolution line is stopped.**
+  `PA_STORM_FIELD_XZ` became a live uniform in the five T196 programs (baked 256 elsewhere; no
+  program added, `registered=2`), with `StormFieldGeometry` as the one derivation of spacing,
+  half-cell, atlas and bytes; the extent is identical at every grid. Only 256 and 512 nest in the
+  16-block candidate tiles that T196's single-tile soundness argument reads; 384 straddles them
+  and was measured by the oracle instead. One launch, 19 arms x 2 poses, 2 min 19 s. **Probe**:
+  0 underestimates at every grid and pose (2.1M / 4.7M / 8.4M nodes x 43 samples), false-empty 0
+  on the ray; useful-empty 98.55 -> 98.63%, false-occupied 76,522 -> 73,188 - the envelope barely
+  tightens because the dilation's vertical term dominates. **Light, SIDE light-only**: pockets
+  **0.705 / 0.684 / 0.698**, dark-interior 0.974-0.976, SSIM 0.951-0.957; FAR 0.710 / 0.744 /
+  0.768 on 207 pocket pixels. **Pocket diagnostic** (new, per capture with mask and difference
+  PNGs): the arm is darker around every pocket by -0.0065 (11% of pocket depth), the wells are
+  12-14% shallower and the walls sit +0.95 px outward - the same at 16, 10.7 and 8 blocks a node;
+  512 recovers 55 of 256's 245 lost pockets and newly loses 61, scattered at random rather than
+  at the envelope edge. The pockets are flattened by uniform over-darkening, not smeared shut:
+  **the 16-block-smearing hypothesis is falsified**, and the remaining suspect is the detail-free
+  R channel overstating extinction along the cone (then Y). **Build** 1.61 / 3.76 / 6.28 ms
+  SIDE, linear in nodes, identical per-node walk cost; the march is flat (13.45 / 13.17 /
+  13.15 ms) and fetches per pixel constant, so a 4x field costs nothing on the ray. **Net**
+  SIDE **2.151x** / 1.923x / 1.666x, FAR 1.581x / 1.357x / 1.155x, `T197_REJECTED count=0`.
+  Winner 256 (8 MiB); production-quality light FAIL on the pocket metric at every resolution.
+  **Post-field attribution** (256 SIDE): rain segment 62.0%, primary 26.8% (+53.5%, 80% of the
+  probe's possible verdicts are false), refine 7.7%, shaft 3.5%, light and probe 0, untagged 0,
+  residual 175 closed. Next: tighter floor, vertical term first (largest non-rain consumer), and
+  separately a detail-aware R channel measured with the pocket diagnostic. Gate 28 s, check
+  build 57 s. Evidence in `validation/performance-shared-field-resolution.md` and
+  `validation/t197-campaign/`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

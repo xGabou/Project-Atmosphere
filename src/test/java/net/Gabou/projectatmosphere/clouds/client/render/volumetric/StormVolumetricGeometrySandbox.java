@@ -661,6 +661,81 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT192OwnershipBound);
         runCorrected("T196 the shared storm field arms compile and FINAL carries no field",
                 StormVolumetricGeometrySandbox::validateT196StormFieldArms);
+        runCorrected("T197 the field resolution derives one geometry and covers one extent",
+                StormVolumetricGeometrySandbox::validateT197FieldResolution);
+    }
+
+    /**
+     * T197. The resolution is a uniform the field programs keep live and
+     * FINAL bakes to T196's grid; the shader carries no other node count; and
+     * the Java geometry every resolution derives from agrees with the
+     * shader's formulae - one extent, the atlas sized to the tiles, the
+     * dual-cell half-extent the dilation uses, the bytes the report quotes.
+     * The candidate-tile nesting that T196's single-tile soundness argument
+     * rests on is recorded per resolution so the report can say which grids
+     * the argument covers and which only the oracle does.
+     */
+    private static void validateT197FieldResolution() {
+        String shader = readWorkspaceSource("src/main/resources/assets/"
+                + "projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh");
+        require(shader.contains("uniform int PaStormFieldXZ;"),
+                "PaStormFieldXZ is not a uniform in the shader source");
+        require(!shader.contains("PA_STORM_FIELD_XZ"),
+                "the shader still names the T196 constant PA_STORM_FIELD_XZ");
+        require(shader.contains("WeatherExtent / float(PaStormFieldXZ)"),
+                "the node spacing is not WeatherExtent over the resolution");
+        require(shader.contains("float halfXZ = 0.5 * paStormFieldVoxelXZ();"),
+                "the probe dilation does not use the resolution's own half-cell");
+        require(shader.contains("const int PA_STORM_FIELD_Y = 32;"),
+                "T197 varies XZ only; Y must stay 32");
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        require(finalSource.contains("const int PaStormFieldXZ = 256;"),
+                "FINAL does not bake the field resolution to 256");
+        for (String arm : new String[] {"t196_generate_only", "t196_field_light",
+                "t196_field_probe", "t196_field_both", "t196_field_hybrid"}) {
+            String source = readWorkspaceSource(base + "cloud_atmosphere_volume_" + arm + ".fsh");
+            require(source.contains("uniform int PaStormFieldXZ;"),
+                    arm + " bakes PaStormFieldXZ, so the campaign could not select a resolution");
+        }
+        String shaderJson = readWorkspaceSource("src/main/resources/assets/"
+                + "projectatmosphere/shaders/core/cloud_atmosphere_volume.json");
+        require(shaderJson.contains("\"PaStormFieldXZ\""),
+                "PaStormFieldXZ is not declared in the shader JSON");
+
+        // The derivation, against the shader's formulae and each other.
+        float extent = CloudWeatherMapRenderer.WEATHER_EXTENT;
+        require(StormFieldGeometry.DEFAULT_XZ == 256 && StormFieldGeometry.Y == 32
+                        && StormFieldGeometry.TILES_X * StormFieldGeometry.TILES_Y
+                        == StormFieldGeometry.Y,
+                "the atlas tiling does not carry exactly one tile per slice");
+        int[] grids = {256, 384, 512};
+        StringBuilder summary = new StringBuilder("T197_FIELD_GEOMETRY");
+        for (int xz : grids) {
+            require(StormFieldGeometry.supported(xz), xz + " is not a supported resolution");
+            double voxel = StormFieldGeometry.voxelXZ(xz);
+            require(Math.abs(voxel * xz - extent) < 1.0e-3D,
+                    "world coverage changed at " + xz);
+            require(Math.abs(StormFieldGeometry.halfCellXZ(xz) - 0.5D * voxel) < 1.0e-6D,
+                    "half-cell is not half the node spacing at " + xz);
+            require(StormFieldGeometry.nodes(xz) == (long) xz * xz * 32L,
+                    "node count at " + xz);
+            require(StormFieldGeometry.atlasWidth(xz) == xz * 8
+                            && StormFieldGeometry.atlasHeight(xz) == xz * 4,
+                    "atlas is not 8x4 tiles of xz at " + xz);
+            require(StormFieldGeometry.bytes(xz) == StormFieldGeometry.nodes(xz) * 4L,
+                    "RG16F bytes at " + xz);
+            summary.append('|').append(StormFieldGeometry.describe(xz));
+        }
+        require(Math.abs(StormFieldGeometry.bytes(256) - 8_388_608L) == 0L,
+                "256 is not T196's 8.4 MB");
+        // The soundness argument's premise, by resolution: cells nest in the
+        // 16-block candidate tiles at 256 and 512 and straddle them at 384.
+        require(StormFieldGeometry.nestsInCandidateTiles(256)
+                        && StormFieldGeometry.nestsInCandidateTiles(512)
+                        && !StormFieldGeometry.nestsInCandidateTiles(384),
+                "candidate-tile nesting is not 256 yes, 384 no, 512 yes");
+        System.out.println(summary);
     }
 
     /**
@@ -712,6 +787,9 @@ public final class StormVolumetricGeometrySandbox {
             require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
             require(source.contains("uniform int PaStormFieldPass;"),
                     arm[0] + " bakes PaStormFieldPass, so the renderer could not run its build");
+            // T197. The resolution rides with the pass.
+            require(source.contains("uniform int PaStormFieldXZ;"),
+                    arm[0] + " bakes PaStormFieldXZ");
             require(source.contains("#define PA_PRECIPITATION_ABSENT"),
                     arm[0] + " is not precipitation-specialized");
             compileFragmentShader(resolveMojImports(source), arm[0]);

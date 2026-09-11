@@ -462,4 +462,420 @@ final class StormImageQualityMetrics {
         double db = sumB / count;
         return new double[] {da, db, da <= 0.0D ? Double.NaN : db / da};
     }
+    // -----------------------------------------------------------------------
+    // T197 Task 5. Pocket diagnostics.
+    //
+    // shadowPocketRetention is one scalar and cannot say whether a
+    // resolution recovered the pockets 256 lost or merely traded some for
+    // others, nor whether the lost ones were smeared shut (their walls moved)
+    // or filled in (their floor rose). These measure the pockets themselves:
+    // every reference pocket pixel, clustered into regions, its luminance
+    // error, the depth of its well, and the displacement of its walls along
+    // the four axes at the reference's half-depth level. Recovery against the
+    // 256 capture is computed on the same reference pockets, which every arm
+    // of a pose shares because the anchor is captured once per pose.
+    // -----------------------------------------------------------------------
+
+    /** Chebyshev radius within which pocket pixels belong to one region. */
+    private static final int POCKET_REGION_RADIUS = 2;
+    /** How far a wall is searched for, in pixels. */
+    private static final int POCKET_WALL_REACH = 8;
+    /** Pixels within this distance of a pocket count as its neighbourhood. */
+    private static final int POCKET_NEIGHBOURHOOD = 3;
+
+    /**
+     * One capture's pocket diagnostic. {@code refPocket}, {@code kept} and
+     * {@code region} are per pixel; {@code region} is -1 off a pocket.
+     */
+    record PocketDiagnostics(
+            int pocketPixels,
+            int pocketRegions,
+            int keptPixels,
+            int lostPixels,
+            int keptRegions,
+            int lostRegions,
+            double meanPocketLuminanceRef,
+            double meanPocketLuminanceArm,
+            double meanPocketAbsError,
+            double meanPocketSignedError,
+            double meanDepthRef,
+            double meanDepthArm,
+            double meanWallDisplacementPx,
+            double meanSignedWallDisplacementPx,
+            int wallsMeasured,
+            int wallsFilled,
+            int wallsBeyondReach,
+            boolean[] refPocket,
+            boolean[] kept,
+            int[] region) {
+
+        String format() {
+            return "pocketPixels=" + pocketPixels
+                    + " pocketRegions=" + pocketRegions
+                    + " keptPixels=" + keptPixels
+                    + " lostPixels=" + lostPixels
+                    + " keptRegions=" + keptRegions
+                    + " lostRegions=" + lostRegions
+                    + " pixelRetention=" + f(pocketPixels == 0 ? Double.NaN
+                            : (double) keptPixels / pocketPixels)
+                    + " regionRetention=" + f(pocketRegions == 0 ? Double.NaN
+                            : (double) keptRegions / pocketRegions)
+                    + " pocketLumRef=" + f(meanPocketLuminanceRef)
+                    + " pocketLumArm=" + f(meanPocketLuminanceArm)
+                    + " pocketAbsError=" + f(meanPocketAbsError)
+                    + " pocketSignedError=" + f(meanPocketSignedError)
+                    + " pocketErrorOverDepth=" + f(meanDepthRef <= 0.0D ? Double.NaN
+                            : meanPocketAbsError / meanDepthRef)
+                    + " depthRef=" + f(meanDepthRef)
+                    + " depthArm=" + f(meanDepthArm)
+                    + " depthRatio=" + f(meanDepthRef <= 0.0D ? Double.NaN
+                            : meanDepthArm / meanDepthRef)
+                    + " wallDisplacementPx=" + f(meanWallDisplacementPx)
+                    + " wallSignedDisplacementPx=" + f(meanSignedWallDisplacementPx)
+                    + " wallsMeasured=" + wallsMeasured
+                    + " wallsFilled=" + wallsFilled
+                    + " wallsBeyondReach=" + wallsBeyondReach;
+        }
+
+        /**
+         * This capture's pockets classed against another capture of the same
+         * reference: recovered (lost there, kept here), newly lost (kept
+         * there, lost here), and the agreements.
+         */
+        String formatAgainst(PocketDiagnostics baseline, String tag) {
+            if (baseline.refPocket.length != refPocket.length) {
+                return tag + "=incomparable";
+            }
+            int recovered = 0;
+            int newlyLost = 0;
+            int bothKept = 0;
+            int bothLost = 0;
+            for (int i = 0; i < refPocket.length; i++) {
+                if (!refPocket[i]) {
+                    continue;
+                }
+                if (kept[i] && !baseline.kept[i]) {
+                    recovered++;
+                } else if (!kept[i] && baseline.kept[i]) {
+                    newlyLost++;
+                } else if (kept[i]) {
+                    bothKept++;
+                } else {
+                    bothLost++;
+                }
+            }
+            return tag + "Recovered=" + recovered
+                    + " " + tag + "NewlyLost=" + newlyLost
+                    + " " + tag + "BothKept=" + bothKept
+                    + " " + tag + "BothLost=" + bothLost
+                    + " " + tag + "LostThere=" + baseline.lostPixels
+                    + " " + tag + "RecoveredFraction=" + f(baseline.lostPixels == 0
+                            ? Double.NaN : (double) recovered / baseline.lostPixels)
+                    + " " + tag + "NetChange=" + (recovered - newlyLost);
+        }
+    }
+
+    static PocketDiagnostics pocketDiagnostics(float[] a, float[] b, int width, int height) {
+        int n = width * height;
+        double[] la = new double[n];
+        double[] lb = new double[n];
+        boolean[] interiorA = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            la[i] = luminance(a, i);
+            lb[i] = luminance(b, i);
+            interiorA[i] = alpha(a, i) >= INTERIOR_ALPHA;
+        }
+        boolean[] refPocket = new boolean[n];
+        boolean[] kept = new boolean[n];
+        int[] region = new int[n];
+        Arrays.fill(region, -1);
+        int pocketPixels = 0;
+        int keptPixels = 0;
+        double sumLumRef = 0.0D;
+        double sumLumArm = 0.0D;
+        double sumAbs = 0.0D;
+        double sumSigned = 0.0D;
+        long errorSamples = 0L;
+        double sumDepthRef = 0.0D;
+        double sumDepthArm = 0.0D;
+        double sumWallAbs = 0.0D;
+        double sumWallSigned = 0.0D;
+        int wallsMeasured = 0;
+        int wallsFilled = 0;
+        int wallsBeyond = 0;
+        int[][] directions = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (int y = 2; y < height - 2; y++) {
+            for (int x = 2; x < width - 2; x++) {
+                int i = y * width + x;
+                if (!interiorA[i] || !isLocalMinimum(la, width, x, y)) {
+                    continue;
+                }
+                refPocket[i] = true;
+                pocketPixels++;
+                boolean survives = false;
+                for (int dy = -1; dy <= 1 && !survives; dy++) {
+                    for (int dx = -1; dx <= 1; dx++) {
+                        if (isLocalMinimum(lb, width, x + dx, y + dy)) {
+                            survives = true;
+                            break;
+                        }
+                    }
+                }
+                kept[i] = survives;
+                if (survives) {
+                    keptPixels++;
+                }
+                sumLumRef += la[i];
+                sumLumArm += lb[i];
+                // Error over the pocket's 3x3, the region the metric judged.
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dx = -1; dx <= 1; dx++) {
+                        int j = i + dy * width + dx;
+                        sumAbs += Math.abs(lb[j] - la[j]);
+                        sumSigned += lb[j] - la[j];
+                        errorSamples++;
+                    }
+                }
+                // Well depth: the 5x5 ring's brightest against the floor; the
+                // arm's floor is its 3x3 minimum so a one-pixel drift is not
+                // charged as filling.
+                double ringA = 0.0D;
+                double ringB = 0.0D;
+                double floorB = Double.MAX_VALUE;
+                for (int dy = -2; dy <= 2; dy++) {
+                    for (int dx = -2; dx <= 2; dx++) {
+                        int j = i + dy * width + dx;
+                        if (Math.max(Math.abs(dx), Math.abs(dy)) == 2) {
+                            ringA = Math.max(ringA, la[j]);
+                            ringB = Math.max(ringB, lb[j]);
+                        } else {
+                            floorB = Math.min(floorB, lb[j]);
+                        }
+                    }
+                }
+                double depthRef = Math.max(0.0D, ringA - la[i]);
+                sumDepthRef += depthRef;
+                sumDepthArm += Math.max(0.0D, ringB - floorB);
+                // Walls: along each axis, the distance to the reference's
+                // half-depth level in the reference and in the arm. The arm
+                // is searched at the same absolute level, so a wall that
+                // moved outward (smeared) reads positive and one that closed
+                // in reads negative; a centre already above the level is a
+                // filled pocket, not a moved wall.
+                if (depthRef > 1.0e-4D) {
+                    double level = la[i] + 0.5D * depthRef;
+                    for (int[] direction : directions) {
+                        int refDist = 0;
+                        int armDist = 0;
+                        for (int k = 1; k <= POCKET_WALL_REACH; k++) {
+                            int px = x + direction[0] * k;
+                            int py = y + direction[1] * k;
+                            if (px < 0 || py < 0 || px >= width || py >= height) {
+                                break;
+                            }
+                            int j = py * width + px;
+                            if (refDist == 0 && la[j] >= level) {
+                                refDist = k;
+                            }
+                            if (armDist == 0 && lb[j] >= level) {
+                                armDist = k;
+                            }
+                            if (refDist != 0 && armDist != 0) {
+                                break;
+                            }
+                        }
+                        if (refDist == 0) {
+                            // The reference's wall is beyond reach along this
+                            // axis: not a wall this diagnostic can measure.
+                            continue;
+                        }
+                        if (lb[i] >= level) {
+                            wallsFilled++;
+                            continue;
+                        }
+                        if (armDist == 0) {
+                            wallsBeyond++;
+                            continue;
+                        }
+                        wallsMeasured++;
+                        sumWallAbs += Math.abs(armDist - refDist);
+                        sumWallSigned += armDist - refDist;
+                    }
+                }
+            }
+        }
+        // Regions: pocket pixels within POCKET_REGION_RADIUS of one another,
+        // by union-find over the pocket pixels alone.
+        int[] parent = new int[n];
+        for (int i = 0; i < n; i++) {
+            parent[i] = i;
+        }
+        for (int y = 2; y < height - 2; y++) {
+            for (int x = 2; x < width - 2; x++) {
+                int i = y * width + x;
+                if (!refPocket[i]) {
+                    continue;
+                }
+                for (int dy = -POCKET_REGION_RADIUS; dy <= POCKET_REGION_RADIUS; dy++) {
+                    for (int dx = -POCKET_REGION_RADIUS; dx <= POCKET_REGION_RADIUS; dx++) {
+                        int px = x + dx;
+                        int py = y + dy;
+                        if (px < 0 || py < 0 || px >= width || py >= height) {
+                            continue;
+                        }
+                        int j = py * width + px;
+                        if (refPocket[j]) {
+                            union(parent, i, j);
+                        }
+                    }
+                }
+            }
+        }
+        java.util.Map<Integer, Integer> regionIndex = new java.util.HashMap<>();
+        boolean[] regionKept = new boolean[pocketPixels];
+        int regions = 0;
+        for (int i = 0; i < n; i++) {
+            if (!refPocket[i]) {
+                continue;
+            }
+            int root = find(parent, i);
+            Integer index = regionIndex.get(root);
+            if (index == null) {
+                index = regions++;
+                regionIndex.put(root, index);
+            }
+            region[i] = index;
+            if (kept[i]) {
+                regionKept[index] = true;
+            }
+        }
+        int keptRegions = 0;
+        for (int r = 0; r < regions; r++) {
+            if (regionKept[r]) {
+                keptRegions++;
+            }
+        }
+        return new PocketDiagnostics(
+                pocketPixels, regions, keptPixels, pocketPixels - keptPixels,
+                keptRegions, regions - keptRegions,
+                pocketPixels == 0 ? Double.NaN : sumLumRef / pocketPixels,
+                pocketPixels == 0 ? Double.NaN : sumLumArm / pocketPixels,
+                errorSamples == 0L ? Double.NaN : sumAbs / errorSamples,
+                errorSamples == 0L ? Double.NaN : sumSigned / errorSamples,
+                pocketPixels == 0 ? Double.NaN : sumDepthRef / pocketPixels,
+                pocketPixels == 0 ? Double.NaN : sumDepthArm / pocketPixels,
+                wallsMeasured == 0 ? Double.NaN : sumWallAbs / wallsMeasured,
+                wallsMeasured == 0 ? Double.NaN : sumWallSigned / wallsMeasured,
+                wallsMeasured, wallsFilled, wallsBeyond,
+                refPocket, kept, region);
+    }
+
+    private static int find(int[] parent, int i) {
+        while (parent[i] != i) {
+            parent[i] = parent[parent[i]];
+            i = parent[i];
+        }
+        return i;
+    }
+
+    private static void union(int[] parent, int i, int j) {
+        int ri = find(parent, i);
+        int rj = find(parent, j);
+        if (ri != rj) {
+            parent[Math.max(ri, rj)] = Math.min(ri, rj);
+        }
+    }
+
+    /**
+     * Two images beside the log. {@code _mask.png}: the reference luminance
+     * in grey with every reference pocket marked - green kept, red lost, and
+     * against a baseline cyan recovered and magenta newly lost.
+     * {@code _diff.png}: the signed luminance change arm minus reference
+     * within {@link #POCKET_NEIGHBOURHOOD} pixels of a pocket, red brighter
+     * (a pocket filling in) and blue darker, scaled to the reference's mean
+     * pocket depth, over the dimmed reference elsewhere. Captures read back
+     * bottom-up, so rows are flipped for the file.
+     */
+    static void writePocketImages(float[] a, float[] b, int width, int height,
+            PocketDiagnostics pockets, PocketDiagnostics baseline,
+            java.nio.file.Path prefix) throws java.io.IOException {
+        int n = width * height;
+        double[] la = new double[n];
+        double[] lb = new double[n];
+        double range = 1.0e-6D;
+        for (int i = 0; i < n; i++) {
+            la[i] = luminance(a, i);
+            lb[i] = luminance(b, i);
+            range = Math.max(range, la[i]);
+        }
+        boolean[] near = new boolean[n];
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                if (!pockets.refPocket()[y * width + x]) {
+                    continue;
+                }
+                for (int dy = -POCKET_NEIGHBOURHOOD; dy <= POCKET_NEIGHBOURHOOD; dy++) {
+                    for (int dx = -POCKET_NEIGHBOURHOOD; dx <= POCKET_NEIGHBOURHOOD; dx++) {
+                        int px = x + dx;
+                        int py = y + dy;
+                        if (px >= 0 && py >= 0 && px < width && py < height) {
+                            near[py * width + px] = true;
+                        }
+                    }
+                }
+            }
+        }
+        double depthScale = Double.isNaN(pockets.meanDepthRef()) || pockets.meanDepthRef() <= 0.0D
+                ? range * 0.1D : pockets.meanDepthRef();
+        try (com.mojang.blaze3d.platform.NativeImage mask =
+                     new com.mojang.blaze3d.platform.NativeImage(width, height, false);
+             com.mojang.blaze3d.platform.NativeImage diff =
+                     new com.mojang.blaze3d.platform.NativeImage(width, height, false)) {
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    int i = y * width + x;
+                    int fileY = height - 1 - y;
+                    int grey = (int) Math.round(255.0D * Math.sqrt(Math.min(1.0D, la[i] / range)));
+                    int r = grey;
+                    int g = grey;
+                    int bl = grey;
+                    if (pockets.refPocket()[i]) {
+                        boolean keptHere = pockets.kept()[i];
+                        boolean baseKept = baseline != null && baseline.kept()[i];
+                        if (baseline != null && keptHere && !baseKept) {
+                            r = 0; g = 255; bl = 255;
+                        } else if (baseline != null && !keptHere && baseKept) {
+                            r = 255; g = 0; bl = 255;
+                        } else if (keptHere) {
+                            r = 0; g = 255; bl = 0;
+                        } else {
+                            r = 255; g = 0; bl = 0;
+                        }
+                    }
+                    mask.setPixelRGBA(x, fileY, abgr(r, g, bl));
+                    if (near[i]) {
+                        double signed = (lb[i] - la[i]) / depthScale;
+                        double t = Math.min(1.0D, Math.abs(signed));
+                        int base = 40;
+                        int hot = (int) Math.round(base + (255 - base) * t);
+                        if (signed >= 0.0D) {
+                            diff.setPixelRGBA(x, fileY, abgr(hot, base, base));
+                        } else {
+                            diff.setPixelRGBA(x, fileY, abgr(base, base, hot));
+                        }
+                    } else {
+                        int dim = grey / 3;
+                        diff.setPixelRGBA(x, fileY, abgr(dim, dim, dim));
+                    }
+                }
+            }
+            mask.writeToFile(java.nio.file.Path.of(prefix + "_mask.png").toFile());
+            diff.writeToFile(java.nio.file.Path.of(prefix + "_diff.png").toFile());
+        }
+    }
+
+    /** NativeImage packs ABGR. */
+    private static int abgr(int r, int g, int b) {
+        return (255 << 24) | ((b & 255) << 16) | ((g & 255) << 8) | (r & 255);
+    }
 }

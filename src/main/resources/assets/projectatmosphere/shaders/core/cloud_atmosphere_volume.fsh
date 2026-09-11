@@ -271,7 +271,7 @@ uniform int PaRainFieldConservative;
 uniform int PaRainFieldClosedForm;
 /**
  * T196. The shared 3D storm field. 0 renders; 1 is the node build pass, one
- * fragment per node of the 256x256x32 atlas; 2 is the soundness oracle, which
+ * fragment per node of the PaStormFieldXZ-square x 32 atlas; 2 is the soundness oracle, which
  * writes the node floor beside a dense reference floor instead of a field.
  * Baked to 0 in every program that neither builds nor reads the field, so
  * neither pass is compiled into them.
@@ -308,9 +308,16 @@ const float PA_STORM_FIELD_LIPSCHITZ_HEADROOM = 1.2;
 // T196. Bound manually on the rain-field unit - the two fields are never
 // resident in the same program - for the reason RainFieldSampler is.
 uniform sampler2D StormFieldSampler;
-// T196. The field grid: 256x256 nodes over WeatherExtent, 32 over the slab,
-// stored as an 8x4 atlas of 256x256 tiles.
-const int PA_STORM_FIELD_XZ = 256;
+// T196. The field grid: PaStormFieldXZ nodes square over WeatherExtent, 32
+// over the slab, stored as an 8x4 atlas of PaStormFieldXZ-square tiles.
+// T197. The horizontal resolution is a uniform the field programs keep live
+// (256, 384 or 512 in the campaign; FINAL bakes 256) so one program serves
+// every resolution: the node spacing, the texel centres, the atlas
+// coordinates and the dual-cell half-extent the probe floor dilates by all
+// derive from it below. WeatherExtent is covered at every value - resolution
+// changes the spacing, never the coverage. Y stays 32, so the atlas keeps its
+// 8x4 tiles and the vertical margin is unchanged between resolutions.
+uniform int PaStormFieldXZ;
 const int PA_STORM_FIELD_Y = 32;
 const int PA_STORM_FIELD_TILES_X = 8;
 const int PA_STORM_FIELD_TILES_Y = 4;
@@ -5938,9 +5945,10 @@ float cloudDensity(
 // ---------------------------------------------------------------------------
 // T196. The shared 3D storm field.
 //
-// One coarse volume over the weather domain and the slab, 256x256x32 nodes,
-// built once per frame by a fullscreen pass over a 2048x1024 atlas (8x4 tiles
-// of 256x256, one per slice) and read by the two consumers T193 attributed
+// One coarse volume over the weather domain and the slab, PaStormFieldXZ
+// nodes square by 32 (256x256x32 in T196; T197 measures 384 and 512), built
+// once per frame by a fullscreen pass over an 8x4 atlas of one tile per
+// slice and read by the two consumers T193 attributed
 // 43% of descriptor traversal to:
 //
 //   R  detail-free production density at the node  - the light cone reads it
@@ -5972,7 +5980,7 @@ float cloudDensity(
 
 
 float paStormFieldVoxelXZ() {
-    return WeatherExtent / float(PA_STORM_FIELD_XZ);
+    return WeatherExtent / float(PaStormFieldXZ);
 }
 
 float paStormFieldVoxelY() {
@@ -5991,7 +5999,7 @@ vec3 paStormFieldCoord(vec3 p) {
 // Atlas uv of in-tile texel coordinates (x, z) on slice k, clamped half a
 // texel inside the tile so bilinear filtering never reads a neighbouring slice.
 vec2 paStormFieldAtlasUv(float x, float z, int k) {
-    float edge = float(PA_STORM_FIELD_XZ);
+    float edge = float(PaStormFieldXZ);
     x = clamp(x, 0.5, edge - 0.5);
     z = clamp(z, 0.5, edge - 0.5);
     float tx = float(k - (k / PA_STORM_FIELD_TILES_X) * PA_STORM_FIELD_TILES_X);
@@ -6047,8 +6055,8 @@ bool paStormFieldMaterialPossible(vec3 p) {
     int k = int(c.y);
     ivec2 tile = ivec2(
         k - (k / PA_STORM_FIELD_TILES_X) * PA_STORM_FIELD_TILES_X,
-        k / PA_STORM_FIELD_TILES_X) * PA_STORM_FIELD_XZ;
-    ivec2 xz = clamp(ivec2(floor(c.xz)), ivec2(0), ivec2(PA_STORM_FIELD_XZ - 1));
+        k / PA_STORM_FIELD_TILES_X) * PaStormFieldXZ;
+    ivec2 xz = clamp(ivec2(floor(c.xz)), ivec2(0), ivec2(PaStormFieldXZ - 1));
     if (paWorkloadCaptureActive()) {
         paStormFieldProbeFetches++;
     }
@@ -6071,7 +6079,8 @@ bool paStormFieldMaterialPossible(vec3 p) {
 // A weather-map family could carry material anywhere its raster is painted;
 // the field does not model those families, so any coverage or morphology in
 // the 3x3 weather texels around the node (8-block texels; the dual cell is
-// +-8 blocks) marks the node uncovered. Descriptor-owned storms suppress their
+// +-8 blocks at 256 nodes and smaller at every higher resolution, so the
+// window stays a superset) marks the node uncovered. Descriptor-owned storms suppress their
 // member rasters, so this does not fire inside them.
 bool paStormFieldNonStormPossible(vec2 nodeXZ) {
     ivec2 size = textureSize(WeatherMapSampler, 0);
@@ -7358,12 +7367,12 @@ void main() {
     // program that does not generate, so the branch is not compiled into them
     // at all.
     // T196. The shared storm field's build pass. One fragment per node of
-    // the 2048x1024 atlas; pass 2 writes the oracle pair instead.
+    // the atlas, whose edge is PaStormFieldXZ tiles; pass 2 writes the oracle pair instead.
     if (PaStormFieldPass != 0) {
         ivec2 paNodeFrag = ivec2(gl_FragCoord.xy);
-        ivec2 paNodeTile = paNodeFrag / PA_STORM_FIELD_XZ;
+        ivec2 paNodeTile = paNodeFrag / PaStormFieldXZ;
         int paNodeSlice = paNodeTile.y * PA_STORM_FIELD_TILES_X + paNodeTile.x;
-        ivec2 paNodeXZ = paNodeFrag - paNodeTile * PA_STORM_FIELD_XZ;
+        ivec2 paNodeXZ = paNodeFrag - paNodeTile * PaStormFieldXZ;
         float paNodeVoxelXZ = paStormFieldVoxelXZ();
         float paNodeVoxelY = paStormFieldVoxelY();
         vec3 paNode = vec3(
@@ -9761,9 +9770,9 @@ void main() {
         // The fragment grid is mapped onto the node grid so the sampled nodes
         // tile the field rather than one slice of it.
         vec3 paNodeCoord = vec3(
-            texCoord.x * float(PA_STORM_FIELD_XZ),
+            texCoord.x * float(PaStormFieldXZ),
             fract(texCoord.y * 7.0) * float(PA_STORM_FIELD_Y),
-            texCoord.y * float(PA_STORM_FIELD_XZ));
+            texCoord.y * float(PaStormFieldXZ));
         vec3 paNodeSample = vec3(
             WeatherOrigin.x + (floor(paNodeCoord.x) + 0.5) * paStormFieldVoxelXZ(),
             SlabBaseY + (floor(paNodeCoord.y) + 0.5) * paStormFieldVoxelY(),

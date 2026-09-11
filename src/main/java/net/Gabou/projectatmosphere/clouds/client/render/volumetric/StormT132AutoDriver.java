@@ -837,20 +837,27 @@ final class StormT132AutoDriver {
             StormOptimizationDiagnosticMode mode,
             int descriptorLimit,
             String tag,
-            int sampleFrames) {
+            int sampleFrames,
+            /**
+             * T197. The storm field's horizontal node count this arm runs
+             * at, or 0 to leave the harness default (256). The same program
+             * measured at two resolutions is two cells, so it enters the
+             * label and the report key.
+             */
+            int stormFieldXZ) {
         T166Arm(CoreCostDiagnosticProgram program) {
             this(program, Float.NaN, StormOptimizationDiagnosticMode.NORMAL_PRODUCTION, -1,
-                    "", 0);
+                    "", 0, 0);
         }
 
         T166Arm(CoreCostDiagnosticProgram program, float resolutionScale,
                 StormOptimizationDiagnosticMode mode) {
-            this(program, resolutionScale, mode, -1, "", 0);
+            this(program, resolutionScale, mode, -1, "", 0, 0);
         }
 
         T166Arm(CoreCostDiagnosticProgram program, float resolutionScale,
                 StormOptimizationDiagnosticMode mode, int descriptorLimit) {
-            this(program, resolutionScale, mode, descriptorLimit, "", 0);
+            this(program, resolutionScale, mode, descriptorLimit, "", 0, 0);
         }
 
         /**
@@ -860,7 +867,25 @@ final class StormT132AutoDriver {
          */
         T166Arm(CoreCostDiagnosticProgram program, String tag, int sampleFrames) {
             this(program, Float.NaN, StormOptimizationDiagnosticMode.NORMAL_PRODUCTION, -1,
-                    tag, sampleFrames);
+                    tag, sampleFrames, 0);
+        }
+
+        /** T197. A repeat of a field program at a given resolution. */
+        T166Arm(CoreCostDiagnosticProgram program, String tag, int sampleFrames,
+                int stormFieldXZ) {
+            this(program, Float.NaN, StormOptimizationDiagnosticMode.NORMAL_PRODUCTION, -1,
+                    tag, sampleFrames, stormFieldXZ);
+        }
+
+        /**
+         * T197. What the pricing report groups repeats by: the program, and
+         * the resolution when the arm sets one. Keying by the program alone
+         * would fold three resolutions of t196_field_both into one row.
+         */
+        String armKey() {
+            return stormFieldXZ > 0
+                    ? program.serializedName() + "@x" + stormFieldXZ
+                    : program.serializedName();
         }
 
         /**
@@ -883,6 +908,9 @@ final class StormT132AutoDriver {
             }
             if (descriptorLimit >= 0) {
                 base = base + "@d" + descriptorLimit;
+            }
+            if (stormFieldXZ > 0) {
+                base = base + "@x" + stormFieldXZ;
             }
             return tag == null || tag.isEmpty() ? base : base + "#" + tag;
         }
@@ -1667,6 +1695,108 @@ final class StormT132AutoDriver {
     /** T196 marker predicate. */
     private static boolean sharedFieldRunRequested() {
         return Files.exists(T196_MARKER);
+    }
+
+    // -----------------------------------------------------------------------
+    // T197. The shared field's horizontal resolution, for the shadow pockets.
+    // The same five T196 programs at 256, 384 and 512 nodes: the resolution is
+    // a uniform the field programs keep live, so the matrix adds no program.
+    // -----------------------------------------------------------------------
+
+    private static final Path T197_MARKER = Path.of("t197-shared-field-resolution.txt");
+
+    private static final String[] T197_POSES = {"SIDE", "FAR"};
+
+    /** The resolutions under test; the first is T196's grid and the pocket baseline. */
+    private static final int[] T197_XZ = {256, 384, 512};
+
+    private static boolean t197Run;
+    private static boolean t197OriginalHistoryEnabled;
+
+    /**
+     * T197. Per pose, which counter capture is next: 0 the production
+     * workload with the monolith unforced, then one post-field capture per
+     * resolution with the field forced onto the monolith and the soundness
+     * oracle requested for that same frame, and {@code T197_XZ.length + 1}
+     * done. Every capture sits beside the same anchors.
+     */
+    private static int t197CounterPhase;
+
+    /**
+     * The T197 matrix: the production candidate at each resolution, anchor
+     * bracketed, three repeats. Every arm builds its field on its own clock,
+     * so the build cost per resolution is measured on the arm itself and the
+     * net ratio charges it; the march-only ratio separates the ray-side cost.
+     */
+    private static final T166Arm[] T197_ARMS = buildT197Arms();
+
+    private static T166Arm[] buildT197Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        for (int repeat = 1; repeat <= 3; repeat++) {
+            for (int xz : T197_XZ) {
+                arms.add(new T166Arm(CoreCostDiagnosticProgram.T196_FIELD_BOTH,
+                        "r" + repeat, 60, xz));
+                arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                        String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+            }
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t197Arm() {
+        return T197_ARMS[Math.max(0, Math.min(T197_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T197_OPTIMIZATION_ARMS =
+            buildT197OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT197OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T197_ARMS.length];
+        for (int i = 0; i < T197_ARMS.length; i++) {
+            modes[i] = T197_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /** T197. An image arm: a field program captured at a resolution. */
+    private record T197ImageArm(CoreCostDiagnosticProgram program, int stormFieldXZ) {
+        String label() {
+            return program.serializedName() + "@x" + stormFieldXZ;
+        }
+    }
+
+    /**
+     * The quality harness runs the light consumer alone - the pocket metric
+     * T196 banked was measured on it - and both consumers, at every
+     * resolution, 256 first so the later arms can be compared with it pocket
+     * by pocket.
+     */
+    private static final T197ImageArm[] T197_IMAGE_ARMS = buildT197ImageArms();
+
+    private static T197ImageArm[] buildT197ImageArms() {
+        java.util.List<T197ImageArm> arms = new java.util.ArrayList<>();
+        for (int xz : T197_XZ) {
+            arms.add(new T197ImageArm(CoreCostDiagnosticProgram.T196_FIELD_LIGHT, xz));
+            arms.add(new T197ImageArm(CoreCostDiagnosticProgram.T196_FIELD_BOTH, xz));
+        }
+        return arms.toArray(new T197ImageArm[0]);
+    }
+
+    /**
+     * T197 Task 5. The 256 arm's pocket survival per pose and program, so a
+     * higher resolution's pockets can be classed as recovered or newly lost
+     * against it rather than only counted.
+     */
+    private static final java.util.Map<String, StormImageQualityMetrics.PocketDiagnostics>
+            T197_POCKET_BASELINE = new java.util.HashMap<>();
+
+    /** T197 marker predicate. */
+    private static boolean sharedFieldResolutionRunRequested() {
+        return Files.exists(T197_MARKER);
     }
 
     private static T166Arm[] buildT193Arms() {
@@ -2855,7 +2985,7 @@ final class StormT132AutoDriver {
                 || t178Run || t179Run || t180Run || t181Run || t182Run
                 || t184Run || t185Run || t186Run || t187Run || t188Run
                 || t189Run || t190Run || t192Run || t193Run || t194Run
-                || t195Run || t196Run;
+                || t195Run || t196Run || t197Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -3113,7 +3243,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t196Run ? t196Arm()
+            T166Arm arm = t197Run ? t197Arm()
+                    : t196Run ? t196Arm()
                     : t195Run ? t195Arm()
                     : t194Run ? t194Arm()
                     : t193Run ? t193Arm()
@@ -3144,6 +3275,10 @@ final class StormT132AutoDriver {
             VolumetricCloudDebugConfig.setFinalProgramOverride(arm.program());
             VolumetricCloudDebugConfig.setFixedResolutionScale(arm.resolutionScale());
             VolumetricCloudDebugConfig.setDescriptorCountLimit(arm.descriptorLimit());
+            // T197. The field resolution is part of the arm; an arm that sets
+            // none runs at the default, so no earlier arm's value leaks.
+            VolumetricCloudDebugConfig.setStormFieldXZ(arm.stormFieldXZ() > 0
+                    ? arm.stormFieldXZ() : StormFieldGeometry.DEFAULT_XZ);
             VolumetricCloudDebugConfig.setT136ConstantLighting(false);
             // The oracle arms need their capture pass; everything else must
             // upload exactly the production mode its program bakes.
@@ -3221,6 +3356,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t197Run) {
+            return t197Arm().label();
+        }
         if (t196Run) {
             return t196Arm().label();
         }
@@ -3336,6 +3474,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t197Run) {
+            return T197_OPTIMIZATION_ARMS;
+        }
         if (t196Run) {
             return T196_OPTIMIZATION_ARMS;
         }
@@ -3582,6 +3723,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t197Run) {
+            return T197_POSES;
+        }
         if (t196Run) {
             return T196_POSES;
         }
@@ -4061,6 +4205,11 @@ final class StormT132AutoDriver {
                 t196OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t196CounterPhase = 0;
                 VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
+                t197Run = sharedFieldResolutionRunRequested();
+                t197OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t197CounterPhase = 0;
+                T197_POCKET_BASELINE.clear();
+                VolumetricCloudDebugConfig.setStormFieldXZ(StormFieldGeometry.DEFAULT_XZ);
                 // T188 Task 3 and Task 11. Counters come from the monolith, so
                 // the monolith has to be using the field for them to describe
                 // the post-field workload rather than the one it replaced.
@@ -4127,7 +4276,8 @@ final class StormT132AutoDriver {
                                 || t193Run
                                 || t194Run
                                 || t195Run
-                                || t196Run;
+                                || t196Run
+                                || t197Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -4141,7 +4291,7 @@ final class StormT132AutoDriver {
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
                             && !t171Run && !t172Run && !t173Run && !t174Run
                             && !t175Run && !t176Run && !t177Run && !t178Run
-                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run) {
+                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run && !t197Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -4151,7 +4301,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t196Run ? "T196_SHARED_FIELD"
+                            t197Run ? "T197_SHARED_FIELD_RESOLUTION"
+                                    : t196Run ? "T196_SHARED_FIELD"
                                     : t195Run ? "T195_SHARED_FIELD_LOOKUP"
                                     : t194Run ? "T194_SHARED_FIELD_PRICING"
                                     : t193Run ? "T193_PRODUCTION_ATTRIBUTION"
@@ -4520,7 +4671,8 @@ final class StormT132AutoDriver {
                         || (t193Run && t193Arm().program().fixedWork())
                         || (t194Run && t194Arm().program().fixedWork())
                         || (t195Run && t195Arm().program().fixedWork())
-                        || (t196Run && t196Arm().program().fixedWork())) {
+                        || (t196Run && t196Arm().program().fixedWork())
+                        || (t197Run && t197Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -4540,6 +4692,19 @@ final class StormT132AutoDriver {
                         // with the field forced on and the soundness oracle
                         // run in that same frame.
                         if (t196CounterPhase == 1) {
+                            VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(3);
+                            VolumetricCloudDebugConfig.requestStormFieldSoundness();
+                        } else {
+                            VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
+                        }
+                    }
+                    if (t197Run) {
+                        // T196's two captures, with the post-field one
+                        // repeated per resolution: the oracle and the ray-side
+                        // probe audit are both rerun at every grid.
+                        if (t197CounterPhase >= 1) {
+                            VolumetricCloudDebugConfig.setStormFieldXZ(
+                                    T197_XZ[t197CounterPhase - 1]);
                             VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(3);
                             VolumetricCloudDebugConfig.requestStormFieldSoundness();
                         } else {
@@ -4585,15 +4750,27 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info("T136_COUNTERS cell={} {}",
                             t135CounterLabel + (t196Run
                                     ? (t196CounterPhase == 0 ? "|production" : "|field")
+                                    : t197Run
+                                    ? (t197CounterPhase == 0 ? "|production"
+                                            : "|field@x" + T197_XZ[t197CounterPhase - 1])
                                     : ""), line);
                     if (t196Run && t196CounterPhase == 0) {
                         // The pose stays open for its post-field capture.
                         t196CounterPhase = 1;
+                    } else if (t197Run && t197CounterPhase < T197_XZ.length) {
+                        // The pose stays open for the next resolution.
+                        t197CounterPhase++;
                     } else {
                         t135CountersCapturedPose = sweepPose();
                         if (t196Run) {
                             t196CounterPhase = 0;
                             VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
+                        }
+                        if (t197Run) {
+                            t197CounterPhase = 0;
+                            VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
+                            VolumetricCloudDebugConfig.setStormFieldXZ(
+                                    StormFieldGeometry.DEFAULT_XZ);
                         }
                     }
                 }
@@ -4692,6 +4869,16 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
+                }
+                if (t197Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT197ResolutionReport());
+                    VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(0);
+                    VolumetricCloudDebugConfig.setStormFieldXZ(StormFieldGeometry.DEFAULT_XZ);
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(
+                            t197OriginalHistoryEnabled);
                 }
                 if (t196Run) {
                     ProjectAtmosphere.LOGGER.info(buildT196FieldReport());
@@ -5636,6 +5823,14 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t197Run) {
+            CoreCostDiagnosticProgram[] programs =
+                    new CoreCostDiagnosticProgram[T197_IMAGE_ARMS.length];
+            for (int i = 0; i < programs.length; i++) {
+                programs[i] = T197_IMAGE_ARMS[i].program();
+            }
+            return programs;
+        }
         if (t196Run) {
             return T196_IMAGE_ARMS;
         }
@@ -5758,9 +5953,17 @@ final class StormT132AutoDriver {
             return;
         }
         CoreCostDiagnosticProgram arm = t166ImageArms()[index];
+        // T197. The image arm carries its resolution; the capture name and
+        // the report label carry it too, so two captures of one program at
+        // different grids can never be confused.
+        String armLabel = t197Run ? T197_IMAGE_ARMS[index].label() : arm.serializedName();
         if ((t166ImageStep - 2) % 2 == 0) {
             VolumetricCloudDebugConfig.setFinalProgramOverride(arm);
-            if (StormReferenceImageCapture.request("t166_" + arm.serializedName() + "_" + pose)
+            if (t197Run) {
+                VolumetricCloudDebugConfig.setStormFieldXZ(
+                        T197_IMAGE_ARMS[index].stormFieldXZ());
+            }
+            if (StormReferenceImageCapture.request("t166_" + armLabel + "_" + pose)
                     .startsWith("acquiring")) {
                 t166ImageStep++;
             }
@@ -5798,12 +6001,54 @@ final class StormT132AutoDriver {
         } else {
             ProjectAtmosphere.LOGGER.info(
                     "T166_IMAGE_AB pose={} arm={} a=lean_final {} {} digestsEqual={}",
-                    pose, arm.serializedName(),
+                    pose, armLabel,
                     StormReferenceImageComparison.compare(t166AnchorImage, captured).format(),
                     StormArmQualityMetrics.compare(t166AnchorImage, captured).format(),
                     t166AnchorImage.digest().equals(captured.digest()));
+            if (t197Run) {
+                t197ReportPockets(pose, T197_IMAGE_ARMS[index], captured);
+            }
         }
         t166ImageStep++;
+    }
+
+    /**
+     * T197 Task 5. The pocket diagnostic for one capture: how many of the
+     * reference's shadow pockets the arm keeps and loses, their luminance
+     * error and wall displacement, and - against the 256 capture of the same
+     * program and pose - which pockets this resolution recovered and which it
+     * newly lost. A mask and a difference image of the pocket neighbourhoods
+     * go beside the log so the mechanism can be seen, not only counted.
+     */
+    private static void t197ReportPockets(String pose, T197ImageArm arm,
+            StormReferenceImageComparison.Reference captured) {
+        StormImageQualityMetrics.PocketDiagnostics pockets =
+                StormImageQualityMetrics.pocketDiagnostics(
+                        t166AnchorImage.pixels(), captured.pixels(),
+                        captured.width(), captured.height());
+        String baselineKey = pose + "|" + arm.program().serializedName();
+        StormImageQualityMetrics.PocketDiagnostics baseline = T197_POCKET_BASELINE.get(baselineKey);
+        if (arm.stormFieldXZ() == T197_XZ[0]) {
+            T197_POCKET_BASELINE.put(baselineKey, pockets);
+            baseline = null;
+        }
+        ProjectAtmosphere.LOGGER.info("T197_POCKETS pose={} arm={} xz={} {} {}",
+                pose, arm.label(), arm.stormFieldXZ(), pockets.format(),
+                baseline == null ? "versus256=n/a"
+                        : pockets.formatAgainst(baseline, "versus256"));
+        try {
+            Path directory = Path.of("t197-pockets");
+            Files.createDirectories(directory);
+            StormImageQualityMetrics.writePocketImages(
+                    t166AnchorImage.pixels(), captured.pixels(),
+                    captured.width(), captured.height(), pockets, baseline,
+                    directory.resolve(pose + "_" + arm.label()));
+        } catch (java.io.IOException | RuntimeException failure) {
+            // Evidence, not machinery: a capture that cannot be written must
+            // not stop the sweep.
+            ProjectAtmosphere.LOGGER.warn("T197_POCKETS image not written for {} {}",
+                    pose, arm.label(), failure);
+        }
     }
 
     private static void t162CompareAgainstAnchor(String arm) {
@@ -6245,6 +6490,22 @@ final class StormT132AutoDriver {
     }
 
     /**
+     * T197. The production candidate at each resolution: march-only ratio,
+     * build on its own clock, and the net ratio the decision is judged on.
+     * The 256 arm opens each block, so the block index is the repeat.
+     */
+    private static String buildT197ResolutionReport() {
+        StringBuilder out = new StringBuilder(buildBracketedPricingReport(
+                "T197", "T197_RESOLUTION_DECISION", T197_POSES, T197_ARMS,
+                CoreCostDiagnosticProgram.T196_FIELD_BOTH.serializedName() + "@x" + T197_XZ[0]));
+        for (int xz : T197_XZ) {
+            out.append(String.format(Locale.ROOT, "%nT197_GRID %s",
+                    StormFieldGeometry.describe(xz)));
+        }
+        return out.toString();
+    }
+
+    /**
      * Anchor-bracketed blocks and per-arm verdicts for a pricing matrix.
      * {@code blockLead} is the program whose cell opens a new block, so the
      * block index in the log lines up with the repeat.
@@ -6255,6 +6516,17 @@ final class StormT132AutoDriver {
             String[] poses,
             T166Arm[] arms,
             CoreCostDiagnosticProgram blockLead) {
+        return buildBracketedPricingReport(tag, heading, poses, arms,
+                blockLead.serializedName());
+    }
+
+    /** T197. The block lead by arm key, so a resolution-qualified arm can open a block. */
+    private static String buildBracketedPricingReport(
+            String tag,
+            String heading,
+            String[] poses,
+            T166Arm[] arms,
+            String blockLead) {
         StringBuilder out = new StringBuilder(heading);
         for (String pose : poses) {
             java.util.Map<String, java.util.List<double[]>> byProgram =
@@ -6265,7 +6537,7 @@ final class StormT132AutoDriver {
                 if (t194IsAnchor(arm) || i == 0 || i + 1 >= arms.length) {
                     continue;
                 }
-                if (arm.program() == blockLead) {
+                if (arm.armKey().equals(blockLead)) {
                     block++;
                 }
                 StormT135PerformanceProfile.Cell before =
@@ -6301,7 +6573,7 @@ final class StormT132AutoDriver {
                 if (drift > T171_REPEAT_TOLERANCE) {
                     continue;
                 }
-                byProgram.computeIfAbsent(arm.program().serializedName(),
+                byProgram.computeIfAbsent(arm.armKey(),
                         key -> new java.util.ArrayList<>())
                         .add(new double[] {ratio, cell.cloudP50(), cell.cloudP95(),
                                 cell.rainFieldP50(), cell.rainFieldP95(), baseline,

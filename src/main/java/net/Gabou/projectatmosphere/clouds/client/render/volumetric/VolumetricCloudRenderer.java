@@ -722,20 +722,24 @@ public final class VolumetricCloudRenderer {
         // forced frame's lookups enabled against no field at all.
         shader.safeGetUniform("PaStormFieldPass").set(0);
         shader.safeGetUniform("PaStormFieldEnabled").set(0);
-        // T196. The shared storm field. One draw over the 2048x1024 atlas -
-        // 256x256x32 nodes, each a detail-free production density and the
-        // probe floor - before the timed draw, on the field clock. The
-        // monolith runs it too when the campaign forces the field onto it,
-        // so the counters describe the post-field workload.
+        // T197. The resolution goes up with the pass and consumer bits every
+        // frame, from the same value the atlas below is allocated for.
+        int stormFieldXZ = VolumetricCloudDebugConfig.stormFieldXZ();
+        shader.safeGetUniform("PaStormFieldXZ").set(stormFieldXZ);
+        // T196. The shared storm field. One draw over the atlas - XZ-square
+        // by 32 nodes, each a detail-free production density and the probe
+        // floor - before the timed draw, on the field clock. The monolith
+        // runs it too when the campaign forces the field onto it, so the
+        // counters describe the post-field workload.
         if (stormFieldProgram(program)) {
             RenderTarget stormFieldTarget =
-                    VolumetricCloudRenderTargets.prepareStormFieldTarget();
+                    VolumetricCloudRenderTargets.prepareStormFieldTarget(stormFieldXZ);
             if (stormFieldTarget != null) {
                 int enabledBits = program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
                         ? VolumetricCloudDebugConfig.stormFieldForcedOnMonolith()
                         : program.stormFieldEnabledBits();
                 if (VolumetricCloudDebugConfig.consumeStormFieldSoundnessRequest()) {
-                    runStormFieldSoundnessOracle(shader, puffCandidateTarget);
+                    runStormFieldSoundnessOracle(shader, puffCandidateTarget, stormFieldXZ);
                 }
                 VolumetricCloudRenderTargets.clearAndBind(stormFieldTarget);
                 shader.safeGetUniform("PaStormFieldPass").set(1);
@@ -1017,8 +1021,9 @@ public final class VolumetricCloudRenderer {
      * finds material - and the count must be zero.
      */
     private static void runStormFieldSoundnessOracle(
-            ShaderInstance shader, RenderTarget puffCandidateTarget) {
-        RenderTarget oracle = VolumetricCloudRenderTargets.prepareStormFieldOracleTarget();
+            ShaderInstance shader, RenderTarget puffCandidateTarget, int stormFieldXZ) {
+        RenderTarget oracle =
+                VolumetricCloudRenderTargets.prepareStormFieldOracleTarget(stormFieldXZ);
         if (oracle == null) {
             return;
         }
@@ -1141,8 +1146,11 @@ public final class VolumetricCloudRenderer {
             for (int bucket = 0; bucket < binaryMissSlack.length; bucket++) {
                 missSlack.append(bucket == 0 ? "" : ",").append(binaryMissSlack[bucket]);
             }
+            // T197. The resolution and its geometry lead the line, so the
+            // oracles of one launch can be told apart.
             ProjectAtmosphere.LOGGER.info(
-                    "T196_SOUNDNESS nodes={} uncovered={} covered={} boundaryNodes={}"
+                    "T196_SOUNDNESS xz={} voxelXZ={} halfCellXZ={} atlas={}x{}"
+                            + " nodes={} uncovered={} covered={} boundaryNodes={}"
                             + " referenceSamplesPerNode=43 underestimates={}"
                             + " boundaryUnderestimates={} worstUnderestimate={}"
                             + " fieldEmpty={} referenceEmpty={} usefulEmptyRetained={}"
@@ -1150,6 +1158,12 @@ public final class VolumetricCloudRenderer {
                             + " overestimateMean={} overestimateHistogram0.1={}"
                             + " lipschitzNodes={} maxLipschitzY={} lipschitzYHistogram0.5={}"
                             + " binaryMisses={} binaryMissSlackLog2={} worstBinarySlack={}",
+                    stormFieldXZ,
+                    String.format(java.util.Locale.ROOT, "%.4f",
+                            StormFieldGeometry.voxelXZ(stormFieldXZ)),
+                    String.format(java.util.Locale.ROOT, "%.4f",
+                            StormFieldGeometry.halfCellXZ(stormFieldXZ)),
+                    width, height,
                     nodes, uncovered, nodes - uncovered, boundary, underestimates,
                     boundaryUnderestimates,
                     String.format(java.util.Locale.ROOT, "%.5f", worstUnderestimate),
