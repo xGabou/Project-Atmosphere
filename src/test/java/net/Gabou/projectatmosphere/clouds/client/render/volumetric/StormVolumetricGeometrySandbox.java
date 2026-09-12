@@ -671,6 +671,77 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT199FieldAllocation);
         runCorrected("T199 the retained far-tap audit measures the top rim as its own region",
                 StormVolumetricGeometrySandbox::validateT199TopRimRegion);
+        runCorrected("T202 the body consumers on the field compile, bake their bits and FINAL"
+                        + " carries no primary audit",
+                StormVolumetricGeometrySandbox::validateT202BodyField);
+    }
+
+    /**
+     * T202. The three body-consumer arms and the primary-sample audit exist
+     * as generated programs, bake the consumer bits their enum entries
+     * declare (16 the primary body from the field, 32 the refinement's
+     * clearance from A), keep the build pass live, compile in GL; the audit
+     * alone defines {@code PA_PRIMARY_AUDIT} and keeps its output selector
+     * live; FINAL defines no audit; the shader selects both consumers by
+     * their bits and the build writes A under bit 32 on covered nodes only,
+     * so the light's uncovered fallback reads what it always read; the
+     * renderer uploads the consumer bits to the build draw so the monolith's
+     * atlas matches FINAL's; and the audit report's names match its capture
+     * count.
+     */
+    private static void validateT202BodyField() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String shader = readWorkspaceSource("src/main/resources/assets/"
+                + "projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh");
+        String[][] arms = {
+                {"t202_primary_field", "27", "false"},
+                {"t202_refine_field", "43", "false"},
+                {"t202_both_field", "59", "false"},
+                {"t202_primary_audit", "27", "true"},
+                // The representation oracles inherit production's bits.
+                {"t202_dinterp_oracle", String.valueOf(StormFieldGeometry.PRODUCTION_CONSUMER_BITS), "false"},
+                {"t202_dinterp_audit", String.valueOf(StormFieldGeometry.PRODUCTION_CONSUMER_BITS), "true"}};
+        for (String[] arm : arms) {
+            String path = base + "cloud_atmosphere_volume_" + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T202 program missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains("const int PaStormFieldEnabled = " + arm[1] + ";"),
+                    arm[0] + " does not bake PaStormFieldEnabled = " + arm[1]);
+            require(source.contains("uniform int PaStormFieldPass;"),
+                    arm[0] + " bakes the build pass the renderer needs live");
+            boolean audit = Boolean.parseBoolean(arm[2]);
+            require(source.contains("#define PA_PRIMARY_AUDIT") == audit,
+                    arm[0] + (audit ? " does not define" : " defines") + " the primary audit");
+            require(source.contains("uniform int PaLightAuditOutput;") == audit,
+                    arm[0] + (audit ? " bakes" : " keeps live") + " the audit output selector");
+            CoreCostDiagnosticProgram program = CoreCostDiagnosticProgram.parse(arm[0]);
+            require(program != null && program.stormFieldEnabledBits() == Integer.parseInt(arm[1])
+                            && program.stormFieldGeneration(),
+                    arm[0] + "'s enum entry disagrees with its generated program");
+            require(program.primaryAuditCapture() == audit,
+                    arm[0] + "'s enum entry misreports the audit capture");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        require(!finalSource.contains("#define PA_PRIMARY_AUDIT"), "FINAL defines the primary audit");
+        require(shader.contains("(PaStormFieldEnabled & 16) != 0")
+                        && shader.contains("paStormFieldPrimaryDensityAt(")
+                        && shader.contains("(PaStormFieldEnabled & 32) != 0")
+                        && shader.contains("paStormFieldClearanceAt("),
+                "the body consumers are not selected by consumer bits 16 and 32");
+        String node = functionBlock(shader, "vec4 paStormFieldNodeAt(vec3 node, out float unionDistanceOut)");
+        require(node.contains("(PaStormFieldEnabled & 32) != 0 && floorL > PA_STORM_FIELD_UNCOVERED * 0.5"),
+                "the build does not confine the clearance floor to covered nodes under bit 32");
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudRenderer.java");
+        require(renderer.contains("shader.safeGetUniform(\"PaStormFieldEnabled\").set(enabledBits);"),
+                "the renderer does not upload the consumer bits to the build draw");
+        require(StormPrimaryFieldAuditReport.OUTPUT_NAMES.length == StormPrimaryFieldAuditReport.OUTPUTS,
+                "the primary audit report names do not match its capture count");
+        System.out.println("T202_BODY_FIELD arms=" + arms.length + " bits=16|32 auditInFinal=false");
     }
 
     /**
@@ -804,14 +875,16 @@ public final class StormVolumetricGeometrySandbox {
         // behind a uniform, and the strip list is empty (build.gradle says why).
         require(!shader.contains("PA_STORM_FIELD_ORACLE"),
                 "the source gates the soundness oracle by define again; T199j measured that");
-        // The T198 comparator is byte-identical to FINAL: it is the program
-        // T198 accepted, and T199's matrix prices FINAL against it at 1.00x
-        // by construction. The both-consumer T196 control compiles beside it.
+        // T202. The comparator byte-identical to FINAL is the T202
+        // refinement arm: it is the program T202 accepted, so the T202 matrix
+        // priced FINAL's exact program against the FINAL of T201. The T198
+        // comparator (bits 11, the T199-T201 FINAL) and the T196 control
+        // still compile beside it.
         String[] hosts = {"t196_field_both", "t198_field_both_exact"};
-        String comparator = readWorkspaceSource(base + "cloud_atmosphere_volume_t198_field_both_exact.fsh");
+        String comparator = readWorkspaceSource(base + "cloud_atmosphere_volume_t202_refine_field.fsh");
         require(comparator.equals(finalSource),
-                "t198_field_both_exact is no longer byte-identical to FINAL;"
-                        + " the T199 comparator would measure a source difference");
+                "t202_refine_field is no longer byte-identical to FINAL;"
+                        + " the T202 comparator would measure a source difference");
         for (String host : hosts) {
             String source = readWorkspaceSource(base + "cloud_atmosphere_volume_" + host + ".fsh");
             compileFragmentShader(resolveMojImports(source), host);
@@ -1920,9 +1993,13 @@ public final class StormVolumetricGeometrySandbox {
             // fetch sink exists only so the compiler cannot fold the
             // fetches away, and it reaches the march through a uniform
             // uploaded as exactly zero.
+            // T202 adds the primary-sample audit on the same reasoning: its
+            // accumulators exist only in the audit program, which the T202
+            // invariant asserts FINAL does not define.
             if (line.startsWith("#ifdef PA_RAIN_MASK_OUTPUT")
                     || line.startsWith("#ifdef PA_ARM_FIELD_SLICES")
-                    || line.startsWith("#ifdef PA_ARM_FIELD_LOOKUP")) {
+                    || line.startsWith("#ifdef PA_ARM_FIELD_LOOKUP")
+                    || line.startsWith("#ifdef PA_PRIMARY_AUDIT")) {
                 maskDepth++;
                 continue;
             }
@@ -1950,7 +2027,7 @@ public final class StormVolumetricGeometrySandbox {
                             + " is not guarded by paWorkloadCaptureActive(): " + line);
         }
         require(maskDepth == 0,
-                "T188/T194/T195 diagnostic #ifdef blocks are unbalanced in the shader source");
+                "T188/T194/T195/T202 diagnostic #ifdef blocks are unbalanced in the shader source");
         require(mutations >= 10,
                 "T123 workload counters were not found; the instrumentation check is vacuous");
         String guard = functionBlock(shader, "bool paWorkloadCaptureActive()");

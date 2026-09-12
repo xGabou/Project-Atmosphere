@@ -287,6 +287,15 @@ uniform int PaStormFieldPass;
  * hybrid that kept taps 0-1 on the exact walk - was retired: with bit 8 every
  * tap evaluates the noise itself, so there was nothing left for it to
  * restore, and T198 showed it left the far taps biased.
+ * T202. Bit 16: the primary body density reads the field's threshold and
+ * height (R, B) and evaluates the base noise, the detail octaves and the
+ * erosion at the sample itself - the bit-8 lookup at mip 0 with the primary's
+ * detail flags - instead of walking the descriptors; an uncovered node hands
+ * the sample back to the exact evaluation. Bit 32: the union-distance
+ * refinement reads the node's clearance floor from A (the build writes the
+ * walk's minimum descriptor clearance, dilated over the dual cell, into A on
+ * covered nodes when this bit is on; uncovered nodes keep the node density
+ * the light's fallback reads) instead of walking the descriptors for it.
  */
 uniform int PaStormFieldEnabled;
 /**
@@ -573,6 +582,30 @@ float paLaFieldSum[4] = float[4](0.0, 0.0, 0.0, 0.0);
 // call only, so the primary march and the field build are untouched.
 int paLightAuditExactVariant = 0;
 #endif
+#ifdef PA_PRIMARY_AUDIT
+// T202 Task 3. Accumulators over every primary body sample of this pixel's
+// march: the field density against the exact one - signed error, magnitude,
+// square, extremum, the over/under counts, the zero/nonzero and the material
+// (> 0.0008) disagreements split by direction, the uncovered fallbacks, both
+// sides' sums, and the count and error of the samples the exact side places
+// at a body edge (0 < exact <= 0.05). Guarded by a define for T198's reason.
+float paPaCount = 0.0;
+float paPaSumErr = 0.0;
+float paPaSumAbs = 0.0;
+float paPaSumSq = 0.0;
+float paPaMaxAbs = 0.0;
+float paPaOver = 0.0;
+float paPaUnder = 0.0;
+float paPaZeroDisagree = 0.0;
+float paPaExactZeroFieldNot = 0.0;
+float paPaFieldZeroExactNot = 0.0;
+float paPaMaterialDisagree = 0.0;
+float paPaFallback = 0.0;
+float paPaExactSum = 0.0;
+float paPaFieldSum = 0.0;
+float paPaEdgeCount = 0.0;
+float paPaEdgeSumAbs = 0.0;
+#endif
 #ifdef PA_RAIN_MASK_OUTPUT
 // T188 Task 0. The rain-only capture. Rain and cloud are composited in the
 // rendered frame, so no mask can be recovered from it after the fact; these
@@ -815,12 +848,27 @@ int paStormFieldFalseEmpty = 0;
 int paStormFieldFalseOccupied = 0;
 int paStormFieldAgreeEmpty = 0;
 int paStormFieldAgreeOccupied = 0;
+// T202. The two body consumers on the field: fetches served to the primary
+// body density and to the union-distance refinement, and the calls each
+// handed back to the exact walk because the node was uncovered or outside
+// the slab.
+int paStormFieldPrimaryFetches = 0;
+int paStormFieldPrimaryFallback = 0;
+int paStormFieldRefineFetches = 0;
+int paStormFieldRefineFallback = 0;
 // T196. Published by directStormShape for the node build: the softness range
 // of the groups that entered the union, which the dilated envelope needs and
 // the coverage value alone does not carry.
 float paLastStormMinSoftness = 1.0e9;
 float paLastStormMaxSoftness = 0.0;
 float paLastStormUnionDistance = 1.0e9;
+// T202. The walk's minimum descriptor clearance at the node - the value the
+// refinement reads at a ray point - published so the build can floor it over
+// the dual cell. 1e9 when the node's tile carries no candidate.
+float paLastStormMinClearance = 1.0e9;
+// T202 oracle. The union's blended softness, beside its distance, so a
+// representation that interpolates the distance can form the envelope itself.
+float paLastStormUnionSoftness = 0.0;
 float paLastStormMaxVerticalSlope = 1.0;
 float paLastStormMaxAspect = 1.0;
 // T198. Published by cloudDensity in build mode: the exact storm-body
@@ -961,7 +1009,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 69);
+        || (DebugView >= 28 && DebugView <= 70);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -3107,6 +3155,8 @@ float directStormShape(
     paLastStormMinSoftness = 1.0e9;
     paLastStormMaxSoftness = 0.0;
     paLastStormUnionDistance = 1.0e9;
+    paLastStormMinClearance = 1.0e9;
+    paLastStormUnionSoftness = 0.0;
     paLastStormMaxVerticalSlope = 1.0;
     paLastStormMaxAspect = 1.0;
     if (paWorkloadCaptureActive()) {
@@ -3322,12 +3372,17 @@ float directStormShape(
     if (paWorkloadCaptureActive()) {
         paReuseSuffOrd4 += (paT177Suff && paLightTapOrdinal == 4) ? 1 : 0;
     }
+    // T202. The clearance is published before the started check: a walk
+    // whose groups were all rejected still bounds the safe advance, and the
+    // node build needs that bound as much as the ray does.
+    paLastStormMinClearance = minDescriptorClearance;
     if (!started) {
         return 0.0;
     }
     envelopeStrength = stormStrength;
     unionDistanceBlocks = stormDistance;
     paLastStormUnionDistance = stormDistance;
+    paLastStormUnionSoftness = stormSoftness;
     return stormEnvelopeFromDistance(stormDistance, stormSoftness, stormStrength);
 }
 
@@ -6309,7 +6364,230 @@ vec4 paStormFieldNodeAt(vec3 node, out float unionDistanceOut) {
     } else {
         floorL = paStormFieldFloorFromWalk();
     }
+    if ((PaStormFieldEnabled & 32) != 0 && floorL > PA_STORM_FIELD_UNCOVERED * 0.5) {
+        // T202. A carries the refinement's clearance floor on a covered node:
+        // the walk's minimum descriptor clearance at the node less the
+        // largest drop it can take to any point of the dual cell - the same
+        // axis-split Lipschitz dilation the probe floor uses, on the same
+        // published constants - so clearance(p) >= A for every p in the cell.
+        // A tile with no candidate leaves the clearance at its sentinel, and
+        // production's walk at any point of that tile does the same, so the
+        // cap below is the coarse step's own cap and nothing is lost. Half
+        // float: the cap keeps it exact to an eighth of a block.
+        float clearanceFloor = paLastStormMinClearance > 1.0e8
+            ? 4096.0
+            : paLastStormMinClearance - paStormFieldDilationBlocks();
+        density = clamp(clearanceFloor, -4096.0, 4096.0);
+    }
     return vec4(threshold, floorL, paLastStormHeight01, density);
+}
+
+// T202. The primary body density from the field: the bit-8 light lookup's
+// form - the field's threshold and height at p, the exact base noise at p at
+// mip 0 - with the primary call's own detail stages: the detail octave, the
+// near-camera second octave when DetailQuality allows it, and the erosion
+// bite, exactly as cloudDensity's STAGE 5-6 apply them to a descriptor-owned
+// storm. The material terms follow with the descriptor constants cloudDensity
+// uses. Zero outside the slab, which bounds every cloud the frame can
+// contain. covered is false where the node is uncovered - a weather-map
+// family or a funnel could carry material the field does not model - and the
+// caller evaluates the exact density instead.
+float paStormFieldBodyFromThreshold(vec3 p, float lowerBound, float height01,
+        bool useDetail, bool nearCamera);
+
+float paStormFieldPrimaryDensityAt(vec3 p, bool useDetail, bool nearCamera, out bool covered) {
+    covered = true;
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y > float(PA_STORM_FIELD_Y)) {
+        return 0.0;
+    }
+    float ky = clamp(c.y - 0.5, 0.0, float(PA_STORM_FIELD_Y - 1));
+    int k0 = int(floor(ky));
+    int k1 = min(k0 + 1, PA_STORM_FIELD_Y - 1);
+    float t = ky - float(k0);
+    if (paWorkloadCaptureActive()) {
+        paStormFieldPrimaryFetches++;
+    }
+    vec4 f0 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k0));
+    vec4 f1 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k1));
+    if (min(f0.r, f1.r) <= PA_STORM_FIELD_UNCOVERED * 0.5) {
+        covered = false;
+        if (paWorkloadCaptureActive()) {
+            paStormFieldPrimaryFallback++;
+        }
+        return 0.0;
+    }
+    float lowerBound = mix(f0.r, f1.r, t);
+    if (lowerBound >= 0.999) {
+        return 0.0;
+    }
+    return paStormFieldBodyFromThreshold(
+        p, lowerBound, saturate(mix(f0.b, f1.b, t)), useDetail, nearCamera);
+}
+
+// T202. The body from a threshold and a height at p: the exact base noise at
+// p at mip 0, the primary call's detail stages, the erosion bite and the
+// descriptor material terms - what cloudDensity's STAGE 5-6 and the material
+// block apply to a descriptor-owned storm once the walk has produced the
+// threshold. Shared by the field lookup above and the representation oracle
+// below, so the two differ only in where the threshold comes from.
+float paStormFieldBodyFromThreshold(vec3 p, float lowerBound, float height01,
+        bool useDetail, bool nearCamera) {
+    vec3 samplePos = p;
+    samplePos.xz -= MaterialOffset;
+    vec4 baseNoise = texture(
+        BaseNoiseSampler, baseNoiseDomain(samplePos, STORM_BASE_NOISE_SCALE), 0.0);
+    float lowFbm = baseNoise.g * 0.625 + baseNoise.b * 0.25 + baseNoise.a * 0.125;
+    float baseCarrier = saturate(remap(baseNoise.r, -(1.0 - lowFbm), 1.0, 0.0, 1.0));
+    float cloud = saturate((stormBaseField(baseCarrier) - lowerBound)
+        / max(1.0 - lowerBound, 0.0001));
+    if (cloud > 0.003 && useDetail) {
+        vec3 detailPos = detailNoiseDomain(samplePos) + (baseNoise.gbr - 0.5) * 0.18;
+        vec4 detail = texture(DetailNoiseSampler, detailPos, 0.0);
+        if (paWorkloadCaptureActive()) {
+            paDetailOctaveEvaluations += 3;
+            paDetailFetchPrimary++;
+        }
+        float detailFbm = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
+        if (nearCamera && DetailQuality >= 2) {
+            float fineWeight = paT149DetailGraded()
+                ? smoothstep(0.65, 1.65, paProjectedFeaturePixels(p, 8.4))
+                : 1.0;
+            if (fineWeight > 0.0001) {
+                vec4 fine = texture(
+                    DetailNoiseSampler,
+                    detailPos * 2.71 + vec3(0.173, -0.291, 0.417),
+                    0.0);
+                if (paWorkloadCaptureActive()) {
+                    paDetailOctaveEvaluations += 3;
+                    paDetailFetchSecondOctave++;
+                    paDetailFetchPrimary++;
+                }
+                float fineDetail = fine.r * 0.625 + fine.g * 0.25 + fine.b * 0.125;
+                detailFbm = mix(detailFbm, detailFbm * 0.72 + fineDetail * 0.28, fineWeight);
+            }
+        }
+        cloud = max(cloud - (1.0 - detailFbm) * STORM_EROSION, 0.0);
+    }
+    cloud *= mix(1.0, 1.18, 0.72 * (1.0 - height01) * 0.6);
+    cloud *= mix(0.90, 1.10, 0.78);
+    cloud *= 1.0 + 0.68 * (1.0 - height01) * 0.32;
+    return max(cloud, 0.0) * 0.73 * DensityMul;
+}
+
+#ifdef PA_PRIMARY_DINTERP
+// T202 representation oracle. The first run interpolated the node THRESHOLD
+// (R) and lost 16-26% of the thin material with a 0.69-0.88 edge SSIM: the
+// threshold is a smoothstep of the union distance, and across a slab cell
+// the distance moves by up to eight blocks a block vertically, so the
+// chord of the smoothstep is not the smoothstep. This oracle interpolates
+// what a second atlas would store instead - the union distance (clamped so
+// a far node reads as far, never as the sentinel), the union's softness,
+// its strength, and the height - over the eight nodes of the dual cell, and
+// forms the envelope, the threshold and the body at the sample. Each node
+// is one build-mode walk, so it is eight walks a sample: quality only,
+// never timed, never a candidate as written. The overlap class comes from
+// the nearest node. Where no node of the cell enters the union the sample
+// is empty, exactly as production's early-coverage reject.
+const float PA_DINTERP_FAR = 1024.0;
+
+void paDInterpNode(vec3 node, out float distance, out float softness, out float strength,
+        out int roleMask, out float height01) {
+    bool owns;
+    float unionDistance;
+    float clearance;
+    paStormFieldBuildNode = true;
+    paStormFieldRejectMargin = 0.5 * paStormFieldVoxelY();
+    directStormShape(node, owns, height01, strength, roleMask, unionDistance, clearance);
+    paStormFieldBuildNode = false;
+    paStormFieldRejectMargin = 0.0;
+    distance = min(unionDistance, PA_DINTERP_FAR);
+    softness = max(paLastStormUnionSoftness, STORM_MIN_EDGE_BLOCKS);
+}
+
+float paStormDInterpOracleDensityAt(vec3 p, bool useDetail, bool nearCamera) {
+    if (StormLobeCount <= 0) {
+        return 0.0;
+    }
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y > float(PA_STORM_FIELD_Y)) {
+        return 0.0;
+    }
+    float vx = paStormFieldVoxelXZ();
+    float vy = paStormFieldVoxelY();
+    vec3 g = vec3(c.x - 0.5, clamp(c.y - 0.5, 0.0, float(PA_STORM_FIELD_Y - 1)), c.z - 0.5);
+    vec3 g0 = floor(g);
+    vec3 f = g - g0;
+    float distance = 0.0;
+    float softness = 0.0;
+    float strength = 0.0;
+    float height01 = 0.0;
+    int nearestMask = 0;
+    float nearestWeight = -1.0;
+    for (int corner = 0; corner < 8; corner++) {
+        vec3 o = vec3(float(corner & 1), float((corner >> 1) & 1), float((corner >> 2) & 1));
+        vec3 gi = g0 + o;
+        gi.y = clamp(gi.y, 0.0, float(PA_STORM_FIELD_Y - 1));
+        vec3 node = vec3(
+            WeatherOrigin.x + (gi.x + 0.5) * vx,
+            SlabBaseY + (gi.y + 0.5) * vy,
+            WeatherOrigin.y + (gi.z + 0.5) * vx);
+        float w = (o.x > 0.5 ? f.x : 1.0 - f.x) * (o.y > 0.5 ? f.y : 1.0 - f.y)
+            * (o.z > 0.5 ? f.z : 1.0 - f.z);
+        float nd;
+        float ns;
+        float nStrength;
+        int nMask;
+        float nHeight;
+        paDInterpNode(node, nd, ns, nStrength, nMask, nHeight);
+        distance += w * nd;
+        softness += w * ns;
+        strength += w * nStrength;
+        height01 += w * nHeight;
+        if (w > nearestWeight) {
+            nearestWeight = w;
+            nearestMask = nMask;
+        }
+    }
+    float coverage = stormEnvelopeFromDistance(distance, softness, strength);
+    if (coverage <= 0.001) {
+        return 0.0;
+    }
+    float lowerBound = stormCoverageLowerBound(coverage, strength, (nearestMask & 7) == 7);
+    return paStormFieldBodyFromThreshold(p, lowerBound, saturate(height01), useDetail, nearCamera);
+}
+#endif
+
+// T202. The refinement's clearance from the field: the floor the build wrote
+// into A for the node whose dual cell contains p, one texel fetch, the way
+// the probe reads its floor. False where the node is uncovered or p is
+// outside the slab; the caller walks the descriptors as before.
+bool paStormFieldClearanceAt(vec3 p, out float clearance) {
+    clearance = 0.0;
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y >= float(PA_STORM_FIELD_Y)) {
+        if (paWorkloadCaptureActive()) {
+            paStormFieldRefineFallback++;
+        }
+        return false;
+    }
+    int k = int(c.y);
+    ivec2 tile = ivec2(
+        k - (k / PA_STORM_FIELD_TILES_X) * PA_STORM_FIELD_TILES_X,
+        k / PA_STORM_FIELD_TILES_X) * PaStormFieldXZ;
+    ivec2 xz = clamp(ivec2(floor(c.xz)), ivec2(0), ivec2(PaStormFieldXZ - 1));
+    if (paWorkloadCaptureActive()) {
+        paStormFieldRefineFetches++;
+    }
+    vec4 node = texelFetch(StormFieldSampler, tile + xz, 0);
+    if (node.g <= PA_STORM_FIELD_UNCOVERED * 0.5) {
+        if (paWorkloadCaptureActive()) {
+            paStormFieldRefineFallback++;
+        }
+        return false;
+    }
+    clearance = node.a;
+    return true;
 }
 
 // The exact threshold production applies at one point, for the oracle: L
@@ -8339,11 +8617,27 @@ void main() {
             paUnionDistance = 0.0;
             paMinClearance = 0.0;
 #else
-            paDensityConsumer = 5;
-            directStormShape(
-                p, paProbeOwned, paProbeHeight01, paProbeStrength, paProbeRoleMask,
-                paUnionDistance, paMinClearance);
-            paDensityConsumer = 0;
+            // T202. Bit 32: the clearance floor of the node whose cell holds
+            // p, one texel fetch, in place of the walk. The floor is at most
+            // the walk's value anywhere in the cell, so the safe advance
+            // below can only shorten and never steps over material the walk
+            // would have stopped for. An uncovered node walks as before.
+            bool paRefineFromField = false;
+            if ((PaStormFieldEnabled & 32) != 0) {
+                paRefineFromField = paStormFieldClearanceAt(p, paMinClearance);
+                paProbeOwned = false;
+                paProbeHeight01 = 0.0;
+                paProbeStrength = 0.0;
+                paProbeRoleMask = 0;
+                paUnionDistance = 1.0e9;
+            }
+            if (!paRefineFromField) {
+                paDensityConsumer = 5;
+                directStormShape(
+                    p, paProbeOwned, paProbeHeight01, paProbeStrength, paProbeRoleMask,
+                    paUnionDistance, paMinClearance);
+                paDensityConsumer = 0;
+            }
 #endif
             if (paWorkloadCaptureActive()) {
                 paRefineEvents++;
@@ -8711,8 +9005,55 @@ void main() {
         // the delta prices the exact primary evaluation alone. Visually
         // invalid (a 16-block node is not the body), never a candidate.
         float bodyDensity = paStormFieldDensityAt(p);
+        bool paPrimaryCovered = true;
+#elif defined(PA_PRIMARY_DINTERP)
+        // T202 representation oracle: the distance-interpolated body, eight
+        // build-mode walks a sample. Quality only.
+        float bodyDensity = paStormDInterpOracleDensityAt(p, DetailQuality > 0, nearCamera);
+        bool paPrimaryCovered = true;
 #else
-        float bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
+        // T202. Bit 16: the body from the field's threshold and height with
+        // the noise, detail and erosion evaluated here, in place of the
+        // descriptor walk; an uncovered node evaluates exactly as before.
+        float bodyDensity;
+        bool paPrimaryCovered = true;
+        if ((PaStormFieldEnabled & 16) != 0) {
+            bodyDensity = paStormFieldPrimaryDensityAt(
+                p, DetailQuality > 0, nearCamera, paPrimaryCovered);
+        }
+        if ((PaStormFieldEnabled & 16) == 0 || !paPrimaryCovered) {
+            bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
+        }
+#endif
+#ifdef PA_PRIMARY_AUDIT
+        // T202 Task 3. The exact density beside the field's at every primary
+        // sample, accumulated per pixel; the march itself integrates the
+        // field's value, so the structure audited is the candidate's.
+        {
+            float paPaExact = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
+            float paPaErr = bodyDensity - paPaExact;
+            paPaCount += 1.0;
+            paPaSumErr += paPaErr;
+            paPaSumAbs += abs(paPaErr);
+            paPaSumSq += paPaErr * paPaErr;
+            paPaMaxAbs = max(paPaMaxAbs, abs(paPaErr));
+            paPaOver += paPaErr > 1.0e-6 ? 1.0 : 0.0;
+            paPaUnder += paPaErr < -1.0e-6 ? 1.0 : 0.0;
+            bool paPaExactZero = paPaExact <= 0.0;
+            bool paPaFieldZero = bodyDensity <= 0.0;
+            paPaZeroDisagree += paPaExactZero != paPaFieldZero ? 1.0 : 0.0;
+            paPaExactZeroFieldNot += (paPaExactZero && !paPaFieldZero) ? 1.0 : 0.0;
+            paPaFieldZeroExactNot += (!paPaExactZero && paPaFieldZero) ? 1.0 : 0.0;
+            paPaMaterialDisagree +=
+                (paPaExact > 0.0008) != (bodyDensity > 0.0008) ? 1.0 : 0.0;
+            paPaFallback += paPrimaryCovered ? 0.0 : 1.0;
+            paPaExactSum += paPaExact;
+            paPaFieldSum += bodyDensity;
+            if (paPaExact > 0.0 && paPaExact <= 0.05 * DensityMul) {
+                paPaEdgeCount += 1.0;
+                paPaEdgeSumAbs += abs(paPaErr);
+            }
+        }
 #endif
         paCapturePrimaryGroups = false;
         paDensityConsumer = 0;
@@ -9660,6 +10001,21 @@ void main() {
     }
     return;
 #endif
+#ifdef PA_PRIMARY_AUDIT
+    // T202 Task 3. Four accumulators a capture, selected by the same output
+    // uniform the light audit uses; the CPU sums the captures over the frame.
+    gl_FragDepth = 1.0;
+    if (PaLightAuditOutput == 1) {
+        fragColor = vec4(paPaZeroDisagree, paPaMaterialDisagree, paPaOver, paPaUnder);
+    } else if (PaLightAuditOutput == 2) {
+        fragColor = vec4(paPaExactSum, paPaFieldSum, paPaEdgeCount, paPaEdgeSumAbs);
+    } else if (PaLightAuditOutput == 3) {
+        fragColor = vec4(paPaMaxAbs, paPaFallback, paPaExactZeroFieldNot, paPaFieldZeroExactNot);
+    } else {
+        fragColor = vec4(paPaCount, paPaSumErr, paPaSumAbs, paPaSumSq);
+    }
+    return;
+#endif
 #ifdef PA_RAIN_MASK_OUTPUT
     // T188 Task 0. R = rain optical mass, G = onset height, B = termination
     // height, A = contiguous rain runs. Zero mass is "no rain here", which is
@@ -10027,6 +10383,16 @@ void main() {
             float(paStormFieldProbeFetches),
             float(paStormFieldProbeProvablyEmpty),
             float(paStormFieldProbeFallback)
+        );
+        return;
+    }
+    if (DebugView == 70) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paStormFieldPrimaryFetches),
+            float(paStormFieldPrimaryFallback),
+            float(paStormFieldRefineFetches),
+            float(paStormFieldRefineFallback)
         );
         return;
     }

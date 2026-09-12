@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 47;
+    private static final int STAGES = 48;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -137,6 +137,7 @@ final class StormWorkloadRuntimeCapture {
             case 44 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_A;
             case 45 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_B;
             case 46 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_C;
+            case 47 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_D;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -265,7 +266,7 @@ final class StormWorkloadRuntimeCapture {
                     values[39][0], values[39][1], values[39][2], values[39][3],
                     FieldProbe.of(values[40], values[41]),
                     FieldCertainty.of(values[42], values[43]),
-                    StormField.of(values[44], values[45], values[46]));
+                    StormField.of(values[44], values[45], values[46], values[47]));
         }
     }
 
@@ -331,16 +332,23 @@ final class StormWorkloadRuntimeCapture {
             double lightFetches,
             double probeFetches,
             double probeProvablyEmpty,
-            double probeFallback
+            double probeFallback,
+            // T202. The body consumers' fetches and their exact fallbacks.
+            double primaryFetches,
+            double primaryFallback,
+            double refineFetches,
+            double refineFallback
     ) {
         static final StormField ZERO = new StormField(
-                0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+                0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                0.0D, 0.0D, 0.0D, 0.0D);
 
-        static StormField of(double[] audit, double[] node, double[] fetches) {
+        static StormField of(double[] audit, double[] node, double[] fetches, double[] body) {
             return new StormField(
                     audit[0], audit[1], audit[2], audit[3],
                     node[0], node[1], node[2], node[3],
-                    fetches[0], fetches[1], fetches[2], fetches[3]);
+                    fetches[0], fetches[1], fetches[2], fetches[3],
+                    body[0], body[1], body[2], body[3]);
         }
     }
 
@@ -886,7 +894,16 @@ final class StormWorkloadRuntimeCapture {
                     + " stormFieldLightFetchesPerPixel=" + perPixel(stormField.lightFetches())
                     + " stormFieldProbeFetchesPerPixel=" + perPixel(stormField.probeFetches())
                     + " stormFieldProbeProvablyEmpty=" + fmt(stormField.probeProvablyEmpty())
-                    + " stormFieldProbeFallback=" + fmt(stormField.probeFallback());
+                    + " stormFieldProbeFallback=" + fmt(stormField.probeFallback())
+                    // T202. The body consumers: how many primary samples and
+                    // refinement events the field served, and how many each
+                    // handed back to the exact walk.
+                    + " stormFieldPrimaryFetches=" + fmt(stormField.primaryFetches())
+                    + " stormFieldPrimaryFallback=" + fmt(stormField.primaryFallback())
+                    + " stormFieldRefineFetches=" + fmt(stormField.refineFetches())
+                    + " stormFieldRefineFallback=" + fmt(stormField.refineFallback())
+                    + " stormFieldPrimaryFetchesPerPixel=" + perPixel(stormField.primaryFetches())
+                    + " stormFieldRefineFetchesPerPixel=" + perPixel(stormField.refineFetches());
         }
 
         double oraclePostOpacityDistance() {

@@ -739,7 +739,34 @@ public enum CoreCostDiagnosticProgram {
     /** T201: the rain shaft's Gauss samples off; the segment test stays. */
     T201_NO_RAIN_SHAFT("t201_norain_shaft"),
     /** T201: primary from the field and no refinement together - the combined ceiling. */
-    T201_PRIMARY_NO_REFINE("t201_primary_norefine");
+    T201_PRIMARY_NO_REFINE("t201_primary_norefine"),
+
+    // -----------------------------------------------------------------------
+    // T202. The primary body density and the union-distance refinement read
+    // the shared field instead of walking the descriptors. Each arm is FINAL
+    // (bits 11) with one or both body consumers added: 16 the primary body
+    // from the field's threshold and height with the noise, detail and
+    // erosion evaluated at the sample; 32 the refinement's clearance from the
+    // node's floor in A. The audit program evaluates the exact density
+    // beside the field's at every primary sample and outputs accumulators.
+    // -----------------------------------------------------------------------
+
+    /** T202: the primary body density from the field (bits 11 | 16). */
+    T202_PRIMARY_FIELD("t202_primary_field"),
+    /** T202: the refinement's clearance from the field (bits 11 | 32). */
+    T202_REFINE_FIELD("t202_refine_field"),
+    /** T202: both body consumers on the field (bits 11 | 16 | 32) - the candidate. */
+    T202_BOTH_FIELD("t202_both_field"),
+    /** T202: primary-sample audit output, the field's body beside the exact one. */
+    T202_PRIMARY_AUDIT("t202_primary_audit"),
+    /**
+     * T202: the representation oracle - the primary body from the union
+     * distance, softness, strength and height interpolated over the dual
+     * cell's eight nodes (eight walks a sample), on FINAL's bits. Quality only.
+     */
+    T202_DINTERP_ORACLE("t202_dinterp_oracle"),
+    /** T202: the representation oracle's audit output. */
+    T202_DINTERP_AUDIT("t202_dinterp_audit");
 
 
     private final String serializedName;
@@ -849,6 +876,11 @@ public enum CoreCostDiagnosticProgram {
             case T196_FIELD_PROBE -> 2;
             case T196_FIELD_BOTH -> 3;
             case T198_FIELD_LIGHT_EXACT -> 9;
+            // T202. Baked explicitly rather than inherited, so the arms keep
+            // their meaning whatever production's bits become.
+            case T202_PRIMARY_FIELD, T202_PRIMARY_AUDIT -> 1 | 2 | 8 | 16;
+            case T202_REFINE_FIELD -> 1 | 2 | 8 | 32;
+            case T202_BOTH_FIELD -> 1 | 2 | 8 | 16 | 32;
             default -> StormFieldGeometry.PRODUCTION_CONSUMER_BITS;
         };
     }
@@ -899,6 +931,15 @@ public enum CoreCostDiagnosticProgram {
      */
     public boolean lightAuditCapture() {
         return this == T198_LIGHT_AUDIT;
+    }
+
+    /**
+     * T202. True for the program whose fragment output is a primary-sample
+     * audit accumulator rather than a frame; its captures are summed on the
+     * CPU and are comparable to nothing else.
+     */
+    public boolean primaryAuditCapture() {
+        return this == T202_PRIMARY_AUDIT || this == T202_DINTERP_AUDIT;
     }
 
     public boolean rainMaskCapture() {

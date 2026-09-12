@@ -313,7 +313,12 @@ def leanFinalConstants = [
         // it to 0. The T196 soundness oracle (pass 2) stays compiled into
         // FINAL behind the live pass, which the renderer never uploads as 2
         // there: T199 measured that compiling it out costs 30% at SIDE.
-        'uniform int PaStormFieldEnabled;'         : 'const int PaStormFieldEnabled = 11;',
+        // T202. 32: the refinement's clearance floor from A
+        // (StormFieldGeometry.PRODUCTION_CONSUMER_BITS = 43). The T202 arms
+        // bake their bits explicitly; t202_refine_field is now the program
+        // FINAL is byte-identical to. Bit 16 (the primary body from the
+        // field) failed the body's quality bar and stays a campaign arm.
+        'uniform int PaStormFieldEnabled;'         : 'const int PaStormFieldEnabled = 43;',
         // T197. The field's horizontal resolution, closed at T196's grid:
         // 384 and 512 did not recover the shadow pockets, T198 did.
         'uniform int PaStormFieldXZ;'              : 'const int PaStormFieldXZ = 256;',
@@ -1062,6 +1067,49 @@ def leanProgramVariants = [
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
                    'PA_ARM_PRIMARY_FIELD_DENSITY 1', 'PA_ARM_NO_REFINE 1'],
          keepUniforms: []],
+
+        // T202. The body consumers on the field. Each is FINAL's
+        // specialization with the light and probe bits (11) plus 16 (the
+        // primary body density from the field's threshold and height, noise
+        // and detail exact at the sample) and/or 32 (the refinement's
+        // clearance from the node floor in A); the bits are baked explicitly
+        // so the arms keep their meaning whatever production bakes. The
+        // audit program is the primary arm with the exact density evaluated
+        // beside the field's at every primary sample; its output selector
+        // stays live.
+        [name: 'cloud_atmosphere_volume_t202_primary_field',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 27;']],
+        [name: 'cloud_atmosphere_volume_t202_refine_field',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 43;']],
+        [name: 'cloud_atmosphere_volume_t202_both_field',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 59;']],
+        [name: 'cloud_atmosphere_volume_t202_primary_audit',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_PRIMARY_AUDIT 1'],
+         keepUniforms: ['PaStormFieldPass', 'PaLightAuditOutput'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 27;']],
+        // The representation oracle: the primary body from the union
+        // distance, softness, strength and height interpolated over the
+        // eight nodes of the dual cell (eight build-mode walks a sample), on
+        // FINAL's bits - a quality arm, never timed - and its audit.
+        [name: 'cloud_atmosphere_volume_t202_dinterp_oracle',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_PRIMARY_DINTERP 1'],
+         keepUniforms: ['PaStormFieldPass']],
+        [name: 'cloud_atmosphere_volume_t202_dinterp_audit',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_PRIMARY_DINTERP 1', 'PA_PRIMARY_AUDIT 1'],
+         keepUniforms: ['PaStormFieldPass', 'PaLightAuditOutput']],
 
         // T192. The closed-form ownership bound as classification triage.
         // Three arms only, and the campaign-scoped loading T191 added means

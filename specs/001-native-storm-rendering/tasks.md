@@ -3240,6 +3240,49 @@ implementation, while visual polish remains independently active.
   selects the next architecture by removable ms (>= 4 major, 2-4 strong, 1-2 secondary, < 1 no
   campaign). Evidence in `validation/performance-time-attribution.md` and
   `validation/t201-campaign/`. [SC-005, SC-021]
+- [X] T202 [PERFORMANCE] [US3] The primary body density and the refinement on the shared field.
+  Architecture campaign against T201's #1 target, the per-call descriptor traversal behind the
+  primary body density and the union-distance refinement (pair ceiling 2.62-2.70 ms). Two
+  consumer bits on the accepted field: 16, the primary body from the field's threshold and
+  height (R, B) with the base noise, detail octaves and erosion evaluated at the sample
+  (`paStormFieldPrimaryDensityAt`, the T198 light lookup at mip 0 with the primary's detail
+  stages; uncovered nodes fall back to the exact walk); 32, the refinement's clearance floor
+  read from A (`paStormFieldClearanceAt`, one texel fetch; the build writes the walk's
+  minimum descriptor clearance dilated over the dual cell - the probe floor's own Lipschitz
+  dilation - on covered nodes, uncovered nodes keep the light's fallback density; the
+  renderer uploads the consumer bits to the build draw so the monolith's atlas matches
+  FINAL's). Campaign `T202` (`run/t202-primary-traversal.txt`, `primaryTraversalRunRequested`,
+  `t202Run`, `T202_ARMS`, `T202_OPTIMIZATION_ARMS`, `T202_IMAGE_ARMS`) at SIDE and
+  PLAY_VIS_NEAR, 0.25: counters on the monolith at bits 11 and 59, frames of each consumer
+  and both against the FINAL anchor with the T178 quality harness and the T197 pocket
+  diagnostic, a primary-sample audit (`t202_primary_audit`, `PA_PRIMARY_AUDIT`: the exact
+  density beside the field's at every primary sample, joined per pixel class by
+  `StormPrimaryFieldAuditReport`), then anchor-bracketed timing of `t202_primary_field` (27),
+  `t202_refine_field` (43), `t202_both_field` (59) and T201's three ceilings re-timed in the
+  same session; a second run added the representation oracle `t202_dinterp_oracle` /
+  `t202_dinterp_audit` (`PA_PRIMARY_DINTERP`: the union distance, softness, strength and
+  height interpolated over the dual cell's eight nodes, eight walks a sample, quality only).
+  RESULT: refinement PASS - image exact-class (cloud SSIM 0.995, IoU 0.998, thin 0.98-1.00,
+  hole 0.98-1.00), 0.54 / 0.86 ms (0.63 / 0.67 on the repeat), minor band, **banked: FINAL
+  bakes bits 43** (`StormFieldGeometry.PRODUCTION_CONSUMER_BITS`, `leanFinalConstants`; FINAL
+  is byte-identical to `t202_refine_field`, sandbox-asserted). Primary FAIL on quality despite
+  1.6-2.1 ms (80% of its ceiling): thin retention 0.70-0.84, edge SSIM 0.68-0.89, IoU
+  0.96-0.97, 4.5-4.7% of primary samples disagreeing on zero/nonzero, -3/-4% body mass; the
+  distance oracle recovers the interior (hole 0.86 -> 0.98) but not the boundary (edge SSIM
+  0.71 / 0.90, thin 0.91 / 0.70, 3.4% disagreement) - the descriptor geometry's curvature
+  across a 16 x ~20-block cell, so no 256 x 32 field carries the body at body accuracy.
+  Workload (SIDE): shape calls tagged primary 945k -> 0, refinement 268k -> 25k (out-of-slab
+  fallbacks), exact SDFs 17.6M -> 8.2M, lobe visits 27.1M -> 15.7M, noise unchanged; the
+  residual walk is the rain segment test. Campaign `T202B` (`run/t202b-post-baseline.txt`,
+  `postBaselineRunRequested`, `t202bRun`, `T202B_ARMS`, no image arms) then measured the
+  post-T202 FINAL baseline and the rain segment test's ceiling on it (`t182_norainseg`,
+  measurement only): FINAL ray 12.7 / 12.6 ms, and the segment test **7.7 / 8.2 ms**
+  (ratio 2.5-3.0x) - the binding constraint, now priced. Temporal stays closed (raw 0.25
+  combined 15-17 ms). Three launches (~6, 6 and 4 min), campaignGate x3 and check build
+  PASS. New counters on view 70 (`STORM_WORKLOAD_STORM_FIELD_D`, stage 47); the T123
+  instrumentation invariant masks `PA_PRIMARY_AUDIT`; new T202 invariant (six programs
+  compile, bake their bits, FINAL carries no audit). Evidence in
+  `validation/performance-primary-traversal.md` and `validation/t202-campaign/`. [SC-005, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

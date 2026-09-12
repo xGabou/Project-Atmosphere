@@ -783,7 +783,14 @@ public final class VolumetricCloudRenderer {
                 }
                 VolumetricCloudRenderTargets.clearAndBind(stormFieldTarget);
                 shader.safeGetUniform("PaStormFieldPass").set(1);
-                shader.safeGetUniform("PaStormFieldEnabled").set(0);
+                // T202. The build reads the consumer bits too: bit 32 decides
+                // what the node's A channel carries (the refinement's
+                // clearance floor, or the node density). FINAL bakes the bits,
+                // so its build has always seen them; the monolith is uploaded
+                // the same value here so its atlas matches FINAL's. The build
+                // pass returns before any consumer lookup, so nothing in it
+                // reads the atlas it is writing.
+                shader.safeGetUniform("PaStormFieldEnabled").set(enabledBits);
                 shader.apply();
                 PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
                 bindManualTextures(shader, puffCandidateTarget.getColorTextureId());

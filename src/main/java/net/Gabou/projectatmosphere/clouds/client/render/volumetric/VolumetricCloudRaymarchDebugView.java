@@ -186,7 +186,14 @@ public enum VolumetricCloudRaymarchDebugView {
     STORM_WORKLOAD_STORM_FIELD_B(68, "storm_workload_storm_field_b"),
 
     /** T196. Fetches the field served, and the probe's two field-only verdicts. */
-    STORM_WORKLOAD_STORM_FIELD_C(69, "storm_workload_storm_field_c");
+    STORM_WORKLOAD_STORM_FIELD_C(69, "storm_workload_storm_field_c"),
+
+    /**
+     * T202. The body consumers on the field: fetches served to the primary
+     * body density and to the refinement, and each one's fallbacks to the
+     * exact walk.
+     */
+    STORM_WORKLOAD_STORM_FIELD_D(70, "storm_workload_storm_field_d");
 
     private final int shaderId;
     private final String serializedName;

@@ -74,8 +74,9 @@ public final class VolumetricCloudDebugConfig {
      * reasoning: the monolith is the only program that counts, so it has to
      * read the field for the counters to describe the post-field workload -
      * the collapsed light and probe walks, the fetches, and the probe audit.
-     * Bits as PaStormFieldEnabled: 1 light, 2 probe, 8 exact-noise tap.
-     * Never applied to a timed arm.
+     * Bits as PaStormFieldEnabled: 1 light, 2 probe, 8 exact-noise tap,
+     * 32 the refinement's clearance floor (T202); 16, the primary body from
+     * the field, is a campaign arm only. Never applied to a timed arm.
      *
      * <p>T199. FINAL bakes {@link StormFieldGeometry#PRODUCTION_CONSUMER_BITS},
      * so the monolith defaults to the same value: a debug view renders the

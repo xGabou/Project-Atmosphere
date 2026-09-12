@@ -26,8 +26,14 @@ public final class StormFieldGeometry {
      * bakes this value, the monolith uploads it unless a campaign overrides
      * it, and every program specialized from FINAL inherits it. Bit 4, the
      * T196 hybrid, is dead at this value.
+     * T202. 32: the union-distance refinement reads its clearance floor from
+     * A (the build writes the walk's minimum descriptor clearance, dilated
+     * over the dual cell, on covered nodes; uncovered nodes keep the node
+     * density the light's fallback reads). Bit 16 - the primary body from
+     * the field's threshold - measured 1.8-2.1 ms but failed the body's
+     * quality bar (thin retention 0.70-0.84) and is not production.
      */
-    public static final int PRODUCTION_CONSUMER_BITS = 1 | 2 | 8;
+    public static final int PRODUCTION_CONSUMER_BITS = 1 | 2 | 8 | 32;
     /** Vertical slices. T197 varies XZ only. */
     public static final int Y = 32;
     public static final int TILES_X = 8;

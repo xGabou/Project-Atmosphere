@@ -278,7 +278,13 @@ public final class StormCampaignRegistry {
                     "T200_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
             new Campaign("T201", "t201-time-attribution.txt",
                     "timeAttributionRunRequested", "t201Run",
-                    "T201_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "T201_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            new Campaign("T202", "t202-primary-traversal.txt",
+                    "primaryTraversalRunRequested", "t202Run",
+                    "T202_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            new Campaign("T202B", "t202b-post-baseline.txt",
+                    "postBaselineRunRequested", "t202bRun",
+                    "T202B_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.
