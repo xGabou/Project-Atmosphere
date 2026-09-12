@@ -2014,6 +2014,305 @@ final class StormT132AutoDriver {
         return Files.exists(T199_MARKER);
     }
 
+    // -----------------------------------------------------------------------
+    // T200. FINAL's pixel-scaling exponent after the shared field. T151
+    // closed interleaved reconstruction on cost ~ pixels^0.49-0.75, measured
+    // before T196-T199 moved the light and probe walks out of the per-pixel
+    // ray; this re-measures the current FINAL - field built every frame,
+    // both consumers on - at five raw scales, three repeats a scale, at the
+    // severe SIDE pose, the representative PLAY_NEAR pose and FAR. Nothing
+    // is optimized; the report fits time = fixed + k * pixels^alpha with
+    // the field build as the resolution-independent term and derives the
+    // temporal-reconstruction budget at each candidate raw scale.
+    // -----------------------------------------------------------------------
+
+    private static final Path T200_MARKER = Path.of("t200-pixel-scaling.txt");
+
+    // PLAY_VIS_NEAR, not PLAY_NEAR: at 4x the radius the storm sits beyond the
+    // 2000-block cloud render distance and the T150 guard rejects the pose as
+    // empty sky (run 1, 10:27 on 12Sep2026, abandoned it after three attempts);
+    // 1.6x is the representative gameplay pose the T135 budget is quoted at.
+    private static final String[] T200_POSES = {"SIDE", "PLAY_VIS_NEAR", "FAR"};
+
+    /** Raw scales of the 1920x1080 window: 480x270 ... 1920x1080. */
+    private static final float[] T200_SCALES = {0.25F, 0.375F, 0.50F, 0.75F, 1.00F};
+
+    private static final int T200_REPEATS = 3;
+
+    private static boolean t200Run;
+    private static boolean t200OriginalHistoryEnabled;
+
+    /**
+     * Ascending scales within a repeat, three repeats, so a session drift
+     * shows as a spread across repeats rather than a trend across scales.
+     * No anchors: the report wants absolute milliseconds per scale, not a
+     * ratio to a control.
+     */
+    private static final T166Arm[] T200_ARMS = buildT200Arms();
+
+    private static T166Arm[] buildT200Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        for (int repeat = 1; repeat <= T200_REPEATS; repeat++) {
+            for (float scale : T200_SCALES) {
+                arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL, scale,
+                        StormOptimizationDiagnosticMode.NORMAL_PRODUCTION, -1,
+                        "r" + repeat, 60, 0));
+            }
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t200Arm() {
+        return T200_ARMS[Math.max(0, Math.min(T200_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T200_OPTIMIZATION_ARMS =
+            buildT200OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT200OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T200_ARMS.length];
+        for (int i = 0; i < T200_ARMS.length; i++) {
+            modes[i] = T200_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /** T200 captures no images: the question is cost, and the image is FINAL's. */
+    private static final CoreCostDiagnosticProgram[] T200_IMAGE_ARMS = {};
+
+    /** T200 marker predicate. */
+    private static boolean pixelScalingRunRequested() {
+        return Files.exists(T200_MARKER);
+    }
+
+    /** The cloud target a scale produces from the harness window, as prepareCloudTargets does. */
+    private static int[] t200Target(float scale) {
+        return new int[] {
+                Math.max(1, (int) Math.ceil(T135_WIDTH * scale)),
+                Math.max(1, (int) Math.ceil(T135_HEIGHT * scale))};
+    }
+
+    private static String t200ArmLabel(float scale, int repeat) {
+        return new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL, scale,
+                StormOptimizationDiagnosticMode.NORMAL_PRODUCTION, -1,
+                "r" + repeat, 60, 0).label();
+    }
+
+    /** Mean, min, max of one cell field over the repeats present. */
+    private record T200Stat(int n, double mean, double min, double max) {
+        static T200Stat of(java.util.List<Double> values) {
+            if (values.isEmpty()) {
+                return new T200Stat(0, Double.NaN, Double.NaN, Double.NaN);
+            }
+            double sum = 0.0D;
+            double min = Double.MAX_VALUE;
+            double max = -Double.MAX_VALUE;
+            for (double v : values) {
+                sum += v;
+                min = Math.min(min, v);
+                max = Math.max(max, v);
+            }
+            return new T200Stat(values.size(), sum / values.size(), min, max);
+        }
+
+        double spread() {
+            return n == 0 || mean <= 0.0D ? Double.NaN : (max - min) / mean;
+        }
+    }
+
+    /** Least-squares slope of y on x with r-squared; both arrays the same length >= 2. */
+    private static double[] t200Fit(double[] x, double[] y) {
+        int n = x.length;
+        double mx = 0.0D;
+        double my = 0.0D;
+        for (int i = 0; i < n; i++) {
+            mx += x[i];
+            my += y[i];
+        }
+        mx /= n;
+        my /= n;
+        double sxy = 0.0D;
+        double sxx = 0.0D;
+        double syy = 0.0D;
+        for (int i = 0; i < n; i++) {
+            sxy += (x[i] - mx) * (y[i] - my);
+            sxx += (x[i] - mx) * (x[i] - mx);
+            syy += (y[i] - my) * (y[i] - my);
+        }
+        double slope = sxx == 0.0D ? Double.NaN : sxy / sxx;
+        double intercept = my - slope * mx;
+        double r2 = sxx == 0.0D || syy == 0.0D ? Double.NaN : (sxy * sxy) / (sxx * syy);
+        return new double[] {slope, intercept, r2};
+    }
+
+    /**
+     * T200. Per pose and scale the measured milliseconds (ray, field build,
+     * composite, combined) with the repeat spread; the 0.75 / 0.25 ratios; the
+     * exponent two ways - the two-point ratio of those scales, and the
+     * log-log fit over every scale with its r-squared - for the ray alone and
+     * for the whole renderer with the field build held as the fixed term; and
+     * the temporal budget left at each candidate raw scale against 10 and 8 ms.
+     * Lines are labelled MEASURED or DERIVED.
+     */
+    private static String buildT200Report() {
+        StringBuilder out = new StringBuilder("T200_PIXEL_SCALING_DECISION");
+        for (String pose : T200_POSES) {
+            double[] pixels = new double[T200_SCALES.length];
+            double[] rayMean = new double[T200_SCALES.length];
+            double[] combinedMean = new double[T200_SCALES.length];
+            T200Stat[] fieldStats = new T200Stat[T200_SCALES.length];
+            boolean[] present = new boolean[T200_SCALES.length];
+            java.util.List<Double> fieldAll = new java.util.ArrayList<>();
+            for (int s = 0; s < T200_SCALES.length; s++) {
+                float scale = T200_SCALES[s];
+                java.util.List<Double> ray50 = new java.util.ArrayList<>();
+                java.util.List<Double> ray95 = new java.util.ArrayList<>();
+                java.util.List<Double> field50 = new java.util.ArrayList<>();
+                java.util.List<Double> field95 = new java.util.ArrayList<>();
+                java.util.List<Double> comp50 = new java.util.ArrayList<>();
+                java.util.List<Double> comp95 = new java.util.ArrayList<>();
+                java.util.List<Double> frame50 = new java.util.ArrayList<>();
+                int width = 0;
+                int height = 0;
+                for (int repeat = 1; repeat <= T200_REPEATS; repeat++) {
+                    StormT135PerformanceProfile.Cell cell =
+                            t162Cell(pose, t200ArmLabel(scale, repeat));
+                    if (cell == null || cell.cloudP50() <= 0.0D) {
+                        continue;
+                    }
+                    ray50.add(cell.cloudP50());
+                    ray95.add(cell.cloudP95());
+                    field50.add(Math.max(0.0D, cell.rainFieldP50()));
+                    field95.add(Math.max(0.0D, cell.rainFieldP95()));
+                    comp50.add(cell.compositeP50());
+                    comp95.add(cell.compositeP95());
+                    frame50.add(cell.frameP50());
+                    width = cell.cloudWidth();
+                    height = cell.cloudHeight();
+                }
+                int[] expected = t200Target(scale);
+                if (width <= 0) {
+                    width = expected[0];
+                    height = expected[1];
+                }
+                T200Stat r50 = T200Stat.of(ray50);
+                T200Stat r95 = T200Stat.of(ray95);
+                T200Stat f50 = T200Stat.of(field50);
+                T200Stat f95 = T200Stat.of(field95);
+                T200Stat c50 = T200Stat.of(comp50);
+                T200Stat c95 = T200Stat.of(comp95);
+                T200Stat fr50 = T200Stat.of(frame50);
+                present[s] = r50.n() > 0;
+                pixels[s] = (double) width * height;
+                rayMean[s] = r50.mean();
+                fieldStats[s] = f50;
+                fieldAll.addAll(field50);
+                combinedMean[s] = r50.mean() + f50.mean();
+                out.append(String.format(Locale.ROOT,
+                        "%nT200_SCALE MEASURED pose=%s scale=%.4f target=%dx%d expected=%dx%d"
+                                + " pixels=%d cells=%d rayP50=%.4f rayP50Min=%.4f rayP50Max=%.4f"
+                                + " rayP50Spread=%.4f rayP95=%.4f fieldP50=%.4f fieldP95=%.4f"
+                                + " compositeP50=%.4f compositeP95=%.4f combinedP50=%.4f"
+                                + " combinedP95=%.4f frameP50=%.4f",
+                        pose, scale, width, height, expected[0], expected[1], (long) pixels[s],
+                        r50.n(), r50.mean(), r50.min(), r50.max(), r50.spread(), r95.mean(),
+                        f50.mean(), f95.mean(), c50.mean(), c95.mean(),
+                        r50.mean() + f50.mean(), r95.mean() + f95.mean(), fr50.mean()));
+            }
+            // The field build across scales: the fixed term, and how fixed it is.
+            T200Stat fixed = T200Stat.of(fieldAll);
+            out.append(String.format(Locale.ROOT,
+                    "%nT200_FIXED MEASURED pose=%s fieldBuildMean=%.4f fieldBuildMin=%.4f"
+                            + " fieldBuildMax=%.4f fieldBuildSpreadAcrossScales=%.4f cells=%d",
+                    pose, fixed.mean(), fixed.min(), fixed.max(), fixed.spread(), fixed.n()));
+            // Two-point ratios, 0.75 over 0.25.
+            int i25 = t200ScaleIndex(0.25F);
+            int i75 = t200ScaleIndex(0.75F);
+            if (i25 >= 0 && i75 >= 0 && present[i25] && present[i75]) {
+                double pxRatio = pixels[i75] / pixels[i25];
+                double rayRatio = rayMean[i75] / rayMean[i25];
+                double combinedRatio = combinedMean[i75] / combinedMean[i25];
+                out.append(String.format(Locale.ROOT,
+                        "%nT200_RATIO MEASURED pose=%s pixels075over025=%.4f rayP50Ratio=%.4f"
+                                + " combinedP50Ratio=%.4f",
+                        pose, pxRatio, rayRatio, combinedRatio));
+                out.append(String.format(Locale.ROOT,
+                        "%nT200_ALPHA DERIVED pose=%s method=twoPoint025to075 alphaRay=%.4f"
+                                + " alphaCombined=%.4f",
+                        pose, Math.log(rayRatio) / Math.log(pxRatio),
+                        Math.log(combinedRatio) / Math.log(pxRatio)));
+            }
+            // Log-log fit over every present scale.
+            int count = 0;
+            for (boolean p : present) {
+                count += p ? 1 : 0;
+            }
+            if (count >= 2) {
+                double[] lx = new double[count];
+                double[] lyRay = new double[count];
+                double[] lyCombined = new double[count];
+                int w = 0;
+                for (int s = 0; s < T200_SCALES.length; s++) {
+                    if (!present[s]) {
+                        continue;
+                    }
+                    lx[w] = Math.log(pixels[s]);
+                    lyRay[w] = Math.log(rayMean[s]);
+                    lyCombined[w] = Math.log(combinedMean[s]);
+                    w++;
+                }
+                double[] ray = t200Fit(lx, lyRay);
+                double[] combined = t200Fit(lx, lyCombined);
+                out.append(String.format(Locale.ROOT,
+                        "%nT200_ALPHA DERIVED pose=%s method=logLogFit scales=%d alphaRay=%.4f"
+                                + " kRay=%.6e r2Ray=%.4f alphaCombinedNoFixed=%.4f r2Combined=%.4f",
+                        pose, count, ray[0], Math.exp(ray[1]), ray[2], combined[0], combined[2]));
+                // The model the brief asks for: time = fixed + k * pixels^alpha,
+                // with the field build as the fixed term and the ray as the
+                // pixel-dependent one, so the whole renderer's curve is the
+                // ray's fit shifted by the measured build.
+                out.append(String.format(Locale.ROOT,
+                        "%nT200_MODEL DERIVED pose=%s fixedMs=%.4f k=%.6e alpha=%.4f"
+                                + " predicted025=%.4f predicted0375=%.4f predicted050=%.4f"
+                                + " predicted075=%.4f predicted100=%.4f",
+                        pose, fixed.mean(), Math.exp(ray[1]), ray[0],
+                        t200Model(fixed.mean(), ray, 0.25F), t200Model(fixed.mean(), ray, 0.375F),
+                        t200Model(fixed.mean(), ray, 0.50F), t200Model(fixed.mean(), ray, 0.75F),
+                        t200Model(fixed.mean(), ray, 1.00F)));
+            }
+            // Temporal budget at the candidate raw scales.
+            for (float candidate : new float[] {0.25F, 0.375F, 0.50F}) {
+                int s = t200ScaleIndex(candidate);
+                if (s < 0 || !present[s]) {
+                    continue;
+                }
+                double raw = combinedMean[s];
+                out.append(String.format(Locale.ROOT,
+                        "%nT200_BUDGET DERIVED pose=%s rawScale=%.4f rawCloudMs=%.4f"
+                                + " (ray=%.4f field=%.4f) budgetTo10ms=%.4f budgetTo8ms=%.4f",
+                        pose, candidate, raw, rayMean[s], fieldStats[s].mean(),
+                        10.0D - raw, 8.0D - raw));
+            }
+        }
+        return out.toString();
+    }
+
+    private static int t200ScaleIndex(float scale) {
+        for (int s = 0; s < T200_SCALES.length; s++) {
+            if (Math.abs(T200_SCALES[s] - scale) < 1.0e-6F) {
+                return s;
+            }
+        }
+        return -1;
+    }
+
+    private static double t200Model(double fixed, double[] fit, float scale) {
+        int[] target = t200Target(scale);
+        double px = (double) target[0] * target[1];
+        return fixed + Math.exp(fit[1]) * Math.pow(px, fit[0]);
+    }
+
     private static T166Arm[] buildT193Arms() {
         java.util.List<T166Arm> arms = new java.util.ArrayList<>();
         int anchor = 0;
@@ -3200,7 +3499,7 @@ final class StormT132AutoDriver {
                 || t178Run || t179Run || t180Run || t181Run || t182Run
                 || t184Run || t185Run || t186Run || t187Run || t188Run
                 || t189Run || t190Run || t192Run || t193Run || t194Run
-                || t195Run || t196Run || t198Run || t199Run;
+                || t195Run || t196Run || t198Run || t199Run || t200Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -3458,7 +3757,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t199Run ? t199Arm()
+            T166Arm arm = t200Run ? t200Arm()
+                    : t199Run ? t199Arm()
                     : t198Run ? t198Arm()
                     : t196Run ? t196Arm()
                     : t195Run ? t195Arm()
@@ -3568,6 +3868,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t200Run) {
+            return t200Arm().label();
+        }
         if (t199Run) {
             return t199Arm().label();
         }
@@ -3689,6 +3992,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t200Run) {
+            return T200_OPTIMIZATION_ARMS;
+        }
         if (t199Run) {
             return T199_OPTIMIZATION_ARMS;
         }
@@ -3941,6 +4247,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t200Run) {
+            return T200_POSES;
+        }
         if (t199Run) {
             return T199_POSES;
         }
@@ -4444,6 +4753,8 @@ final class StormT132AutoDriver {
                 // timed arm; the rebuild counters start from zero here.
                 t199Lifecycle = t199Run ? new T199LifecycleProbe() : null;
                 VolumetricCloudRenderer.resetStormFieldRebuildCounters();
+                t200Run = pixelScalingRunRequested();
+                t200OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 // T188 Task 3 and Task 11. Counters come from the monolith, so
                 // the monolith has to be using the field for them to describe
                 // the post-field workload rather than the one it replaced.
@@ -4512,7 +4823,8 @@ final class StormT132AutoDriver {
                                 || t195Run
                                 || t196Run
                                 || t198Run
-                                || t199Run;
+                                || t199Run
+                                || t200Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -4526,7 +4838,7 @@ final class StormT132AutoDriver {
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
                             && !t171Run && !t172Run && !t173Run && !t174Run
                             && !t175Run && !t176Run && !t177Run && !t178Run
-                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run && !t198Run && !t199Run) {
+                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run && !t198Run && !t199Run && !t200Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -4536,7 +4848,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t199Run ? "T199_SHARED_FIELD_FINAL"
+                            t200Run ? "T200_PIXEL_SCALING"
+                                    : t199Run ? "T199_SHARED_FIELD_FINAL"
                                     : t198Run ? "T198_LIGHT_FIELD_BIAS"
                                     : t196Run ? "T196_SHARED_FIELD"
                                     : t195Run ? "T195_SHARED_FIELD_LOOKUP"
@@ -4909,7 +5222,8 @@ final class StormT132AutoDriver {
                         || (t195Run && t195Arm().program().fixedWork())
                         || (t196Run && t196Arm().program().fixedWork())
                         || (t198Run && t198Arm().program().fixedWork())
-                        || (t199Run && t199Arm().program().fixedWork())) {
+                        || (t199Run && t199Arm().program().fixedWork())
+                        || (t200Run && t200Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -5133,6 +5447,14 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
+                }
+                if (t200Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT200Report());
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(
+                            t200OriginalHistoryEnabled);
                 }
                 if (t199Run) {
                     ProjectAtmosphere.LOGGER.info(buildT199FinalFieldReport());
@@ -5617,7 +5939,10 @@ final class StormT132AutoDriver {
         if (poseGuardsArmed() && !t153OracleRun && t166PoseCameraRebuildNeeded(pose)) {
             return;
         }
-        if (programArmCampaign() && t141ArmIndex == 0
+        // T200 captures nothing: with an empty arm list the phase's done
+        // sentinel (length * 2 + 1) never clears its own gate, so it is
+        // skipped outright rather than entered.
+        if (programArmCampaign() && !t200Run && t141ArmIndex == 0
                 && t166ImageStep < t166ImageArms().length * 2 + 2) {
             tickT166Images(pose);
             return;
@@ -6118,6 +6443,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t200Run) {
+            return T200_IMAGE_ARMS;
+        }
         if (t198Run || t199Run) {
             T198ImageArm[] imageArms = t199Run ? T199_IMAGE_ARMS : T198_IMAGE_ARMS;
             CoreCostDiagnosticProgram[] programs =

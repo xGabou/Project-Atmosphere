@@ -3157,6 +3157,45 @@ implementation, while visual polish remains independently active.
   checklist passed, no correctness residual is open other than the named far-tap rim, and the
   rain share is recorded without action; state yes/no with the numbers and the exact next task.
   Add the `[X]` summary to this file, commit with the session attribution, do not merge.
+- [X] T200 [PERFORMANCE] [US3] FINAL pixel-scaling baseline for temporal readiness.
+  **Done: TEMPORAL READY = NO.** Five scales x three repeats at SIDE, PLAY_VIS_NEAR (the brief's
+  PLAY_NEAR at 4x the radius sits beyond the 2000-block cloud render distance and the T150 guard
+  rejected it as empty sky; 1.6x is the representative pose the T135 budget is quoted at) and
+  FAR, one deterministic fixture a pose, no shader variant. MEASURED: SIDE ray 13.17 / 26.99 /
+  40.82 / 80.36 / 131.73 ms at 0.25 / 0.375 / 0.5 / 0.75 / 1.0 (480x270 ... 1920x1080), field
+  build 2.1-2.2 ms fixed (no trend with scale), composite 0.09 ms; 0.75 / 0.25 ray ratio **6.10x**
+  SIDE, **5.55x** PLAY_VIS_NEAR, 3.57x FAR for 9x pixels. DERIVED: alpha (log-log, r2 >= 0.999)
+  **0.823 SIDE, 0.779 PLAY_VIS_NEAR**, 0.650 FAR (two-point agrees to 0.001); T138's pre-field
+  0.760 / 0.761 / 0.711 - removing the per-sample walks made the ray *more* linear in pixels, and
+  T151's 0.49-0.75 band is superseded. Budget: at raw 0.25 the cloud cost alone is **15.35 ms SIDE
+  / 14.43 PLAY_VIS_NEAR** (ray + field), -4.4 to -5.4 ms against 10 ms and -6.4 to -7.3 against
+  8 ms before any reconstruction; a 6 ms raw cost needs ~0.12 scale (~225x125). Criterion 1
+  (meaningful ray reduction) passes, 2 and 3 fail: the deficit is per-pixel cost (~100 ns a
+  pixel at 480x270), not pixel count. Next: **T201, a time attribution of the field FINAL** with
+  the T166/T193-style ceiling arms at 0.25 (SIDE + PLAY_VIS_NEAR) to rank non-rain consumers by
+  ms (the T199 call shares cannot); temporal is revisited when raw 0.25 is under ~6 ms. Two
+  launches (~5 min each), campaignGate x2 and check build PASS. Evidence in
+  `validation/performance-pixel-scaling.md` and `validation/t200-campaign/`. Original brief:
+  Measurement only: no probe-floor, rain, field-resolution, far-tap, temporal or reconstruction change. T151
+  closed interleaved reconstruction on cost ~ pixels^0.49-0.75, measured before T196-T199 moved the
+  light and probe walks out of the per-pixel ray; T200 re-measures the current FINAL (field built
+  every frame, bits 11) at raw scales 0.25 / 0.375 / 0.50 / 0.75 / 1.00 of the 1920x1080 window
+  (480x270 ... 1920x1080), three repeats a scale, 60 samples, at SIDE (severe), PLAY_NEAR
+  (representative) and FAR, on one deterministic fixture per pose. Campaign `T200`
+  (`run/t200-pixel-scaling.txt`, `pixelScalingRunRequested`, `t200Run`, `T200_ARMS` of
+  `LEAN_FINAL` at each scale via `T166Arm.resolutionScale` - a runtime setting, no shader variant
+  - `T200_OPTIMIZATION_ARMS`, no image arms) in `StormCampaignRegistry.java` and
+  `StormT132AutoDriver.java`; `buildT200Report()` prints per pose and scale the MEASURED ray
+  p50/p95, field build p50/p95, composite p50/p95, combined and frame p50 with target dimensions,
+  pixel counts and repeat spread; the field build as the fixed term with its spread across scales;
+  the 0.75 / 0.25 pixel, ray and combined ratios; DERIVED alpha two ways (two-point 0.25-0.75,
+  and a log-log fit over every scale with r-squared) for the ray alone and for the whole renderer;
+  the model `time = fixed + k * pixels^alpha` with predictions per scale; and the temporal budget
+  left at raw 0.25 / 0.375 / 0.50 against 10 ms and 8 ms. Decision: TEMPORAL READY only if
+  reducing raw scale materially cuts the ray cost, the budget left covers reconstruction and
+  history validation, and the total can plausibly approach 8-10 ms; otherwise the next task is a
+  fresh profile of the largest non-rain structural consumer. Evidence in
+  `validation/performance-pixel-scaling.md` and `validation/t200-campaign/`. [SC-005, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
