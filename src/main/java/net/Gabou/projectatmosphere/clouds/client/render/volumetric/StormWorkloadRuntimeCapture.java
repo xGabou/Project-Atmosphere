@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 48;
+    private static final int STAGES = 55;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -138,6 +138,13 @@ final class StormWorkloadRuntimeCapture {
             case 45 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_B;
             case 46 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_C;
             case 47 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_D;
+            case 48 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_A;
+            case 49 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_B;
+            case 50 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_C;
+            case 51 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_D;
+            case 52 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_E;
+            case 53 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_F;
+            case 54 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_G;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -266,7 +273,9 @@ final class StormWorkloadRuntimeCapture {
                     values[39][0], values[39][1], values[39][2], values[39][3],
                     FieldProbe.of(values[40], values[41]),
                     FieldCertainty.of(values[42], values[43]),
-                    StormField.of(values[44], values[45], values[46], values[47]));
+                    StormField.of(values[44], values[45], values[46], values[47]),
+                    RainGate.of(values[48], values[49], values[50], values[51], values[52],
+                            values[53], values[54]));
         }
     }
 
@@ -320,6 +329,60 @@ final class StormWorkloadRuntimeCapture {
      * T196. The shared storm field: the probe decision audit, the per-node
      * build cost and the fetches served.
      */
+    /**
+     * T203. The rain gate: the walk classes and window decisions of the
+     * segment test (Task 1), the gate's census on the ray (Task 8), its
+     * soundness oracle, the census of its proofs, and the per-cell build
+     * cost (Task 5). Grouped for the same 255-slot reason as StormField.
+     */
+    record RainGate(
+            double walkUnowned,
+            double walkOwnedNoBase,
+            double walkOwnedEnvelopeZero,
+            double walkOwnedEroded,
+            double walkOwnedSupported,
+            double segSupported,
+            double segAboveAttach,
+            double segBelowWindow,
+            double gateFetches,
+            double gateDryRejects,
+            double gateWindowRejects,
+            double gateFallbacks,
+            double gateOutOfDomain,
+            double gatePrecipFallbacks,
+            double gateFallbackWalks,
+            double gateFallbackSupported,
+            double oracleFalseDry,
+            double oracleWindowViolations,
+            double oracleExcessAbove,
+            double oracleExcessBelow,
+            double censusUnowned,
+            double censusNoBase,
+            double censusEnvelope,
+            double censusPrecip,
+            double cellShapeCalls,
+            double cellGroupWalks,
+            double cellLobeVisits,
+            double cellExactSdf
+    ) {
+        static final RainGate ZERO = new RainGate(
+                0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                0.0D, 0.0D, 0.0D, 0.0D);
+
+        static RainGate of(double[] a, double[] b, double[] c, double[] d, double[] e,
+                double[] f, double[] g) {
+            return new RainGate(
+                    a[0], a[1], a[2], a[3],
+                    b[0], b[1], b[2], b[3],
+                    c[0], c[1], c[2], c[3],
+                    d[0], d[1], d[2], d[3],
+                    e[0], e[1], e[2], e[3],
+                    f[0], f[1], f[2], f[3],
+                    g[0], g[1], g[2], g[3]);
+        }
+    }
+
     record StormField(
             double probeFalseEmpty,
             double probeFalseOccupied,
@@ -447,7 +510,9 @@ final class StormWorkloadRuntimeCapture {
             // build could prove safe.
             FieldCertainty fieldCertainty,
             // T196. The shared storm field's audit, build cost and fetches.
-            StormField stormField
+            StormField stormField,
+            // T203. The rain gate's walk classes, census, oracle and build cost.
+            RainGate rainGate
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -502,7 +567,7 @@ final class StormWorkloadRuntimeCapture {
                     // T190 certainty census, likewise absent.
                     FieldCertainty.ZERO,
                     // T196 storm field, likewise absent.
-                    StormField.ZERO);
+                    StormField.ZERO, RainGate.ZERO);
         }
 
         private static String ratio(double numerator, double denominator) {
@@ -903,7 +968,50 @@ final class StormWorkloadRuntimeCapture {
                     + " stormFieldRefineFetches=" + fmt(stormField.refineFetches())
                     + " stormFieldRefineFallback=" + fmt(stormField.refineFallback())
                     + " stormFieldPrimaryFetchesPerPixel=" + perPixel(stormField.primaryFetches())
-                    + " stormFieldRefineFetchesPerPixel=" + perPixel(stormField.refineFetches());
+                    + " stormFieldRefineFetchesPerPixel=" + perPixel(stormField.refineFetches())
+                    // T203. Where the rain-support walks end up (Task 1),
+                    // the gate's census on the ray (Task 8), its soundness
+                    // oracle and proof census, and the per-cell build cost.
+                    + " rainWalkUnowned=" + fmt(rainGate.walkUnowned())
+                    + " rainWalkOwnedNoBase=" + fmt(rainGate.walkOwnedNoBase())
+                    + " rainWalkOwnedEnvelopeZero=" + fmt(rainGate.walkOwnedEnvelopeZero())
+                    + " rainWalkOwnedEroded=" + fmt(rainGate.walkOwnedEroded())
+                    + " rainWalkOwnedSupported=" + fmt(rainGate.walkOwnedSupported())
+                    + " rainSegSupported=" + fmt(rainGate.segSupported())
+                    + " rainSegAboveAttach=" + fmt(rainGate.segAboveAttach())
+                    + " rainSegBelowWindow=" + fmt(rainGate.segBelowWindow())
+                    + " rainGateFetches=" + fmt(rainGate.gateFetches())
+                    + " rainGateDryRejects=" + fmt(rainGate.gateDryRejects())
+                    + " rainGateWindowRejects=" + fmt(rainGate.gateWindowRejects())
+                    + " rainGateFallbacks=" + fmt(rainGate.gateFallbacks())
+                    + " rainGateOutOfDomain=" + fmt(rainGate.gateOutOfDomain())
+                    + " rainGatePrecipFallbacks=" + fmt(rainGate.gatePrecipFallbacks())
+                    + " rainGateFallbackWalks=" + fmt(rainGate.gateFallbackWalks())
+                    + " rainGateFallbackSupported=" + fmt(rainGate.gateFallbackSupported())
+                    + " rainGateRejectFraction="
+                    + ratio(rainGate.gateDryRejects() + rainGate.gateWindowRejects(),
+                            Math.max(1.0D, rainGate.gateFetches()))
+                    + " rainGateFallbackFraction="
+                    + ratio(rainGate.gateFallbacks(), Math.max(1.0D, rainGate.gateFetches()))
+                    + " rainGateFallbackPrecision="
+                    + ratio(rainGate.gateFallbackSupported(),
+                            Math.max(1.0D, rainGate.gateFallbackWalks()))
+                    + " rainGateOracleFalseDry=" + fmt(rainGate.oracleFalseDry())
+                    + " rainGateOracleWindowViolations=" + fmt(rainGate.oracleWindowViolations())
+                    + " rainGateOracleExcessAboveMilliBlocks=" + fmt(rainGate.oracleExcessAbove())
+                    + " rainGateOracleExcessBelowMilliBlocks=" + fmt(rainGate.oracleExcessBelow())
+                    + " rainGateOracleDryCells="
+                    + fmt(rainGate.censusUnowned() + rainGate.censusNoBase() + rainGate.censusEnvelope())
+                    + " rainGateCensusUnowned=" + fmt(rainGate.censusUnowned())
+                    + " rainGateCensusNoBase=" + fmt(rainGate.censusNoBase())
+                    + " rainGateCensusEnvelope=" + fmt(rainGate.censusEnvelope())
+                    + " rainGateCensusPrecip=" + fmt(rainGate.censusPrecip())
+                    + " rainGateCellShapeCalls=" + fmt(rainGate.cellShapeCalls())
+                    + " rainGateCellGroupWalks=" + fmt(rainGate.cellGroupWalks())
+                    + " rainGateCellLobeVisits=" + fmt(rainGate.cellLobeVisits())
+                    + " rainGateCellExactSdf=" + fmt(rainGate.cellExactSdf())
+                    + " rainGateCellShapeCallsPerPixel=" + perPixel(rainGate.cellShapeCalls())
+                    + " rainGateCellExactSdfPerPixel=" + perPixel(rainGate.cellExactSdf());
         }
 
         double oraclePostOpacityDistance() {

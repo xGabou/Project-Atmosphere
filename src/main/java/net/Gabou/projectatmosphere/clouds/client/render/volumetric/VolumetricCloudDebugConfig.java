@@ -70,6 +70,23 @@ public final class VolumetricCloudDebugConfig {
     }
 
     /**
+     * T203. The rain gate field on the monolith, on the same reasoning as the
+     * rain field above: the counters that census the gate and the oracle
+     * that checks its proofs only exist on the monolith, so it must build
+     * and read the gate for them to describe anything. Never applied to a
+     * timed arm.
+     */
+    private static volatile boolean rainGateForcedOnMonolith;
+
+    public static boolean rainGateForcedOnMonolith() {
+        return rainGateForcedOnMonolith;
+    }
+
+    public static void setRainGateForcedOnMonolith(boolean forced) {
+        rainGateForcedOnMonolith = forced;
+    }
+
+    /**
      * T196. The shared storm field's consumer bits on the monolith, on T188's
      * reasoning: the monolith is the only program that counts, so it has to
      * read the field for the counters to describe the post-field workload -

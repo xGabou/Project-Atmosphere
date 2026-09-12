@@ -674,6 +674,135 @@ public final class StormVolumetricGeometrySandbox {
         runCorrected("T202 the body consumers on the field compile, bake their bits and FINAL"
                         + " carries no primary audit",
                 StormVolumetricGeometrySandbox::validateT202BodyField);
+        runCorrected("T203 the rain gate rejects by proof or defers, its programs bake the gate"
+                        + " and FINAL bakes it off",
+                StormVolumetricGeometrySandbox::validateT203RainGate);
+    }
+
+    /**
+     * T203. The rain gate field. The three arms exist as generated programs,
+     * bake {@code PaRainGateField} to the value their enum entries imply (1
+     * build and read, 2 build only), keep the build pass live and compile in
+     * GL; the mask arm alone defines the rain-mask output; FINAL bakes the
+     * gate off and defines no mask; the segment test's gate block contains
+     * no approximate answer - it may only {@code continue} past a sample or
+     * fall through to the exact path, never return true, assign the support
+     * or the attach height; the build writes the flag bits the ray tests;
+     * the renderer uploads the gate for the build draw and gives the storm
+     * field its own unit; and the texture-unit contract is contiguous.
+     */
+    private static void validateT203RainGate() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String shader = readWorkspaceSource("src/main/resources/assets/"
+                + "projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh");
+        String[][] arms = {
+                {"t203_rain_gate", "1", "false"},
+                {"t203_gate_generate_only", "2", "false"},
+                {"t203_rain_mask_gate", "1", "true"}};
+        for (String[] arm : arms) {
+            String path = base + "cloud_atmosphere_volume_" + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T203 program missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains("const int PaRainGateField = " + arm[1] + ";"),
+                    arm[0] + " does not bake PaRainGateField = " + arm[1]);
+            // The ray programs bake the rain-field pass off so the gate
+            // build folds out of them (the first run's 2.5-4 ms codegen
+            // penalty); the storm field's pass stays live for its build.
+            require(source.contains("const int PaRainFieldPass = 0;")
+                            && source.contains("uniform int PaStormFieldPass;"),
+                    arm[0] + " does not fold the gate build out of the ray");
+            require(source.contains("const int PaRainFieldEnabled = 0;"),
+                    arm[0] + " keeps T188's lookup live beside the gate");
+            boolean mask = Boolean.parseBoolean(arm[2]);
+            require(source.contains("#define PA_RAIN_MASK_OUTPUT") == mask,
+                    arm[0] + (mask ? " does not define" : " defines") + " the rain-mask output");
+            CoreCostDiagnosticProgram program = CoreCostDiagnosticProgram.parse(arm[0]);
+            require(program != null && program.rainGateGeneration()
+                            && program.rainGateLookup() == "1".equals(arm[1])
+                            && program.rainMaskCapture() == mask
+                            && program.stormFieldGeneration(),
+                    arm[0] + "'s enum entry disagrees with its generated program");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+        // The build program: the pass and the gate baked on, so main returns
+        // from the build branch; registered through the campaign's support
+        // table because no arm table selects it.
+        String buildPath = base + "cloud_atmosphere_volume_t203_gate_build.fsh";
+        if (!Files.exists(workspacePath(buildPath))) {
+            throw new IllegalStateException(
+                    "generated T203 build program missing; run generateLeanFinalShader: " + buildPath);
+        }
+        String buildSource = readWorkspaceSource(buildPath);
+        require(buildSource.contains("const int PaRainFieldPass = 1;")
+                        && buildSource.contains("const int PaRainGateField = 2;"),
+                "t203_gate_build does not bake the build pass and the gate on");
+        compileFragmentShader(resolveMojImports(buildSource), "t203_gate_build");
+        String driver = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/StormT132AutoDriver.java");
+        require(driver.contains("T203_SUPPORT_PROGRAMS = {")
+                        && driver.contains("CoreCostDiagnosticProgram.T203_GATE_BUILD"),
+                "the build program is not in the campaign's support table");
+        String registry = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/StormCampaignRegistry.java");
+        require(registry.contains("id + \"_SUPPORT_PROGRAMS\""),
+                "the registry does not register a campaign's support programs");
+        String shaderJson = readWorkspaceSource("src/main/resources/assets/"
+                + "projectatmosphere/shaders/core/cloud_atmosphere_volume.json");
+        require(shaderJson.contains("\"PaRainGateField\""),
+                "PaRainGateField is not a JSON uniform: the monolith's set() would be a no-op");
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        require(finalSource.contains("const int PaRainGateField = 0;"),
+                "FINAL does not bake the rain gate off");
+        require(!finalSource.contains("#define PA_RAIN_MASK_OUTPUT"),
+                "FINAL defines the rain-mask output");
+
+        // The gate block: from its guard to the T145 gate that follows it.
+        String segment = functionBlock(shader, "bool rainSegmentMayContribute(");
+        int gateStart = segment.indexOf("if (PaRainGateField == 1) {");
+        int gateEnd = segment.indexOf("// T145. Rain contributes only strictly below", gateStart);
+        require(gateStart >= 0 && gateEnd > gateStart,
+                "the segment test's gate block is not where T203 placed it");
+        String gate = segment.substring(gateStart, gateEnd);
+        require(!gate.contains("return true") && !gate.contains("return false")
+                        && !gate.contains("support =") && !gate.contains("attachY =")
+                        && gate.contains("continue;"),
+                "the gate block answers rain itself instead of rejecting by proof or deferring");
+        require(gate.contains("PA_RAIN_GATE_PRECIP") && gate.contains("PA_RAIN_GATE_DRY")
+                        && gate.contains("p.y >= paGateCell.b || p.y <= paGateCell.g"),
+                "the gate does not test the flag bits and the attach window the build writes");
+        require(segment.indexOf("localRainSupportAt(", gateEnd) > 0,
+                "the exact evaluation no longer follows the gate");
+        String build = functionBlock(shader, "vec4 paRainGateBuildCell(");
+        require(build.contains("paCellProvablyUnowned(")
+                        && build.contains("PA_RAIN_GATE_HEADROOM")
+                        && build.contains("paLastStormMaxVerticalSlope")
+                        && build.contains("attachMin - pad - PA_RAIN_GATE_WINDOW"),
+                "the build does not carry the three proofs and the attach bounds");
+        require(build.contains("flags |= PA_RAIN_GATE_PRECIP"),
+                "the build does not defer raster precipitation to the exact path");
+        String lookup = functionBlock(shader, "bool paRainGateCellAt(");
+        require(lookup.contains("texelFetch(RainFieldSampler") && !lookup.contains("texture("),
+                "the gate lookup filters a field of per-cell bounds");
+        require(shader.contains("if (PaRainFieldPass == 1 && PaRainGateField != 0) {"),
+                "the gate build is not selected under the rain-field pass");
+
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudRenderer.java");
+        require(renderer.contains("shader.safeGetUniform(\"PaRainGateField\").set(1);")
+                        && renderer.contains("RAIN_GATE_TIMER.begin();")
+                        && renderer.contains("copyFrameUniforms(shader, buildShader);")
+                        && renderer.contains("FullscreenQuad.draw(buildShader);"),
+                "the renderer does not build the gate with the build program on its own clock");
+        require(renderer.contains("STORM_FIELD_TEXTURE_UNIT,\n                stormFieldTextureId"),
+                "the storm field is not bound on its own unit beside the gate");
+        CloudTextureUnitContract.selfCheck();
+        require(CloudTextureUnitContract.STORM_FIELD_UNIT != CloudTextureUnitContract.RAIN_FIELD_UNIT,
+                "the two fields share a texture unit");
+        System.out.println("T203_RAIN_GATE arms=" + arms.length + " gateInFinal=false"
+                + " gateAnswers=proof-or-defer");
     }
 
     /**

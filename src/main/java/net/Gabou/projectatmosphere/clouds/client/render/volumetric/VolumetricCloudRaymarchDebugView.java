@@ -193,7 +193,36 @@ public enum VolumetricCloudRaymarchDebugView {
      * body density and to the refinement, and each one's fallbacks to the
      * exact walk.
      */
-    STORM_WORKLOAD_STORM_FIELD_D(70, "storm_workload_storm_field_d");
+    STORM_WORKLOAD_STORM_FIELD_D(70, "storm_workload_storm_field_d"),
+
+    /**
+     * T203. The rain-support walk's outcomes: unowned, owned without a BASE
+     * support, owned with support but no coverage at the support height,
+     * owned with coverage but eroded under the cutoff.
+     */
+    STORM_WORKLOAD_RAIN_GATE_A(71, "storm_workload_rain_gate_a"),
+
+    /** T203. Supported walks, and the height window's decisions on them. */
+    STORM_WORKLOAD_RAIN_GATE_B(72, "storm_workload_rain_gate_b"),
+
+    /** T203. The gate's census on the ray: fetches, dry and window rejects, fallbacks. */
+    STORM_WORKLOAD_RAIN_GATE_C(73, "storm_workload_rain_gate_c"),
+
+    /** T203. Out-of-domain columns, raster deferrals, and the fallbacks' precision. */
+    STORM_WORKLOAD_RAIN_GATE_D(74, "storm_workload_rain_gate_d"),
+
+    /**
+     * T203. The gate's soundness oracle: the exact samples that violate a
+     * dry claim or an attach bound, and the bound misses' excess in blocks
+     * per side. Only this view evaluates production beside the gate field.
+     */
+    STORM_WORKLOAD_RAIN_GATE_E(75, "storm_workload_rain_gate_e"),
+
+    /** T203. The census of the field's proofs by reason, and the raster deferrals. */
+    STORM_WORKLOAD_RAIN_GATE_F(76, "storm_workload_rain_gate_f"),
+
+    /** T203. What building one gate cell costs, in the ray's own counters. */
+    STORM_WORKLOAD_RAIN_GATE_G(77, "storm_workload_rain_gate_g");
 
     private final int shaderId;
     private final String serializedName;

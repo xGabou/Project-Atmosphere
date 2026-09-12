@@ -766,7 +766,40 @@ public enum CoreCostDiagnosticProgram {
      */
     T202_DINTERP_ORACLE("t202_dinterp_oracle"),
     /** T202: the representation oracle's audit output. */
-    T202_DINTERP_AUDIT("t202_dinterp_audit");
+    T202_DINTERP_AUDIT("t202_dinterp_audit"),
+
+    // -----------------------------------------------------------------------
+    // T203. The rain gate field: a per-column field of dry proofs and attach
+    // bounds the segment test consults before its exact evaluation. FINAL's
+    // specialization (bits 43) with the gate baked on; the gate rejects by
+    // proof or defers to production's own test, so no arm here carries an
+    // approximate rain answer.
+    // -----------------------------------------------------------------------
+
+    /** T203: the gate built and read by the segment test - the candidate. */
+    T203_RAIN_GATE("t203_rain_gate"),
+    /** T203: the gate built and never read - its build cost alone. */
+    T203_GATE_GENERATE_ONLY("t203_gate_generate_only"),
+    /** T203: the rain-only capture through the gate, against t188_rain_mask_ref. */
+    T203_RAIN_MASK_GATE("t203_rain_mask_gate"),
+    /**
+     * T203: the gate field's build pass as its own program - the pass baked
+     * on, the march never reached. The first run carried the build inside
+     * the ray program and the ray paid 2.5-4 ms for code it never executed
+     * (the T199 codegen lesson); the ray programs now bake the pass off and
+     * this program draws the field for them.
+     */
+    T203_GATE_BUILD("t203_gate_build"),
+    /**
+     * T203 run 3 decomposition of the residual above the gate. Reject-all:
+     * every sample rejected before the field read - the segment test's own
+     * structure. No-fallback: the field read paid, the exact fallback
+     * skipped. No-shaft: the gate as measured with the shaft's samples off.
+     * All image-invalid; bounds, never candidates.
+     */
+    T203_GATE_REJECT_ALL("t203_gate_reject_all"),
+    T203_GATE_NO_FALLBACK("t203_gate_no_fallback"),
+    T203_GATE_NO_SHAFT("t203_gate_no_shaft");
 
 
     private final String serializedName;
@@ -947,7 +980,23 @@ public enum CoreCostDiagnosticProgram {
                 || this == T189_RAIN_MASK_NEAREST
                 || this == T189_RAIN_MASK_STRICT
                 || this == T190_RAIN_MASK_SAFE
-                || this == T192_RAIN_MASK_BOUND;
+                || this == T192_RAIN_MASK_BOUND
+                || this == T203_RAIN_MASK_GATE;
+    }
+
+    /** T203. Programs whose frame builds the rain gate field. */
+    public boolean rainGateGeneration() {
+        return this == T203_RAIN_GATE || this == T203_GATE_GENERATE_ONLY
+                || this == T203_RAIN_MASK_GATE
+                || this == T203_GATE_REJECT_ALL || this == T203_GATE_NO_FALLBACK
+                || this == T203_GATE_NO_SHAFT;
+    }
+
+    /** T203. Programs whose segment test reads the gate. */
+    public boolean rainGateLookup() {
+        return this == T203_RAIN_GATE || this == T203_RAIN_MASK_GATE
+                || this == T203_GATE_REJECT_ALL || this == T203_GATE_NO_FALLBACK
+                || this == T203_GATE_NO_SHAFT;
     }
 
     public String resourceName() {

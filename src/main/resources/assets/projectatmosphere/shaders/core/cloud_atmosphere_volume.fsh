@@ -270,6 +270,19 @@ uniform int PaRainFieldConservative;
  */
 uniform int PaRainFieldClosedForm;
 /**
+ * T203. The rain gate field. T188-T192 stored the column's rain triple and
+ * asked the ray to trust it, and a 0.1-0.2% per-column error became 3-12%
+ * false rain through an OR over sixty samples. This field never answers
+ * "rain": it answers "provably no descriptor rain anywhere in this cell"
+ * and "attach height provably inside [Amin, Amax] here", and the segment
+ * test keeps production's exact evaluation for every sample the field
+ * cannot reject. 0 off; 1 the build pass (under PaRainFieldPass) writes the
+ * gate field and rainSegmentMayContribute reads it; 2 builds without
+ * reading, the build-cost arm. Baked 0 everywhere but the T203 programs and
+ * the monolith, which uploads it when a campaign forces the gate on.
+ */
+uniform int PaRainGateField;
+/**
  * T196. The shared 3D storm field. 0 renders; 1 is the node build pass, one
  * fragment per node of the PaStormFieldXZ-square x 32 atlas; 2 is the soundness oracle, which
  * writes the node floor beside a dense reference floor instead of a field.
@@ -367,6 +380,38 @@ const float PA_FIELD_SUPPORT_CUTOFF = 0.01;
  * gate's own resolution, so a cell that passes cannot move a segment across it.
  */
 const float PA_FIELD_ATTACH_TOLERANCE = 1.0;
+/**
+ * T203. The gate field's flag bits, stored exactly in R: 1 the cell is
+ * provably free of descriptor rain, 2 the raster precipitation map may be
+ * above its 0.02 cutoff somewhere in the cell (any of the 3x3 morphology
+ * texels the bilinear filter can reach from a point of the cell), in which
+ * case the raster branch of localRainSupportAt is live and the gate defers
+ * to the exact evaluation.
+ */
+const int PA_RAIN_GATE_DRY = 1;
+const int PA_RAIN_GATE_PRECIP = 2;
+/**
+ * T203. The segment test's own window below the attach height; the gate's
+ * lower bound is stored as Amin minus this so the ray compares once.
+ */
+const float PA_RAIN_GATE_WINDOW = 184.0;
+/**
+ * T203. Headroom on the Lipschitz dilations the gate's dry proofs use - the
+ * per-lobe support distance across the cell and the union distance across
+ * the cell and the support height span - the same margin the storm field's
+ * floor carries, calibrated by that field's oracle and checked again here
+ * by the gate's own (view 75).
+ */
+const float PA_RAIN_GATE_HEADROOM = PA_STORM_FIELD_LIPSCHITZ_HEADROOM;
+/**
+ * T203. The lobe pseudo-distance's domain warp adds to its horizontal slope
+ * 0.08 * 2.3 * 0.00197 (the weighted horizontal wave numbers of
+ * lowFrequencyDomainWarp) * (2 - 1/radial) <= 0.00073 blocks per block per
+ * block of the lobe's radius, rounded up; see paRainGateBuildCell.
+ */
+const float PA_RAIN_GATE_WARP_SLOPE = 0.0008;
+/** T203. The attach bounds' rounding pad, in blocks; see paRainGateBuildCell. */
+const float PA_RAIN_GATE_BOUND_PAD = 0.002;
 /**
  * Uploaded as exactly zero. The amplification arm perturbs its extra
  * evaluation by this, so the compiler cannot prove the second call redundant
@@ -564,6 +609,47 @@ int paRainFieldFallbacks = 0;
 // the build could not prove uniform and so paid the exact traversal for.
 int paRainFieldSafeHits = 0;
 int paRainFieldMixedFallbacks = 0;
+/**
+ * T203 Task 1. Where the rain-support walks that actually run end up, so
+ * the segment test's cost is decomposed before the gate is trusted: the
+ * walk found the column unowned; owned but no BASE lobe supports it; owned
+ * with support but the union carries no coverage at the support height (the
+ * ownership ring, provable by geometry); owned with coverage but the noise
+ * eroded the support below the cutoff (not provable by geometry); owned and
+ * supported above the cutoff. Counted only where the walk ran.
+ */
+int paRainWalkUnowned = 0;
+int paRainWalkOwnedNoBase = 0;
+int paRainWalkOwnedEnvelopeZero = 0;
+int paRainWalkOwnedEroded = 0;
+int paRainWalkOwnedSupported = 0;
+/** T203 Task 1. Of the supported samples, how the height window decides. */
+int paRainSegSupported = 0;
+int paRainSegAboveAttach = 0;
+int paRainSegBelowWindow = 0;
+/**
+ * T203 Task 8. The gate's census on the ray: cells fetched, samples the
+ * dry flag rejected, samples the attach window rejected, samples handed to
+ * the exact test (the fallback), columns outside the field's domain, samples
+ * deferred because the raster precipitation is live in the cell; and of
+ * the fallbacks, how many reached a walk and how many of those found
+ * support - the gate's precision.
+ */
+int paRainGateFetches = 0;
+int paRainGateDryRejects = 0;
+int paRainGateWindowRejects = 0;
+int paRainGateFallbacks = 0;
+int paRainGateOutOfDomain = 0;
+int paRainGatePrecipFallbacks = 0;
+int paRainGateFallbackWalks = 0;
+int paRainGateFallbackSupported = 0;
+/**
+ * T203. Published by directStormRainSupportAt under capture: whether a BASE
+ * lobe supported the column, and the union coverage at its support height,
+ * so the walk's outcome can be classed without a second walk.
+ */
+bool paLastRainHasLocalBase = false;
+float paLastRainCoverage = 0.0;
 #ifdef PA_LIGHT_AUDIT
 // T198 Task 1. Per-tap accumulators over every light tap this pixel's march
 // evaluates: signed error (field - exact), its magnitude and square, the
@@ -1009,7 +1095,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 70);
+        || (DebugView >= 28 && DebugView <= 77);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -3418,6 +3504,11 @@ float directStormFinalDensity(
     float coverage = directStormShape(
         p, ownsDescriptorGroup, dominantHeight01, envelopeStrength, activeRoleMask,
         paUnionDistanceUnusedA, paClearanceUnusedA);
+    // T203. The rain-support classification reads the coverage the walk
+    // found at the support height; guarded so FINAL carries no extra write.
+    if (paWorkloadCaptureActive()) {
+        paLastRainCoverage = coverage;
+    }
     if (coverage <= 0.0) {
         return 0.0;
     }
@@ -4692,6 +4783,9 @@ float directStormRainSupportAt(
         out bool ownsDescriptorGroup) {
     float supportY;
     bool hasLocalBase = directStormLocalBaseAt(worldXZ, attachY, supportY);
+    if (paWorkloadCaptureActive()) {
+        paLastRainHasLocalBase = hasLocalBase;
+    }
     float ignoredHeight01;
     // The coverage envelope is not a visible body. Rain must attach to the
     // density the noise stages actually produced, or it can hang under a
@@ -4929,6 +5023,203 @@ float paClassifyCellByCorners(
         || (maxAttach - minAttach) > PA_FIELD_ATTACH_TOLERANCE) ? 1.0 : 0.0;
 }
 
+/**
+ * T203. The gate field's cell for a column: an exact texel fetch, never a
+ * filter - every channel is a per-cell bound and a blend of two bounds is
+ * neither. Cell (i, j) owns world XZ over [i/N, (i+1)/N) of the weather
+ * domain (T189), so floor(uv * N) is the cell whose proof covers this
+ * column. False outside the domain, where the gate says nothing and the
+ * segment test keeps its exact path.
+ */
+bool paRainGateCellAt(vec2 worldXZ, out vec4 cell) {
+    vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        cell = vec4(0.0);
+        return false;
+    }
+    ivec2 size = textureSize(RainFieldSampler, 0);
+    ivec2 texel = clamp(
+        ivec2(floor(uv * vec2(size))),
+        ivec2(0),
+        size - ivec2(1)
+    );
+    cell = texelFetch(RainFieldSampler, texel, 0);
+    return true;
+}
+
+/**
+ * T203. One cell of the rain gate field, built once per frame per column
+ * cell of the weather domain.
+ *
+ * <p>Stored: R the flag bits (PA_RAIN_GATE_DRY, PA_RAIN_GATE_PRECIP), G a
+ * lower bound on the descriptor attach height over the cell less the
+ * segment test's window, B an upper bound on that attach height, A the
+ * reason the cell was proved dry (0 not proved, 1 provably unowned, 2 no
+ * BASE lobe can support it, 3 the union provably carries no coverage at any
+ * support height in it) - a census channel, never read by the ray.
+ *
+ * <p>Why each proof is sound. Descriptor rain at a column needs (T145,
+ * localRainSupportAt) the column owned by a descriptor group AND
+ * directStormRainSupportAt above the cutoff there, and directStormRainSupportAt
+ * is zero unless some BASE lobe supports the column AND the storm union
+ * carries coverage at the column's support height. So the cell is free of
+ * descriptor rain if any one of these holds everywhere in it:
+ *
+ *  1. no ownership ellipse meets the cell - T192's closed form, one squared
+ *     inequality per lobe, proven non-vacuous on 40,000 trials;
+ *  2. no BASE lobe supports any column of the cell. A lobe supports a column
+ *     iff its pseudo-distance at (column, its own support height) is under
+ *     its softness, and that distance is evaluated at one fixed height, so
+ *     across the cell it can fall by at most the half-diagonal times the
+ *     lobe's horizontal Lipschitz constant - the ellipse aspect (T196) -
+ *     under the same headroom the storm field's floor carries;
+ *  3. the union's coverage is zero at every (column, support height) of the
+ *     cell. The support height is a convex combination of the supporting
+ *     lobes' own support heights, so it lies in [Ymin, Ymax] over the lobes
+ *     of proof 2's complement; one build-mode walk at the cell's centre and
+ *     its own support height publishes the union distance and the walk's
+ *     Lipschitz constants, and the storm field's dilation over an XZ move of
+ *     the half-diagonal and a Y move of the span proves the envelope zero
+ *     when the dilated distance clears the union's largest softness.
+ *
+ * <p>The attach bounds follow from the same convexity: the attach height is
+ * the support-weighted mean of the supporting BASE lobes' base heights, and
+ * the supporting set at any column of the cell is a subset of proof 2's
+ * candidate set, so [min, max] of that set's base heights bounds it.
+ *
+ * <p>The raster branch is not proved, it is deferred: any of the 3x3
+ * morphology texels a point of the cell can filter from carrying
+ * precipitation above 0.02 sets PA_RAIN_GATE_PRECIP, and the ray hands such
+ * cells to the exact evaluation whatever the descriptor proofs say.
+ *
+ * <p>The candidate tile is 16 blocks on the weather origin and the cell grid
+ * is the weather map's, so at 256 cells or more each cell lies inside one
+ * tile and the walk at its centre sees exactly the groups any column of the
+ * cell would - the same alignment the storm field's node build relies on.
+ */
+vec4 paRainGateBuildCell(vec2 cellCentreXZ, vec2 cellHalf) {
+    float halfDiagonal = length(cellHalf);
+    int flags = 0;
+    ivec2 morphologySize = textureSize(MorphologyMapSampler, 0);
+    ivec2 morphologyCentre = ivec2(floor(
+        (cellCentreXZ - WeatherOrigin) / WeatherExtent * vec2(morphologySize)));
+    for (int dz = -1; dz <= 1; dz++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            ivec2 texel = clamp(morphologyCentre + ivec2(dx, dz), ivec2(0),
+                morphologySize - ivec2(1));
+            if (saturate(texelFetch(MorphologyMapSampler, texel, 0).a) > 0.02) {
+                flags |= PA_RAIN_GATE_PRECIP;
+            }
+        }
+    }
+    if (StormLobeCount <= 0) {
+        return vec4(float(flags | PA_RAIN_GATE_DRY), 0.0, 0.0, 1.0);
+    }
+    if (paCellProvablyUnowned(cellCentreXZ - cellHalf, cellCentreXZ + cellHalf)) {
+        return vec4(float(flags | PA_RAIN_GATE_DRY), 0.0, 0.0, 1.0);
+    }
+    // Proof 2, and the candidate set for the attach and support-height bounds.
+    float attachMin = 1.0e9;
+    float attachMax = -1.0e9;
+    float supportYMin = 1.0e9;
+    float supportYMax = -1.0e9;
+    bool anySupport = false;
+    for (int descriptorIndex = 0; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
+        if (descriptorIndex >= StormLobeCount) {
+            break;
+        }
+        vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+        if (lifecycleRole.w < -0.5) {
+            continue;
+        }
+        int packedTopology = int(floor(lifecycleRole.w + 0.5));
+        int role = packedTopology - (packedTopology / 8) * 8;
+        if (role != 0) {
+            continue;
+        }
+        vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
+        if (saturate(shearMedia.z) <= 0.0) {
+            // directStormLocalBaseAt scales the lobe's support by this; zero
+            // means the lobe never supports, whatever its distance.
+            continue;
+        }
+        vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
+        vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
+        float lobeSupportY = mix(positionHeight.z, positionHeight.w, 0.22);
+        int supportGroupSlot;
+        int supportRole;
+        float centreDistance = directStormLobeDistance(
+            vec3(cellCentreXZ.x, lobeSupportY, cellCentreXZ.y),
+            descriptorIndex,
+            supportGroupSlot,
+            supportRole
+        );
+        float softness = stormEdgeWidthBlocksFromData(
+            positionHeight, radiusRotation, shearMedia, role);
+        vec2 baseRadii = max(radiusRotation.xy, vec2(1.0));
+        float aspect = max(baseRadii.x, baseRadii.y) / min(baseRadii.x, baseRadii.y);
+        // The lobe distance's horizontal slope outside the surface is at
+        // most the ellipse aspect (1.03 at aspect 2 on a numeric sweep of
+        // the gradient-normalised form) plus the domain warp's: the warp
+        // moves the normalised radius by 0.08 times a sum of three sines
+        // whose horizontal wave numbers weigh to 0.00197 per block at the
+        // 2.3 domain scale, and a unit of normalised radius is up to
+        // 2 - 1/radial effective radii of blocks - so the warp's slope is
+        // bounded by PA_RAIN_GATE_WARP_SLOPE times the lobe's larger radius.
+        // The first oracle run found 81-126 attach-bound misses a pose with
+        // the aspect alone: the fixture's lobes are several hundred blocks.
+        float lipschitz = aspect + PA_RAIN_GATE_WARP_SLOPE * max(baseRadii.x, baseRadii.y);
+        if (centreDistance - halfDiagonal * lipschitz * PA_RAIN_GATE_HEADROOM >= softness) {
+            continue;
+        }
+        anySupport = true;
+        attachMin = min(attachMin, positionHeight.z);
+        attachMax = max(attachMax, positionHeight.z);
+        supportYMin = min(supportYMin, lobeSupportY);
+        supportYMax = max(supportYMax, lobeSupportY);
+    }
+    if (!anySupport) {
+        return vec4(float(flags | PA_RAIN_GATE_DRY), 0.0, 0.0, 2.0);
+    }
+    // Proof 3. The centre's own support height when it has one; the span's
+    // midpoint otherwise, so the vertical dilation covers the whole span.
+    float centreAttachY;
+    float centreSupportY;
+    bool centreHasBase = directStormLocalBaseAt(cellCentreXZ, centreAttachY, centreSupportY);
+    float evalY = centreHasBase
+        ? clamp(centreSupportY, supportYMin, supportYMax)
+        : 0.5 * (supportYMin + supportYMax);
+    float yHalf = max(supportYMax - evalY, evalY - supportYMin);
+    paStormFieldBuildNode = true;
+    paStormFieldRejectMargin = yHalf;
+    bool centreOwns;
+    float centreHeight01;
+    directStormFinalDensity(
+        vec3(cellCentreXZ.x, evalY, cellCentreXZ.y), 0.0, centreOwns, centreHeight01);
+    paStormFieldBuildNode = false;
+    paStormFieldRejectMargin = 0.0;
+    bool envelopeEmpty;
+    if (paLastStormUnionDistance > 1.0e8) {
+        envelopeEmpty = true;
+    } else {
+        float dilation = (halfDiagonal * paLastStormMaxAspect
+            + yHalf * paLastStormMaxVerticalSlope) * PA_RAIN_GATE_HEADROOM;
+        float unionSoftness = max(paLastStormMaxSoftness, STORM_MIN_EDGE_BLOCKS);
+        envelopeEmpty = paLastStormUnionDistance - dilation >= unionSoftness;
+    }
+    // The attach height is the support-weighted mean of the candidates'
+    // base heights, and a weighted mean of equal values lands an ulp past
+    // them in float: run 4's oracle found 231-239 misses a pose whose
+    // excess summed under half a block. The bounds carry a pad far below
+    // anything visible and far above the rounding.
+    float pad = PA_RAIN_GATE_BOUND_PAD;
+    return vec4(
+        float(envelopeEmpty ? (flags | PA_RAIN_GATE_DRY) : flags),
+        attachMin - pad - PA_RAIN_GATE_WINDOW,
+        attachMax + pad,
+        envelopeEmpty ? 3.0 : 0.0);
+}
+
 float localRainSupportAt(
         vec2 worldXZ,
         out float attachY,
@@ -5034,6 +5325,26 @@ float localRainSupportAt(
     float directSupport = PaRainFieldEnabled == 1
         ? paRainFieldSupportAt(worldXZ, stormBaseY, directStormOwned)
         : directStormRainSupportAt(worldXZ, stormBaseY, directStormOwned);
+    // T203 Task 1. Class the walk's outcome. The eroded class is a column
+    // the union covers at its support height whose noise-eroded density
+    // still fell under the cutoff: the one class no geometric proof reaches.
+    if (paWorkloadCaptureActive() && PaRainFieldEnabled != 1) {
+        paRainWalkUnowned += directStormOwned ? 0 : 1;
+    }
+    if (paWorkloadCaptureActive() && PaRainFieldEnabled != 1) {
+        paRainWalkOwnedNoBase += (directStormOwned && !paLastRainHasLocalBase) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive() && PaRainFieldEnabled != 1) {
+        paRainWalkOwnedEnvelopeZero += (directStormOwned && paLastRainHasLocalBase
+            && paLastRainCoverage <= 0.0) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive() && PaRainFieldEnabled != 1) {
+        paRainWalkOwnedEroded += (directStormOwned && paLastRainHasLocalBase
+            && paLastRainCoverage > 0.0 && directSupport <= 0.01) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive() && PaRainFieldEnabled != 1) {
+        paRainWalkOwnedSupported += (directStormOwned && directSupport > 0.01) ? 1 : 0;
+    }
 #endif
     // Descriptor-owned storm splats are intentionally absent from the raster
     // map. Their separate precipitation intensity therefore comes from the
@@ -5140,6 +5451,60 @@ bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
         float along = sampleIndex == 0 ? FIRST_SAMPLE : SECOND_SAMPLE;
 #endif
         vec3 p = mix(segmentStart, segmentEnd, along);
+        // T203. The gate field. One exact texel fetch decides whether this
+        // sample can be rejected by proof - the cell is free of descriptor
+        // rain, or the sample lies outside every attach height the cell can
+        // have - and every other sample takes the exact path below, which is
+        // production's own test. The gate has no approximate branch: it
+        // rejects by proof or it defers.
+        bool paGateFell = false;
+        if (PaRainGateField == 1) {
+#ifdef PA_ARM_RAIN_GATE_REJECT_ALL
+            // T203 run 3 decomposition. Every sample rejected before the
+            // fetch: what the segment test's own structure costs with no
+            // field read and no walk. Image-invalid (no rain); a bound.
+            continue;
+#endif
+            vec4 paGateCell;
+            if (paRainGateCellAt(p.xz, paGateCell)) {
+                if (paWorkloadCaptureActive()) {
+                    paRainGateFetches++;
+                }
+                int paGateFlags = int(paGateCell.r + 0.5);
+                if ((paGateFlags & PA_RAIN_GATE_PRECIP) == 0) {
+                    if ((paGateFlags & PA_RAIN_GATE_DRY) != 0) {
+                        if (paWorkloadCaptureActive()) {
+                            paRainGateDryRejects++;
+                        }
+                        continue;
+                    }
+                    if (p.y >= paGateCell.b || p.y <= paGateCell.g) {
+                        if (paWorkloadCaptureActive()) {
+                            paRainGateWindowRejects++;
+                        }
+                        continue;
+                    }
+                    paGateFell = true;
+                    if (paWorkloadCaptureActive()) {
+                        paRainGateFallbacks++;
+                    }
+#ifdef PA_ARM_RAIN_GATE_NO_FALLBACK
+                    // T203 run 3 decomposition. The fetch and the gate's
+                    // decisions paid, the exact fallback skipped: the
+                    // residual above the reject-all arm is the field read.
+                    // Image-invalid (no rain); a bound.
+                    continue;
+#endif
+                } else {
+                    paGateFell = true;
+                    if (paWorkloadCaptureActive()) {
+                        paRainGatePrecipFallbacks++;
+                    }
+                }
+            } else if (paWorkloadCaptureActive()) {
+                paRainGateOutOfDomain++;
+            }
+        }
         // T145. Rain contributes only strictly below the attachment height, and
         // that height is either the raster cloud base for this column or, when
         // the column is descriptor-owned, a convex combination of the BASE
@@ -5181,6 +5546,23 @@ bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
         paDensityConsumer = 0;
         bool paRainHit = support > 0.01 && p.y < attachY
             && p.y > attachY - 184.0;
+        // T203 Task 1 and Task 8: the window's decision on supported samples,
+        // and the gate's precision on the samples it handed to this path.
+        if (paWorkloadCaptureActive()) {
+            paRainSegSupported += support > 0.01 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainSegAboveAttach += (support > 0.01 && p.y >= attachY) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainSegBelowWindow += (support > 0.01 && p.y <= attachY - 184.0) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainGateFallbackWalks += paGateFell ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainGateFallbackSupported += (paGateFell && support > 0.01) ? 1 : 0;
+        }
         if (paWorkloadCaptureActive()) {
             paRainSegTrueAt0 += (paRainHit && sampleIndex == 0) ? 1 : 0;
         }
@@ -7927,6 +8309,18 @@ void main() {
         gl_FragDepth = 0.0;
         return;
     }
+    if (PaRainFieldPass == 1 && PaRainGateField != 0) {
+        // T203. The rain gate field's build pass: one fragment per column
+        // cell of the weather domain, the cell's proofs and bounds written
+        // in place of T188's triple. Sits above the T188 build so a program
+        // with the gate baked on never compiles the old field's build.
+        ivec2 paGateGrid = textureSize(WeatherMapSampler, 0);
+        vec2 paGateHalf = (WeatherExtent / vec2(paGateGrid)) * 0.5;
+        fragColor = paRainGateBuildCell(
+            WeatherOrigin + texCoord * WeatherExtent, paGateHalf);
+        gl_FragDepth = 0.0;
+        return;
+    }
     if (PaRainFieldPass == 1) {
         vec2 fieldWorldXZ = WeatherOrigin + texCoord * WeatherExtent;
         float fieldAttachY;
@@ -10393,6 +10787,142 @@ void main() {
             float(paStormFieldPrimaryFallback),
             float(paStormFieldRefineFetches),
             float(paStormFieldRefineFallback)
+        );
+        return;
+    }
+    // T203. 71-72: where the rain-support walks end up and how the window
+    // decides on supported samples (Task 1). 73-74: the gate's census on
+    // the ray (Task 8). 75: the gate's soundness oracle. 76: the census of
+    // the field's proofs. 77: what building one gate cell costs.
+    if (DebugView == 71) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainWalkUnowned),
+            float(paRainWalkOwnedNoBase),
+            float(paRainWalkOwnedEnvelopeZero),
+            float(paRainWalkOwnedEroded)
+        );
+        return;
+    }
+    if (DebugView == 72) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainWalkOwnedSupported),
+            float(paRainSegSupported),
+            float(paRainSegAboveAttach),
+            float(paRainSegBelowWindow)
+        );
+        return;
+    }
+    if (DebugView == 73) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainGateFetches),
+            float(paRainGateDryRejects),
+            float(paRainGateWindowRejects),
+            float(paRainGateFallbacks)
+        );
+        return;
+    }
+    if (DebugView == 74) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainGateOutOfDomain),
+            float(paRainGatePrecipFallbacks),
+            float(paRainGateFallbackWalks),
+            float(paRainGateFallbackSupported)
+        );
+        return;
+    }
+    // T203 Task 4. The gate's soundness, measured on the field the frame
+    // built. Each fragment takes the cell its texCoord lands in, reads the
+    // cell's claims, and evaluates the exact production rain support at
+    // nine lattice points strictly inside the cell and eight hashed ones. A
+    // dry claim is violated by any sample a group owns with support above
+    // the cutoff; the attach bounds are violated by any such sample whose
+    // attach height lies outside them. Both counts must be zero: the gate
+    // rejects by these claims, and a violated claim is missed rain.
+    if (DebugView == 75 || DebugView == 76) {
+        gl_FragDepth = 1.0;
+        ivec2 paOracleGrid = textureSize(RainFieldSampler, 0);
+        ivec2 paOracleCell = clamp(
+            ivec2(floor(texCoord * vec2(paOracleGrid))), ivec2(0), paOracleGrid - ivec2(1));
+        vec4 paOracleField = texelFetch(RainFieldSampler, paOracleCell, 0);
+        int paOracleFlags = int(paOracleField.r + 0.5);
+        bool paOracleDry = (paOracleFlags & PA_RAIN_GATE_DRY) != 0;
+        bool paOraclePrecip = (paOracleFlags & PA_RAIN_GATE_PRECIP) != 0;
+        if (DebugView == 76) {
+            int paReason = int(paOracleField.a + 0.5);
+            fragColor = vec4(
+                paReason == 1 ? 1.0 : 0.0,
+                paReason == 2 ? 1.0 : 0.0,
+                paReason == 3 ? 1.0 : 0.0,
+                paOraclePrecip ? 1.0 : 0.0
+            );
+            return;
+        }
+        vec2 paOracleHalf = (WeatherExtent / vec2(paOracleGrid)) * 0.5;
+        vec2 paOracleCentre = WeatherOrigin
+            + (vec2(paOracleCell) + 0.5) / vec2(paOracleGrid) * WeatherExtent;
+        float paFalseDry = 0.0;
+        float paWindowViolations = 0.0;
+        float paExcessAbove = 0.0;
+        float paExcessBelow = 0.0;
+        for (int paSample = 0; paSample < 17; paSample++) {
+            vec2 paOffset;
+            if (paSample < 9) {
+                paOffset = vec2(float(paSample - (paSample / 3) * 3 - 1),
+                    float(paSample / 3 - 1)) * 0.999;
+            } else {
+                vec3 paSeed = fract(vec3(paOracleCell, paSample) * vec3(0.1031, 0.1030, 0.0973));
+                paSeed = paSeed + dot(paSeed, paSeed.yxz + 33.33);
+                paOffset = fract((paSeed.xx + paSeed.yz) * paSeed.zy) * 2.0 - 1.0;
+            }
+            vec2 paQ = paOracleCentre + paOffset * paOracleHalf;
+            float paQAttach;
+            bool paQOwns;
+            float paQSupport = directStormRainSupportAt(paQ, paQAttach, paQOwns);
+            bool paQRain = paQOwns && paQSupport > 0.01;
+            paFalseDry = paFalseDry + ((paOracleDry && paQRain) ? 1.0 : 0.0);
+            // The lower bound is compared as the gate and production compute
+            // it - attach minus the window against the stored Amin minus the
+            // window - not as a reconstructed Amin: the first run's 117
+            // "violations" were single-lobe columns whose attach equals Amin
+            // exactly and whose (Amin - 184) + 184 rounded above it.
+            bool paAbove = !paOracleDry && paQRain && paQAttach > paOracleField.b;
+            bool paBelow = !paOracleDry && paQRain
+                && paQAttach - PA_RAIN_GATE_WINDOW < paOracleField.g;
+            paWindowViolations = paWindowViolations + ((paAbove || paBelow) ? 1.0 : 0.0);
+            // The excess in blocks, summed, so a miss reads as a margin.
+            paExcessAbove = paExcessAbove + (paAbove ? paQAttach - paOracleField.b : 0.0);
+            paExcessBelow = paExcessBelow
+                + (paBelow ? paOracleField.g - (paQAttach - PA_RAIN_GATE_WINDOW) : 0.0);
+        }
+        // The excess in milli-blocks: the capture prints whole numbers.
+        fragColor = vec4(
+            paFalseDry,
+            paWindowViolations,
+            paExcessAbove * 1000.0,
+            paExcessBelow * 1000.0
+        );
+        return;
+    }
+    if (DebugView == 77) {
+        gl_FragDepth = 1.0;
+        int paGateShapeBefore = paDirectStormShapeCalls;
+        int paGateGroupBefore = paDescriptorGroupsEntered;
+        int paGateLobeBefore = paLobesVisited;
+        int paGateSdfBefore = paLobeExactSdf;
+        ivec2 paGateCostGrid = textureSize(WeatherMapSampler, 0);
+        vec2 paGateCostHalf = (WeatherExtent / vec2(paGateCostGrid)) * 0.5;
+        vec2 paGateCostCentre = WeatherOrigin
+            + (floor(texCoord * vec2(paGateCostGrid)) + 0.5) / vec2(paGateCostGrid) * WeatherExtent;
+        paRainGateBuildCell(paGateCostCentre, paGateCostHalf);
+        fragColor = vec4(
+            float(paDirectStormShapeCalls - paGateShapeBefore),
+            float(paDescriptorGroupsEntered - paGateGroupBefore),
+            float(paLobesVisited - paGateLobeBefore),
+            float(paLobeExactSdf - paGateSdfBefore)
         );
         return;
     }

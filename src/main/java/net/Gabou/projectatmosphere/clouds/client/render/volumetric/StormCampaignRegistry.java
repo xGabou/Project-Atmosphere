@@ -120,6 +120,9 @@ public final class StormCampaignRegistry {
         for (String id : StormCampaignRegistry.activeCampaignIds()) {
             collectSelectablePrograms(selectable, id + "_ARMS");
             collectSelectablePrograms(selectable, id + "_IMAGE_ARMS");
+            // T203. Programs a campaign's frames draw with but never select
+            // as an arm - the gate field's build program.
+            collectSelectablePrograms(selectable, id + "_SUPPORT_PROGRAMS");
         }
         return selectable;
     }
@@ -284,7 +287,10 @@ public final class StormCampaignRegistry {
                     "T202_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
             new Campaign("T202B", "t202b-post-baseline.txt",
                     "postBaselineRunRequested", "t202bRun",
-                    "T202B_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "T202B_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            new Campaign("T203", "t203-rain-gate.txt",
+                    "rainGateRunRequested", "t203Run",
+                    "T203_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.

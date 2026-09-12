@@ -23,7 +23,15 @@ public final class CloudTextureUnitContract {
      * GlStateManager's array and throws inside ShaderInstance.apply.
      */
     public static final int RAIN_FIELD_UNIT = 15;
-    public static final int MAX_PA_TOUCHED_UNIT = RAIN_FIELD_UNIT;
+    /**
+     * T203. The shared storm field's own unit. T196 shared the rain-field
+     * unit because no program held both fields; the rain gate field is read
+     * by programs that also read the storm field, so each gets a unit. Every
+     * desktop GL 3.3 driver exposes at least 16 fragment units and the
+     * renderer checks the real count once and logs the shortfall.
+     */
+    public static final int STORM_FIELD_UNIT = 16;
+    public static final int MAX_PA_TOUCHED_UNIT = STORM_FIELD_UNIT;
     public static final int REQUIRED_FRAGMENT_TEXTURE_UNITS = MAX_PA_TOUCHED_UNIT + 1;
 
     private CloudTextureUnitContract() {
@@ -37,6 +45,7 @@ public final class CloudTextureUnitContract {
                 || BASE_NOISE_UNIT != PUFF_CANDIDATE_UNIT + 1
                 || DETAIL_NOISE_UNIT != BASE_NOISE_UNIT + 1
                 || RAIN_FIELD_UNIT != DETAIL_NOISE_UNIT + 1
+                || STORM_FIELD_UNIT != RAIN_FIELD_UNIT + 1
                 || REQUIRED_FRAGMENT_TEXTURE_UNITS != MAX_PA_TOUCHED_UNIT + 1) {
             throw new IllegalStateException("native cloud texture-unit contract is not contiguous");
         }

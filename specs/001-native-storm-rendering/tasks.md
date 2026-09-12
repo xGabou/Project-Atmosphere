@@ -3283,6 +3283,50 @@ implementation, while visual polish remains independently active.
   instrumentation invariant masks `PA_PRIMARY_AUDIT`; new T202 invariant (six programs
   compile, bake their bits, FINAL carries no audit). Evidence in
   `validation/performance-primary-traversal.md` and `validation/t202-campaign/`. [SC-005, SC-021]
+- [X] T203 [PERFORMANCE] [US3] The rain segment test's architecture: the rain gate field.
+  Reopened on T202's measurement of the rain family at 7.7-9.2 ms (60-67% of the ray). A
+  per-column field (512^2 RGBA32F, T188's target and unit) of *dry proofs and attach bounds*,
+  never a rain answer: R flag bits (provably free of descriptor rain; raster precipitation
+  possible), G/B sound bounds on the attach height (minus the 184-block window), A the proof
+  census. Three proofs per cell in the build (`paRainGateBuildCell`): T192's closed-form
+  ownership bound, no-BASE-support by the lobe distance's Lipschitz dilation (aspect plus the
+  domain warp's slope `PA_RAIN_GATE_WARP_SLOPE`, headroom 1.2), and the T196 floor test at the
+  support height; the attach bounds by convexity over the candidate lobes, padded by 0.002 for
+  float rounding. `rainSegmentMayContribute` fetches one texel (`paRainGateCellAt`,
+  `texelFetch`, never filtered) and rejects only by proof - dry, or the sample outside
+  [Amin-184, Amax) - and defers everything else to production's own exact test; the shaft
+  stays exact. The build is its own program (`t203_gate_build`, pass and gate baked on,
+  `copyFrameUniforms`/`setFrameSamplers` from the ray program, `RAIN_GATE_TIMER`): run 1 carried
+  it in the ray program and the ray paid 2.5-4 ms of codegen for code it never executed. The
+  storm field moved to its own unit (`STORM_FIELD_UNIT` 16). Campaign `T203`
+  (`run/t203-rain-gate.txt`, `rainGateRunRequested`, `t203Run`, `T203_ARMS`,
+  `T203_OPTIMIZATION_ARMS`, `T203_IMAGE_ARMS`, `T203_SUPPORT_PROGRAMS` - a table the registry
+  now resolves) at SIDE and PLAY_VIS_NEAR, 0.25: counters with the gate off (the T203 walk
+  classes, views 71-72) and forced on (census 73-74, soundness oracle 75 - 17 exact samples a
+  cell, census 76, build cost 77; `PaRainGateField` declared in the shader JSON), the rain
+  mask through the gate against `t188_rain_mask_ref` and the frame against FINAL, then
+  anchor-bracketed timing of `t203_rain_gate` x3, `t203_gate_generate_only`, `t182_norainseg`
+  and three residual bounds (`t203_gate_reject_all`, `t203_gate_no_fallback`,
+  `t203_gate_no_shaft`). RESULT: **quality exact** - rain IoU 1.000, 0 false / 0 missed rain,
+  frames byte-identical to FINAL at both poses, false-safe 0 (2 x 118.8k dry cells), attach
+  bounds 0 misses after a warp-slope term and a 0.002-block rounding pad (run 5); **traversal gone** - segment-test walks 2.30M -> 196k (-91.5%) SIDE,
+  3.47M -> 97k (-97%) PLAY_VIS_NEAR, exact SDFs 15.5M -> 7.8M, 2.3% / 1.8% of samples fall
+  back; build 0.12 ms, 4 MB; **but net 1.2-2.2 / 1.1-2.4 ms, mean 1.6** (ratios 1.13-1.23 / 1.13-1.31,
+  runs 2-5) of a 7.1-8.3 ms ceiling: FAIL against >= 4 and CLOSE by the brief's scale
+  (2-3 borderline, < 2 close). The bound arms decompose the residual: the walks the gate removed were worth
+  2.0-2.4 ms, the walks it left 0.2, the field read 0.5, the test's skeleton 1.3-1.5, and the
+  **shaft path 2.5-3.2 ms for 132k walks** - code presence and divergence, not traversal. The
+  rain-traversal question is answered and closed; the family's remaining cost is structural.
+  Not baked into FINAL (the user's call: an exact minor-band gain at 0.12 ms and 4 MB; the
+  T202 recipe bakes it). Temporal stays closed (12-13 ms raw combined with the gate). Five
+  launches (~2-5 min each), campaignGate x6, check build PASS. Task 1 breakdown: the "ring"
+  (owned, supported, union empty) is an empty class - support at the BASE height and coverage
+  there are one condition - so the provable classes are unowned (57-79% of walks) and
+  no-BASE-support (12-23%); eroded 6-15%; 74-84% of supported samples sit above the local
+  attach height. Harness lessons: a runtime-set uniform must be in the shader JSON or
+  `safeGetUniform().set()` is a silent no-op; a build pass belongs in its own program.
+  Evidence in `validation/performance-rain-gate.md` and `validation/t203-campaign/`.
+  [SC-005, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

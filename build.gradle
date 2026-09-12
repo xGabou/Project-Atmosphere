@@ -301,6 +301,11 @@ def leanFinalConstants = [
         // is absent rather than merely unentered.
         'uniform int PaRainFieldConservative;'     : 'const int PaRainFieldConservative = 0;',
         'uniform int PaRainFieldClosedForm;'       : 'const int PaRainFieldClosedForm = 0;',
+        // T203. The rain gate field: its build branch and the segment
+        // test's gate are compiled out of every program that does not opt
+        // in; the T203 arms override the row to 1 (build and read) or 2
+        // (build only), and the monolith uploads it live.
+        'uniform int PaRainGateField;'             : 'const int PaRainGateField = 0;',
         // T196-T199. The shared storm field is production: FINAL builds it
         // before every timed draw and both consumers read it. PaStormFieldPass
         // is therefore NOT in this map - the renderer uploads 1 for the build
@@ -1110,6 +1115,65 @@ def leanProgramVariants = [
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
                    'PA_PRIMARY_DINTERP 1', 'PA_PRIMARY_AUDIT 1'],
          keepUniforms: ['PaStormFieldPass', 'PaLightAuditOutput']],
+
+        // T203. The rain gate field. FINAL's specialization (bits 43
+        // inherited) with the gate baked on: the build pass under
+        // PaRainFieldPass writes per-cell dry proofs and attach bounds, and
+        // the segment test rejects by them or defers to its exact path. The
+        // generate-only arm builds and never reads (2), pricing the build;
+        // the mask arm is the rain-only capture against t188_rain_mask_ref.
+        // The ray programs bake the rain-field pass OFF, so the gate build
+        // branch folds out of them: the first run kept it live and the ray
+        // paid 2.5-4 ms for code it never executed. The build is its own
+        // program below, the pass baked on.
+        [name        : 'cloud_atmosphere_volume_t203_rain_gate',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        // Bakes 2: the gate off in the segment test, so the ray is FINAL's
+        // and the renderer still draws the build - the build's frame cost.
+        [name        : 'cloud_atmosphere_volume_t203_gate_generate_only',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 2;']],
+        [name        : 'cloud_atmosphere_volume_t203_rain_mask_gate',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        // Run 3: the residual above the gate, decomposed. Each is the gate
+        // program with one bound define; all image-invalid.
+        [name        : 'cloud_atmosphere_volume_t203_gate_reject_all',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_GATE_REJECT_ALL 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        [name        : 'cloud_atmosphere_volume_t203_gate_no_fallback',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_GATE_NO_FALLBACK 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        [name        : 'cloud_atmosphere_volume_t203_gate_no_shaft',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_RAIN_SHAFT 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        // The build program: FINAL's specialization with the rain-field pass
+        // and the gate baked on, so main returns from the build branch and
+        // the march is dead code. It receives the ray program's uniforms and
+        // samplers at draw time.
+        [name        : 'cloud_atmosphere_volume_t203_gate_build',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: [],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 2;',
+                        'uniform int PaRainFieldPass;':
+                                'const int PaRainFieldPass = 1;']],
 
         // T192. The closed-form ownership bound as classification triage.
         // Three arms only, and the campaign-scoped loading T191 added means
