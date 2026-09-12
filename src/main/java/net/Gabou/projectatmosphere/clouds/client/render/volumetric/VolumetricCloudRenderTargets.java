@@ -215,8 +215,11 @@ public final class VolumetricCloudRenderTargets {
                     GL11.GL_LINEAR);
             stormFieldTargetXZ = xz;
             // The memory the report quotes is what was actually allocated.
+            // T199: once per lifetime on the production path (XZ is
+            // constant), so a second line in a session names the release
+            // that preceded it - see destroyAll.
             net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
-                    "T197_FIELD_ALLOC format={} {}", StormFieldGeometry.FORMAT,
+                    "T199_FIELD_ALLOC format={} {}", StormFieldGeometry.FORMAT,
                     StormFieldGeometry.describe(xz));
         }
         return stormFieldTarget;
@@ -288,6 +291,14 @@ public final class VolumetricCloudRenderTargets {
         int height = Math.max(1, Mth.ceil(mainTarget.height * safeScale));
         RenderTarget current = cloudTargets[0];
         if (current == null || current.width != width || current.height != height) {
+            // T199. A resolution transition recreates the cloud targets and
+            // nothing else: the storm field's atlas is world-space, not
+            // screen-space, and survives here. Logged so the session shows it.
+            if (current != null && stormFieldTarget != null) {
+                net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                        "T199_FIELD_KEPT cloudTargets={}x{}->{}x{} xz={}",
+                        current.width, current.height, width, height, stormFieldTargetXZ);
+            }
             destroyCloudTargets();
             for (int i = 0; i < 2; i++) {
                 RenderTarget target = new TextureTarget(width, height, true, Minecraft.ON_OSX);
@@ -373,18 +384,24 @@ public final class VolumetricCloudRenderTargets {
     }
 
     public static void onResize() {
-        destroyAll();
+        destroyAll("resize");
     }
 
     public static void onLevelChanged() {
-        destroyAll();
+        destroyAll("levelChanged");
     }
 
+    /**
+     * Every release path ends here: the pass disabled, a resource reload, a
+     * logout or level change, the client closing. T199: the storm field's
+     * release is logged with the reason so a session log shows each
+     * allocation paired with what freed it.
+     */
     public static void shutdown() {
-        destroyAll();
+        destroyAll("shutdown");
     }
 
-    private static void destroyAll() {
+    private static void destroyAll(String reason) {
         CloudWeatherMapRenderer.invalidateCache();
         if (weatherTarget != null) {
             weatherTarget.destroyBuffers();
@@ -429,6 +446,8 @@ public final class VolumetricCloudRenderTargets {
         if (stormFieldTarget != null) {
             stormFieldTarget.destroyBuffers();
             stormFieldTarget = null;
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T199_FIELD_RELEASE reason={} xz={}", reason, stormFieldTargetXZ);
         }
         releaseStormFieldOracleTarget();
         if (visibleVolumeOracleTarget != null) {

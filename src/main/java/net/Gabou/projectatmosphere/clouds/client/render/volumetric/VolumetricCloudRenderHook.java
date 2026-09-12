@@ -86,6 +86,8 @@ public final class VolumetricCloudRenderHook {
                 + " cells=" + ClientCloudCellCache.trackedCellCount()
                 + " cloudProgram=" + VolumetricCloudRenderer.lastProgram().serializedName()
                 + " raymarchGpuMs=" + VolumetricCloudRenderer.lastGpuMilliseconds()
+                // T199. The shared field's build, on its own clock, every frame.
+                + " fieldGpuMs=" + VolumetricCloudRenderer.lastRainFieldGpuMilliseconds()
                 + " governorScale=" + VolumetricCloudRenderer.governorStepScale()
                 + " cloudlets[" + lastCloudletBudgetStats.summary() + "]"
                 + " " + CloudWeatherMapRenderer.cacheStatus()

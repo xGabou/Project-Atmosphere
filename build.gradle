@@ -301,13 +301,21 @@ def leanFinalConstants = [
         // is absent rather than merely unentered.
         'uniform int PaRainFieldConservative;'     : 'const int PaRainFieldConservative = 0;',
         'uniform int PaRainFieldClosedForm;'       : 'const int PaRainFieldClosedForm = 0;',
-        // T196. The shared storm field: neither the build pass nor either
-        // consumer's lookup is compiled into a program that does not opt in.
-        'uniform int PaStormFieldPass;'            : 'const int PaStormFieldPass = 0;',
-        'uniform int PaStormFieldEnabled;'         : 'const int PaStormFieldEnabled = 0;',
-        // T197. The field's horizontal resolution. Only the field programs
-        // keep it live; everywhere else it is dead code behind the baked
-        // pass and consumer bits and is pinned to T196's grid.
+        // T196-T199. The shared storm field is production: FINAL builds it
+        // before every timed draw and both consumers read it. PaStormFieldPass
+        // is therefore NOT in this map - the renderer uploads 1 for the build
+        // draw and 0 for the render, so it stays a live uniform in FINAL and
+        // in every variant, and the generated JSON keeps it. The consumer
+        // bits are baked: 1 light, 2 probe, 8 the T198 exact-noise tap
+        // (StormFieldGeometry.PRODUCTION_CONSUMER_BITS); bit 4, the T196
+        // hybrid, is statically false at this value. An arm that measures
+        // another lookup overrides the row; the T196 build-cost arm overrides
+        // it to 0. The T196 soundness oracle (pass 2) stays compiled into
+        // FINAL behind the live pass, which the renderer never uploads as 2
+        // there: T199 measured that compiling it out costs 30% at SIDE.
+        'uniform int PaStormFieldEnabled;'         : 'const int PaStormFieldEnabled = 11;',
+        // T197. The field's horizontal resolution, closed at T196's grid:
+        // 384 and 512 did not recover the shadow pockets, T198 did.
         'uniform int PaStormFieldXZ;'              : 'const int PaStormFieldXZ = 256;',
         // T198. The light-tap audit's selectors; the audit itself is behind
         // PA_LIGHT_AUDIT, so these are inert everywhere but that program.
@@ -322,6 +330,24 @@ def leanFinalConstants = [
 // also the clearest single proof that the specialization really did eliminate
 // the diagnostic paths rather than merely hide them.
 def leanFinalRemovedSamplers = ['OracleIntervalSampler']
+
+// T199. Source-level defines the monolith carries and lean programs do not.
+// The raw source would define each of these at its top, so the
+// un-specialized monolith - the program every campaign's counters and
+// oracles run on - keeps the measurement; the generator strips the
+// definition from every lean variant, and a variant that hosts the
+// measurement lists the same name in its defines to put it back.
+//
+// Empty since T199j. T199c used it for PA_STORM_FIELD_ORACLE, the field's
+// soundness oracle (PaStormFieldPass == 2), and the T199 campaign then
+// measured FINAL-without-the-oracle 30% slower at SIDE and 12% at FAR than
+// t198_field_both_exact, whose generated source differed by that one define
+// alone (T171 excludes program identity). A compiler artifact, but the
+// program T198 accepted is the one with the dead branch in, so FINAL keeps
+// it behind the live pass the renderer never uploads as 2. The mechanism
+// stays for the next monolith-only measurement, with that lesson attached:
+// re-time FINAL before trusting that removing dead code is free.
+def leanFinalStrippedDefines = []
 
 // The uniform names the lean program no longer declares. Minecraft binds every
 // uniform named in the JSON, so the generated JSON must drop them; the renderer
@@ -949,37 +975,29 @@ def leanProgramVariants = [
         // the timed march carries no runtime branch on it. Every arm builds:
         // generate_only prices the build alone, the other three add one or
         // both lookups, and both is the production candidate.
-        // T197. PaStormFieldXZ stays live too, so the same five programs
-        // serve 256, 384 and 512 nodes: the resolution is uploaded per arm
-        // rather than compiled per arm, and no program is added.
+        // T197 kept PaStormFieldXZ live here to sweep 384 and 512; T199
+        // retired the sweep, so the grid is the baked 256 everywhere and the
+        // hybrid arm (bit 4, superseded by T198's bit 8) is gone.
         [name: 'cloud_atmosphere_volume_t196_generate_only',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
-         keepUniforms: ['PaStormFieldPass', 'PaStormFieldXZ'],
+         keepUniforms: ['PaStormFieldPass'],
          overrides: ['uniform int PaStormFieldEnabled;':
                      'const int PaStormFieldEnabled = 0;']],
         [name: 'cloud_atmosphere_volume_t196_field_light',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
-         keepUniforms: ['PaStormFieldPass', 'PaStormFieldXZ'],
+         keepUniforms: ['PaStormFieldPass'],
          overrides: ['uniform int PaStormFieldEnabled;':
                      'const int PaStormFieldEnabled = 1;']],
         [name: 'cloud_atmosphere_volume_t196_field_probe',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
-         keepUniforms: ['PaStormFieldPass', 'PaStormFieldXZ'],
+         keepUniforms: ['PaStormFieldPass'],
          overrides: ['uniform int PaStormFieldEnabled;':
                      'const int PaStormFieldEnabled = 2;']],
         [name: 'cloud_atmosphere_volume_t196_field_both',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
-         keepUniforms: ['PaStormFieldPass', 'PaStormFieldXZ'],
+         keepUniforms: ['PaStormFieldPass'],
          overrides: ['uniform int PaStormFieldEnabled;':
                      'const int PaStormFieldEnabled = 3;']],
-        // Both consumers, first two light taps exact: prices buying the
-        // shadow pockets back with half the light gain.
-        [name: 'cloud_atmosphere_volume_t196_field_hybrid',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
-         keepUniforms: ['PaStormFieldPass', 'PaStormFieldXZ'],
-         overrides: ['uniform int PaStormFieldEnabled;':
-                     'const int PaStormFieldEnabled = 7;']],
-
         // T198. The light-tap audit: t196_field_light's march with the exact
         // density evaluated beside every field tap and an accumulator of the
         // difference as the fragment output. One program; the variant and
@@ -989,7 +1007,7 @@ def leanProgramVariants = [
                    'PA_LIGHT_AUDIT 1'],
          // The consumer bits stay live too, so one audit program measures
          // both the T196 lookup (1) and the T198 exact-noise lookup (9).
-         keepUniforms: ['PaStormFieldPass', 'PaStormFieldXZ', 'PaStormFieldEnabled',
+         keepUniforms: ['PaStormFieldPass', 'PaStormFieldEnabled',
                         'PaLightAuditVariant', 'PaLightAuditOutput']],
         // T198 Task 4. The correction: the field carries the descriptor
         // traversal (threshold and height per node) and the tap evaluates
@@ -997,14 +1015,27 @@ def leanProgramVariants = [
         // the pocket metric, both consumers as the production candidate.
         [name: 'cloud_atmosphere_volume_t198_field_light_exact',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
-         keepUniforms: ['PaStormFieldPass', 'PaStormFieldXZ'],
+         keepUniforms: ['PaStormFieldPass'],
          overrides: ['uniform int PaStormFieldEnabled;':
                      'const int PaStormFieldEnabled = 9;']],
         [name: 'cloud_atmosphere_volume_t198_field_both_exact',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
-         keepUniforms: ['PaStormFieldPass', 'PaStormFieldXZ'],
+         keepUniforms: ['PaStormFieldPass'],
          overrides: ['uniform int PaStormFieldEnabled;':
                      'const int PaStormFieldEnabled = 11;']],
+
+        // T199. The pre-field FINAL: the lean specialization with the field's
+        // consumers off and no build pass. Now that FINAL itself carries the
+        // field, this is the reference every FINAL-with-field number is
+        // measured against - the image and pocket anchor and the timing
+        // anchor of the T199 matrix.
+        [name: 'cloud_atmosphere_volume_t199_final_nofield',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: [],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaStormFieldPass;':
+                     'const int PaStormFieldPass = 0;']],
 
         // T192. The closed-form ownership bound as classification triage.
         // Three arms only, and the campaign-scoped loading T191 added means
@@ -1317,6 +1348,7 @@ tasks.register('generateLeanFinalShader') {
     inputs.property('leanConstants', leanFinalConstants.toString())
     inputs.property('leanProgramName', leanFinalShaderName)
     inputs.property('leanRemovedSamplers', leanFinalRemovedSamplers.toString())
+    inputs.property('leanStrippedDefines', leanFinalStrippedDefines.toString())
     inputs.property('leanVariants', leanProgramVariants.toString())
     outputs.dir(leanFinalGeneratedResources)
     doLast {
@@ -1361,6 +1393,25 @@ tasks.register('generateLeanFinalShader') {
                 variantSource = variantSource.replace(
                         uniformDeclaration, constantDeclaration)
                 baked.add(uniformName)
+            }
+
+            // T199. Monolith-only defines come out of every lean program; a
+            // host puts its own back through `defines` below. A definition
+            // that has moved or been renamed must fail the build for the
+            // same reason a missed uniform does: the measurement would
+            // silently ship inside FINAL.
+            leanFinalStrippedDefines.each { String defineName ->
+                String definition = '#define ' + defineName + ' 1'
+                if (!variantSource.contains(definition)) {
+                    throw new GradleException(
+                            'Lean specialization could not find ' + definition
+                                    + ' in cloud_atmosphere_volume.fsh. Update'
+                                    + ' leanFinalStrippedDefines in build.gradle and'
+                                    + ' the shader together.')
+                }
+                variantSource = variantSource.replace(definition,
+                        '// ' + defineName + ' is monolith-only; a lean host re-defines'
+                                + ' it in build.gradle')
             }
 
             if (!variant.defines.isEmpty()) {

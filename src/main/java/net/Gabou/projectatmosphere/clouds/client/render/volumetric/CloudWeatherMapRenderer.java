@@ -125,6 +125,11 @@ public final class CloudWeatherMapRenderer {
         return lastOriginZ;
     }
 
+    /** T199. Every miss is a bake, so this counts the weather rasters' generations. */
+    public static long cacheMisses() {
+        return cacheMisses;
+    }
+
     public static String cacheStatus() {
         return "weatherMapCacheHits=" + cacheHits + " misses=" + cacheMisses
                 + " inputSignature=" + hex(lastInputSignature)

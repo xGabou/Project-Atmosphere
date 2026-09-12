@@ -279,10 +279,14 @@ uniform int PaRainFieldClosedForm;
 uniform int PaStormFieldPass;
 /**
  * T196. Which consumers read the field: bit 1 the light cone, bit 2 the
- * empty-span probe. Baked per program: 0 in FINAL and every control.
+ * empty-span probe. Baked per program.
  * T198. Bit 8: the light cone reads the field's threshold and height (R, B)
  * and evaluates the base noise, the detail and the erosion at the tap itself,
- * instead of the node density in A. Bit 4 (T196 hybrid) is unchanged.
+ * instead of the node density in A.
+ * T199. Production is 11 (1 | 2 | 8), baked into FINAL. Bit 4 - the T196
+ * hybrid that kept taps 0-1 on the exact walk - was retired: with bit 8 every
+ * tap evaluates the noise itself, so there was nothing left for it to
+ * restore, and T198 showed it left the far taps biased.
  */
 uniform int PaStormFieldEnabled;
 /**
@@ -6304,6 +6308,12 @@ vec4 paStormFieldNodeAt(vec3 node, out float unionDistanceOut) {
 
 // The exact threshold production applies at one point, for the oracle: L
 // where the descriptor path can produce material, else 1.
+// T199. This and the pass-2 branch below stay compiled into FINAL behind the
+// live PaStormFieldPass, which the renderer never uploads as 2 on FINAL:
+// T199c gated them out with a define and the T199 campaign measured FINAL
+// 30% slower at SIDE (12% at FAR) than t198_field_both_exact, whose only
+// source difference was that define - a compiler artifact, but the program
+// T198 accepted is the one with the branch in, so that is the one shipped.
 float paStormFieldReferenceFloorAt(vec3 q, out float unionDistanceOut) {
     bool owns;
     float height01;
@@ -6527,9 +6537,8 @@ float lightMarchOpticalDepth(
 #else
         // T196. The shared field serves the tap: same four taps, same
         // weights, same early-out, one trilinear read instead of a walk.
-        // Bit 4 keeps the first two taps - the ones that carry detail and sit
-        // within a voxel of the sample - on the exact walk, so the field
-        // serves only the far half of the cone.
+        // T199 retired bit 4 (the near taps on the exact walk); bit 8 is
+        // what production runs.
 #ifdef PA_LIGHT_AUDIT
         // T198 Task 1. The field serves the tap exactly as t196_field_light
         // does, and the exact production density is evaluated beside it at
@@ -6566,7 +6575,6 @@ float lightMarchOpticalDepth(
         }
 #else
         float density = (PaStormFieldEnabled & 1) != 0
-                && !((PaStormFieldEnabled & 4) != 0 && i < 2)
             ? ((PaStormFieldEnabled & 8) != 0
                 ? paStormFieldLightDensityAt(pos + offset, detailTap)
                 : paStormFieldDensityAt(pos + offset))

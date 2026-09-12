@@ -695,9 +695,6 @@ public enum CoreCostDiagnosticProgram {
     /** T196: both consumers read the field - the production candidate. */
     T196_FIELD_BOTH("t196_field_both"),
 
-    /** T196: both consumers, but the first two light taps stay exact. */
-    T196_FIELD_HYBRID("t196_field_hybrid"),
-
     // -----------------------------------------------------------------------
     // T198. The light field's extinction bias. One program: the field serves
     // the light cone as t196_field_light does, and every tap also evaluates
@@ -715,7 +712,17 @@ public enum CoreCostDiagnosticProgram {
     T198_FIELD_LIGHT_EXACT("t198_field_light_exact"),
 
     /** T198: both consumers, the light through the exact-noise lookup - the candidate. */
-    T198_FIELD_BOTH_EXACT("t198_field_both_exact");
+    T198_FIELD_BOTH_EXACT("t198_field_both_exact"),
+
+    // -----------------------------------------------------------------------
+    // T199. The shared field is FINAL's. One control: the lean program with
+    // the field's consumers off and no build - the pre-field FINAL, which
+    // is the image, pocket and timing anchor now that FINAL builds and reads
+    // the field itself.
+    // -----------------------------------------------------------------------
+
+    /** T199: FINAL without the field, the reference for every FINAL-with-field number. */
+    T199_FINAL_NOFIELD("t199_final_nofield");
 
 
     private final String serializedName;
@@ -794,27 +801,38 @@ public enum CoreCostDiagnosticProgram {
      * what makes it the ground truth the field is measured against.
      */
     /**
-     * T196. True for the arms whose program keeps {@code PaStormFieldPass}
-     * live: the renderer issues the field build before the timed draw only
-     * for these.
+     * T196. True for the programs whose {@code PaStormFieldPass} is live:
+     * the renderer issues the field build before the timed draw only for
+     * these.
+     *
+     * <p>T199. FINAL builds the field, and so does every program specialized
+     * from it, because a program that bakes consumer bits reads the atlas on
+     * its first frame and must never do so against one nobody built. The
+     * only program that builds and reads nothing is the T196 build-cost arm;
+     * the monolith decides at runtime, see
+     * {@link VolumetricCloudDebugConfig#stormFieldForcedOnMonolith()}.
      */
     public boolean stormFieldGeneration() {
-        return this == T196_GENERATE_ONLY || this == T196_FIELD_LIGHT
-                || this == T196_FIELD_PROBE || this == T196_FIELD_BOTH
-                || this == T196_FIELD_HYBRID || this == T198_LIGHT_AUDIT
-                || this == T198_FIELD_LIGHT_EXACT || this == T198_FIELD_BOTH_EXACT;
+        return this == T196_GENERATE_ONLY
+                || (this != DIAGNOSTIC_MONOLITH && stormFieldEnabledBits() != 0);
     }
 
-    /** T196. The consumers this arm's program bakes in: 1 light, 2 probe. */
+    /**
+     * T196. The consumers this program bakes in: 1 light, 2 probe, 8 the
+     * T198 exact-noise tap. T199: production is
+     * {@link StormFieldGeometry#PRODUCTION_CONSUMER_BITS}, baked through
+     * {@code leanFinalConstants} into FINAL and inherited by every lean
+     * variant that does not override it; the monolith's value is uploaded,
+     * not baked, so it reports 0 here.
+     */
     public int stormFieldEnabledBits() {
         return switch (this) {
+            case DIAGNOSTIC_MONOLITH, T196_GENERATE_ONLY, T199_FINAL_NOFIELD -> 0;
             case T196_FIELD_LIGHT, T198_LIGHT_AUDIT -> 1;
             case T196_FIELD_PROBE -> 2;
             case T196_FIELD_BOTH -> 3;
-            case T196_FIELD_HYBRID -> 7;
             case T198_FIELD_LIGHT_EXACT -> 9;
-            case T198_FIELD_BOTH_EXACT -> 11;
-            default -> 0;
+            default -> StormFieldGeometry.PRODUCTION_CONSUMER_BITS;
         };
     }
 

@@ -44,7 +44,52 @@ final class StormLightTapErrorReport {
     private static final int O_EXACT = 6;
     private static final int O_FIELD = 7;
 
+    /**
+     * T199g. The storm's top rim as one more region: cloud pixels within
+     * {@link #topRimRows} of the cloud's upper silhouette in their column.
+     * T198 found the corrected field's remaining error - the far taps'
+     * one-sided under-estimate - by eye in the difference image, "confined
+     * to the anvil's top rim"; this measures it, so the FINAL baseline
+     * carries a number for it. The flag rides on the class array above the
+     * class values, and the class-keyed regions mask it off.
+     */
+    static final String TOP_RIM_NAME = "topRim";
+    private static final int CLASS_MASK = 0xF;
+    private static final int TOP_RIM_FLAG = 0x10;
+
     private StormLightTapErrorReport() {
+    }
+
+    /** Rim depth in rows: about 2% of the frame, never under three rows. */
+    static int topRimRows(int height) {
+        return Math.max(3, height / 45);
+    }
+
+    /**
+     * Flags the rim pixels in place. A column's silhouette is its first
+     * cloud pixel from the top of the frame; the rim is that pixel and the
+     * cloud pixels in the rows just below it.
+     */
+    static void flagTopRim(int[] classes, int width, int height) {
+        int rows = topRimRows(height);
+        for (int x = 0; x < width; x++) {
+            int top = -1;
+            for (int y = 0; y < height; y++) {
+                if ((classes[y * width + x] & CLASS_MASK) != StormImageQualityMetrics.CLASS_NONE) {
+                    top = y;
+                    break;
+                }
+            }
+            if (top < 0) {
+                continue;
+            }
+            for (int y = top; y < Math.min(height, top + rows); y++) {
+                int i = y * width + x;
+                if ((classes[i] & CLASS_MASK) != StormImageQualityMetrics.CLASS_NONE) {
+                    classes[i] |= TOP_RIM_FLAG;
+                }
+            }
+        }
     }
 
     /** One region's aggregate for one variant and tap. */
@@ -69,13 +114,16 @@ final class StormLightTapErrorReport {
         int height = anchor.height();
         int n = width * height;
         int[] classes = StormImageQualityMetrics.pixelClasses(anchor.pixels(), width, height);
-        int regions = StormImageQualityMetrics.CLASS_NAMES.length;
-        // Region 0 in the output is "all cloud" (every class but none).
+        flagTopRim(classes, width, height);
+        // Region 0 in the output is "all cloud" (every class but none); the
+        // class regions follow; the top rim (T199g) is last and overlaps them.
+        int regions = StormImageQualityMetrics.CLASS_NAMES.length + 1;
         String[] regionNames = new String[regions];
         regionNames[0] = "allCloud";
-        for (int r = 1; r < regions; r++) {
+        for (int r = 1; r < StormImageQualityMetrics.CLASS_NAMES.length; r++) {
             regionNames[r] = StormImageQualityMetrics.CLASS_NAMES[r];
         }
+        regionNames[regions - 1] = TOP_RIM_NAME;
         float[][][] px = new float[VARIANTS][OUTPUTS][];
         boolean[] variantPresent = new boolean[VARIANTS];
         for (int v = 0; v < VARIANTS; v++) {
@@ -276,7 +324,14 @@ final class StormLightTapErrorReport {
     }
 
     private static boolean inRegion(int[] classes, int r, int i) {
-        return r == 0 ? classes[i] != StormImageQualityMetrics.CLASS_NONE : classes[i] == r;
+        int cls = classes[i] & CLASS_MASK;
+        if (r == 0) {
+            return cls != StormImageQualityMetrics.CLASS_NONE;
+        }
+        if (r == StormImageQualityMetrics.CLASS_NAMES.length) {
+            return (classes[i] & TOP_RIM_FLAG) != 0;
+        }
+        return cls == r;
     }
 
     private static boolean hasSamples(float[] count, int i) {

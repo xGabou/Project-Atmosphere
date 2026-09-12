@@ -2802,6 +2802,361 @@ implementation, while visual polish remains independently active.
   ray / combined p50-p95, SIDE and FAR net with spreads, PASS/FAIL against Task 9, and the exact
   next task (PASS: productionize the field into FINAL; FAIL: the remaining tap-level error).
   Add the `[X]` summary to this file, commit with the session attribution, do not merge.
+- [X] T199 [PERFORMANCE] [US3] Productionize the accepted T198 shared light/probe field into the
+  ordinary FINAL renderer path. **Done: PASS, the shared field is FINAL.** FINAL builds the
+  256x256x32 RGBA16F field before every timed draw and reads it on both consumers (bits 11 baked
+  through `leanFinalConstants`, `PaStormFieldPass` live, XZ a constant, the audit out, the T196
+  hybrid and the T197 sweep retired); the monolith defaults to the same bits so debug views
+  render FINAL's image. **FINAL is byte-identical to the T198-accepted program and prices at
+  1.00x of it** (13.03 vs 13.10 ms SIDE, 10.73 vs 10.77 FAR); **fresh baseline net 2.088x SIDE /
+  1.545x FAR** against the pre-field FINAL (`t199_final_nofield`, 30.6 / 19.0 ms), build 1.65 /
+  1.55 ms, empty-sky build 0.53 ms (named as the first follow-up). Probe sound: false-empty 0,
+  oracle underestimates 1 of 2.1M (worst 0.0012, boundary 0). Pockets on run 2's fixture:
+  light-only 0.851 / 0.904, FINAL 0.771 / 0.871 - FAR reproduces T198 like for like, SIDE is the
+  fixture (619 pockets vs T198's 784; the metric is never compared across sessions again).
+  Attribution under the field: rain segment 65.9% / 66.8%, light and probe 0, recorded not acted
+  on. Far-tap residual re-measured on the FINAL baseline (taps 2-3 at the pockets -0.047 /
+  -0.096, cone -8.7%), located in the pixels beneath the anvil top rather than the silhouette
+  rows, not worked. Lifecycle proven in the log (alloc once, kept across cloud-target
+  recreation, released on disable / reload / resize / exit). Every-frame rebuild kept; reuse
+  counters in place. **Two lessons banked**: compiling the dead oracle out of FINAL cost 30% at
+  SIDE (run 1) - the strip was reverted and FINAL ships the measured program; and campaign
+  evidence must always be read within one session. Decision A: tighter floor deferred (bound
+  4.7% / 4.4% < 10%). Decision B: structurally ready for temporal work, not budget-ready; the
+  next task is a two-scale FINAL baseline to re-derive the pixel-scaling exponent. Two client
+  runs of ~5 min, gate 25-45 s, check build PASS. Evidence in
+  `validation/performance-shared-field-final.md` and `validation/t199-campaign/`. Not merged.
+  Basis, fixed by T198 and not re-decided here: 256x256x32
+  (`StormFieldGeometry.DEFAULT_XZ`, Y 32, RGBA16F, 16 MiB); R/B = the storm body's exact
+  threshold L and height01 at the node from the build-mode walk, G = the conservative probe floor,
+  A = the T196 density; every one of the four light taps interpolates the envelope and evaluates
+  the base noise, the detail (taps 0-1) and the erosion at its own point (consumer bits 8 + 1),
+  the probe reads G `NEAREST` (bit 2) - production bits **11**; probe false-empty 0 and oracle
+  underestimates 0; pockets 0.880 SIDE / 0.923 FAR; net SIDE 2.151x, FAR 1.580x; march +0.27 ms,
+  build +0.004 ms over T196's ~0.84 ms. **Acceptance**: FINAL binds one program that builds the
+  field before its timed draw and reads it on both consumers; FINAL carries no audit, no oracle
+  pass, no hybrid branch and no live resolution; the field's atlas is allocated once, survives
+  cloud-target recreation, and is released on pass disable, shader reload and shutdown; the
+  field rebuilds every frame; FINAL-path pockets >= 0.85 SIDE / >= 0.90 FAR against the
+  pre-field FINAL image, dark interior within 0.02 of T198, `T196_SOUNDNESS` underestimates 0 on
+  the production node equation, `stormFieldProbeFalseEmpty=0` under production bits; a fresh
+  paired FINAL baseline at SIDE and FAR within the T198 band (>= 1.20x, expected ~2.15x / ~1.58x)
+  with the field build p50-p95 on its own clock; fresh attribution under the productionized
+  field; the tap 2-3 top-rim residual (-0.04 / -0.06) re-measured by the retained audit and
+  recorded, not touched. **Constraints**: do not optimize the far-tap residual; do not change the
+  field resolution (256 stays; XZ becomes a constant, which is not a change); do not reopen rain
+  optimization (T184-T192 evidence stands, rain segment share is recorded, not acted on); do not
+  merge; keep every T19x report, campaign log and PNG under `validation/`. Evidence goes to
+  `specs/001-native-storm-rendering/validation/performance-shared-field-final.md` and
+  `specs/001-native-storm-rendering/validation/t199-campaign/`. Sub-tasks T199a-T199k below, in
+  order; the campaign is one launch after T199h. [SC-005, SC-021]
+- [X] T199a [US3] Campaign-only audit (item 1). **Done: ledger written as section 1 of
+  `validation/performance-shared-field-final.md`** (nine tables, 60 controls, every one anchored
+  to a file:line at `6046ea0`). Decision recorded: FINAL bakes bits **11**, bit 4 is dead in FINAL,
+  `PaStormFieldPass` stays live (0/1), `PaStormFieldXZ` bakes 256, audit selectors bake 0.
+  Findings for the later sub-tasks: the pass-2 oracle (`.fsh:7574-7633`, sole callers of
+  `paStormFieldReferenceFloorAt`) would compile into FINAL once the pass is live, so T199c's
+  `PA_STORM_FIELD_ORACLE` define is required, not optional; `stormFieldForcedOnMonolith == 0`
+  today means "no field", so the monolith's default must become 11 or every debug view diverges
+  from FINAL; `LEAN_FINAL_SPECIALIZATIONS` in the sandbox lacks every T188+ row; and
+  `validateT197FieldResolution` (`:765`) asserts `PaStormFieldXZ` is live on every field arm -
+  the T197 clause must be inverted with the T196 one when T199h bakes XZ. Baseline confirmed:
+  `DEFAULT_XZ == 256`, no `run/t19*-*.txt` marker, `run/t132-autorun*.txt` present. No code
+  change. Original brief: inspect and record, as section 1 of the report, a
+  three-column ledger (promote to FINAL / campaign-only, keep / campaign-only, retire) of every
+  field-related control, with the file and line it lives in. Cover at least: the `PaStormFieldPass`
+  values 0/1/2 (render, build, T196 soundness oracle) in
+  `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh`; the
+  `PaStormFieldEnabled` bits 1 (light), 2 (probe), 4 (T196 hybrid: taps 0-1 exact), 8 (T198
+  exact-noise tap) and the tap selector at `(PaStormFieldEnabled & 1) != 0 && !((... & 4) != 0
+  && i < 2)`; `PaStormFieldXZ`; `PA_LIGHT_AUDIT`, `PaLightAuditVariant`, `PaLightAuditOutput` and
+  the audit accumulators; in `VolumetricCloudDebugConfig.java` `stormFieldForcedOnMonolith`,
+  `stormFieldXZ`/`setStormFieldXZ`, `lightAuditVariant`/`lightAuditOutput`,
+  `lightAuditFieldBits`, `stormFieldSoundnessRequested`; in `VolumetricCloudRenderer.java`
+  `stormFieldProgram()`, the build block before the timed draw, the `RAIN_FIELD_TIMER` serving as
+  the field clock, `runStormFieldSoundnessOracle`, the manual `StormFieldSampler` bind on unit 15
+  in `bindManualTextures`, and `stormFieldTextureId` reset every frame; in
+  `VolumetricCloudRenderTargets.java` `prepareStormFieldTarget`, `stormFieldTargetXZ`,
+  `prepareStormFieldOracleTarget`/`releaseStormFieldOracleTarget` and the release in
+  `shutdown()`; in `CoreCostDiagnosticProgram.java` `stormFieldGeneration()`,
+  `stormFieldEnabledBits()`, `lightAuditCapture()` and the T196/T198 constants; in `build.gradle`
+  the `leanFinalConstants` rows for `PaStormFieldPass/Enabled/XZ/PaLightAuditVariant/Output`,
+  the T196 `keepUniforms` pattern and the `t196_*`/`t198_*` variant rows; in
+  `StormT132AutoDriver.java` the `t196Run`/`t197Run`/`t198Run` phases. State the decision that
+  FINAL's baked bits are 11 and that bit 4 is dead in FINAL, and confirm the baseline
+  (`DEFAULT_XZ == 256`, no `run/t19*-*.txt` marker, `run/t132-autorun.txt` present). No code
+  change in this sub-task.
+- [X] T199b [US3] Promote the field into FINAL (item 2). **Done: seven edits, no shader change,
+  `compileJava` clean, generated FINAL verified** (`PaStormFieldPass` live and kept in the JSON,
+  `PaStormFieldEnabled = 11`, `PaStormFieldXZ = 256`, audit selectors 0, `t171_dup_a` byte-identical
+  to FINAL). Two departures from the brief, both recorded in report section 2.1: the constant is
+  `StormFieldGeometry.PRODUCTION_CONSUMER_BITS` (the class the other field constants live in,
+  headless for the sandbox), and `stormFieldGeneration()` is derived from the baked bits
+  (`T196_GENERATE_ONLY || (!monolith && bits != 0)`) rather than a hand-list, because the field
+  enters through the shared `leanFinalConstants` map - the only way `t171_dup_a/b` stay
+  byte-identical to FINAL - so every lean variant inherits bits 11 unless it overrides the row
+  and must therefore build before it reads. `resetStormFieldMonolithBits()` added and used by the
+  three end-of-campaign resets; campaign-start and mid-campaign 0s untouched so T196-T198's
+  production phases keep their pre-field meaning. `campaignGate` (`gate-t199b.log`, 25 s): T161
+  PASSED, halts at the T196 "FINAL does not bake the storm field out" clause (`:835`) - T199c's
+  inversion. Original brief: `build.gradle`: in `leanFinalConstants`
+  set `'uniform int PaStormFieldEnabled;' : 'const int PaStormFieldEnabled = 11;'`, keep
+  `PaStormFieldXZ = 256`, and remove `PaStormFieldPass` from the map so `cloud_atmosphere_volume_final`
+  declares it live and the generated JSON keeps it (it is derived from the map by
+  `leanFinalRemovedUniforms`); update the comment block above the map (T196/T197/T198 rows) to say
+  the field is now production. `CoreCostDiagnosticProgram.java`: `stormFieldGeneration()` returns
+  true for `LEAN_FINAL` and `stormFieldEnabledBits()` returns 11 for it. `VolumetricCloudRenderer.java`:
+  the build block runs for `LEAN_FINAL` through `stormFieldProgram()` with `PaStormFieldPass` 1
+  then 0 around the build draw exactly as the arms do, the manual sampler bind is unconditional
+  on FINAL frames, `lastRainFieldGpuMilliseconds` reports the field build on FINAL, and the
+  render status string (`VolumetricCloudRenderHook.java` status builder) gains
+  `field=<build ms>`; make the monolith default to the production bits (11) so every debug view
+  renders the image FINAL renders - `stormFieldForcedOnMonolith` becomes an override that
+  campaigns set explicitly, `setStormFieldForcedOnMonolith(0)` restoring the production default
+  rather than "no field" (rename it or add `PRODUCTION_FIELD_BITS = 11` in
+  `VolumetricCloudDebugConfig.java` and reference it from both classes). `leanFinalEligible()`:
+  add `VolumetricCloudDebugConfig.stormFieldXZ() == StormFieldGeometry.DEFAULT_XZ` and the
+  audit selectors at 0, since FINAL now bakes those; the lean list and the predicate change
+  together (the header comment says so). If `prepareStormFieldTarget` returns null on a FINAL
+  frame, raise `LeanFinalProgramUnavailableException("storm field atlas unavailable")` rather than
+  rendering bits 11 against no field - the established loud fallback.
+- [X] T199c [US3] Compile campaign and audit controls out of FINAL (item 3). **Done; campaignGate
+  PASS** (`gate-t199c-campaign.log`, 0 FAILED, `T199_FINAL_FIELD bits=11 xz=256 passLive=1
+  audit=0 oracle=0 hosts=2`; T161/T171/T191/T196/T197/T198/T199 PASSED). One departure from the
+  brief, recorded in report section 2.2: the oracle gate's polarity is inverted, because the
+  monolith - the raw source, loaded with no defines - is the program every T196-T198 soundness
+  phase runs on, so a hosts-only `#ifdef` would have stripped the oracle from it. The raw source
+  now defines `PA_STORM_FIELD_ORACLE` at its top, `generateLeanFinalShader` strips it from every
+  lean variant through a new `leanFinalStrippedDefines` list (missing definition fails the build),
+  and `t196_field_both` / `t198_field_both_exact` re-define it. Gated: `paStormFieldReferenceFloorAt`
+  and the pass-2 branch. Sandbox: four rows added to `LEAN_FINAL_SPECIALIZATIONS`, the T196 FINAL
+  clause inverted (label now "FINAL keeps the build pass live"), `validateT199FinalField` added
+  (source, JSON, hosts, non-hosts, enum agreement, monolith default, GL compile). Original brief: In
+  `cloud_atmosphere_volume.fsh` put the `PaStormFieldPass == 2` soundness-oracle branch behind
+  `#ifdef PA_STORM_FIELD_ORACLE`, and in `build.gradle` add `'PA_STORM_FIELD_ORACLE 1'` to the
+  defines of `t196_field_both` and `t198_field_both_exact` only (the oracle hosts); leave
+  `PA_LIGHT_AUDIT` on `t198_light_audit` only. Verify by reading the generated
+  `build/generated/leanFinalResources/.../cloud_atmosphere_volume_final.fsh` that it contains
+  `const int PaStormFieldEnabled = 11;`, `const int PaStormFieldXZ = 256;`, `uniform int
+  PaStormFieldPass;`, `const int PaLightAuditVariant = 0;`, `const int PaLightAuditOutput = 0;`,
+  no `PA_LIGHT_AUDIT`, no `PA_STORM_FIELD_ORACLE` and that the bit-4 hybrid test is statically
+  false. Sandbox (`src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`):
+  add `PaStormFieldEnabled`, `PaStormFieldXZ`, `PaLightAuditVariant`, `PaLightAuditOutput` rows
+  to `LEAN_FINAL_SPECIALIZATIONS`, add a `T199 FINAL builds and reads the shared field and carries
+  no field diagnostics` invariant that asserts the list above and compiles the generated FINAL
+  in GL, invert the T196 invariant's "FINAL carries no field" clause, keep the T198 clause that
+  FINAL defines no audit, and print `T199_FINAL_FIELD bits=11 xz=256 passLive=1 audit=0 oracle=0`.
+- [X] T199d [US3] Field allocation, lifecycle, reload and shutdown (item 4). **Done in code and
+  by trace; the pasted session lines land at T199j.** Every release path converges on
+  `VolumetricCloudRenderTargets.destroyAll(reason)` (disable, resource reload, logout/level change,
+  resize, client stop) and cloud-target recreation calls only `destroyCloudTargets()`, so no
+  lifecycle code was needed - the events were made log-visible instead: `T199_FIELD_ALLOC`
+  (renamed from `T197_FIELD_ALLOC`), `T199_FIELD_RELEASE reason=<shutdown|resize|levelChanged>`,
+  `T199_FIELD_KEPT` on every cloud-target recreation that left the atlas alone. (c) and (d) are
+  automated by a new frame-stepped `StormT132AutoDriver.T199LifecycleProbe` (disable, enable,
+  `reloadResourcePacks()`, wait) printing `T199_LIFECYCLE step=..`; T199f sequences it before any
+  timed arm; (b) and (e) fall out of the campaign's own scale changes and join/exit; (f) is not
+  triggerable (`TextureTarget` throws rather than returns null) and is verified by reading the
+  guard. Sandbox `validateT199FieldAllocation` pins RGBA16F / 8 B a node / 2048x1024 / 2,097,152
+  nodes / 16 MiB / nests / supported (`gate-t199d-campaign.log`, PASS). The six-row trace table
+  with the expected log line for each event is report section 3. Original brief: Confirm in code and
+  on the dev client, and record as report section 3 with the log lines: (a) first FINAL frame
+  allocates one RGBA16F 2048x1024 atlas via `VolumetricCloudRenderTargets.prepareStormFieldTarget(256)`
+  and logs `T197_FIELD_ALLOC` once (rename the tag `T199_FIELD_ALLOC`, keep the fields);
+  (b) cloud-target recreation on a resolution-scale transition (`VolumetricCloudRenderer`
+  history invalidation / `destroyCloudTargets`) leaves the atlas allocated; (c)
+  `VolumetricCloudRenderHook.setRuntimeEnabled(false)` -> `VolumetricCloudRenderTargets.shutdown()`
+  destroys it and the next enable re-allocates; (d) a shader reload (F3+T, or the
+  `RegisterShadersEvent` path in `src/main/java/net/Gabou/projectatmosphere/client/render/shader/VolumetricCloudShaders.java`)
+  rebinds `StormFieldSampler` on unit 15 on the next frame because `stormFieldTextureId` is reset
+  per frame; (e) leaving and re-entering a world; (f) the `LeanFinalProgramUnavailableException`
+  path from T199b disables the pass with the cause in the status string. Add a sandbox unit
+  check that `StormFieldGeometry.bytes(256) == 16 MiB`, `atlasWidth/Height(256) == 2048/1024`
+  and `nestsInCandidateTiles(256)`; nothing else is unit-testable without GL, so (b)-(f) are a
+  checklist run once on the dev client with the log lines pasted into the report.
+- [X] T199e [US3] Every-frame rebuild (item 5). **Done: policy recorded (every frame, no skip,
+  no dirty signature) in report section 4; the counters a future reuse task would start from are
+  in place.** `VolumetricCloudRenderer.countStormFieldBuild` composes a count-only signature of
+  the field's inputs (descriptor + candidate signatures, weather bake generation via new
+  `CloudWeatherMapRenderer.cacheMisses()`, origin, slab, `MaterialOffset`) and counts `builds` /
+  `unchangedInputs` / `unchangedDescriptors`; `stormFieldRebuildStatus()` and
+  `resetStormFieldRebuildCounters()` expose them. The build cost comes from the campaign's field
+  column on the FINAL arm at SIDE and FAR, and on a `lean_final@d0` repeat (the descriptor
+  upload capped at zero: the build against an empty sky, at the same poses - T199f chose this over
+  a CLEAR pose because CLEAR has no storm and would stall the fixture qualification) and prints
+  `T199_FIELD_REBUILD` per pose; numbers land at T199j. `compileJava` clean. Original brief: T196 Task 11's dirty-reuse measurement on a
+  moving fixture was deferred and never taken, and T195's audit found the weather bake,
+  descriptor upload and material advection all refresh every frame while a storm moves; exact
+  reuse is therefore **not proven** and FINAL rebuilds the field every frame, unconditionally,
+  before its timed draw. Do not add a skip or a dirty signature in T199. Record in report
+  section 4: the build cost per frame from `lastRainFieldGpuMilliseconds` at SIDE, FAR and an
+  empty-sky pose (the price of building against zero descriptors), and the frame counts from
+  `StormLobeSpatialIndex`'s existing dirty-signature hit/miss over the campaign's moving frames as
+  the evidence a future reuse task would start from.
+- [X] T199f [US3] Campaign T199 wiring (items 6-9, one launch). **Done; campaignGate PASS**
+  (`gate-t199f-campaign.log`, `T170_WIRING campaigns=42 violations=0`, T191 reachability PASS
+  with the new control, `t199_final_nofield` compiled and asserted in the T199 invariant).
+  Registry row added; `t199_final_nofield` (lean specialization, pass and bits both baked 0) in
+  `build.gradle` + `T199_FINAL_NOFIELD` enum (bits 0, no build); driver: marker, predicate, flags,
+  `T199_POSES = {SIDE, FAR}`, `T199_ARMS` (nofield anchors; per repeat `lean_final`,
+  `t198_field_both_exact@x256`, `lean_final@d0` - the empty-sky build - three repeats, 60
+  samples), `T199_OPTIMIZATION_ARMS`, `T199_IMAGE_ARMS` (`t198_field_light_exact` light-only,
+  `lean_final` both, then the audit variant 0 x 8 outputs at bits 11), counter phases
+  `{0 |nofield, 11 |final}` with `requestStormFieldSoundness()` on the second (the oracle runs on
+  the monolith, which carries it), `T199_ATTRIBUTION` echoed from the `|final` counters' share
+  fields, the lifecycle probe ticked ahead of the pose guards, `T199_FIELD_REBUILD` per pose,
+  `buildT199FinalFieldReport()` -> `T199_FINAL_FIELD_DECISION` with `lean_final` as block lead;
+  every `t198Run` dispatch site wired for `t199Run`. Three design points recorded: the image
+  anchor and `t194IsAnchor` are the nofield control under T199 (FINAL is the arm under test);
+  `T166Arm.armKey()` now carries `@d<cap>` so the empty-sky repeat is its own row; pockets are
+  classed against the nofield anchor with the light-only frame as the baseline and FINAL's frame
+  reported `versusLightOnly`, so the probe consumer's share of any pocket loss is visible - note
+  T198 measured both-consumer pockets at 0.861 / 0.874, below the parent's 0.90 FAR figure,
+  which was the light-only number; T199k judges FINAL on the both-consumer frame and says so.
+  Original brief: Add
+  `new Campaign("T199", "t199-shared-field-final.txt", "sharedFieldFinalRunRequested", "t199Run",
+  "T199_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP)` to `StormCampaignRegistry.java`; in
+  `build.gradle` one campaign-scoped control `cloud_atmosphere_volume_t199_final_nofield`
+  (the lean specialization with `PaStormFieldEnabled = 0`, `PaStormFieldPass = 0`, defines
+  `PA_PRECIPITATION_ABSENT 1`, `PA_ARM_DESC_PRECOMPUTE 1`, keepUniforms `[]`) as the pre-field
+  FINAL reference for both image and timing, plus its enum constant in
+  `CoreCostDiagnosticProgram.java`; in `StormT132AutoDriver.java` the marker, predicate, flag,
+  `T199_POSES = {SIDE, FAR}`, `T199_ARMS` (the nofield control as anchor; `LEAN_FINAL` as the
+  candidate; `t198_field_both_exact` as the T198 control so the FINAL number is comparable to
+  T198's 2.151x; three repeats, 60 samples), `T199_OPTIMIZATION_ARMS`, `T199_IMAGE_ARMS`
+  (`LEAN_FINAL` against the nofield control at both poses with `t197ReportPockets`-style pocket
+  diagnostics and `T166_IMAGE_AB`), counter phases on the monolith at production bits 11
+  (`T136_COUNTERS` for `stormFieldProbeFalseEmpty`, probe fetches per px) and one
+  `T193_PRODUCTION_ATTRIBUTION`-style attribution phase printed as `T199_ATTRIBUTION` (rain
+  segment, primary, refine, shaft, light, probe, untagged, residual), one
+  `requestStormFieldSoundness()` on `t198_field_both_exact` at 256 (the oracle host that shares
+  FINAL's node equation; T199c's sandbox proves the two are generated from the same source with
+  the same bits), the T199d `T199LifecycleProbe` ticked to completion as the campaign's first
+  phase (before any timed arm - it disables the pass and reloads resources), the T199e rebuild
+  counters (`resetStormFieldRebuildCounters()` at start, `T199_FIELD_REBUILD pose=..` +
+  `stormFieldRebuildStatus()` after each pose's timing block) with `CLEAR` added as a third
+  timing pose for the FINAL arm's field column only (no image, pocket or counter phase there -
+  it has no storm), the T199g audit captures, and `buildT199Report()` via
+  `buildBracketedPricingReport("T199", "T199_FINAL_FIELD_DECISION", ...)` with the nofield
+  control's arm key as block lead. Wire every `t198Run` dispatch site for `t199Run`.
+- [X] T199g [US3] Retained far-tap audit (item 10). **Done; campaignGate PASS**
+  (`gate-t199g-campaign.log`, `T199_TOP_RIM rows=6 flagged=66`). The capture wiring landed in
+  T199f (bits 11, variant 0, eight outputs, once per pose, before any timed arm). New in T199g:
+  `StormLightTapErrorReport.flagTopRim` / `topRimRows` make the top rim a measured region -
+  per column, the cloud's first pixel from the top of the frame and the cloud pixels in the
+  ~2% of rows below it (six at 270, floor three), flagged above the class values so the
+  class-keyed regions are unchanged and `region=topRim` overlaps them - so the FINAL baseline
+  carries `T198_TAP_ERROR .. tap=2|3 region=topRim|pocket` lines rather than a difference-image
+  observation. Headless `validateT199TopRimRegion` added. Report section 8.1 records the expected
+  residual from T198 (taps 2-3 mean -0.037 / -0.064, one-sided, cone -5.9% SIDE) and names the
+  remaining error as the far taps' vertical envelope, not worked in T199. Original brief: Keep `t198_light_audit`,
+  `StormLightTapErrorReport.java` and the `PaLightAudit*` selectors as a permanent diagnostic. In
+  the T199 campaign take one audit capture per pose with `setLightAuditFieldBits(11)` and variant
+  0, and have `StormLightTapErrorReport` print `T198_TAP_ERROR` for taps 2-3 in the reference
+  pocket and top-rim (edge band, upper half) regions. Record the residual as the FINAL baseline
+  in report section 8 (expected about -0.04 / -0.06 one-sided, RMS ~0.21 / 0.25); state the
+  named remaining error is the vertical envelope on the far taps and that it is **not** worked
+  in T199.
+- [X] T199h [US3] Clean temporary campaign plumbing (item 11). **Done; campaignGate PASS after it
+  (`gate-t199i-campaign-1.log`, `T170_WIRING campaigns=41 violations=0`).** Retired: bit 4 (the
+  hybrid tap selector and the uniform's doc), `t196_field_hybrid` (variant, enum, `case 7`, the
+  T196 timing and image tables, the sandbox row); the whole T197 campaign (marker, poses,
+  `T197_XZ`, flags, arms, image arms, `T197ImageArm`, predicate, report, every dispatch site, the
+  registry row); the runtime resolution state (`stormFieldXZ`/`setStormFieldXZ` and every upload -
+  the renderer uploads `DEFAULT_XZ` to the monolith, every lean program bakes it, and
+  `leanFinalEligible` drops its XZ clause); `PaStormFieldXZ` from every field arm's
+  `keepUniforms`. Sandbox: `validateT197FieldResolution` now asserts the grid baked on all eight
+  field programs (was: live on five), the T196 and T198 invariants no longer require it live.
+  Kept, with reasons, in report section 9: the T196 single-consumer arms and `t196_field_both`,
+  the audit and `t198_field_light_exact` (T199's light-only image arm), `t198_field_both_exact`,
+  `t199_final_nofield`, the `T166Arm.stormFieldXZ` label, `t197ReportPockets` and the pocket
+  baseline, `StormFieldGeometry`, every cited log tag, everything under `validation/`. Variants
+  156 declared (155 + nofield - hybrid). Original brief: Retire, in this order, each with the
+  sandbox and gate still green: the bit-4 hybrid branch in `cloud_atmosphere_volume.fsh` and
+  `cloud_atmosphere_volume_t196_field_hybrid` (`build.gradle`, `T196_FIELD_HYBRID` in
+  `CoreCostDiagnosticProgram.java`, `stormFieldEnabledBits()` case 7); the
+  ~~`cloud_atmosphere_volume_t198_field_light_exact` arm~~ (T199f keeps it: it is T199's
+  light-only image arm, the pocket number comparable to T198's 0.880 / 0.923, and the audit's
+  luminance link); the T197 XZ sweep (`t197Run` sweep loop in
+  `StormT132AutoDriver.java`, `setStormFieldXZ` callers) with `PaStormFieldXZ` baked to 256 in the
+  remaining field arms by dropping it from their `keepUniforms` - `StormFieldGeometry` and its
+  `supported()` stay, and the sandbox's `validateT197FieldResolution` clause that every field arm
+  keeps `PaStormFieldXZ` live (`:765`) and the T196 invariant's matching `bakes PaStormFieldXZ`
+  check (`:862`) are inverted with it, keeping the `T197_FIELD_GEOMETRY` facts; the
+  `t196_field_light` / `t196_field_probe` single-consumer arms unless
+  T199f still uses them. Keep `t196_field_both` (the T196 control and an oracle host),
+  `t198_field_both_exact`, `t198_light_audit`, `t199_final_nofield`, every workload view, every
+  `T19x_*` log tag the reports cite, the registry rows (the wiring check reads the newest row), and
+  everything under `validation/`. Record the variant count before and after (155 declared, T198
+  registered 5) and the ledger in report section 9.
+- [X] T199i [US3] Gate during development (item 12). **Done: the gate ran after every code
+  sub-task** - `gate-t199b.log` (the expected T196 halt), `gate-t199c-campaign.log`,
+  `gate-t199d-campaign.log`, `gate-t199f-campaign.log`, `gate-t199g-campaign.log`,
+  `gate-t199i-campaign-1.log` (after T199h) - all PASS from T199c on, 25-45 s each, main-level
+  5-7 s; T161, T170 wiring (42 -> 41 campaigns), T171, T175 (47), T191, T196, T197, T198 and the
+  three T199 invariants green on the last. Original brief: run `./gradlew.bat campaignGate` after T199c,
+  after T199f and after T199h (tens of seconds; inspect `elapsedMs` first if slow) and keep the
+  three `gate-t199-campaign-*.log` files; the T199 invariant, `T161`, `T175` (count unchanged at
+  47), `T196`, `T198` and the campaign wiring check for the registry's newest row must all pass.
+- [X] T199j [US3] Run the campaign once. **Done - run twice, and the first run is why.** Run 1
+  (23:18-23:24, `t199-campaign/t199-run1-oracle-stripped.log`) priced the T199c FINAL - the
+  oracle compiled out - at **18.55 ms SIDE against 14.12 ms** for `t198_field_both_exact`
+  (+31%; FAR +12%), whose generated source differed by the one `#define PA_STORM_FIELD_ORACLE 1`
+  line (`diff`-verified; T171 excludes program identity; the nofield anchors reproduced T198's
+  pre-field FINAL to the tenth). FINAL failed its own 1.00x comparator check, so the strip was
+  reverted: the raw source no longer defines or gates the oracle, `leanFinalStrippedDefines` is
+  empty with the lesson attached, the hosts drop the redundant define, FINAL carries the pass-2
+  branch dead behind the live uniform, and `validateT199FinalField` asserts the branch present
+  and `t198_field_both_exact` byte-identical to FINAL (`gate-t199i-campaign-2.log`). The
+  lifecycle probe was also resequenced (run 1 ticked it with the nofield anchor pinned, so the
+  atlas was not resident). Run 2 (23:30-23:35, `t199-campaign/t199-run.log`, 4 mask/diff PNGs):
+  **FINAL 13.03 / 10.73 ms = 1.00x of the comparator (0.5% / 0.4%), net 2.088x SIDE / 1.545x
+  FAR**, build 1.65 / 1.55 ms, empty-sky build 0.53 ms; pockets light-only 0.851 / 0.904, FINAL
+  0.771 / 0.871 (a 619-pocket fixture; FAR reproduces T198 like for like, SIDE is the fixture);
+  soundness underestimates 1 (worst 0.0012, boundary 0), false-empty 0, probe 3.51 / 0.92
+  fetches per px; attribution rain segment 65.9% / 66.8%, primary 24.2 / 22.0, light and probe
+  0; far taps 2-3 at the pockets -0.047 / -0.096 (cone -8.7%), and the screen-space top rim
+  carries almost none of it (-0.002 / -0.011) - the residual sits in the pixels beneath the
+  anvil top; `T199_FIELD_REBUILD` 1121/1119 - the frozen fixture, not a play number; lifecycle
+  ALLOC / KEPT / RELEASE(resize) / RELEASE(shutdown) on disable / reload ok / ALLOC / RELEASE at
+  exit all present. Marker retired; `./gradlew.bat check build` PASS once after (`gate-t199.log`,
+  47 invariants, jar built). A first launch was killed by the tool's memory guard during world
+  entry and relaunched detached. Original brief: Run the campaign once (`run/t199-shared-field-final.txt`, keep
+  `run/t132-autorun.txt` and `run/t132-autorun-exit.txt`, `./gradlew.bat runClient --offline
+  -PsimpleCloudsMandatory=false`, one GPU campaign at a time), retire the marker, extract the
+  `T199_*`, `T196_SOUNDNESS`, `T136_COUNTERS`, `T166_IMAGE_AB`, `T197_POCKETS` and `T198_TAP_ERROR`
+  lines to `validation/t199-campaign/t199-run.log` with the pocket mask/diff PNGs, then run
+  `./gradlew.bat check build` once (item 13) and keep `gate-t199.log`.
+- [X] T199k [US3] Report, decisions and bank (items 14-15). **Done:
+  `validation/performance-shared-field-final.md`, 12 sections + status, no pending items.**
+  Decision A (tighter probe floor): upper bound = false-occupied fraction x (primary + refine
+  share) = 0.157 x 30.2% = **4.7% SIDE**, 0.160 x 27.6% = **4.4% FAR** - below the 10% rule at
+  both poses, **deferred** with the number; the floor is still loose where it matters (84% of
+  occupied verdicts are false) but what it costs is bounded. Decision B (temporal
+  reconstruction): **structurally ready, not budget-ready, and the deciding number is not in
+  T199's data** - FINAL is 4-8x over the 8.0 ms Ultra budget at the severe poses at the shipped
+  scale by T146/T147's exponent, and T151's reopen condition for reconstruction is new evidence
+  on the pixel-scaling exponent, which T196-T199 may have moved by removing the per-sample light
+  and probe walks (44.5% of the pre-field frame, now 0). Exact next task: a two-scale FINAL
+  baseline (0.25 / 0.75, SIDE + PLAY_NEAR) to re-derive the exponent; before it, the empty-sky
+  build early-out (0.53 ms a clear frame, exact by construction). Committed, not merged.
+  Original brief: Write
+  `validation/performance-shared-field-final.md`: 1 campaign-only ledger, 2 FINAL wiring and the
+  generated-source proof, 3 lifecycle checklist with log lines, 4 rebuild policy and cost, 5
+  quality (pockets, dark interior, contrast, SSIMs, IoU, changed pixels) FINAL vs nofield and vs
+  T198, 6 soundness (underestimates, binary misses, useful-empty, false-empty), 7 baseline (field
+  / ray / combined p50-p95, SIDE and FAR net with spreads, against nofield and against
+  `t198_field_both_exact`), 8 attribution and the far-tap residual, 9 cleanup ledger and variant
+  counts, 10 gate/build, 11 **decision A - tighter probe floor**: from section 8 compute the
+  upper bound the floor could still save as (false-occupied probe verdicts / probe verdicts) x
+  (primary + refine segment share) of the FINAL frame at SIDE and FAR; justified only if that
+  bound is >= 10% of frame time at either pose, otherwise record it as deferred with the number;
+  12 **decision B - temporal reconstruction readiness**: ready only if FINAL SIDE and FAR GPU
+  ms are inside the T135 Ultra budget, the history path (`HistorySampler`, reprojection
+  confidence, invalidation on resolution transitions) is intact under the field, the lifecycle
+  checklist passed, no correctness residual is open other than the named far-tap rim, and the
+  rain share is recorded without action; state yes/no with the numbers and the exact next task.
+  Add the `[X]` summary to this file, commit with the session attribution, do not merge.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

@@ -659,12 +659,195 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT191VariantScope);
         runCorrected("T192 the closed-form ownership bound never claims a cell falsely",
                 StormVolumetricGeometrySandbox::validateT192OwnershipBound);
-        runCorrected("T196 the shared storm field arms compile and FINAL carries no field",
+        runCorrected("T196 the shared storm field arms compile and FINAL keeps the build pass live",
                 StormVolumetricGeometrySandbox::validateT196StormFieldArms);
         runCorrected("T197 the field resolution derives one geometry and covers one extent",
                 StormVolumetricGeometrySandbox::validateT197FieldResolution);
         runCorrected("T198 the light-tap audit compiles and FINAL carries none of it",
                 StormVolumetricGeometrySandbox::validateT198LightAudit);
+        runCorrected("T199 FINAL builds and reads the shared field and carries no field diagnostics",
+                StormVolumetricGeometrySandbox::validateT199FinalField);
+        runCorrected("T199 the production atlas is one 16 MiB RGBA16F allocation that nests in the tiles",
+                StormVolumetricGeometrySandbox::validateT199FieldAllocation);
+        runCorrected("T199 the retained far-tap audit measures the top rim as its own region",
+                StormVolumetricGeometrySandbox::validateT199TopRimRegion);
+    }
+
+    /**
+     * T199g. The tap-error report's top-rim region: on a synthetic class map
+     * with a flat cloud top, exactly the first {@code topRimRows} cloud rows
+     * of every column are flagged, no sky pixel is, the flag never disturbs
+     * the class value, and a column without cloud flags nothing.
+     */
+    private static void validateT199TopRimRegion() {
+        int width = 12;
+        int height = 270;
+        int rows = StormLightTapErrorReport.topRimRows(height);
+        require(rows == 6, "the rim depth at 270 rows is not six");
+        require(StormLightTapErrorReport.topRimRows(64) == 3, "the rim depth floor is not three rows");
+        int[] classes = new int[width * height];
+        int top = 40;
+        int bottom = 200;
+        for (int x = 0; x < width - 1; x++) {
+            for (int y = top; y < bottom; y++) {
+                classes[y * width + x] = y == top ? StormImageQualityMetrics.CLASS_EDGE
+                        : (x % 2 == 0 ? StormImageQualityMetrics.CLASS_INTERIOR
+                                : StormImageQualityMetrics.CLASS_POCKET);
+            }
+        }
+        // The last column stays sky.
+        int[] original = classes.clone();
+        StormLightTapErrorReport.flagTopRim(classes, width, height);
+        int flagged = 0;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int i = y * width + x;
+                boolean rim = (classes[i] & 0x10) != 0;
+                require((classes[i] & 0xF) == original[i], "the rim flag changed a class value");
+                boolean expected = x < width - 1 && y >= top && y < top + rows;
+                require(rim == expected, "rim flag wrong at x=" + x + " y=" + y);
+                if (rim) {
+                    flagged++;
+                }
+            }
+        }
+        require(flagged == (width - 1) * rows, "rim pixel count " + flagged);
+        System.out.println("T199_TOP_RIM rows=" + rows + " flagged=" + flagged
+                + " region=" + StormLightTapErrorReport.TOP_RIM_NAME);
+    }
+
+    /**
+     * T199. The allocation FINAL makes once per lifetime, stated as numbers
+     * the renderer cannot drift from: RGBA16F, 2048x1024, 2,097,152 nodes,
+     * 16 MiB at the production grid, nested in the candidate tiles so the
+     * single-tile soundness argument holds. The lifecycle itself (release on
+     * disable, reload, logout and shutdown; survival across cloud-target
+     * recreation) is a render-thread matter evidenced by the
+     * T199_FIELD_ALLOC / _RELEASE / _KEPT lines a campaign session logs.
+     */
+    private static void validateT199FieldAllocation() {
+        int xz = StormFieldGeometry.DEFAULT_XZ;
+        require(StormFieldGeometry.FORMAT.equals("RGBA16F") && StormFieldGeometry.BYTES_PER_NODE == 8,
+                "the production node is not four half floats");
+        require(StormFieldGeometry.atlasWidth(xz) == 2048 && StormFieldGeometry.atlasHeight(xz) == 1024,
+                "the production atlas is not 2048x1024");
+        require(StormFieldGeometry.nodes(xz) == 2_097_152L,
+                "the production grid is not 256x256x32 nodes");
+        require(StormFieldGeometry.bytes(xz) == 16L * 1024L * 1024L,
+                "the production atlas is not 16 MiB");
+        require(StormFieldGeometry.nestsInCandidateTiles(xz),
+                "the production grid does not nest in the candidate tiles");
+        require(StormFieldGeometry.supported(xz), "the production grid is not a supported resolution");
+        System.out.println("T199_FIELD_ALLOCATION " + StormFieldGeometry.describe(xz)
+                + " format=" + StormFieldGeometry.FORMAT);
+    }
+
+    /**
+     * T199. The shared field is production. The generated FINAL keeps
+     * {@code PaStormFieldPass} live (the renderer uploads 1 for the build
+     * draw, 0 for the render), bakes the consumer bits to
+     * {@link StormFieldGeometry#PRODUCTION_CONSUMER_BITS}, the grid to
+     * {@link StormFieldGeometry#DEFAULT_XZ} and both T198 audit selectors to
+     * 0, defines no audit, keeps the soundness-oracle branch dead behind the
+     * live pass (T199j measured compiling it out at -30% SIDE), is
+     * byte-identical to the T198 comparator {@code t198_field_both_exact},
+     * and compiles in GL. The T196 build-cost arm still bakes its consumers
+     * to 0. The enum must agree with the generated programs: FINAL generates
+     * and bakes production, the monolith reports 0 (its bits are uploaded),
+     * and the generate-only arm generates and bakes 0.
+     */
+    private static void validateT199FinalField() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalPath = base + "cloud_atmosphere_volume_final.fsh";
+        if (!Files.exists(workspacePath(finalPath))) {
+            throw new IllegalStateException(
+                    "generated FINAL missing; run generateLeanFinalShader: " + finalPath);
+        }
+        String finalSource = readWorkspaceSource(finalPath);
+        String shader = readWorkspaceSource("src/main/resources/assets/"
+                + "projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh");
+        int bits = StormFieldGeometry.PRODUCTION_CONSUMER_BITS;
+        List<String> violations = new ArrayList<>();
+        if (!finalSource.contains("uniform int PaStormFieldPass;")) {
+            violations.add("PaStormFieldPass is not live; FINAL could not run its build draw");
+        }
+        if (!finalSource.contains("const int PaStormFieldEnabled = " + bits + ";")) {
+            violations.add("PaStormFieldEnabled is not baked to " + bits);
+        }
+        if (!finalSource.contains("const int PaStormFieldXZ = "
+                + StormFieldGeometry.DEFAULT_XZ + ";")) {
+            violations.add("PaStormFieldXZ is not baked to " + StormFieldGeometry.DEFAULT_XZ);
+        }
+        if (!finalSource.contains("const int PaLightAuditVariant = 0;")
+                || !finalSource.contains("const int PaLightAuditOutput = 0;")) {
+            violations.add("an audit selector is live");
+        }
+        if (finalSource.contains("#define PA_LIGHT_AUDIT")) {
+            violations.add("FINAL defines PA_LIGHT_AUDIT");
+        }
+        if (!finalSource.contains("if (PaStormFieldPass == 2) {")) {
+            violations.add("FINAL no longer carries the soundness oracle branch; T199j"
+                    + " measured compiling it out at -30% SIDE, so it stays, dead behind"
+                    + " the live pass");
+        }
+        require(violations.isEmpty(), "FINAL field productionization incomplete: "
+                + String.join("; ", violations));
+        // The JSON binds every uniform it names, so the pass must survive
+        // the strip that removes the baked ones.
+        String finalJson = readWorkspaceSource(base + "cloud_atmosphere_volume_final.json");
+        require(finalJson.contains("\"PaStormFieldPass\""),
+                "the generated FINAL JSON dropped PaStormFieldPass");
+        require(!finalJson.contains("\"PaStormFieldEnabled\"")
+                        && !finalJson.contains("\"PaStormFieldXZ\""),
+                "the generated FINAL JSON still names a baked field uniform");
+        // No source-level gate on the oracle: the branch is production code
+        // behind a uniform, and the strip list is empty (build.gradle says why).
+        require(!shader.contains("PA_STORM_FIELD_ORACLE"),
+                "the source gates the soundness oracle by define again; T199j measured that");
+        // The T198 comparator is byte-identical to FINAL: it is the program
+        // T198 accepted, and T199's matrix prices FINAL against it at 1.00x
+        // by construction. The both-consumer T196 control compiles beside it.
+        String[] hosts = {"t196_field_both", "t198_field_both_exact"};
+        String comparator = readWorkspaceSource(base + "cloud_atmosphere_volume_t198_field_both_exact.fsh");
+        require(comparator.equals(finalSource),
+                "t198_field_both_exact is no longer byte-identical to FINAL;"
+                        + " the T199 comparator would measure a source difference");
+        for (String host : hosts) {
+            String source = readWorkspaceSource(base + "cloud_atmosphere_volume_" + host + ".fsh");
+            compileFragmentShader(resolveMojImports(source), host);
+        }
+        // The T199 control is the pre-field FINAL: no build, no consumer, and
+        // otherwise FINAL's specialization, so it compiles and its JSON
+        // carries neither field uniform.
+        String nofield = readWorkspaceSource(base + "cloud_atmosphere_volume_t199_final_nofield.fsh");
+        require(nofield.contains("const int PaStormFieldPass = 0;")
+                        && nofield.contains("const int PaStormFieldEnabled = 0;")
+                        && nofield.contains("#define PA_PRECIPITATION_ABSENT")
+                        && nofield.contains("#define PA_ARM_DESC_PRECOMPUTE"),
+                "t199_final_nofield is not the pre-field FINAL specialization");
+        String nofieldJson = readWorkspaceSource(base + "cloud_atmosphere_volume_t199_final_nofield.json");
+        require(!nofieldJson.contains("\"PaStormFieldPass\"")
+                        && !nofieldJson.contains("\"PaStormFieldEnabled\""),
+                "the t199_final_nofield JSON names a baked field uniform");
+        require(!CoreCostDiagnosticProgram.T199_FINAL_NOFIELD.stormFieldGeneration()
+                        && CoreCostDiagnosticProgram.T199_FINAL_NOFIELD.stormFieldEnabledBits() == 0,
+                "the T199 control must neither build nor read the field");
+        compileFragmentShader(resolveMojImports(nofield), "t199_final_nofield");
+        // The enum agrees with the programs.
+        require(CoreCostDiagnosticProgram.LEAN_FINAL.stormFieldGeneration()
+                        && CoreCostDiagnosticProgram.LEAN_FINAL.stormFieldEnabledBits() == bits,
+                "LEAN_FINAL does not generate and bake production's consumers");
+        require(!CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH.stormFieldGeneration()
+                        && CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH.stormFieldEnabledBits() == 0,
+                "the monolith's field bits must be uploaded, not baked");
+        require(CoreCostDiagnosticProgram.T196_GENERATE_ONLY.stormFieldGeneration()
+                        && CoreCostDiagnosticProgram.T196_GENERATE_ONLY.stormFieldEnabledBits() == 0,
+                "the build-cost arm must build and read nothing");
+        require(VolumetricCloudDebugConfig.stormFieldForcedOnMonolith() == bits,
+                "the monolith does not default to production's consumers");
+        compileFragmentShader(resolveMojImports(finalSource), "T199 FINAL with the shared field");
+        System.out.println("T199_FINAL_FIELD bits=" + bits + " xz=" + StormFieldGeometry.DEFAULT_XZ
+                + " passLive=1 audit=0 oracleBranch=dead comparatorIdentical=true hosts=" + hosts.length);
     }
 
     /**
@@ -687,7 +870,6 @@ public final class StormVolumetricGeometrySandbox {
         String audit = readWorkspaceSource(path);
         require(audit.contains("#define PA_LIGHT_AUDIT"), "the audit program does not define PA_LIGHT_AUDIT");
         require(audit.contains("uniform int PaStormFieldPass;")
-                        && audit.contains("uniform int PaStormFieldXZ;")
                         && audit.contains("uniform int PaLightAuditVariant;")
                         && audit.contains("uniform int PaLightAuditOutput;"),
                 "the audit program bakes a selector it must keep live");
@@ -702,9 +884,8 @@ public final class StormVolumetricGeometrySandbox {
         for (String[] arm : corrections) {
             String source = readWorkspaceSource(base + "cloud_atmosphere_volume_" + arm[0] + ".fsh");
             require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
-            require(source.contains("uniform int PaStormFieldPass;")
-                            && source.contains("uniform int PaStormFieldXZ;"),
-                    arm[0] + " bakes a field uniform the renderer needs live");
+            require(source.contains("uniform int PaStormFieldPass;"),
+                    arm[0] + " bakes the build pass the renderer needs live");
             require(!source.contains("#define PA_LIGHT_AUDIT"), arm[0] + " defines the audit");
             compileFragmentShader(resolveMojImports(source), arm[0]);
         }
@@ -732,12 +913,13 @@ public final class StormVolumetricGeometrySandbox {
     }
 
     /**
-     * T197. The resolution is a uniform the field programs keep live and
-     * FINAL bakes to T196's grid; the shader carries no other node count; and
-     * the Java geometry every resolution derives from agrees with the
-     * shader's formulae - one extent, the atlas sized to the tiles, the
-     * dual-cell half-extent the dilation uses, the bytes the report quotes.
-     * The candidate-tile nesting that T196's single-tile soundness argument
+     * T197. The resolution is one uniform in the source, which every lean
+     * program bakes to T196's grid (T199 retired the sweep that kept it live
+     * on the field arms); the shader carries no other node count; and the
+     * Java geometry every resolution derives from agrees with the shader's
+     * formulae - one extent, the atlas sized to the tiles, the dual-cell
+     * half-extent the dilation uses, the bytes the report quotes. The
+     * candidate-tile nesting that T196's single-tile soundness argument
      * rests on is recorded per resolution so the report can say which grids
      * the argument covers and which only the oracle does.
      */
@@ -758,11 +940,16 @@ public final class StormVolumetricGeometrySandbox {
         String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
         require(finalSource.contains("const int PaStormFieldXZ = 256;"),
                 "FINAL does not bake the field resolution to 256");
+        // T199h. The sweep is retired: every field arm bakes the grid too,
+        // so no program can be uploaded a resolution the atlas was not
+        // allocated for.
         for (String arm : new String[] {"t196_generate_only", "t196_field_light",
-                "t196_field_probe", "t196_field_both", "t196_field_hybrid"}) {
+                "t196_field_probe", "t196_field_both", "t198_light_audit",
+                "t198_field_light_exact", "t198_field_both_exact", "t199_final_nofield"}) {
             String source = readWorkspaceSource(base + "cloud_atmosphere_volume_" + arm + ".fsh");
-            require(source.contains("uniform int PaStormFieldXZ;"),
-                    arm + " bakes PaStormFieldXZ, so the campaign could not select a resolution");
+            require(source.contains("const int PaStormFieldXZ = 256;")
+                            && !source.contains("uniform int PaStormFieldXZ;"),
+                    arm + " keeps PaStormFieldXZ live; T199 pinned the grid");
         }
         String shaderJson = readWorkspaceSource("src/main/resources/assets/"
                 + "projectatmosphere/shaders/core/cloud_atmosphere_volume.json");
@@ -825,16 +1012,18 @@ public final class StormVolumetricGeometrySandbox {
     /**
      * T196. The four field arms compile in a real GL context before a GPU
      * campaign is spent on them; each keeps the build-pass uniform live and
-     * bakes its consumer bits; and FINAL bakes both to zero, so neither the
-     * build pass nor either lookup exists in the shipped program. The field
-     * sampler must stay a manual binding, for T188's texture-unit reason.
+     * bakes its consumer bits. T199 inverted the FINAL clause: the shipped
+     * program now keeps the pass live and bakes production's consumers, the
+     * full statement of which is validateT199FinalField. The field sampler
+     * must stay a manual binding, for T188's texture-unit reason.
      */
     private static void validateT196StormFieldArms() {
         String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
         String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
-        require(finalSource.contains("const int PaStormFieldPass = 0;")
-                        && finalSource.contains("const int PaStormFieldEnabled = 0;"),
-                "FINAL does not bake the storm field out");
+        require(finalSource.contains("uniform int PaStormFieldPass;")
+                        && finalSource.contains("const int PaStormFieldEnabled = "
+                                + StormFieldGeometry.PRODUCTION_CONSUMER_BITS + ";"),
+                "FINAL no longer carries the storm field the way T199 productionized it");
         String shaderJson = readWorkspaceSource("src/main/resources/assets/"
                 + "projectatmosphere/shaders/core/cloud_atmosphere_volume.json");
         require(!shaderJson.contains("StormFieldSampler"),
@@ -844,8 +1033,7 @@ public final class StormVolumetricGeometrySandbox {
                 {"cloud_atmosphere_volume_t196_generate_only", "const int PaStormFieldEnabled = 0;"},
                 {"cloud_atmosphere_volume_t196_field_light", "const int PaStormFieldEnabled = 1;"},
                 {"cloud_atmosphere_volume_t196_field_probe", "const int PaStormFieldEnabled = 2;"},
-                {"cloud_atmosphere_volume_t196_field_both", "const int PaStormFieldEnabled = 3;"},
-                {"cloud_atmosphere_volume_t196_field_hybrid", "const int PaStormFieldEnabled = 7;"}
+                {"cloud_atmosphere_volume_t196_field_both", "const int PaStormFieldEnabled = 3;"}
         };
         for (String[] arm : arms) {
             String path = base + arm[0] + ".fsh";
@@ -857,9 +1045,8 @@ public final class StormVolumetricGeometrySandbox {
             require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
             require(source.contains("uniform int PaStormFieldPass;"),
                     arm[0] + " bakes PaStormFieldPass, so the renderer could not run its build");
-            // T197. The resolution rides with the pass.
-            require(source.contains("uniform int PaStormFieldXZ;"),
-                    arm[0] + " bakes PaStormFieldXZ");
+            // T197 kept the resolution live here; T199 bakes it (checked by
+            // validateT197FieldResolution).
             require(source.contains("#define PA_PRECIPITATION_ABSENT"),
                     arm[0] + " is not precipitation-specialized");
             compileFragmentShader(resolveMojImports(source), arm[0]);
@@ -6500,7 +6687,17 @@ public final class StormVolumetricGeometrySandbox {
             {"PaDiagnosticLightingMode", "const int PaDiagnosticLightingMode = 0;"},
             {"PaRayTraceMode", "const int PaRayTraceMode = 0;"},
             {"PaRayTraceNdc", "const vec2 PaRayTraceNdc = vec2(0.0);"},
-            {"PaRayTraceFragCoord", "const vec2 PaRayTraceFragCoord = vec2(0.0);"}
+            {"PaRayTraceFragCoord", "const vec2 PaRayTraceFragCoord = vec2(0.0);"},
+            // T199. The shared field is production: consumers baked on, the
+            // grid pinned, the T198 audit selectors off. PaStormFieldPass is
+            // deliberately absent - it stays live for the build draw, and
+            // validateT199FinalField asserts that.
+            {"PaStormFieldEnabled", "const int PaStormFieldEnabled = "
+                    + StormFieldGeometry.PRODUCTION_CONSUMER_BITS + ";"},
+            {"PaStormFieldXZ", "const int PaStormFieldXZ = "
+                    + StormFieldGeometry.DEFAULT_XZ + ";"},
+            {"PaLightAuditVariant", "const int PaLightAuditVariant = 0;"},
+            {"PaLightAuditOutput", "const int PaLightAuditOutput = 0;"}
     };
 
     /**

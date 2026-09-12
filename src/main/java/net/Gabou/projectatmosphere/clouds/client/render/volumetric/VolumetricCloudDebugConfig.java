@@ -70,14 +70,21 @@ public final class VolumetricCloudDebugConfig {
     }
 
     /**
-     * T196. The shared storm field forced onto the monolith, on T188's
+     * T196. The shared storm field's consumer bits on the monolith, on T188's
      * reasoning: the monolith is the only program that counts, so it has to
      * read the field for the counters to describe the post-field workload -
      * the collapsed light and probe walks, the fetches, and the probe audit.
-     * Bits as PaStormFieldEnabled: 1 light, 2 probe. Never applied to a timed
-     * arm.
+     * Bits as PaStormFieldEnabled: 1 light, 2 probe, 8 exact-noise tap.
+     * Never applied to a timed arm.
+     *
+     * <p>T199. FINAL bakes {@link StormFieldGeometry#PRODUCTION_CONSUMER_BITS},
+     * so the monolith defaults to the same value: a debug view renders the
+     * image FINAL renders. A campaign that needs the monolith on another
+     * lookup - or on none, 0 - sets it explicitly and restores production
+     * with {@link #resetStormFieldMonolithBits()} when it retires.
      */
-    private static volatile int stormFieldForcedOnMonolith;
+    private static volatile int stormFieldForcedOnMonolith =
+            StormFieldGeometry.PRODUCTION_CONSUMER_BITS;
 
     /**
      * T196. One frame's soundness oracle: the next field build writes the
@@ -90,8 +97,14 @@ public final class VolumetricCloudDebugConfig {
         return stormFieldForcedOnMonolith;
     }
 
+    /** Campaign override; 0 means the monolith neither builds nor reads the field. */
     public static void setStormFieldForcedOnMonolith(int enabledBits) {
         stormFieldForcedOnMonolith = enabledBits;
+    }
+
+    /** T199. Back to production's consumers, and to lean-FINAL eligibility. */
+    public static void resetStormFieldMonolithBits() {
+        stormFieldForcedOnMonolith = StormFieldGeometry.PRODUCTION_CONSUMER_BITS;
     }
 
     public static void requestStormFieldSoundness() {
@@ -102,22 +115,6 @@ public final class VolumetricCloudDebugConfig {
         boolean requested = stormFieldSoundnessRequested;
         stormFieldSoundnessRequested = false;
         return requested;
-    }
-
-    /**
-     * T197. The field's horizontal node count, {@code PaStormFieldXZ}. The
-     * renderer allocates the atlas from it and uploads it every frame, so
-     * the Java allocation and the shader's node mapping cannot disagree; the
-     * campaign sets it per arm. Y is fixed; see {@link StormFieldGeometry}.
-     */
-    private static volatile int stormFieldXZ = StormFieldGeometry.DEFAULT_XZ;
-
-    public static int stormFieldXZ() {
-        return stormFieldXZ;
-    }
-
-    public static void setStormFieldXZ(int xz) {
-        stormFieldXZ = StormFieldGeometry.supported(xz) ? xz : StormFieldGeometry.DEFAULT_XZ;
     }
 
     /**

@@ -56,6 +56,21 @@ public final class VolumetricCloudRenderer {
     private static long frameIndex;
     private static volatile float lastGpuMilliseconds = -1.0F;
     private static volatile float lastRainFieldGpuMilliseconds = -1.0F;
+    /**
+     * T199e. The field rebuilds every frame; these only count how often it
+     * need not have. A build's inputs are the descriptor set and candidate
+     * grid, the weather rasters' generation, the weather origin and slab, and
+     * the material advection offset; when none of them moved since the last
+     * build the previous atlas was exact. Reuse is deliberately not
+     * implemented here - T196 Task 11's moving-fixture measurement was never
+     * taken - so a future task starts from these numbers, not from a hunch.
+     */
+    private static long stormFieldInputSignature;
+    private static long lastStormFieldDescriptorSignature;
+    private static boolean stormFieldInputSignatureValid;
+    private static long stormFieldBuilds;
+    private static long stormFieldBuildsInputsUnchanged;
+    private static long stormFieldBuildsDescriptorsUnchanged;
     private static volatile boolean lastHistoryValid;
     private static volatile float lastHistoryConfidence;
     private static volatile float lastResolutionScale = 1.0F;
@@ -366,7 +381,8 @@ public final class VolumetricCloudRenderer {
                 || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
                     && VolumetricCloudDebugConfig.rainFieldForcedOnMonolith())
                 // T196. The storm field builds on the same clock, so the
-                // campaign report's field column is its build cost.
+                // campaign report's field column is its build cost; T199: on
+                // FINAL this is the production build, every frame.
                 || stormFieldProgram(program)
                 ? RAIN_FIELD_TIMER.getLastMilliseconds()
                 : 0.0F;
@@ -722,9 +738,10 @@ public final class VolumetricCloudRenderer {
         // forced frame's lookups enabled against no field at all.
         shader.safeGetUniform("PaStormFieldPass").set(0);
         shader.safeGetUniform("PaStormFieldEnabled").set(0);
-        // T197. The resolution goes up with the pass and consumer bits every
-        // frame, from the same value the atlas below is allocated for.
-        int stormFieldXZ = VolumetricCloudDebugConfig.stormFieldXZ();
+        // T197 varied the grid; T199 pinned it. Every lean program bakes the
+        // constant, and the monolith is uploaded the same value here so its
+        // node mapping and the atlas below can never disagree.
+        int stormFieldXZ = StormFieldGeometry.DEFAULT_XZ;
         shader.safeGetUniform("PaStormFieldXZ").set(stormFieldXZ);
         // T198. The audit's selectors ride with the field uniforms; only the
         // audit program declares them.
@@ -733,13 +750,26 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("PaLightAuditOutput").set(
                 VolumetricCloudDebugConfig.lightAuditOutput());
         // T196. The shared storm field. One draw over the atlas - XZ-square
-        // by 32 nodes, each a detail-free production density and the probe
-        // floor - before the timed draw, on the field clock. The monolith
-        // runs it too when the campaign forces the field onto it, so the
-        // counters describe the post-field workload.
+        // by 32 nodes, each the storm body's threshold and height, the probe
+        // floor and a detail-free density - before the timed draw, on the
+        // field clock. T199: FINAL runs it every frame (its consumer bits are
+        // baked on), the monolith runs it at production's bits unless a
+        // campaign overrides them, so the counters describe the post-field
+        // workload and a debug view renders FINAL's image.
         if (stormFieldProgram(program)) {
             RenderTarget stormFieldTarget =
                     VolumetricCloudRenderTargets.prepareStormFieldTarget(stormFieldXZ);
+            if (stormFieldTarget == null
+                    && program == CoreCostDiagnosticProgram.LEAN_FINAL) {
+                // The lean program reads the atlas unconditionally, so a frame
+                // without one would light the cone and probe the scan against
+                // zeros: wrong, and silently so. Same loud fallback as a
+                // failed link.
+                throw new LeanFinalProgramUnavailableException(
+                        "storm field atlas (" + StormFieldGeometry.describe(stormFieldXZ)
+                                + ") unavailable; FINAL bakes the field consumers on"
+                                + " and must not draw without it");
+            }
             if (stormFieldTarget != null) {
                 int enabledBits = program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
                         ? VolumetricCloudDebugConfig.stormFieldForcedOnMonolith()
@@ -757,6 +787,7 @@ public final class VolumetricCloudRenderer {
                 shader.apply();
                 PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
                 bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
+                countStormFieldBuild(weather, materialOffsetX, materialOffsetZ);
                 RAIN_FIELD_TIMER.begin();
                 try {
                     FullscreenQuad.draw(shader);
@@ -883,7 +914,16 @@ public final class VolumetricCloudRenderer {
                 && !StormMaterialRuntimeTrace.active()
                 && !VolumetricCloudDebugConfig.t098LegacyHitDepth()
                 && !VolumetricCloudDebugConfig.t098LegacyFinePromotion()
-                && !VolumetricCloudDebugConfig.t136ConstantLighting();
+                && !VolumetricCloudDebugConfig.t136ConstantLighting()
+                // T199. The field rows of leanFinalConstants: consumer bits
+                // 11 and the audit selectors 0 (the grid, 256, has no runtime
+                // state since T199h). A campaign that moves the monolith off
+                // production's lookup or takes an audit capture is uploading
+                // a value FINAL has baked differently and takes the monolith.
+                && VolumetricCloudDebugConfig.stormFieldForcedOnMonolith()
+                        == StormFieldGeometry.PRODUCTION_CONSUMER_BITS
+                && VolumetricCloudDebugConfig.lightAuditVariant() == 0
+                && VolumetricCloudDebugConfig.lightAuditOutput() == 0;
     }
 
     /**
@@ -1015,7 +1055,52 @@ public final class VolumetricCloudRenderer {
         GL20.glUniform1i(location, unit);
     }
 
-    /** T196. Programs that build the field this frame. */
+    /**
+     * T196. Programs that build the field this frame: every program whose
+     * consumer bits are baked (T199: FINAL and its lean variants), plus the
+     * monolith whenever its uploaded bits are non-zero - production's by
+     * default, a campaign's override otherwise.
+     */
+    /** T199e. Count-only, see the field declarations; never skips a build. */
+    private static void countStormFieldBuild(
+            CloudWeatherMapRenderer.Result weather, float materialOffsetX, float materialOffsetZ) {
+        long descriptors = PuffLobeSpatialIndex.descriptorSignatureForDiagnostics() * 31L
+                + PuffLobeSpatialIndex.candidateSignatureForDiagnostics();
+        long signature = descriptors;
+        signature = signature * 31L + CloudWeatherMapRenderer.cacheMisses();
+        signature = signature * 31L + Double.doubleToLongBits(weather.originX());
+        signature = signature * 31L + Double.doubleToLongBits(weather.originZ());
+        signature = signature * 31L + Float.floatToIntBits(weather.slabBaseY());
+        signature = signature * 31L + Float.floatToIntBits(materialOffsetX);
+        signature = signature * 31L + Float.floatToIntBits(materialOffsetZ);
+        stormFieldBuilds++;
+        if (stormFieldInputSignatureValid) {
+            if (signature == stormFieldInputSignature) {
+                stormFieldBuildsInputsUnchanged++;
+            }
+            if (descriptors == lastStormFieldDescriptorSignature) {
+                stormFieldBuildsDescriptorsUnchanged++;
+            }
+        }
+        stormFieldInputSignature = signature;
+        lastStormFieldDescriptorSignature = descriptors;
+        stormFieldInputSignatureValid = true;
+    }
+
+    /** T199e. {@code builds=.. unchangedInputs=.. unchangedDescriptors=..} since the last reset. */
+    public static String stormFieldRebuildStatus() {
+        return "builds=" + stormFieldBuilds
+                + " unchangedInputs=" + stormFieldBuildsInputsUnchanged
+                + " unchangedDescriptors=" + stormFieldBuildsDescriptorsUnchanged;
+    }
+
+    public static void resetStormFieldRebuildCounters() {
+        stormFieldBuilds = 0L;
+        stormFieldBuildsInputsUnchanged = 0L;
+        stormFieldBuildsDescriptorsUnchanged = 0L;
+        stormFieldInputSignatureValid = false;
+    }
+
     private static boolean stormFieldProgram(CoreCostDiagnosticProgram program) {
         return program.stormFieldGeneration()
                 || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH

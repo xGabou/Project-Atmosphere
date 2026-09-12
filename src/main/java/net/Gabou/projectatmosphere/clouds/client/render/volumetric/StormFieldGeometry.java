@@ -18,6 +18,16 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 public final class StormFieldGeometry {
     /** T196's grid, and the value FINAL bakes. */
     public static final int DEFAULT_XZ = 256;
+    /**
+     * T199. The consumers production reads, as {@code PaStormFieldEnabled}
+     * bits: 1 the light cone, 2 the empty-span probe, 8 the T198 exact-noise
+     * tap (the cone interpolates the node's threshold and height and
+     * evaluates the base noise, the detail and the erosion itself). FINAL
+     * bakes this value, the monolith uploads it unless a campaign overrides
+     * it, and every program specialized from FINAL inherits it. Bit 4, the
+     * T196 hybrid, is dead at this value.
+     */
+    public static final int PRODUCTION_CONSUMER_BITS = 1 | 2 | 8;
     /** Vertical slices. T197 varies XZ only. */
     public static final int Y = 32;
     public static final int TILES_X = 8;

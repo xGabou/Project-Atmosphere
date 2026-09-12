@@ -267,12 +267,12 @@ public final class StormCampaignRegistry {
             new Campaign("T196", "t196-shared-field.txt",
                     "sharedFieldRunRequested", "t196Run",
                     "T196_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
-            new Campaign("T197", "t197-shared-field-resolution.txt",
-                    "sharedFieldResolutionRunRequested", "t197Run",
-                    "T197_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
             new Campaign("T198", "t198-light-field-bias.txt",
                     "lightFieldBiasRunRequested", "t198Run",
-                    "T198_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "T198_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            new Campaign("T199", "t199-shared-field-final.txt",
+                    "sharedFieldFinalRunRequested", "t199Run",
+                    "T199_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.
