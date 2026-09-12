@@ -1037,6 +1037,32 @@ def leanProgramVariants = [
                      'uniform int PaStormFieldPass;':
                      'const int PaStormFieldPass = 0;']],
 
+        // T201. Time attribution of the field FINAL at 0.25: each arm is
+        // FINAL's specialization (the field built and read, bits 11) with one
+        // non-rain consumer compiled out, so its delta against the FINAL
+        // anchor is that consumer in milliseconds. t176_nolight,
+        // t181_norefine, t180_noprobe and t175_density_every2 already carry
+        // the same specialization and are reused; these four are the ones no
+        // existing arm removes cleanly (t166_nodetail predates the T174
+        // precompute and is not comparable).
+        [name: 'cloud_atmosphere_volume_t201_nodetail',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_NO_DETAIL 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t201_primary_field',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_PRIMARY_FIELD_DENSITY 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t201_norain_shaft',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_NO_RAIN_SHAFT 1'],
+         keepUniforms: []],
+        // The two expected largest together, measured rather than multiplied.
+        [name: 'cloud_atmosphere_volume_t201_primary_norefine',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_PRIMARY_FIELD_DENSITY 1', 'PA_ARM_NO_REFINE 1'],
+         keepUniforms: []],
+
         // T192. The closed-form ownership bound as classification triage.
         // Three arms only, and the campaign-scoped loading T191 added means
         // they cost nothing on an ordinary startup.

@@ -722,7 +722,24 @@ public enum CoreCostDiagnosticProgram {
     // -----------------------------------------------------------------------
 
     /** T199: FINAL without the field, the reference for every FINAL-with-field number. */
-    T199_FINAL_NOFIELD("t199_final_nofield");
+    T199_FINAL_NOFIELD("t199_final_nofield"),
+
+    // -----------------------------------------------------------------------
+    // T201. Time attribution of the field FINAL at 0.25. Each arm is FINAL
+    // with one non-rain consumer compiled out; its delta against the FINAL
+    // anchor is that consumer's milliseconds. Reused beside these:
+    // T176_NO_LIGHT, T181_NO_REFINE, T180_NO_PROBE, T175_DENSITY_EVERY2 and
+    // the T166 fixed-work ladder.
+    // -----------------------------------------------------------------------
+
+    /** T201: detail noise off everywhere, on the current specialization. */
+    T201_NO_DETAIL("t201_nodetail"),
+    /** T201: the primary body density read from the field's A channel instead of evaluated. */
+    T201_PRIMARY_FIELD("t201_primary_field"),
+    /** T201: the rain shaft's Gauss samples off; the segment test stays. */
+    T201_NO_RAIN_SHAFT("t201_norain_shaft"),
+    /** T201: primary from the field and no refinement together - the combined ceiling. */
+    T201_PRIMARY_NO_REFINE("t201_primary_norefine");
 
 
     private final String serializedName;

@@ -5215,6 +5215,12 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
 }
 
 float rainShaftDensityOverSegment(vec3 segmentStart, vec3 segmentEnd, float mipBias) {
+#ifdef PA_ARM_NO_RAIN_SHAFT
+    // T201 ceiling. The shaft's two Gauss samples a segment are the one
+    // rain-family cost the attribution prices on its own; the segment test
+    // that gates them stays. Visually invalid, never a candidate.
+    return 0.0;
+#endif
     // Fixed Gauss points integrate the broad shaft on coarse body steps. They
     // are world/ray anchored and never depend on FrameIndex or blue-noise
     // jitter, eliminating dotted screen-space curtains and shimmer.
@@ -8697,6 +8703,14 @@ void main() {
             bodyDensity = primaryHeldDensity;
         }
         primaryStepParity++;
+#elif defined(PA_ARM_PRIMARY_FIELD_DENSITY)
+        // T201 ceiling. The primary body density is the shared field's own
+        // node density (A, the detail-free T196 value, one trilinear read)
+        // instead of the exact evaluation, so the march keeps its structure -
+        // steps, early-outs, the lighting spawned from occupied samples - and
+        // the delta prices the exact primary evaluation alone. Visually
+        // invalid (a 16-block node is not the body), never a candidate.
+        float bodyDensity = paStormFieldDensityAt(p);
 #else
         float bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
 #endif

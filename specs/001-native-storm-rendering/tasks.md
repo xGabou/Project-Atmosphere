@@ -3196,6 +3196,50 @@ implementation, while visual polish remains independently active.
   history validation, and the total can plausibly approach 8-10 ms; otherwise the next task is a
   fresh profile of the largest non-rain structural consumer. Evidence in
   `validation/performance-pixel-scaling.md` and `validation/t200-campaign/`. [SC-005, SC-021]
+- [X] T201 [PERFORMANCE] [US3] FINAL time attribution at 0.25 and next-target selection.
+  **Done: the non-rain structural budget is 3.8 / 4.0 ms in total, the 6-8 ms class is not
+  reachable inside scope, and temporal stays paused.** Local controls (46 anchors a pose): SIDE
+  ray 12.98 / field 1.84 / combined 14.82 ms; PLAY_VIS_NEAR 12.35 / 1.96 / 14.31. Ceilings (delta
+  ms, paired, all blocks accepted): primary body density **1.85 / 1.94** (`t201_primary_field`,
+  the field's A channel in place of the exact evaluation), refinement 0.86 / 0.98, detail 0.80 /
+  0.75, light cone 0.27 / 0.31 (the field made it 2% of the ray), probe scan **-0.63 / -1.38** (a
+  saving; stays), every-2nd-step hold -3.9 (not a ceiling); primary + refinement together **2.62
+  / 2.70** (measured, sub-additive); the rain shaft, measured because asked, **2.49 / 2.46** - the
+  largest single consumer priced, and rain-family. Field build 1.84 / 1.96 ms of which the
+  empty-sky atlas is 0.54 and node work 1.3-1.4. Primary audit (T199 bits-11 counters + the T166
+  ladder): 32.8 steps, 6.5 density calls (50.6% zero), 27 shape calls, 202 lobe visits, 164 SDF
+  evaluations a pixel; a production call costs 2.2 ns against 0.27 ns for one coherent
+  evaluation - **the dominant primary cost is the per-call descriptor traversal**, not the noise.
+  Probe consequence bound 0.94-1.19 ms -> **tighter floor closed for this pass**. Ranking: #1
+  primary traversal (<= 1.9 ms, secondary band), #2 refinement (<= 1.0), pair 2.6-2.7 (strong
+  only together). Decision: T202 = primary per-call traversal (with refinement), realistic 1.0-1.5
+  ms, raw 0.25 after it ~13.5 ms; temporal reopen after it **NO** - every non-rain consumer at
+  zero still leaves 11.0 / 10.4 ms, and the 6.7 ms residual is the rain segment test, march
+  control and composition. The rain constraint is now the binding one; the cheapest next fact is
+  one `t182_norainseg` arm timed the same way (a measurement). Four campaign-scoped variants and
+  two `#ifdef`-only hooks added; campaignGate and check build PASS. Evidence in
+  `validation/performance-time-attribution.md` and `validation/t201-campaign/`. Original brief:
+  Measurement only - no temporal, rain, field-resolution, light-quality, probe-floor or
+  architecture change. T200 showed the per-pixel cost, not the pixel count, is the blocker, and
+  T199's call shares cannot rank consumers by milliseconds. Campaign `T201`
+  (`run/t201-time-attribution.txt`, `timeAttributionRunRequested`, `t201Run`, `T201_ARMS`,
+  `T201_OPTIMIZATION_ARMS`, no image arms) at SIDE and PLAY_VIS_NEAR, 0.25 only: FINAL anchors
+  bracket, three repeats, one arm per non-rain consumer compiled out of FINAL's own
+  specialization - reused where an existing arm removes exactly one consumer on the current
+  specialization (`t176_nolight`, `t181_norefine`, `t180_noprobe`, `t175_density_every2`; the
+  T166 no-detail/no-light arms predate the T174 precompute and are not comparable) and new
+  where none does (`t201_primary_field`: the primary body density read from the field's A
+  channel, `PA_ARM_PRIMARY_FIELD_DENSITY`; `t201_nodetail`; `t201_norain_shaft`,
+  `PA_ARM_NO_RAIN_SHAFT`; `t201_primary_norefine`, the two expected largest together, measured
+  not multiplied), plus the `lean_final@d0` empty-sky build and the T166 fixed-work ladder for
+  the per-class cost of one evaluation. `buildT201Report()` prints per consumer control ray ms,
+  removed ray ms, delta ms (the ranking metric), paired ratio and spread, the field build, and
+  the ladder's per-rung deltas. The report also audits the primary march from the counters
+  (steps, density calls, group walks, exact SDFs, detail per pixel), bounds the false-occupied
+  probe consequence in ms (primaryDensityZero / primaryDensityCalls x the primary delta), and
+  selects the next architecture by removable ms (>= 4 major, 2-4 strong, 1-2 secondary, < 1 no
+  campaign). Evidence in `validation/performance-time-attribution.md` and
+  `validation/t201-campaign/`. [SC-005, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
