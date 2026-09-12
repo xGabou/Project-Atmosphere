@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 55;
+    private static final int STAGES = 56;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -145,6 +145,7 @@ final class StormWorkloadRuntimeCapture {
             case 52 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_E;
             case 53 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_F;
             case 54 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_G;
+            case 55 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_SHAFT_LANES;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -185,6 +186,13 @@ final class StormWorkloadRuntimeCapture {
             request.values[request.stage][1] = second;
             request.values[request.stage][2] = third;
             request.values[request.stage][3] = fourth;
+            if (view() == VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_SHAFT_LANES) {
+                // T204. The per-pixel image is censused here, before the
+                // sums replace it: the R channel is the true segment tests
+                // of that pixel, and the tiles are the warp shapes a
+                // fragment shader is likely scheduled in.
+                request.shaftLanes = ShaftLanes.census(pixels, target.width, target.height);
+            }
             request.width = target.width;
             request.height = target.height;
             request.stage++;
@@ -221,6 +229,7 @@ final class StormWorkloadRuntimeCapture {
         private int stage;
         private int width;
         private int height;
+        private ShaftLanes shaftLanes = ShaftLanes.ZERO;
 
         private Request(String view, long token) {
             this.view = view;
@@ -275,7 +284,99 @@ final class StormWorkloadRuntimeCapture {
                     FieldCertainty.of(values[42], values[43]),
                     StormField.of(values[44], values[45], values[46], values[47]),
                     RainGate.of(values[48], values[49], values[50], values[51], values[52],
-                            values[53], values[54]));
+                            values[53], values[54]),
+                    shaftLanes.withCounters(values[55][0], values[55][1], values[55][2]));
+        }
+    }
+
+    /**
+     * T204. The shaft path's spatial census, computed on the CPU from the
+     * per-pixel view 78: pixels whose march found any true segment test,
+     * and the 8x4, 4x8 and 16x16 tiles with any such pixel and with every
+     * pixel such. A warp whose lanes hold one positive pixel runs the shaft
+     * path for all 32; the tile fraction with any positive is the
+     * any-lane rate, and the all-positive fraction is how coherent the
+     * work is where it happens.
+     */
+    record ShaftLanes(
+            double trueSegments,
+            double samples,
+            double positiveSegments,
+            double positivePixels,
+            double tiles8x4, double tiles8x4Any, double tiles8x4All,
+            double tiles4x8Any, double tiles4x8All,
+            double tiles16x16, double tiles16x16Any,
+            double maxPerPixel
+    ) {
+        static final ShaftLanes ZERO = new ShaftLanes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        ShaftLanes withCounters(double segments, double shaftSamples, double positives) {
+            return new ShaftLanes(segments, shaftSamples, positives, positivePixels,
+                    tiles8x4, tiles8x4Any, tiles8x4All, tiles4x8Any, tiles4x8All,
+                    tiles16x16, tiles16x16Any, maxPerPixel);
+        }
+
+        static ShaftLanes census(FloatBuffer pixels, int width, int height) {
+            double positive = 0.0D;
+            double max = 0.0D;
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    float v = pixels.get((y * width + x) * 4);
+                    positive += v > 0.0F ? 1.0D : 0.0D;
+                    max = Math.max(max, v);
+                }
+            }
+            double[] t84 = tiles(pixels, width, height, 8, 4);
+            double[] t48 = tiles(pixels, width, height, 4, 8);
+            double[] t16 = tiles(pixels, width, height, 16, 16);
+            return new ShaftLanes(0.0D, 0.0D, 0.0D, positive, t84[0], t84[1], t84[2],
+                    t48[1], t48[2], t16[0], t16[1], max);
+        }
+
+        /** {count, any-positive, all-positive} over tiles of the given shape. */
+        private static double[] tiles(FloatBuffer pixels, int width, int height,
+                int tileW, int tileH) {
+            double count = 0.0D;
+            double any = 0.0D;
+            double all = 0.0D;
+            for (int ty = 0; ty < height; ty += tileH) {
+                for (int tx = 0; tx < width; tx += tileW) {
+                    boolean anyPositive = false;
+                    boolean allPositive = true;
+                    for (int y = ty; y < Math.min(ty + tileH, height); y++) {
+                        for (int x = tx; x < Math.min(tx + tileW, width); x++) {
+                            boolean p = pixels.get((y * width + x) * 4) > 0.0F;
+                            anyPositive |= p;
+                            allPositive &= p;
+                        }
+                    }
+                    count++;
+                    any += anyPositive ? 1.0D : 0.0D;
+                    all += allPositive ? 1.0D : 0.0D;
+                }
+            }
+            return new double[] {count, any, all};
+        }
+
+        String format() {
+            return " shaftTrueSegments=" + fmt(trueSegments)
+                    + " shaftSamples=" + fmt(samples)
+                    + " shaftPositiveSegments=" + fmt(positiveSegments)
+                    + " shaftPositivePixels=" + fmt(positivePixels)
+                    + " shaftTiles8x4=" + fmt(tiles8x4)
+                    + " shaftTiles8x4Any=" + fmt(tiles8x4Any)
+                    + " shaftTiles8x4All=" + fmt(tiles8x4All)
+                    + " shaftTiles4x8Any=" + fmt(tiles4x8Any)
+                    + " shaftTiles4x8All=" + fmt(tiles4x8All)
+                    + " shaftTiles16x16=" + fmt(tiles16x16)
+                    + " shaftTiles16x16Any=" + fmt(tiles16x16Any)
+                    + " shaftAnyLaneFraction8x4=" + String.format(Locale.ROOT, "%.4f",
+                            tiles8x4Any / Math.max(1.0D, tiles8x4))
+                    + " shaftAllLaneFraction8x4=" + String.format(Locale.ROOT, "%.4f",
+                            tiles8x4All / Math.max(1.0D, tiles8x4))
+                    + " shaftAnyLaneFraction16x16=" + String.format(Locale.ROOT, "%.4f",
+                            tiles16x16Any / Math.max(1.0D, tiles16x16))
+                    + " shaftMaxTrueSegmentsPerPixel=" + fmt(maxPerPixel);
         }
     }
 
@@ -512,7 +613,11 @@ final class StormWorkloadRuntimeCapture {
             // T196. The shared storm field's audit, build cost and fetches.
             StormField stormField,
             // T203. The rain gate's walk classes, census, oracle and build cost.
-            RainGate rainGate
+            RainGate rainGate,
+            // T204. The shaft path's counters and the CPU's warp-tile
+            // census of view 78, grouped: the record is at the 255-slot
+            // ceiling.
+            ShaftLanes shaftLanes
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -567,7 +672,7 @@ final class StormWorkloadRuntimeCapture {
                     // T190 certainty census, likewise absent.
                     FieldCertainty.ZERO,
                     // T196 storm field, likewise absent.
-                    StormField.ZERO, RainGate.ZERO);
+                    StormField.ZERO, RainGate.ZERO, ShaftLanes.ZERO);
         }
 
         private static String ratio(double numerator, double denominator) {
@@ -1011,7 +1116,10 @@ final class StormWorkloadRuntimeCapture {
                     + " rainGateCellLobeVisits=" + fmt(rainGate.cellLobeVisits())
                     + " rainGateCellExactSdf=" + fmt(rainGate.cellExactSdf())
                     + " rainGateCellShapeCallsPerPixel=" + perPixel(rainGate.cellShapeCalls())
-                    + " rainGateCellExactSdfPerPixel=" + perPixel(rainGate.cellExactSdf());
+                    + " rainGateCellExactSdfPerPixel=" + perPixel(rainGate.cellExactSdf())
+                    // T204. The shaft path and its spatial census.
+                    + " shaftPositivePixelFraction=" + perPixel(shaftLanes.positivePixels())
+                    + shaftLanes.format();
         }
 
         double oraclePostOpacityDistance() {

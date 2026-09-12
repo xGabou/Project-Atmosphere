@@ -3327,6 +3327,33 @@ implementation, while visual polish remains independently active.
   `safeGetUniform().set()` is a silent no-op; a build pass belongs in its own program.
   Evidence in `validation/performance-rain-gate.md` and `validation/t203-campaign/`.
   [SC-005, SC-021]
+- [X] T204 [PERFORMANCE] [US3] Rain shaft codegen / divergence attribution. Why the shaft path
+  costs 2.5-3.2 ms for 132k walks. Campaign `T204` (`run/t204-shaft-attribution.txt`,
+  `shaftAttributionRunRequested`, `t204Run`, `T204_ARMS`, `T204_OPTIMIZATION_ARMS`, no image
+  arms) at SIDE and PLAY_VIS_NEAR, 0.25, 15 anchors a pose: the shaft compiled out
+  (`t201_norain_shaft`) x3, compiled in but gated off by a live uniform uploaded 0
+  (`t204_shaft_runtime_false`, `PA_ARM_SHAFT_RUNTIME_FALSE` on `PaDiagnosticEvalEpsilon`) x3,
+  three chunk arms (`t204_shaft_no_walk`, `_no_noise`, `_walk_only`), the family reference
+  (`t182_norainseg`), and the T203 skeleton with the shaft out / runtime-false
+  (`t204_skeleton_*`) beside `t203_gate_reject_all` / `_no_fallback`; a per-pixel shaft view
+  (78, `STORM_WORKLOAD_RAIN_SHAFT_LANES`) the capture censuses in 8x4 / 4x8 / 16x16 tiles on the
+  CPU (`ShaftLanes`) for the any-lane estimate no `#version 150` program can take with subgroup
+  ops; program binary sizes logged at link (`T204_PROGRAM_BINARY`, `GL_PROGRAM_BINARY_LENGTH`).
+  RESULT: shaft ceiling **2.72 / 2.85 ms** (ratios 1.28 / 1.30); runtime-false **1.65 / 1.84**
+  -> **code presence 1.0 ms, execution 1.7-1.8 ms**; the no-walk arm recovers 2.64 / 2.57 -
+  **the shaft is its four inlined column walks** (42 of its 57 KB; FINAL 302.6 KB, shaft out
+  245.6, family out 225.9 - the rain family is 25% of the program), the noise fetch, setup math
+  and composition measure zero. Divergence is not the mechanism: positive pixels 1.75% / 0.64%,
+  8x4 tiles with any positive lane 3.0% / 1.8% at 58% / 36% lane occupancy - clustered - but
+  each active lane runs 67-105 full storm walks. Skeleton: the repeated call/loop alone ~1.0 ms
+  (one block), shaft presence +0.5, gate fetch +0.46. DECISION: dominant mechanism = the shaft's
+  walks (execution + inlined presence); removable ~2.6 ms; next architecture = a separate rain
+  pass fed by the cloud pass's rain intervals and the segment test's column values (the shaft's
+  first sample is the test's own Gauss point), compositing against the cloud's exported
+  transmittance is the quality risk; expected 2.0-2.6 ms, 3.5-5.0 with the whole family moved;
+  temporal after it: NO on the shaft alone (~11.8 raw), borderline-NO with the family moved
+  (~9). One launch (5 min), campaignGate x3, check build PASS. Evidence in
+  `validation/performance-shaft-attribution.md` and `validation/t204-campaign/`. [SC-005, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

@@ -1163,6 +1163,39 @@ def leanProgramVariants = [
          keepUniforms: ['PaStormFieldPass'],
          overrides   : ['uniform int PaRainGateField;':
                                 'const int PaRainGateField = 1;']],
+        // T204. The shaft path's attribution. FINAL's specialization with one
+        // shaft chunk removed or gated; the runtime-false arm keeps
+        // PaDiagnosticEvalEpsilon live (uploaded 0) so the compiler cannot
+        // fold the call away. The skeleton arms are the T203 reject-all gate
+        // program with the shaft compiled out or runtime-false.
+        [name        : 'cloud_atmosphere_volume_t204_shaft_runtime_false',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_SHAFT_RUNTIME_FALSE 1'],
+         keepUniforms: ['PaDiagnosticEvalEpsilon']],
+        [name        : 'cloud_atmosphere_volume_t204_shaft_no_walk',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_SHAFT_NO_WALK 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t204_shaft_no_noise',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_SHAFT_NO_NOISE 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t204_shaft_walk_only',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_SHAFT_WALK_ONLY 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t204_skeleton_shaft_out',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_GATE_REJECT_ALL 1', 'PA_ARM_NO_RAIN_SHAFT 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        [name        : 'cloud_atmosphere_volume_t204_skeleton_runtime_false',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_GATE_REJECT_ALL 1', 'PA_ARM_SHAFT_RUNTIME_FALSE 1'],
+         keepUniforms: ['PaStormFieldPass', 'PaDiagnosticEvalEpsilon'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
         // The build program: FINAL's specialization with the rain-field pass
         // and the gate baked on, so main returns from the build branch and
         // the march is dead code. It receives the ray program's uniforms and

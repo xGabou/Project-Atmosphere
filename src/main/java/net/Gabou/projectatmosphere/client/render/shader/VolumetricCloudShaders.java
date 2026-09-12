@@ -70,7 +70,10 @@ public final class VolumetricCloudShaders {
                         event.getResourceProvider(), CUMULUS_LAYER_SPLAT_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> cumulusLayerSplatShader = loaded);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), VOLUME_ID, DefaultVertexFormat.POSITION_TEX),
-                loaded -> volumeShader = loaded);
+                loaded -> {
+                    volumeShader = loaded;
+                    logProgramBinarySize("diagnostic_monolith", loaded);
+                });
         // Registered defensively. If the generated program is missing or fails
         // to compile, that must not abort the registration of the other cloud
         // programs: the renderer's own guard then refuses to draw FINAL with
@@ -81,7 +84,10 @@ public final class VolumetricCloudShaders {
             event.registerShader(new ShaderInstance(
                             event.getResourceProvider(), LEAN_FINAL_VOLUME_ID,
                             DefaultVertexFormat.POSITION_TEX),
-                    loaded -> leanFinalVolumeShader = loaded);
+                    loaded -> {
+                        leanFinalVolumeShader = loaded;
+                        logProgramBinarySize("lean_final", loaded);
+                    });
             diagnosticVolumeShaders.clear();
             // T191. Campaign arms are loaded only while their campaign is
             // armed. Every arm ever measured used to be compiled and linked on
@@ -203,11 +209,34 @@ public final class VolumetricCloudShaders {
             event.registerShader(
                     new ShaderInstance(event.getResourceProvider(), id,
                             DefaultVertexFormat.POSITION_TEX),
-                    loaded -> diagnosticVolumeShaders.put(program, loaded));
+                    loaded -> {
+                        diagnosticVolumeShaders.put(program, loaded);
+                        logProgramBinarySize(program.serializedName(), loaded);
+                    });
         } catch (IOException | RuntimeException failure) {
             ProjectAtmosphere.LOGGER.error(
                     "[VolumetricClouds] diagnostic program {} failed to load",
                     id, failure);
+        }
+    }
+
+    /**
+     * T204. The linked program's binary length (ARB_get_program_binary), the
+     * one compiler characteristic the driver exposes without vendor tooling:
+     * on NVIDIA the binary carries the assembled machine code, so its size
+     * tracks the instruction count. Logged once per program at link time,
+     * so a campaign's arms can be compared for code presence.
+     */
+    private static void logProgramBinarySize(String name, ShaderInstance shader) {
+        try {
+            if (!org.lwjgl.opengl.GL.getCapabilities().GL_ARB_get_program_binary) {
+                return;
+            }
+            int bytes = org.lwjgl.opengl.GL41.glGetProgrami(shader.getId(),
+                    org.lwjgl.opengl.GL41.GL_PROGRAM_BINARY_LENGTH);
+            ProjectAtmosphere.LOGGER.info("T204_PROGRAM_BINARY program={} bytes={}", name, bytes);
+        } catch (RuntimeException failure) {
+            ProjectAtmosphere.LOGGER.debug("program binary length unavailable for {}", name, failure);
         }
     }
 

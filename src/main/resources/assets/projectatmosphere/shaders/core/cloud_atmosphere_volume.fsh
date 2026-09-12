@@ -650,6 +650,15 @@ int paRainGateFallbackSupported = 0;
  */
 bool paLastRainHasLocalBase = false;
 float paLastRainCoverage = 0.0;
+/**
+ * T204. The shaft path per pixel: samples rainShaftDensityAt evaluated, and
+ * the segments whose shaft returned a positive density. View 78 emits them
+ * per pixel and the capture measures their spatial clustering in
+ * warp-shaped tiles on the CPU - the any-lane estimate a #version 150
+ * program cannot take with subgroup operations.
+ */
+int paRainShaftSamples = 0;
+int paRainShaftPositiveSegments = 0;
 #ifdef PA_LIGHT_AUDIT
 // T198 Task 1. Per-tap accumulators over every light tap this pixel's march
 // evaluates: signed error (field - exact), its magnitude and square, the
@@ -1095,7 +1104,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 77);
+        || (DebugView >= 28 && DebugView <= 78);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -5581,12 +5590,26 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
         return 0.0;
     }
 
+    if (paWorkloadCaptureActive()) {
+        paRainShaftSamples++;
+    }
     float localBaseY;
     float localPrecipitation;
     float localFamilyStrength;
     vec4 localWeather;
     vec4 localMorphology;
     paDensityConsumer = 7;
+#ifdef PA_ARM_SHAFT_NO_WALK
+    // T204 chunk D. The shaft's two column walks replaced by constants the
+    // rest of the path can run on: what the descriptor walks cost inside
+    // the shaft. Image-invalid; a bound.
+    float preliminarySupport = 0.5;
+    localBaseY = p.y + 40.0;
+    localPrecipitation = MaxPrecipitation;
+    localFamilyStrength = 1.0;
+    localWeather = vec4(0.3);
+    localMorphology = vec4(0.3);
+#else
     float preliminarySupport = localRainSupportAt(
         p.xz,
         localBaseY,
@@ -5595,6 +5618,7 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
         localWeather,
         localMorphology
     );
+#endif
     if (preliminarySupport <= 0.01 || p.y >= localBaseY) {
         paDensityConsumer = 0;
         return 0.0;
@@ -5608,13 +5632,27 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
     float familyStrength;
     vec4 weather;
     vec4 morphology;
+#ifdef PA_ARM_SHAFT_NO_WALK
+    float localSupport = 0.5;
+    baseY = localBaseY;
+    precipitation = MaxPrecipitation;
+    familyStrength = 1.0;
+    weather = vec4(0.3);
+    morphology = vec4(0.3);
+#else
     float localSupport = localRainSupportAt(
         sourceXZ, baseY, precipitation, familyStrength, weather, morphology
     );
+#endif
     paDensityConsumer = 0;
     if (localSupport <= 0.01 || precipitation <= 0.02 || p.y >= baseY) {
         return 0.0;
     }
+#ifdef PA_ARM_SHAFT_WALK_ONLY
+    // T204 chunks B+C-D: the walks kept, the setup math, the noise fetch
+    // and the composition dropped. Image-invalid; a bound.
+    return localSupport * 0.05;
+#endif
 
     float condensate = saturate(
         localSupport * 0.36 + weather.a * 0.28 + precipitation * 0.24 + morphology.b * 0.12
@@ -5636,7 +5674,13 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
         p.y * 0.0014 - WorldTime * 0.0015,
         dot(sourceXZ, windDir) * 0.0035
     );
+#ifdef PA_ARM_SHAFT_NO_NOISE
+    // T204: the shaft's 3D noise fetch replaced by a constant that keeps
+    // the streak arithmetic live. Image-invalid; a bound.
+    vec4 rainNoise = vec4(0.6, 0.5, 0.5, 0.5) + vec4(rainDomain.x, rainDomain.y, rainDomain.z, 0.0) * 1.0e-6;
+#else
     vec4 rainNoise = texture(DetailNoiseSampler, rainDomain, mipBias + 0.75);
+#endif
     // R is the coherent low-frequency Worley channel; G/B only roughen real
     // columns.  The previous weighted average plus a 2% floor gave every
     // precipitating texel non-zero density, producing a horizon-wide curtain.
@@ -5665,6 +5709,9 @@ float rainShaftDensityOverSegment(vec3 segmentStart, vec3 segmentEnd, float mipB
     const float SECOND_SAMPLE = 0.7886751346;
     float first = rainShaftDensityAt(mix(segmentStart, segmentEnd, FIRST_SAMPLE), mipBias);
     float second = rainShaftDensityAt(mix(segmentStart, segmentEnd, SECOND_SAMPLE), mipBias);
+    if (paWorkloadCaptureActive()) {
+        paRainShaftPositiveSegments += (first + second) > 0.0 ? 1 : 0;
+    }
     return (first + second) * 0.5;
 }
 
@@ -9486,9 +9533,19 @@ void main() {
         if (paWorkloadCaptureActive()) {
             paPrimaryPrevMaterial = paMaterialNow;
         }
+#ifdef PA_ARM_SHAFT_RUNTIME_FALSE
+        // T204 Task 3. The shaft compiled in full and never executed: the
+        // predicate is conjoined with a live uniform uploaded as zero, which
+        // the compiler cannot fold, so the code's presence is paid and its
+        // execution is not. Image-invalid (no rain); a bound.
+        float rainDensity = (localRainSegment && PaDiagnosticEvalEpsilon < -0.5)
+            ? rainShaftDensityOverSegment(p, segmentEnd, 0.0) * DensityMul
+            : 0.0;
+#else
         float rainDensity = localRainSegment
             ? rainShaftDensityOverSegment(p, segmentEnd, 0.0) * DensityMul
             : 0.0;
+#endif
         float density = bodyDensity + rainDensity;
 #ifdef PA_RAIN_MASK_OUTPUT
         {
@@ -10904,6 +10961,18 @@ void main() {
             paWindowViolations,
             paExcessAbove * 1000.0,
             paExcessBelow * 1000.0
+        );
+        return;
+    }
+    // T204. The shaft path per pixel, for the CPU's warp-tile census: true
+    // segment tests (the shaft's gate), shaft samples, positive segments.
+    if (DebugView == 78) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainSegTrueAt0 + paRainSegTrueAt1),
+            float(paRainShaftSamples),
+            float(paRainShaftPositiveSegments),
+            0.0
         );
         return;
     }

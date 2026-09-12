@@ -2838,6 +2838,133 @@ final class StormT132AutoDriver {
     }
 
     // -----------------------------------------------------------------------
+    // T204. Why the shaft path costs 2.5-3.2 ms for 132k walks. Attribution
+    // only: FINAL's ray against the shaft compiled out (T201's arm), the
+    // shaft compiled in but gated off by a live uniform (code presence
+    // against execution), three chunk arms (walks, noise, walks-only), the
+    // whole-family reference, and the T203 skeleton arms with the shaft out
+    // and runtime-false. One counter capture a pose at production's bits,
+    // where view 78 emits the shaft path per pixel and the capture censuses
+    // it in warp-shaped tiles for the any-lane estimate.
+    // -----------------------------------------------------------------------
+
+    private static final Path T204_MARKER = Path.of("t204-shaft-attribution.txt");
+
+    private static final String[] T204_POSES = {"SIDE", "PLAY_VIS_NEAR"};
+
+    private static boolean t204Run;
+    private static boolean t204OriginalHistoryEnabled;
+
+    private static final T201Consumer[] T204_CONSUMERS = {
+            new T201Consumer(CoreCostDiagnosticProgram.T201_NO_RAIN_SHAFT, "shaftCompiledOut"),
+            new T201Consumer(CoreCostDiagnosticProgram.T204_SHAFT_RUNTIME_FALSE, "shaftRuntimeFalse"),
+            new T201Consumer(CoreCostDiagnosticProgram.T204_SHAFT_NO_WALK, "shaftNoWalk"),
+            new T201Consumer(CoreCostDiagnosticProgram.T204_SHAFT_NO_NOISE, "shaftNoNoise"),
+            new T201Consumer(CoreCostDiagnosticProgram.T204_SHAFT_WALK_ONLY, "shaftWalkOnly"),
+            new T201Consumer(CoreCostDiagnosticProgram.T182_NO_RAIN_SEGMENT, "familyOut(T182)"),
+            new T201Consumer(CoreCostDiagnosticProgram.T203_GATE_REJECT_ALL, "skeleton+shaftPresent"),
+            new T201Consumer(CoreCostDiagnosticProgram.T204_SKELETON_SHAFT_OUT, "skeleton+shaftOut"),
+            new T201Consumer(CoreCostDiagnosticProgram.T204_SKELETON_RUNTIME_FALSE, "skeleton+shaftRuntimeFalse"),
+            new T201Consumer(CoreCostDiagnosticProgram.T203_GATE_NO_FALLBACK, "skeleton+fetch"),
+    };
+
+    private static final T166Arm[] T204_ARMS = buildT204Arms();
+
+    private static T166Arm[] buildT204Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        // The two arms the decision turns on, three repeats each; the
+        // chunks and the skeleton once each.
+        for (int repeat = 1; repeat <= 3; repeat++) {
+            for (int i = 0; i < 2; i++) {
+                arms.add(new T166Arm(T204_CONSUMERS[i].program(), "r" + repeat, 60));
+                arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                        String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+            }
+        }
+        for (int i = 2; i < T204_CONSUMERS.length; i++) {
+            arms.add(new T166Arm(T204_CONSUMERS[i].program(), "r1", 60));
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                    String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t204Arm() {
+        return T204_ARMS[Math.max(0, Math.min(T204_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T204_OPTIMIZATION_ARMS =
+            buildT204OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT204OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T204_ARMS.length];
+        for (int i = 0; i < T204_ARMS.length; i++) {
+            modes[i] = T204_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /** T204 captures no images: every arm is a bound, image-invalid by construction. */
+    private static final CoreCostDiagnosticProgram[] T204_IMAGE_ARMS = {};
+
+    /** T204. The skeleton arms draw the gate with the build program. */
+    private static final CoreCostDiagnosticProgram[] T204_SUPPORT_PROGRAMS = {
+            CoreCostDiagnosticProgram.T203_GATE_BUILD
+    };
+
+    /** T204 marker predicate. */
+    private static boolean shaftAttributionRunRequested() {
+        return Files.exists(T204_MARKER);
+    }
+
+    private static String buildT204Report() {
+        StringBuilder out = new StringBuilder(buildBracketedPricingReport(
+                "T204", "T204_SHAFT_ATTRIBUTION_DECISION", T204_POSES, T204_ARMS,
+                T204_CONSUMERS[0].program()));
+        for (String pose : T204_POSES) {
+            for (T201Consumer consumer : T204_CONSUMERS) {
+                appendBracketedConsumer(out, "T204_CONSUMER", T204_ARMS, pose,
+                        consumer.consumer(), consumer.program().serializedName());
+            }
+            java.util.List<Double> ray = new java.util.ArrayList<>();
+            java.util.List<Double> rayP95 = new java.util.ArrayList<>();
+            java.util.List<Double> field = new java.util.ArrayList<>();
+            java.util.List<Double> fieldP95 = new java.util.ArrayList<>();
+            java.util.List<Double> combined = new java.util.ArrayList<>();
+            for (T166Arm arm : T204_ARMS) {
+                if (!t194IsAnchor(arm)) {
+                    continue;
+                }
+                StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
+                if (cell == null || cell.cloudP50() <= 0.0D) {
+                    continue;
+                }
+                ray.add(cell.cloudP50());
+                rayP95.add(cell.cloudP95());
+                field.add(Math.max(0.0D, cell.rainFieldP50()));
+                fieldP95.add(Math.max(0.0D, cell.rainFieldP95()));
+                combined.add(cell.cloudP50() + Math.max(0.0D, cell.rainFieldP50()));
+            }
+            T200Stat r = T200Stat.of(ray);
+            T200Stat r95 = T200Stat.of(rayP95);
+            T200Stat f = T200Stat.of(field);
+            T200Stat f95 = T200Stat.of(fieldP95);
+            T200Stat c = T200Stat.of(combined);
+            out.append(String.format(Locale.ROOT,
+                    "%nT204_BASELINE pose=%s anchors=%d fieldMs=%.4f fieldP95=%.4f rayMs=%.4f"
+                            + " rayP95=%.4f combinedMs=%.4f combinedMin=%.4f combinedMax=%.4f"
+                            + " raySpread=%.4f",
+                    pose, r.n(), f.mean(), f95.mean(), r.mean(), r95.mean(), c.mean(), c.min(),
+                    c.max(), r.spread()));
+        }
+        return out.toString();
+    }
+
+    // -----------------------------------------------------------------------
     // T202B. After T202: the fresh FINAL baseline at 0.25 (Task 10) and the
     // rain segment test's ceiling on that FINAL (Task 11) - measurement
     // only. The T182 arm removes rainSegmentMayContribute uniformly (the
@@ -4136,7 +4263,7 @@ final class StormT132AutoDriver {
                 || t184Run || t185Run || t186Run || t187Run || t188Run
                 || t189Run || t190Run || t192Run || t193Run || t194Run
                 || t195Run || t196Run || t198Run || t199Run || t200Run
-                || t201Run || t202Run || t202bRun || t203Run;
+                || t201Run || t202Run || t202bRun || t203Run || t204Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -4394,7 +4521,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t203Run ? t203Arm()
+            T166Arm arm = t204Run ? t204Arm()
+                    : t203Run ? t203Arm()
                     : t202bRun ? t202bArm()
                     : t202Run ? t202Arm()
                     : t201Run ? t201Arm()
@@ -4509,6 +4637,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t204Run) {
+            return t204Arm().label();
+        }
         if (t203Run) {
             return t203Arm().label();
         }
@@ -4645,6 +4776,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t204Run) {
+            return T204_OPTIMIZATION_ARMS;
+        }
         if (t203Run) {
             return T203_OPTIMIZATION_ARMS;
         }
@@ -4912,6 +5046,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t204Run) {
+            return T204_POSES;
+        }
         if (t203Run) {
             return T203_POSES;
         }
@@ -5443,6 +5580,8 @@ final class StormT132AutoDriver {
                 t203OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t203CounterPhase = 0;
                 VolumetricCloudDebugConfig.setRainGateForcedOnMonolith(false);
+                t204Run = shaftAttributionRunRequested();
+                t204OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 java.util.Arrays.fill(T202_AUDIT_CAPTURES, null);
                 // T188 Task 3 and Task 11. Counters come from the monolith, so
                 // the monolith has to be using the field for them to describe
@@ -5517,7 +5656,8 @@ final class StormT132AutoDriver {
                                 || t201Run
                                 || t202Run
                                 || t202bRun
-                                || t203Run;
+                                || t203Run
+                                || t204Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -5531,7 +5671,7 @@ final class StormT132AutoDriver {
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
                             && !t171Run && !t172Run && !t173Run && !t174Run
                             && !t175Run && !t176Run && !t177Run && !t178Run
-                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run && !t198Run && !t199Run && !t200Run && !t201Run && !t202Run && !t202bRun && !t203Run) {
+                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run && !t198Run && !t199Run && !t200Run && !t201Run && !t202Run && !t202bRun && !t203Run && !t204Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -5541,7 +5681,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t203Run ? "T203_RAIN_GATE"
+                            t204Run ? "T204_SHAFT_ATTRIBUTION"
+                                    : t203Run ? "T203_RAIN_GATE"
                                     : t202bRun ? "T202B_POST_BASELINE"
                                     : t202Run ? "T202_PRIMARY_TRAVERSAL"
                                     : t201Run ? "T201_TIME_ATTRIBUTION"
@@ -5924,7 +6065,8 @@ final class StormT132AutoDriver {
                         || (t201Run && t201Arm().program().fixedWork())
                         || (t202Run && t202Arm().program().fixedWork())
                         || (t202bRun && t202bArm().program().fixedWork())
-                        || (t203Run && t203Arm().program().fixedWork())) {
+                        || (t203Run && t203Arm().program().fixedWork())
+                        || (t204Run && t204Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -5995,6 +6137,13 @@ final class StormT132AutoDriver {
                         VolumetricCloudDebugConfig.setRainGateForcedOnMonolith(
                                 t203CounterPhase == 1);
                     }
+                    if (t204Run) {
+                        // Production's bits, the gate off: the shaft census
+                        // describes the shipping renderer.
+                        VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(
+                                StormFieldGeometry.PRODUCTION_CONSUMER_BITS);
+                        VolumetricCloudDebugConfig.setRainGateForcedOnMonolith(false);
+                    }
                     // The workload counters live behind debug views 22/23, which
                     // every lean and oracle program bakes off. Releasing the pin
                     // lets the capture link the diagnostic monolith, so the
@@ -6042,6 +6191,7 @@ final class StormT132AutoDriver {
                                     ? T202_COUNTER_LABELS[t202CounterPhase]
                                     : t203Run
                                     ? T203_COUNTER_LABELS[t203CounterPhase]
+                                    : t204Run ? "|final"
                                     : ""), line);
                     if (t199Run && t199CounterPhase == T199_COUNTER_BITS.length - 1) {
                         // T199. The production attribution is the share
@@ -6089,6 +6239,9 @@ final class StormT132AutoDriver {
                         if (t203Run) {
                             t203CounterPhase = 0;
                             VolumetricCloudDebugConfig.setRainGateForcedOnMonolith(false);
+                            VolumetricCloudDebugConfig.resetStormFieldMonolithBits();
+                        }
+                        if (t204Run) {
                             VolumetricCloudDebugConfig.resetStormFieldMonolithBits();
                         }
                     }
@@ -6196,6 +6349,15 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
                     VolumetricCloudDebugConfig.setHistoryEnabled(
                             t202bOriginalHistoryEnabled);
+                }
+                if (t204Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT204Report());
+                    VolumetricCloudDebugConfig.resetStormFieldMonolithBits();
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(
+                            t204OriginalHistoryEnabled);
                 }
                 if (t203Run) {
                     ProjectAtmosphere.LOGGER.info(buildT203Report());
@@ -6719,7 +6881,7 @@ final class StormT132AutoDriver {
         // T200 captures nothing: with an empty arm list the phase's done
         // sentinel (length * 2 + 1) never clears its own gate, so it is
         // skipped outright rather than entered.
-        if (programArmCampaign() && !t200Run && !t201Run && !t202bRun && t141ArmIndex == 0
+        if (programArmCampaign() && !t200Run && !t201Run && !t202bRun && !t204Run && t141ArmIndex == 0
                 && t166ImageStep < t166ImageArms().length * 2 + 2) {
             tickT166Images(pose);
             return;
@@ -7220,6 +7382,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t204Run) {
+            return T204_IMAGE_ARMS;
+        }
         if (t203Run) {
             return T203_IMAGE_ARMS;
         }

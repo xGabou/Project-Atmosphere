@@ -677,6 +677,61 @@ public final class StormVolumetricGeometrySandbox {
         runCorrected("T203 the rain gate rejects by proof or defers, its programs bake the gate"
                         + " and FINAL bakes it off",
                 StormVolumetricGeometrySandbox::validateT203RainGate);
+        runCorrected("T204 the shaft attribution arms compile, the runtime-false arms keep the"
+                        + " live uniform and FINAL carries no T204 define",
+                StormVolumetricGeometrySandbox::validateT204ShaftArms);
+    }
+
+    /**
+     * T204. Six attribution arms exist as generated programs, each defining
+     * exactly its own shaft chunk; the runtime-false arms keep
+     * {@code PaDiagnosticEvalEpsilon} live (a baked zero would let the
+     * compiler fold the shaft away and the arm would measure the
+     * compiled-out ceiling under another name); the skeleton arms bake the
+     * gate on; every one compiles in GL; and FINAL defines none of them.
+     */
+    private static void validateT204ShaftArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String[][] arms = {
+                {"t204_shaft_runtime_false", "PA_ARM_SHAFT_RUNTIME_FALSE", "true", "false"},
+                {"t204_shaft_no_walk", "PA_ARM_SHAFT_NO_WALK", "false", "false"},
+                {"t204_shaft_no_noise", "PA_ARM_SHAFT_NO_NOISE", "false", "false"},
+                {"t204_shaft_walk_only", "PA_ARM_SHAFT_WALK_ONLY", "false", "false"},
+                {"t204_skeleton_shaft_out", "PA_ARM_NO_RAIN_SHAFT", "false", "true"},
+                {"t204_skeleton_runtime_false", "PA_ARM_SHAFT_RUNTIME_FALSE", "true", "true"}};
+        String[] defines = {"PA_ARM_SHAFT_RUNTIME_FALSE", "PA_ARM_SHAFT_NO_WALK",
+                "PA_ARM_SHAFT_NO_NOISE", "PA_ARM_SHAFT_WALK_ONLY"};
+        for (String[] arm : arms) {
+            String path = base + "cloud_atmosphere_volume_" + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T204 program missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains("#define " + arm[1] + " 1"),
+                    arm[0] + " does not define " + arm[1]);
+            boolean live = Boolean.parseBoolean(arm[2]);
+            require(source.contains("uniform float PaDiagnosticEvalEpsilon;") == live,
+                    arm[0] + (live ? " bakes" : " keeps live") + " PaDiagnosticEvalEpsilon");
+            boolean skeleton = Boolean.parseBoolean(arm[3]);
+            require(source.contains("const int PaRainGateField = 1;") == skeleton
+                            && source.contains("#define PA_ARM_RAIN_GATE_REJECT_ALL 1") == skeleton,
+                    arm[0] + " does not sit on the expected gate skeleton");
+            CoreCostDiagnosticProgram program = CoreCostDiagnosticProgram.parse(arm[0]);
+            require(program != null && program.rainGateGeneration() == skeleton,
+                    arm[0] + "'s enum entry disagrees with its generated program");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        for (String define : defines) {
+            require(!finalSource.contains("#define " + define),
+                    "FINAL defines " + define);
+        }
+        String shader = readWorkspaceSource("src/main/resources/assets/"
+                + "projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh");
+        require(shader.contains("localRainSegment && PaDiagnosticEvalEpsilon < -0.5"),
+                "the runtime-false arm does not gate the shaft on the live uniform");
+        System.out.println("T204_SHAFT_ARMS arms=" + arms.length + " definesInFinal=0");
     }
 
     /**

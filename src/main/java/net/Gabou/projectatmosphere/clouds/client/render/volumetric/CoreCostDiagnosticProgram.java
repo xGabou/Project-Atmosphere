@@ -799,7 +799,27 @@ public enum CoreCostDiagnosticProgram {
      */
     T203_GATE_REJECT_ALL("t203_gate_reject_all"),
     T203_GATE_NO_FALLBACK("t203_gate_no_fallback"),
-    T203_GATE_NO_SHAFT("t203_gate_no_shaft");
+    T203_GATE_NO_SHAFT("t203_gate_no_shaft"),
+
+    // -----------------------------------------------------------------------
+    // T204. Why the shaft path costs 2.5-3.2 ms for 132k walks. Every arm
+    // is FINAL's specialization with one shaft chunk removed or gated;
+    // all image-invalid, bounds never candidates. The skeleton arms sit on
+    // the T203 gate program with every sample rejected before the fetch.
+    // -----------------------------------------------------------------------
+
+    /** T204: the shaft compiled in full, its call gated by a live uniform uploaded 0. */
+    T204_SHAFT_RUNTIME_FALSE("t204_shaft_runtime_false"),
+    /** T204: the shaft's two column walks replaced by constants. */
+    T204_SHAFT_NO_WALK("t204_shaft_no_walk"),
+    /** T204: the shaft's 3D noise fetch replaced by a constant. */
+    T204_SHAFT_NO_NOISE("t204_shaft_no_noise"),
+    /** T204: the walks kept, the setup math, noise and composition dropped. */
+    T204_SHAFT_WALK_ONLY("t204_shaft_walk_only"),
+    /** T204: the gate's reject-all skeleton with the shaft compiled out. */
+    T204_SKELETON_SHAFT_OUT("t204_skeleton_shaft_out"),
+    /** T204: the gate's reject-all skeleton with the shaft compiled in, runtime-false. */
+    T204_SKELETON_RUNTIME_FALSE("t204_skeleton_runtime_false");
 
 
     private final String serializedName;
@@ -989,14 +1009,16 @@ public enum CoreCostDiagnosticProgram {
         return this == T203_RAIN_GATE || this == T203_GATE_GENERATE_ONLY
                 || this == T203_RAIN_MASK_GATE
                 || this == T203_GATE_REJECT_ALL || this == T203_GATE_NO_FALLBACK
-                || this == T203_GATE_NO_SHAFT;
+                || this == T203_GATE_NO_SHAFT
+                || this == T204_SKELETON_SHAFT_OUT || this == T204_SKELETON_RUNTIME_FALSE;
     }
 
     /** T203. Programs whose segment test reads the gate. */
     public boolean rainGateLookup() {
         return this == T203_RAIN_GATE || this == T203_RAIN_MASK_GATE
                 || this == T203_GATE_REJECT_ALL || this == T203_GATE_NO_FALLBACK
-                || this == T203_GATE_NO_SHAFT;
+                || this == T203_GATE_NO_SHAFT
+                || this == T204_SKELETON_SHAFT_OUT || this == T204_SKELETON_RUNTIME_FALSE;
     }
 
     public String resourceName() {

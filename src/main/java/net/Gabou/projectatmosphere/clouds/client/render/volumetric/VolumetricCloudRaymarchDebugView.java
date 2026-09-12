@@ -222,7 +222,14 @@ public enum VolumetricCloudRaymarchDebugView {
     STORM_WORKLOAD_RAIN_GATE_F(76, "storm_workload_rain_gate_f"),
 
     /** T203. What building one gate cell costs, in the ray's own counters. */
-    STORM_WORKLOAD_RAIN_GATE_G(77, "storm_workload_rain_gate_g");
+    STORM_WORKLOAD_RAIN_GATE_G(77, "storm_workload_rain_gate_g"),
+
+    /**
+     * T204. The shaft path per pixel - true segment tests, shaft samples,
+     * positive segments - which the capture reads as an image and censuses
+     * in warp-shaped tiles for the any-lane divergence estimate.
+     */
+    STORM_WORKLOAD_RAIN_SHAFT_LANES(78, "storm_workload_rain_shaft_lanes");
 
     private final int shaderId;
     private final String serializedName;
