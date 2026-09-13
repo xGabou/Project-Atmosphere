@@ -197,9 +197,16 @@ final class StormT152MovingCameraFixture {
         PRODUCTION_050("production_050", false, 0, 0.50F),
         /**
          * T207M candidate: the temporal lattice from 0.25 phases, resolved to
-         * 960x540, compared frame by frame against the reference.
+         * 960x540, compared frame by frame against the reference - the
+         * shipping validity (mode 1, with the T208 near-field guard).
          */
-        TEMPORAL_025("temporal_025", false, 1, 0.25F);
+        TEMPORAL_025("temporal_025", false, 1, 0.25F),
+        /**
+         * T208M control: the same lattice under mode 5 - mode 1 without the
+         * near-field guard (T207) - through the same fixture, so the guard is
+         * judged against the T207 validity frame by frame, not across sessions.
+         */
+        TEMPORAL_025_NOGUARD("temporal_025_noguard", false, 5, 0.25F);
 
         private final String label;
         private final boolean history;
@@ -217,26 +224,42 @@ final class StormT152MovingCameraFixture {
             return label;
         }
 
-        /** The arm's successor in its pair, or null when it is the pair's second. */
-        Arm next() {
-            return this == HISTORY_OFF ? HISTORY_ON : this == PRODUCTION_050 ? TEMPORAL_025 : null;
+    }
+
+    /**
+     * Which arms a run drives: T152's history pair, or the temporal set
+     * (T207M / T208M: production 0.50, then the 0.25 lattice under the
+     * shipping validity and under the no-guard control). The first arm is
+     * the reference; every later arm is driven through the same route and
+     * compared frame by frame against the reference's stored frames.
+     */
+    enum ArmSet {
+        HISTORY(Arm.HISTORY_OFF, Arm.HISTORY_ON),
+        TEMPORAL(Arm.PRODUCTION_050, Arm.TEMPORAL_025, Arm.TEMPORAL_025_NOGUARD);
+
+        private final Arm[] arms;
+
+        ArmSet(Arm... arms) {
+            this.arms = arms;
         }
 
-        boolean reference() {
-            return this == HISTORY_OFF || this == PRODUCTION_050;
+        Arm first() {
+            return arms[0];
+        }
+
+        /** The arm after {@code current}, or null when it is the last. */
+        Arm next(Arm current) {
+            for (int i = 0; i < arms.length - 1; i++) {
+                if (arms[i] == current) {
+                    return arms[i + 1];
+                }
+            }
+            return null;
         }
     }
 
-    /** Which pair of arms a run drives: T152's history pair, or T207M's temporal pair. */
-    enum ArmSet {
-        HISTORY(Arm.HISTORY_OFF),
-        TEMPORAL(Arm.PRODUCTION_050);
-
-        private final Arm first;
-
-        ArmSet(Arm first) {
-            this.first = first;
-        }
+    private static boolean referenceArm() {
+        return arm == armSet.first();
     }
 
     private enum State { IDLE, SETTLE, RUN, DONE }
@@ -353,7 +376,7 @@ final class StormT152MovingCameraFixture {
         originalTemporalMode = VolumetricCloudDebugConfig.temporalMode();
         originalResolutionScale = VolumetricCloudDebugConfig.fixedResolutionScale();
         referenceGhostFrames = new byte[ROUTE_FRAMES][];
-        arm = armSet.first;
+        arm = armSet.first();
         routeIndex = 0;
         settleFrames = 0;
         stallFrames = 0;
@@ -364,9 +387,9 @@ final class StormT152MovingCameraFixture {
         applyArmHistory();
         ProjectAtmosphere.LOGGER.info(
                 "T152_ROUTE_BEGIN group={} fingerprint={} centre=({},{}) midY={} radius={}"
-                        + " height={} frames={} arms=2 priorHistory={} restoredOnExit=true",
+                        + " height={} frames={} arms={} priorHistory={} restoredOnExit=true",
                 fixtureGroupId, fixtureFingerprint, fmt(centerX), fmt(centerZ), fmt(midY),
-                fmt(radius), fmt(height), ROUTE_FRAMES, originalHistoryEnabled);
+                fmt(radius), fmt(height), ROUTE_FRAMES, armSet.arms.length, originalHistoryEnabled);
         ProjectAtmosphere.LOGGER.info(
                 "T152_ROUTE_PARAMETERISATION angularStepRad={} surfaceScaleFloor={}"
                         + " surfaceScaleCeiling={} interiorScaleCeiling={}"
@@ -455,10 +478,11 @@ final class StormT152MovingCameraFixture {
         placeCamera(player, routeIndex);
     }
 
-    /** Finishes the current arm and either starts the second or reports. */
+    /** Finishes the current arm and either starts the next or reports. */
     private static void completeArm(LocalPlayer player) {
         ProjectAtmosphere.LOGGER.info("T152_ARM_END arm={} frames={}", arm.label(), ROUTE_FRAMES);
-        if (arm.reference()) {
+        Arm next = armSet.next(arm);
+        if (next != null) {
             // Re-resolve rather than reading the cached fixture back. The cache
             // is filled once when the driver resolves the fixture, so comparing
             // it here would compare the stored value against itself and pass
@@ -472,7 +496,7 @@ final class StormT152MovingCameraFixture {
                 abort("fixture_identity_changed_between_arms");
                 return;
             }
-            arm = arm.next();
+            arm = next;
             routeIndex = 0;
             settleFrames = 0;
             previousAlphaValid = false;
@@ -489,7 +513,8 @@ final class StormT152MovingCameraFixture {
         state = State.DONE;
         status = "t152_complete";
         ProjectAtmosphere.LOGGER.info(
-                "T152_ROUTE_COMPLETE group={} frames={} arms=2", fixtureGroupId, ROUTE_FRAMES);
+                "T152_ROUTE_COMPLETE group={} frames={} arms={}", fixtureGroupId, ROUTE_FRAMES,
+                armSet.arms.length);
     }
 
     private static void abort(String reason) {
@@ -504,7 +529,7 @@ final class StormT152MovingCameraFixture {
         VolumetricCloudDebugConfig.setHistoryEnabled(arm.history);
         // T207M. The temporal pair pins its own mode and scale; the history
         // pair leaves both where the driver put them.
-        if (armSet == ArmSet.TEMPORAL) {
+        if (armSet != ArmSet.HISTORY) {
             VolumetricCloudDebugConfig.setTemporalMode(arm.temporal);
             VolumetricCloudDebugConfig.setTemporalDebugOutput(0);
             VolumetricCloudDebugConfig.setFixedResolutionScale(arm.resolutionScale);
@@ -516,7 +541,7 @@ final class StormT152MovingCameraFixture {
     private static void restore() {
         if (historyOverrideApplied) {
             VolumetricCloudDebugConfig.setHistoryEnabled(originalHistoryEnabled);
-            if (armSet == ArmSet.TEMPORAL) {
+            if (armSet != ArmSet.HISTORY) {
                 VolumetricCloudDebugConfig.setTemporalMode(originalTemporalMode);
                 VolumetricCloudDebugConfig.setFixedResolutionScale(originalResolutionScale);
             }
@@ -867,7 +892,7 @@ final class StormT152MovingCameraFixture {
 
         downsampleAlpha(width, height2);
         String ghost = "";
-        if (arm.reference()) {
+        if (referenceArm()) {
             referenceGhostFrames[routeIndex] = ghostScratch.clone();
         } else {
             ghost = compareAgainstReference();

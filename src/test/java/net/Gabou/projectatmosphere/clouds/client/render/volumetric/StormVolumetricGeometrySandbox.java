@@ -690,6 +690,69 @@ public final class StormVolumetricGeometrySandbox {
                         + " resolve, the lattice covers the pixel, rain stays current-frame,"
                         + " the targets are released",
                 StormVolumetricGeometrySandbox::validateT207TemporalReconstruction);
+        runCorrected("T208 the near-field guard ships in mode 1 and needs distance, motion"
+                        + " and ambiguity together, the attribution switches never reach a"
+                        + " timing cell, the route judges the guard beside the T207 control",
+                StormVolumetricGeometrySandbox::validateT208TemporalCleanup);
+    }
+
+    /**
+     * T208. The near-field guard ships in the production mode (mode 5 is
+     * T207's validity without it, the route's control) and rejects only where
+     * all three hold - the sample within
+     * {@code NEAR_FIELD_DISTANCE}, the reprojection moved it a texel or more,
+     * the current interval ambiguous - so far and static acceptance is
+     * untouched; it is its own class in the counters. The attribution
+     * switches (rain disabled, the split deferred on a non-temporal frame)
+     * are image-arm state, reset by every timing arm and by the campaign's
+     * exit. The resolve carries no phase-scale branch; the motion route runs
+     * production 0.50, then mode 1, then mode 5 through one fixture. The
+     * campaigns are registered and wired.
+     */
+    private static void validateT208TemporalCleanup() {
+        String resolve = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_temporal_resolve.fsh");
+        require(resolve.contains("bool nearFieldReject = ResolveMode != 5")
+                        && resolve.contains("&& reprojectDistance < NEAR_FIELD_DISTANCE")
+                        && resolve.contains("&& motionTexels >= 1.0")
+                        && resolve.contains("&& intervalAmbiguous;")
+                        && resolve.contains("acceptance = CLASS_NEARFIELD;")
+                        && resolve.contains("const float CLASS_NEARFIELD = 9.0;"),
+                "the near-field guard is not production's conjunction of distance, motion and"
+                        + " ambiguity, or is not its own class");
+        require(!resolve.contains("0.125") && !resolve.contains("phaseScale"),
+                "the resolve carries a scale-specific branch");
+        String driver = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/StormT132AutoDriver.java");
+        int apply = driver.indexOf("private static void applyT141Arm() {");
+        int applyEnd = driver.indexOf("if (t163Run) {", apply);
+        String applyBody = driver.substring(apply, applyEnd);
+        require(applyBody.contains("VolumetricCloudDebugConfig.setRainDisabled(false);")
+                        && applyBody.contains("VolumetricCloudDebugConfig.setDeferredSplitForced(false);"),
+                "a timing arm can inherit an image arm's attribution switches");
+        require(driver.contains("long[] counts = new long[10];")
+                        && driver.contains("\"t208-temporal-cleanup.txt\"")
+                        && driver.contains("\"t208-temporal-motion.txt\"")
+                        && driver.contains("private static final int T208_CONTROL_MODE = 5;")
+                        && !driver.contains("T208_LOW_SCALE") && !driver.contains("t208Downsample"),
+                "the T208 campaigns are not wired, the counters do not carry the near-field class,"
+                        + " or a 0.125 phase arm is back");
+        String fixture = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/StormT152MovingCameraFixture.java");
+        require(fixture.contains("TEMPORAL(Arm.PRODUCTION_050, Arm.TEMPORAL_025, Arm.TEMPORAL_025_NOGUARD)")
+                        && fixture.contains("TEMPORAL_025_NOGUARD(\"temporal_025_noguard\", false, 5, 0.25F)")
+                        && !fixture.contains("0.125F"),
+                "the motion route is not production 0.50, then mode 1, then mode 5 through one fixture");
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudRenderer.java");
+        require(renderer.contains("rainPassTarget.setClearColor(0.0F, 0.0F, 0.0F, 4095.0F);")
+                        && renderer.contains("temporal || VolumetricCloudDebugConfig.deferredSplitForced() ? 1 : 0"),
+                "the attribution switches do not produce a rainless frame and a body-only reference");
+        require(CloudTemporalPhaseState.PHASES == 4 && CloudTemporalPhaseState.MAX_AGE_FRAMES == 3
+                        && VolumetricCloudDebugConfig.PRODUCTION_TEMPORAL_MODE == 1,
+                "the phase cycle or the production mode changed");
+        System.out.println("T208_TEMPORAL_CLEANUP nearFieldGuard=production&distance&motion&ambiguity|control=mode5"
+                + "|classes=10|attributionResetPerArm=true|phases=4|maxAge=3|productionMode=1");
     }
 
     /**

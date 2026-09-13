@@ -694,7 +694,10 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("PaSampleJitter").set(
                 temporal ? CloudTemporalPhaseState.jitterX(phase) / Math.max(1.0F, cloudTarget.width) : 0.0F,
                 temporal ? CloudTemporalPhaseState.jitterY(phase) / Math.max(1.0F, cloudTarget.height) : 0.0F);
-        shader.safeGetUniform("PaTemporalPhase").set(temporal ? 1 : 0);
+        // T208 attribution: the body-only reference is a non-temporal frame
+        // with the split deferred and never composited.
+        shader.safeGetUniform("PaTemporalPhase").set(
+                temporal || VolumetricCloudDebugConfig.deferredSplitForced() ? 1 : 0);
         lastInvProj.set(invProj);
         lastInvViewRot.set(invViewRot);
         lastViewProj.set(projection).mul(viewRotation);
@@ -1031,7 +1034,16 @@ public final class VolumetricCloudRenderer {
                                 + (rainShader == null ? " failed to link" : "'s target is unavailable")
                                 + "; FINAL composites the rain pass and must not draw without it");
             }
-            if (rainPassTarget != null) {
+            if (rainPassTarget != null && VolumetricCloudDebugConfig.rainDisabled()) {
+                // T208 attribution. No rain pass: the target is cleared to
+                // "no rain" (rgb 0, packed T_r = 1) so the split cloud
+                // program and the resolve composite nothing. Diagnostic only.
+                rainPassTarget.setClearColor(0.0F, 0.0F, 0.0F, 4095.0F);
+                VolumetricCloudRenderTargets.clearAndBind(rainPassTarget);
+                rainPassTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+                bindMarchTarget(cloudTarget, temporal);
+                rainPassTextureId = rainPassTarget.getColorTextureId();
+            } else if (rainPassTarget != null) {
                 copyFrameUniforms(shader, rainShader);
                 setFrameSamplers(rainShader);
                 VolumetricCloudRenderTargets.clearAndBind(rainPassTarget);

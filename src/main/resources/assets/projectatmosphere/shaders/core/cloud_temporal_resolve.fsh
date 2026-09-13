@@ -84,10 +84,15 @@ uniform int CurrentPhase;
 uniform float MaxRenderDistance;
 // 1 lattice with coverage + depth validity; 2 the same plus the colour clip;
 // 3 current phase only (the no-history baseline: the fallback everywhere);
-// 4 trust-all (diagnostic - ghosts by construction, never production).
+// 4 trust-all (diagnostic - ghosts by construction, never production);
+// 5 mode 1 without the T208 near-field guard (T207's validity, the control:
+// the guard was judged against it on the motion route through one fixture
+// and shipped in mode 1).
 uniform int ResolveMode;
 // 0 clouds; 1 the acceptance class per pixel in R (see CLASS_*), for the
-// campaign's validity counters.
+// campaign's validity counters; 2 the body alone - the resolved lattice
+// without the rain composite (T208's attribution against a body-only
+// reference).
 uniform int DebugOutput;
 
 in vec2 texCoord;
@@ -103,6 +108,11 @@ const float CLASS_DISOCCLUSION = 5.0;
 const float CLASS_DEPTH = 6.0;
 const float CLASS_COLOUR = 7.0;
 const float CLASS_FALLBACK = 8.0;
+// T208. The near-field guard: a history sample of structure near the
+// camera, under meaningful reprojection motion, judged by an interval too
+// wide to say anything - the in-cloud openings episodes of the T207 route.
+const float CLASS_NEARFIELD = 9.0;
+const float NEAR_FIELD_DISTANCE = 96.0;
 
 vec2 phaseJitter(int phase) {
     if (phase == 0) { return PhaseJitter0; }
@@ -356,10 +366,34 @@ void main() {
             // rejects). The route's two in-cloud episodes (frames 1248-1252
             // and 1340-1362 of the first T207M run) were this.
             bool parallaxTooLarge = length(camDelta) > 0.1 * reprojectDistance;
+            // T208. Near field, under motion, with an ambiguous interval:
+            // the current 3x3 straddles an opening (its coverage spans more
+            // than half the range, or its distances more than a third of
+            // the far end), the structure is within NEAR_FIELD_DISTANCE and
+            // the reprojection moved the sample by a texel or more. The
+            // interval test cannot decide there - it accepts anything - so
+            // the history is refused and the site falls back. Far and
+            // static acceptance is untouched: zero motion or a distant
+            // sample never enters this branch. T208M (one fixture, 2200
+            // frames): frames above 0.02 mean alpha error 14 -> 5, the
+            // interior ghost mean 0.0015 -> 0.0011, bias +0.0006 -> +0.0001,
+            // flicker and the far segments unchanged; the in-cloud opening
+            // of frames 1238-1249 that mode 5 holds shut with +0.02 alpha
+            // (history rays from 1.7-5 blocks behind the camera integrate
+            // the medium between the two cameras, which a point reprojection
+            // cannot remove) is tracked to 3e-5. Mode 5 is the control.
+            bool intervalAmbiguous = (alphaMax - alphaMin) > 0.5
+                || (currentHasHit && (farD - nearD) > 0.33 * farD);
+            bool nearFieldReject = ResolveMode != 5
+                && reprojectDistance < NEAR_FIELD_DISTANCE
+                && motionTexels >= 1.0
+                && intervalAmbiguous;
             if (trustAll) {
                 acceptance = CLASS_ACCEPTED;
             } else if (parallaxTooLarge) {
                 acceptance = CLASS_DEPTH;
+            } else if (nearFieldReject) {
+                acceptance = CLASS_NEARFIELD;
             } else if (newSky || newCloud) {
                 acceptance = CLASS_DISOCCLUSION;
             } else if (!coverageAgrees) {
@@ -384,9 +418,20 @@ void main() {
         }
     }
 
-    if (DebugOutput != 0) {
+    if (DebugOutput == 1) {
         fragColor = vec4(acceptance, body.a, bodyDepth, 1.0);
         gl_FragDepth = 1.0;
+        return;
+    }
+    if (DebugOutput == 2) {
+        // The body alone: what the lattice reconstructed before the rain.
+        if (body.a < 0.002) {
+            gl_FragDepth = 1.0;
+            fragColor = vec4(0.0);
+            return;
+        }
+        gl_FragDepth = bodyDepth < 1.0 ? min(bodyDepth, 0.999999) : 1.0;
+        fragColor = vec4(body.rgb, clamp(body.a, 0.0, 1.0));
         return;
     }
 

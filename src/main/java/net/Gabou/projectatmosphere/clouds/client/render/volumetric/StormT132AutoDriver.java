@@ -1584,7 +1584,7 @@ final class StormT132AutoDriver {
         // brackets it.
         return t199Run ? t199IsAnchor(arm)
                 : t206Run ? t206IsAnchor(arm)
-                : t207Run ? t207IsAnchor(arm)
+                : t207Run || t208Run ? t207IsAnchor(arm)
                 : arm.program() == CoreCostDiagnosticProgram.LEAN_FINAL;
     }
 
@@ -1905,7 +1905,7 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info("T199_LIFECYCLE step=pinFinal");
                     VolumetricCloudDebugConfig.setFinalProgramOverride(
                             CoreCostDiagnosticProgram.LEAN_FINAL);
-                    if (temporalRunRequested()) {
+                    if (temporalRunRequested() || temporalCleanupRunRequested()) {
                         // T207. The probe walks the temporal targets too.
                         VolumetricCloudDebugConfig.setTemporalMode(1);
                     }
@@ -3519,12 +3519,12 @@ final class StormT132AutoDriver {
      */
     private static void reportT207Classes(String pose, String armLabel,
             StormReferenceImageComparison.Reference captured) {
-        long[] counts = new long[9];
+        long[] counts = new long[10];
         float[] pixels = captured.pixels();
         int total = captured.width() * captured.height();
         for (int i = 0; i < total; i++) {
             int cls = Math.round(pixels[i * 4]);
-            counts[Math.max(0, Math.min(8, cls))]++;
+            counts[Math.max(0, Math.min(9, cls))]++;
         }
         long history = total - counts[0];
         long candidates = history - counts[8];
@@ -3533,12 +3533,13 @@ final class StormT132AutoDriver {
                         + " candidates={} accepted={} acceptedPct={} offscreen={} offscreenPct={}"
                         + " age={} agePct={} coverage={} coveragePct={} disocclusion={}"
                         + " disocclusionPct={} depth={} depthPct={} colour={} colourPct={}"
-                        + " fallback={}",
+                        + " nearField={} nearFieldPct={} fallback={}",
                 pose, armLabel, total, counts[0], history, candidates,
                 counts[1], pct(counts[1], candidates), counts[2], pct(counts[2], candidates),
                 counts[3], pct(counts[3], candidates), counts[4], pct(counts[4], candidates),
                 counts[5], pct(counts[5], candidates), counts[6], pct(counts[6], candidates),
-                counts[7], pct(counts[7], candidates), counts[8]);
+                counts[7], pct(counts[7], candidates), counts[9], pct(counts[9], candidates),
+                counts[8]);
     }
 
     private static String pct(long part, long whole) {
@@ -3555,12 +3556,17 @@ final class StormT132AutoDriver {
      * and the budget the total leaves against 8 and 10 ms.
      */
     private static String buildT207Report() {
+        return buildTemporalReport("T207", "T207_TEMPORAL_DECISION", T207_POSES, T207_ARMS);
+    }
+
+    /** The T207 report for any campaign built on T207's brackets (T208 too). */
+    private static String buildTemporalReport(String campaign, String decisionTag,
+            String[] poses, T166Arm[] arms) {
         StringBuilder out = new StringBuilder(buildBracketedPricingReport(
-                "T207", "T207_TEMPORAL_DECISION", T207_POSES, T207_ARMS,
-                "lean_final@t1"));
-        for (String pose : T207_POSES) {
-            double[] modeResolve = new double[5];
-            int[] modeCount = new int[5];
+                campaign, decisionTag, poses, arms, "lean_final@t1"));
+        for (String pose : poses) {
+            double[] modeResolve = new double[6];
+            int[] modeCount = new int[6];
             java.util.List<Double> cloud = new java.util.ArrayList<>();
             java.util.List<Double> cloudP95 = new java.util.ArrayList<>();
             java.util.List<Double> field = new java.util.ArrayList<>();
@@ -3575,7 +3581,7 @@ final class StormT132AutoDriver {
             java.util.List<Double> anchorComposite = new java.util.ArrayList<>();
             double referenceTotal = Double.NaN;
             double referenceCloud = Double.NaN;
-            for (T166Arm arm : T207_ARMS) {
+            for (T166Arm arm : arms) {
                 StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
                 if (cell == null || cell.cloudP50() <= 0.0D) {
                     continue;
@@ -3628,24 +3634,154 @@ final class StormT132AutoDriver {
             double reconstruction = modeCount[3] > 0 ? modeResolve[3] / modeCount[3] : Double.NaN;
             double validation = v.mean() - reconstruction;
             out.append(String.format(Locale.ROOT,
-                    "%nT207_TEMPORAL pose=%s phaseScale=%.4f cells=%d rawPhaseMs=%.4f rawPhaseP95=%.4f"
+                    "%n%s_TEMPORAL pose=%s phaseScale=%.4f cells=%d rawPhaseMs=%.4f rawPhaseP95=%.4f"
                             + " fieldMs=%.4f gateBuildMs=%.4f rainPassMs=%.4f resolveMs=%.4f"
                             + " resolveP95=%.4f reconstructionMs=%.4f validationMs=%.4f"
                             + " compositeMs=%.4f totalMs=%.4f totalMin=%.4f totalMax=%.4f"
                             + " anchors=%d anchorCloudMs=%.4f anchorCompositeMs=%.4f"
                             + " anchorTotalMs=%.4f overheadMs=%.4f reference050CloudMs=%.4f"
                             + " reference050TotalMs=%.4f budgetTo8Ms=%.4f budgetTo10Ms=%.4f"
-                            + " resolveMode2Ms=%.4f",
-                    pose, T207_PHASE_SCALE, c.n(), c.mean(), c95.mean(),
+                            + " resolveMode2Ms=%.4f resolveMode5Ms=%.4f",
+                    campaign, pose, T207_PHASE_SCALE, c.n(), c.mean(), c95.mean(),
                     f.mean(), g.mean(), r.mean(), v.mean(), v95.mean(),
                     reconstruction, validation, k.mean(),
                     tt.mean(), tt.min(), tt.max(),
                     at.n(), ac.mean(), ak.mean(), at.mean(), tt.mean() - at.mean(),
                     referenceCloud, referenceTotal,
                     8.0D - tt.mean(), 10.0D - tt.mean(),
-                    modeCount[2] > 0 ? modeResolve[2] / modeCount[2] : Double.NaN));
+                    modeCount[2] > 0 ? modeResolve[2] / modeCount[2] : Double.NaN,
+                    modeCount[5] > 0 ? modeResolve[5] / modeCount[5] : Double.NaN));
         }
         return out.toString();
+    }
+
+    // -----------------------------------------------------------------------
+    // T208. Temporal quality cleanup + the 0.50 production baseline. Per
+    // pose: the SIDE attribution - the 0.25 lattice against production 0.50
+    // with rain, without rain (the rain pass skipped for both), and body-only
+    // against a body-only reference (the split deferred and never
+    // composited); the single-phase baseline, the trust-all ceiling; the
+    // control without the guard statically, which must equal the shipping
+    // lattice (zero motion never enters the guard) - then the counters under both
+    // modes, and the anchor-bracketed timing of the lattice, the guard, the
+    // no-history resolve and production 0.50: T207's brackets, so the two
+    // campaigns read alike. Motion is T208M (the T152 route with three arms
+    // through one fixture: production 0.50, the lattice under mode 1 with
+    // the guard, the lattice under mode 5 without it), which judged the guard. No 0.125 phase:
+    // the 0.50 reconstructed image is the production target.
+    // -----------------------------------------------------------------------
+
+    private static final Path T208_MARKER = Path.of("t208-temporal-cleanup.txt");
+    private static final Path T208M_MARKER = Path.of("t208-temporal-motion.txt");
+
+    private static final String[] T208_POSES = {"SIDE", "PLAY_VIS_NEAR"};
+
+    /** The control resolve mode: mode 1 without the near-field guard (T207). */
+    private static final int T208_CONTROL_MODE = 5;
+
+    private static boolean t208Run;
+    private static boolean t208mRun;
+    private static boolean t208OriginalHistoryEnabled;
+
+    /**
+     * Production 0.25 anchors bracketing: the lattice (mode 1) three times,
+     * the lattice without the near-field guard (mode 5), the baseline resolve
+     * (mode 3) and production at 0.50 - T207's brackets with the guard in
+     * the colour clip's slot.
+     */
+    private static final T166Arm[] T208_ARMS = buildT208Arms();
+
+    private static T166Arm[] buildT208Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        arms.add(t207Arm(T207_PHASE_SCALE, 0, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        for (int repeat = 1; repeat <= T207_REPEATS; repeat++) {
+            arms.add(t207Arm(T207_PHASE_SCALE, 1, "r" + repeat));
+            arms.add(t207Arm(T207_PHASE_SCALE, 0, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        }
+        arms.add(t207Arm(T207_PHASE_SCALE, T208_CONTROL_MODE, "r1"));
+        arms.add(t207Arm(T207_PHASE_SCALE, 0, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        arms.add(t207Arm(T207_PHASE_SCALE, 3, "r1"));
+        arms.add(t207Arm(T207_PHASE_SCALE, 0, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        arms.add(t207Arm(T207_REFERENCE_SCALE, 0, "r1"));
+        arms.add(t207Arm(T207_PHASE_SCALE, 0, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t208Arm() {
+        return T208_ARMS[Math.max(0, Math.min(T208_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T208_OPTIMIZATION_ARMS =
+            buildT208OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT208OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T208_ARMS.length];
+        for (int i = 0; i < T208_ARMS.length; i++) {
+            modes[i] = T208_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /**
+     * T208. An image arm: the scale, the resolve mode, the attribution
+     * switches, the capture kind (0 frame, 1 class map, 2 body only), and
+     * the stored captures it is compared against. Every capture is 960x540:
+     * the references are production at 0.50, the arms the lattice resolved
+     * to the same size.
+     */
+    private record T208ImageArm(String label, float scale, int temporal, boolean rainDisabled,
+            boolean deferredSplit, int debugOutput, String... against) {
+    }
+
+    private static final T208ImageArm[] T208_IMAGE_ARMS = {
+            // References, stored: production 0.50 with rain, without the rain
+            // pass, and the body alone.
+            new T208ImageArm("ref050", 0.50F, 0, false, false, 0),
+            new T208ImageArm("ref050_norain", 0.50F, 0, true, false, 0),
+            new T208ImageArm("ref050_body", 0.50F, 0, false, true, 0),
+            // The lattice (validated, twice: the second against the first is
+            // the pipeline's own repeat noise), the single phase, trust-all,
+            // the control without the guard (statically equal to the lattice,
+            // or the guard is not motion-gated).
+            new T208ImageArm("t025", 0.25F, 1, false, false, 0, "ref050"),
+            new T208ImageArm("t025_r2", 0.25F, 1, false, false, 0, "ref050", "t025"),
+            new T208ImageArm("t025_single", 0.25F, 3, false, false, 0, "ref050"),
+            new T208ImageArm("t025_trust", 0.25F, 4, false, false, 0, "ref050"),
+            new T208ImageArm("t025_control", 0.25F, T208_CONTROL_MODE, false, false, 0, "ref050", "t025"),
+            // The attribution: the lattice without rain against the reference
+            // without rain; the lattice's body against the reference's body.
+            new T208ImageArm("t025_norain", 0.25F, 1, true, false, 0, "ref050_norain"),
+            new T208ImageArm("t025_body", 0.25F, 1, false, false, 2, "ref050_body"),
+            // The counters under both modes.
+            new T208ImageArm("t025_classes", 0.25F, 1, false, false, 1),
+            new T208ImageArm("t025_control_classes", 0.25F, T208_CONTROL_MODE, false, false, 1)
+    };
+
+    private static final CoreCostDiagnosticProgram[] T208_IMAGE_PROGRAMS =
+            buildT208ImagePrograms();
+
+    private static CoreCostDiagnosticProgram[] buildT208ImagePrograms() {
+        CoreCostDiagnosticProgram[] programs = new CoreCostDiagnosticProgram[T208_IMAGE_ARMS.length];
+        java.util.Arrays.fill(programs, CoreCostDiagnosticProgram.LEAN_FINAL);
+        return programs;
+    }
+
+    /** T208. The captures of the current pose, by arm label. */
+    private static final java.util.Map<String, StormReferenceImageComparison.Reference>
+            T208_CAPTURES = new java.util.HashMap<>();
+
+    private static boolean temporalCleanupRunRequested() {
+        return Files.exists(T208_MARKER);
+    }
+
+    private static boolean temporalMotionGuardRunRequested() {
+        return Files.exists(T208M_MARKER);
+    }
+
+    private static String buildT208Report() {
+        return buildTemporalReport("T208", "T208_TEMPORAL_DECISION", T208_POSES, T208_ARMS);
     }
 
     // -----------------------------------------------------------------------
@@ -4948,7 +5084,7 @@ final class StormT132AutoDriver {
                 || t189Run || t190Run || t192Run || t193Run || t194Run
                 || t195Run || t196Run || t198Run || t199Run || t200Run
                 || t201Run || t202Run || t202bRun || t203Run || t204Run || t205Run
-                || t206Run || t207Run;
+                || t206Run || t207Run || t208Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -5206,7 +5342,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t207Run ? t207Arm()
+            T166Arm arm = t208Run ? t208Arm()
+                    : t207Run ? t207Arm()
                     : t206Run ? t206Arm()
                     : t205Run ? t205Arm()
                     : t204Run ? t204Arm()
@@ -5250,9 +5387,12 @@ final class StormT132AutoDriver {
             VolumetricCloudDebugConfig.setDescriptorCountLimit(arm.descriptorLimit());
             VolumetricCloudDebugConfig.setT136ConstantLighting(false);
             // T207. The arm's temporal mode; every earlier campaign's arms
-            // carry 0, the one-frame production path.
+            // carry 0, the one-frame production path. T208: the attribution
+            // switches are image-arm state and never carry into a timing cell.
             VolumetricCloudDebugConfig.setTemporalMode(arm.temporal());
             VolumetricCloudDebugConfig.setTemporalDebugOutput(0);
+            VolumetricCloudDebugConfig.setRainDisabled(false);
+            VolumetricCloudDebugConfig.setDeferredSplitForced(false);
             // The oracle arms need their capture pass; everything else must
             // upload exactly the production mode its program bakes.
             VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(arm.mode());
@@ -5329,6 +5469,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t208Run) {
+            return t208Arm().label();
+        }
         if (t207Run) {
             return t207Arm().label();
         }
@@ -5477,6 +5620,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t208Run) {
+            return T208_OPTIMIZATION_ARMS;
+        }
         if (t207Run) {
             return T207_OPTIMIZATION_ARMS;
         }
@@ -5610,6 +5756,52 @@ final class StormT132AutoDriver {
             return T161_OPTIMIZATION_ARMS;
         }
         return t153OracleRun ? T153_ARMS : T141_ARMS;
+    }
+
+    /**
+     * T208 harness. The sweep is measured at 1920x1080 and the T135_PREPARE
+     * resize is a recorded render call that the window can ignore (the first
+     * T208 launch ran every cell at 854x480 and captured 427x240 references
+     * against 428x240 lattices). Before each pose the framebuffer is checked
+     * and the resize re-issued until it lands; after a bounded wait the pose
+     * proceeds with a warning so a stuck window still ends the campaign.
+     */
+    private static int t135WindowAttempts;
+
+    private static boolean contractWindowReady(Minecraft minecraft) {
+        int width = minecraft.getWindow().getWidth();
+        int height = minecraft.getWindow().getHeight();
+        if (width == T135_WIDTH && height == T135_HEIGHT) {
+            if (t135WindowAttempts > 0) {
+                ProjectAtmosphere.LOGGER.info("T135_WINDOW ready={}x{} attempts={}",
+                        width, height, t135WindowAttempts);
+            }
+            t135WindowAttempts = 0;
+            return true;
+        }
+        if (++t135WindowAttempts > 300) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "T135_WINDOW stuck={}x{} wanted={}x{} attempts={}; the sweep proceeds off-contract",
+                    width, height, T135_WIDTH, T135_HEIGHT, t135WindowAttempts);
+            t135WindowAttempts = 0;
+            return true;
+        }
+        if (t135WindowAttempts % 20 == 1) {
+            ProjectAtmosphere.LOGGER.info("T135_WINDOW resize {}x{} -> {}x{} attempt={}",
+                    width, height, T135_WIDTH, T135_HEIGHT, t135WindowAttempts);
+            try {
+                // A window created hidden or iconified (the launcher's STARTUPINFO
+                // show state is applied to the first ShowWindow of the process)
+                // ignores a bare size request; restore and show it first.
+                long handle = minecraft.getWindow().getWindow();
+                org.lwjgl.glfw.GLFW.glfwRestoreWindow(handle);
+                org.lwjgl.glfw.GLFW.glfwShowWindow(handle);
+                org.lwjgl.glfw.GLFW.glfwSetWindowSize(handle, T135_WIDTH, T135_HEIGHT);
+            } catch (Throwable throwable) {
+                ProjectAtmosphere.LOGGER.warn("T135_WINDOW resize failed: {}", throwable.toString());
+            }
+        }
+        return false;
     }
 
     private static CoreCostDiagnosticProgram t140Arm() {
@@ -5756,6 +5948,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t208Run) {
+            return T208_POSES;
+        }
         if (t207Run) {
             return T207_POSES;
         }
@@ -6126,6 +6321,7 @@ final class StormT132AutoDriver {
                 if (StormPerformanceBaseline.suiteFixture() != null) {
                     ProjectAtmosphere.LOGGER.info("T098_RAYTRACE fixture resolved: {}", begun);
                     advance(movingCameraRunRequested() || temporalMotionRunRequested()
+                            || temporalMotionGuardRunRequested()
                             ? Phase.T152_BEGIN
                             : (performanceRunRequested()
                                     ? Phase.T135_PREPARE : Phase.BEGIN_T098));
@@ -6160,7 +6356,10 @@ final class StormT132AutoDriver {
                 // at 0.50 as the reference, the lattice from 0.25 phases
                 // compared frame by frame against it.
                 t207mRun = temporalMotionRunRequested();
-                String begun = StormT152MovingCameraFixture.begin(t207mRun
+                // T208M. The same set with the no-guard control as a third
+                // arm through the same fixture.
+                t208mRun = temporalMotionGuardRunRequested();
+                String begun = StormT152MovingCameraFixture.begin(t207mRun || t208mRun
                         ? StormT152MovingCameraFixture.ArmSet.TEMPORAL
                         : StormT152MovingCameraFixture.ArmSet.HISTORY);
                 if ("t152_started".equals(begun)) {
@@ -6294,7 +6493,7 @@ final class StormT132AutoDriver {
                 // flag is latched below this line, so the marker predicate is
                 // read directly (the first T206 run skipped the probe).
                 t199Lifecycle = t199Run || productionBaselineRunRequested()
-                        || temporalRunRequested()
+                        || temporalRunRequested() || temporalCleanupRunRequested()
                         ? new T199LifecycleProbe() : null;
                 VolumetricCloudRenderer.resetStormFieldRebuildCounters();
                 t200Run = pixelScalingRunRequested();
@@ -6318,6 +6517,9 @@ final class StormT132AutoDriver {
                 t206OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t207Run = temporalRunRequested();
                 t207OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t208Run = temporalCleanupRunRequested();
+                t208OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                T208_CAPTURES.clear();
                 java.util.Arrays.fill(T202_AUDIT_CAPTURES, null);
                 // T188 Task 3 and Task 11. Counters come from the monolith, so
                 // the monolith has to be using the field for them to describe
@@ -6396,7 +6598,8 @@ final class StormT132AutoDriver {
                                 || t204Run
                                 || t205Run
                                 || t206Run
-                                || t207Run;
+                                || t207Run
+                                || t208Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -6410,7 +6613,7 @@ final class StormT132AutoDriver {
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
                             && !t171Run && !t172Run && !t173Run && !t174Run
                             && !t175Run && !t176Run && !t177Run && !t178Run
-                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run && !t198Run && !t199Run && !t200Run && !t201Run && !t202Run && !t202bRun && !t203Run && !t204Run && !t205Run && !t206Run && !t207Run) {
+                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run && !t198Run && !t199Run && !t200Run && !t201Run && !t202Run && !t202bRun && !t203Run && !t204Run && !t205Run && !t206Run && !t207Run && !t208Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -6420,7 +6623,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t207Run ? "T207_TEMPORAL"
+                            t208Run ? "T208_TEMPORAL_CLEANUP"
+                                    : t207Run ? "T207_TEMPORAL"
                                     : t206Run ? "T206_PRODUCTION_BASELINE"
                                     : t205Run ? "T205_RAIN_PASS"
                                     : t204Run ? "T204_SHAFT_ATTRIBUTION"
@@ -6508,6 +6712,9 @@ final class StormT132AutoDriver {
                 advance(Phase.T135_MOVE);
             }
             case T135_MOVE -> {
+                if (!contractWindowReady(minecraft)) {
+                    return;
+                }
                 // Re-resolve before every pose. A respawn puts the new storm at
                 // the player, so poses derived from the previous fixture would
                 // aim at empty sky and the cell would silently measure nothing.
@@ -6811,7 +7018,8 @@ final class StormT132AutoDriver {
                         || (t204Run && t204Arm().program().fixedWork())
                         || (t205Run && t205Arm().program().fixedWork())
                         || (t206Run && t206Arm().program().fixedWork())
-                        || (t207Run && t207Arm().program().fixedWork())) {
+                        || (t207Run && t207Arm().program().fixedWork())
+                        || (t208Run && t208Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -6882,7 +7090,7 @@ final class StormT132AutoDriver {
                         VolumetricCloudDebugConfig.setRainGateForcedOnMonolith(
                                 t203CounterPhase == 1);
                     }
-                    if (t204Run || t205Run || t206Run || t207Run) {
+                    if (t204Run || t205Run || t206Run || t207Run || t208Run) {
                         // Production's bits, the gate off: the shaft census
                         // describes the shipping renderer.
                         VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(
@@ -6936,7 +7144,7 @@ final class StormT132AutoDriver {
                                     ? T202_COUNTER_LABELS[t202CounterPhase]
                                     : t203Run
                                     ? T203_COUNTER_LABELS[t203CounterPhase]
-                                    : (t204Run || t205Run || t206Run || t207Run) ? "|final"
+                                    : (t204Run || t205Run || t206Run || t207Run || t208Run) ? "|final"
                                     : ""), line);
                     if (t199Run && t199CounterPhase == T199_COUNTER_BITS.length - 1) {
                         // T199. The production attribution is the share
@@ -6986,7 +7194,7 @@ final class StormT132AutoDriver {
                             VolumetricCloudDebugConfig.setRainGateForcedOnMonolith(false);
                             VolumetricCloudDebugConfig.resetStormFieldMonolithBits();
                         }
-                        if (t204Run || t205Run || t206Run || t207Run) {
+                        if (t204Run || t205Run || t206Run || t207Run || t208Run) {
                             VolumetricCloudDebugConfig.resetStormFieldMonolithBits();
                         }
                     }
@@ -7094,6 +7302,20 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
                     VolumetricCloudDebugConfig.setHistoryEnabled(
                             t202bOriginalHistoryEnabled);
+                }
+                if (t208Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT208Report());
+                    VolumetricCloudDebugConfig.resetStormFieldMonolithBits();
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setTemporalMode(
+                            VolumetricCloudDebugConfig.PRODUCTION_TEMPORAL_MODE);
+                    VolumetricCloudDebugConfig.setTemporalDebugOutput(0);
+                    VolumetricCloudDebugConfig.setRainDisabled(false);
+                    VolumetricCloudDebugConfig.setDeferredSplitForced(false);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(
+                            t208OriginalHistoryEnabled);
                 }
                 if (t207Run) {
                     ProjectAtmosphere.LOGGER.info(buildT207Report());
@@ -8157,6 +8379,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t208Run) {
+            return T208_IMAGE_PROGRAMS;
+        }
         if (t207Run) {
             return T207_IMAGE_PROGRAMS;
         }
@@ -8300,10 +8525,13 @@ final class StormT132AutoDriver {
             }
             // T207. The anchor is production at 0.50 - the lattice's exact
             // target - with no temporal; the arms follow at the phase scale.
-            if (t207Run) {
+            if (t207Run || t208Run) {
                 VolumetricCloudDebugConfig.setFixedResolutionScale(T207_REFERENCE_SCALE);
                 VolumetricCloudDebugConfig.setTemporalMode(0);
                 VolumetricCloudDebugConfig.setTemporalDebugOutput(0);
+                VolumetricCloudDebugConfig.setRainDisabled(false);
+                VolumetricCloudDebugConfig.setDeferredSplitForced(false);
+                T208_CAPTURES.clear();
             }
             VolumetricCloudDebugConfig.setFinalProgramOverride(t199Run
                     ? CoreCostDiagnosticProgram.T199_FINAL_NOFIELD
@@ -8345,6 +8573,7 @@ final class StormT132AutoDriver {
                 : t199Run ? T199_IMAGE_ARMS[index].label()
                 : t202Run ? T202_IMAGE_ARMS[index].label()
                 : t207Run ? T207_IMAGE_ARMS[index].label()
+                : t208Run ? T208_IMAGE_ARMS[index].label()
                 : arm.serializedName();
         if ((t166ImageStep - 2) % 2 == 0) {
             VolumetricCloudDebugConfig.setFinalProgramOverride(arm);
@@ -8357,6 +8586,15 @@ final class StormT132AutoDriver {
                 VolumetricCloudDebugConfig.setFixedResolutionScale(T207_PHASE_SCALE);
                 VolumetricCloudDebugConfig.setTemporalMode(t207Arm.temporal());
                 VolumetricCloudDebugConfig.setTemporalDebugOutput(t207Arm.classMap() ? 1 : 0);
+                CloudTemporalPhaseState.invalidateAll();
+            }
+            if (t208Run) {
+                T208ImageArm t208Arm = T208_IMAGE_ARMS[index];
+                VolumetricCloudDebugConfig.setFixedResolutionScale(t208Arm.scale());
+                VolumetricCloudDebugConfig.setTemporalMode(t208Arm.temporal());
+                VolumetricCloudDebugConfig.setTemporalDebugOutput(t208Arm.debugOutput());
+                VolumetricCloudDebugConfig.setRainDisabled(t208Arm.rainDisabled());
+                VolumetricCloudDebugConfig.setDeferredSplitForced(t208Arm.deferredSplit());
                 CloudTemporalPhaseState.invalidateAll();
             }
             if (t202Run) {
@@ -8391,6 +8629,37 @@ final class StormT132AutoDriver {
             t188RainMaskAnchor = captured;
             ProjectAtmosphere.LOGGER.info(
                     "T188_RAIN_MASK pose={} reference {}", pose, captured.format());
+        } else if (t208Run) {
+            // T208. Every capture is stored by label; the arm names the
+            // stored captures it is judged against (all 960x540).
+            T208ImageArm t208Arm = T208_IMAGE_ARMS[index];
+            String expectedView = "t166_" + armLabel + "_" + pose;
+            if (!expectedView.equals(captured.view())) {
+                ProjectAtmosphere.LOGGER.warn(
+                        "T208_IMAGE pose={} arm={} evaluated=false reason=stale_capture view={}",
+                        pose, armLabel, captured.view());
+            } else if (t208Arm.debugOutput() == 1) {
+                reportT207Classes(pose, armLabel, captured);
+            } else {
+                T208_CAPTURES.put(armLabel, captured);
+                ProjectAtmosphere.LOGGER.info("T208_CAPTURE pose={} arm={} {}", pose, armLabel,
+                        captured.format());
+                for (int i = 0; i < t208Arm.against().length; i++) {
+                    StormReferenceImageComparison.Reference against =
+                            T208_CAPTURES.get(t208Arm.against()[i]);
+                    if (against == null) {
+                        ProjectAtmosphere.LOGGER.warn(
+                                "T208_IMAGE_AB pose={} arm={} against={} evaluated=false reason=missing",
+                                pose, armLabel, t208Arm.against()[i]);
+                        continue;
+                    }
+                    ProjectAtmosphere.LOGGER.info(
+                            "T208_IMAGE_AB pose={} arm={} against={} {} {}",
+                            pose, armLabel, t208Arm.against()[i],
+                            StormReferenceImageComparison.compare(against, captured).format(),
+                            StormArmQualityMetrics.compare(against, captured).format());
+                }
+            }
         } else if (t207Run && T207_PREVIOUS_CAPTURES.containsKey(armLabel + pose)
                 && !T207_IMAGE_ARMS[index].classMap()) {
             // T207. A repeat of an arm: the pipeline's own frame-to-frame

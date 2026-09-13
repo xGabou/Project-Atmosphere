@@ -194,19 +194,35 @@ public final class VolumetricCloudDebugConfig {
      * the T206 production path); 1 the four-phase lattice with coverage and
      * depth validity; 2 the same plus the colour clip; 3 the current phase
      * alone resolved through the lattice pass (the no-history baseline);
-     * 4 trust-all (diagnostic, ghosts by construction). The production
+     * 4 trust-all (diagnostic, ghosts by construction); 5 mode 1 without the
+     * T208 near-field guard (T207's validity, the control). The production
      * default is {@link #PRODUCTION_TEMPORAL_MODE}; a campaign sets its arm.
      * T207 banked mode 1: the resolve costs 0.1 ms, the lattice reaches
      * 0.995 SSIM against production 0.50 at PLAY_VIS_NEAR (0.951 at SIDE,
      * parity with the single frame, ahead on every structural term), and
      * the moving-camera route keeps the mean ghost at 0.0007 with nothing
-     * older than the four-frame cycle. Set to 0 to ship the one-frame T206
-     * path.
+     * older than the four-frame cycle. T208 added the near-field guard to
+     * mode 1 (in-cloud history within 96 blocks, under a texel or more of
+     * reprojection motion, at an ambiguous interval, is refused: the route's
+     * frames above 0.02 mean alpha error 14 -> 5). Set to 0 to ship the
+     * one-frame T206 path.
      */
     public static final int PRODUCTION_TEMPORAL_MODE = 1;
     private static volatile int temporalMode = PRODUCTION_TEMPORAL_MODE;
-    /** T207. 1 makes the resolve write its acceptance class map instead of clouds. */
+    /** T207. 1 makes the resolve write its acceptance class map instead of clouds; T208: 2 the body alone. */
     private static volatile int temporalDebugOutput;
+    /**
+     * T208 attribution. True skips the rain pass and clears its target to
+     * "no rain" (T_r = 1), so every consumer - the split cloud program, the
+     * resolve - sees a rainless frame. Diagnostic only.
+     */
+    private static volatile boolean rainDisabled;
+    /**
+     * T208 attribution. True uploads PaTemporalPhase = 1 on a non-temporal
+     * frame, so the cloud target holds the body alone (the split deferred
+     * and never composited) - the body-only reference. Diagnostic only.
+     */
+    private static volatile boolean deferredSplitForced;
     /**
      * Rank 1 reconstruction arm. False keeps the shipped composite accumulation
      * unchanged; true selects the coverage-alpha reconstruction, which removes
@@ -383,7 +399,7 @@ public final class VolumetricCloudDebugConfig {
     }
 
     public static void setTemporalMode(int mode) {
-        temporalMode = Math.max(0, Math.min(4, mode));
+        temporalMode = Math.max(0, Math.min(5, mode));
     }
 
     public static int temporalDebugOutput() {
@@ -392,6 +408,22 @@ public final class VolumetricCloudDebugConfig {
 
     public static void setTemporalDebugOutput(int output) {
         temporalDebugOutput = output;
+    }
+
+    public static boolean rainDisabled() {
+        return rainDisabled;
+    }
+
+    public static void setRainDisabled(boolean disabled) {
+        rainDisabled = disabled;
+    }
+
+    public static boolean deferredSplitForced() {
+        return deferredSplitForced;
+    }
+
+    public static void setDeferredSplitForced(boolean forced) {
+        deferredSplitForced = forced;
     }
 
     public static void setHistoryEnabled(boolean enabled) {
@@ -508,6 +540,8 @@ public final class VolumetricCloudDebugConfig {
         historyEnabled = true;
         temporalMode = PRODUCTION_TEMPORAL_MODE;
         temporalDebugOutput = 0;
+        rainDisabled = false;
+        deferredSplitForced = false;
         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
         sentinelHeightsEnabled = false;
         fullResolutionEnabled = false;

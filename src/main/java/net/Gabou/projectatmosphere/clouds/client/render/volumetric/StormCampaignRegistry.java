@@ -308,7 +308,16 @@ public final class StormCampaignRegistry {
                     null, Routing.PERFORMANCE_ONLY),
             new Campaign("T207", "t207-temporal.txt",
                     "temporalRunRequested", "t207Run",
-                    "T207_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "T207_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            // T208M. The T207M route with the no-guard control as a third
+            // arm through the same fixture; before the sweep for the same
+            // reason as T207M.
+            new Campaign("T208M", "t208-temporal-motion.txt",
+                    "temporalMotionGuardRunRequested", "t208mRun",
+                    null, Routing.PERFORMANCE_ONLY),
+            new Campaign("T208", "t208-temporal-cleanup.txt",
+                    "temporalCleanupRunRequested", "t208Run",
+                    "T208_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.

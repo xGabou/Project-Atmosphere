@@ -3474,6 +3474,49 @@ implementation, while visual polish remains independently active.
   `validation/performance-temporal-reconstruction.md` and `validation/t207-campaign/`.
   Next: rain at lattice resolution / the in-cloud fallback, then the reopened pixel-scaling
   question (a 0.125 phase reconstructing the 0.25 image). [SC-005, SC-006, SC-021]
+- [X] T208 [PERFORMANCE] [US3] Temporal quality cleanup + the 0.50 production baseline. On the
+  T207 lattice (0.25 raw phases -> four-phase temporal -> 960x540; no 0.125 phase, no output
+  below 0.50, no upscaler): (1) SIDE's ceiling attributed with new image arms - the rain pass
+  skipped for arm and reference (`VolumetricCloudDebugConfig.rainDisabled`, the target cleared
+  to "no rain"), the body alone (`deferredSplitForced` on the 0.50 reference, resolve
+  `DebugOutput = 2` on the lattice), the single phase, trust-all, a no-guard control, class maps
+  under both modes; (2) a near-field guard in `cloud_temporal_resolve.fsh` (`CLASS_NEARFIELD`:
+  history within 96 blocks, moved >= 1 phase texel by the reprojection, judged by an ambiguous
+  3x3 interval - coverage span > 0.5 or distance span > 0.33 x far - is refused; resolve mode 5
+  = mode 1 without it, the control), judged on the T152 route with `ArmSet` generalised to a
+  reference plus N candidates (production 0.50 -> mode 1 -> mode 5 through ONE fixture) and
+  shipped in mode 1; (3) T207's bracketed timing (`buildTemporalReport`, shared) re-run; (4)
+  the driver verifies the 1920x1080 window before each pose (`contractWindowReady`,
+  `T135_WINDOW`: a client launched from Bash ignored the T135_PREPARE resize and ran a whole
+  campaign at 854x480). Campaigns `T208` (`run/t208-temporal-cleanup.txt`,
+  `temporalCleanupRunRequested`, `t208Run`, `T208_ARMS`, `T208_IMAGE_ARMS` -> `T208_IMAGE_AB`)
+  and `T208M` (`run/t208-temporal-motion.txt`, `temporalMotionGuardRunRequested`, `t208mRun`).
+  Three static launches (run 2 GPU-contended) and two routes on 13Sep2026. RESULT: **PASS.** SIDE limiter = representation, not validity (trust-all =
+  validated to four digits): where the frame carries rain, the current-frame rain pass at phase
+  resolution (rain-heavy SIDE storm: full 0.796 SSIM / edge 0.38, rain-disabled and body-only
+  **0.976 / 0.99**, silhouette IoU 0.9993); in a rain-light SIDE storm the body lattice's own
+  ~0.93-0.95 ceiling (full 0.9505, single 0.920, trust-all 0.936). PLAY_VIS_NEAR 0.9959 /
+  0.9953 / 0.9940 (three storms), body-only within 0.0005 of it. Guard: route frames > 0.02 mean alpha error **14 -> 5**, interior ghost mean
+  0.00152 -> 0.00111, bias +0.00055 -> +0.00013, route ghost 0.00081 -> 0.00069, flicker
+  0.00212 -> 0.00215 (ref 0.00196), far segments untouched, static acceptance unchanged
+  (100.00 / 99.99%, `nearField = 0`); the in-cloud opening that T207's validity held shut for
+  12 frames at +0.02 alpha (history rays 1.7-5 blocks behind the camera integrating the medium
+  between the cameras) is tracked to 3e-5. On the shipped binary through a second storm the guard is neutral-to-positive
+  (route ghost 0.00084 -> 0.00080, interior p95 0.0066 -> 0.0056, flicker identical) and the 30
+  outlier frames are identical under both modes - an on-axis in-cloud opening (sub-texel
+  reprojection motion, the medium between the two cameras: the along-ray residual named for the
+  follow-up) and a representation episode. Performance (clean sessions): resolve
+  **0.11 ms** (0.04 + 0.07), totals SIDE 8.63 / 8.22 and PLAY_VIS_NEAR 8.56 / 7.85 (two clean sessions) against
+  same-session one-frame anchors 8.28 / 7.81 and 9.21 / 7.78 - the fixture's raw march, the temporal
+  overhead within noise. T209 contract: 960x540 premultiplied RGBA16F + NDC depth, rain
+  composited, scene depth available, no edge metadata, native 1920x1080, insertion at
+  `CloudFieldCompositeRenderer.composite`; budget 1.4-2.2 ms to the 10 ms line (0-0.15 to 8 at these
+  fixtures; 0.05-1.2 in T207's). Harness: run 2's GPU was contended (field build 1.3-19 ms,
+  0.50 reference 80 ms, repeats no longer identical) - quoted as corroboration only.
+  campaignGate x3, check build PASS. Evidence in `validation/performance-temporal-cleanup.md`
+  and `validation/t208-campaign/`. Next: T209 spatial upscale evaluation (control = today's
+  bilinear composite, FSR1/EASU, one depth-guided 2x alternative; body-only beside full-frame at
+  SIDE; the T152 route against native). [SC-005, SC-006, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
