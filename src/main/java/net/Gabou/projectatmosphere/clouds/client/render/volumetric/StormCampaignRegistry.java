@@ -296,7 +296,10 @@ public final class StormCampaignRegistry {
                     "T204_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
             new Campaign("T205", "t205-rain-pass.txt",
                     "rainPassRunRequested", "t205Run",
-                    "T205_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "T205_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            new Campaign("T206", "t206-production-baseline.txt",
+                    "productionBaselineRunRequested", "t206Run",
+                    "T206_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.

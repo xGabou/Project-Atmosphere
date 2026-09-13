@@ -21,6 +21,13 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
  * silent fallback for a FINAL frame, because binding it there would restore the
  * full cost this task exists to remove without changing the image.
  *
+ * <p>T206: a FINAL frame is three production programs. {@link #RAIN_GATE_BUILD}
+ * writes the rain gate field, {@link #RAIN_PASS} marches the rain alone and
+ * exports its radiance, transmittance and depth, and {@link #LEAN_FINAL} - the
+ * cloud march with the rain family compiled out - composites that result at
+ * the rain's depth. The monolith still carries the rain family inside its
+ * march, which is what every debug view and counter capture describes.
+ *
  * <p>The experimental evidence for the split is {@code e301494} on
  * {@code experiment/core-cost}: on one PLAY_VIS_NEAR/Ultra fixture the
  * specialized program rendered a pixel-identical image at 2.984x the speed of
@@ -29,8 +36,27 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 public enum CoreCostDiagnosticProgram {
     /** The unmodified program retaining every dormant diagnostic path. */
     DIAGNOSTIC_MONOLITH("diagnostic_monolith"),
-    /** The compile-time-specialized normal renderer used by FINAL frames. */
+    /**
+     * The compile-time-specialized normal renderer used by FINAL frames.
+     * T206: the split cloud program - the rain family compiled out, the rain
+     * pass's result composited at the rain's depth - drawn after
+     * {@link #RAIN_GATE_BUILD} and {@link #RAIN_PASS} every FINAL frame.
+     */
     LEAN_FINAL("lean_final"),
+    /**
+     * T206. The production rain pass: a rain-only march on the cloud march's
+     * own setup, the T203 gate baked on, exporting rgb + packed (T_r, t_R)
+     * into the cloud-sized rain-pass target. Never selected as a frame's
+     * program; drawn by the renderer before every {@link #rainSplitCloud()}
+     * program.
+     */
+    RAIN_PASS("rain_pass"),
+    /**
+     * T206 (T203's build program, promoted). The rain gate field's build
+     * pass as its own program, drawn before the rain pass every FINAL frame;
+     * receives the ray program's uniforms and samplers at draw time.
+     */
+    RAIN_GATE_BUILD("rain_gate_build"),
     /**
      * T140 diagnostic: the lean renderer plus a conservative whole-pixel
      * rejection oracle. Rays that provably cannot reach cloud return the
@@ -782,14 +808,11 @@ public enum CoreCostDiagnosticProgram {
     T203_GATE_GENERATE_ONLY("t203_gate_generate_only"),
     /** T203: the rain-only capture through the gate, against t188_rain_mask_ref. */
     T203_RAIN_MASK_GATE("t203_rain_mask_gate"),
-    /**
-     * T203: the gate field's build pass as its own program - the pass baked
-     * on, the march never reached. The first run carried the build inside
-     * the ray program and the ray paid 2.5-4 ms for code it never executed
-     * (the T199 codegen lesson); the ray programs now bake the pass off and
-     * this program draws the field for them.
-     */
-    T203_GATE_BUILD("t203_gate_build"),
+    // The gate field's build program (t203_gate_build) is production since
+    // T206: RAIN_GATE_BUILD above. The first T203 run carried the build inside
+    // the ray program and the ray paid 2.5-4 ms for code it never executed
+    // (the T199 codegen lesson); the ray programs bake the pass off and the
+    // build program draws the field for them.
     /**
      * T203 run 3 decomposition of the residual above the gate. Reject-all:
      * every sample rejected before the field read - the segment test's own
@@ -822,20 +845,18 @@ public enum CoreCostDiagnosticProgram {
     T204_SKELETON_RUNTIME_FALSE("t204_skeleton_runtime_false"),
 
     // -----------------------------------------------------------------------
-    // T205. Rain as a separate pass. The split cloud program is FINAL's
+    // T205. Rain as a separate pass. The split cloud program was FINAL's
     // specialization with the rain family compiled out and one composite of
     // the rain pass's result at the rain's depth; the rain pass program is
     // the same source with main returning from a rain-only march before the
-    // cloud march, the T203 gate baked on. The mask pair renders the T188
-    // rain mask through the split.
+    // cloud march, the T203 gate baked on. T206 made that pair LEAN_FINAL
+    // and RAIN_PASS; the campaign copies (t205_cloud_split, t205_rain_pass)
+    // are retired as redundant. The mask pair renders the T188 rain mask
+    // through the production split; the fine-band pair is the priced bound.
     // -----------------------------------------------------------------------
 
-    /** T205: the cloud program without the rain family, compositing the rain pass. */
-    T205_CLOUD_SPLIT("t205_cloud_split"),
-    /** T205: the split cloud program's rain-mask capture. */
+    /** T205: the production split's rain-mask capture. */
     T205_CLOUD_SPLIT_MASK("t205_cloud_split_mask"),
-    /** T205: the rain pass - never selected as an arm, drawn before the split cloud. */
-    T205_RAIN_PASS("t205_rain_pass"),
     /** T205: the rain pass in mask mode, drawn before the split mask. */
     T205_RAIN_PASS_MASK("t205_rain_pass_mask"),
     /** T205: the split cloud drawn with the fine-band rain pass. */
@@ -845,7 +866,17 @@ public enum CoreCostDiagnosticProgram {
     /** T205: the rain pass with the fine stride in the attach band. */
     T205_RAIN_PASS_FINE("t205_rain_pass_fine"),
     /** T205: the fine-band rain pass in mask mode. */
-    T205_RAIN_PASS_FINE_MASK("t205_rain_pass_fine_mask");
+    T205_RAIN_PASS_FINE_MASK("t205_rain_pass_fine_mask"),
+
+    // -----------------------------------------------------------------------
+    // T206. The split is FINAL. One reference: the pre-split FINAL - the
+    // rain family inside the march, no composite - the quality anchor the
+    // production frame is judged against and the timing anchor of the fresh
+    // production baseline.
+    // -----------------------------------------------------------------------
+
+    /** T206: FINAL's specialization before the split - the monolithic reference. */
+    T206_MONOLITHIC_REF("t206_monolithic_ref");
 
 
     private final String serializedName;
@@ -1042,19 +1073,31 @@ public enum CoreCostDiagnosticProgram {
                 || rainSplitCloud();
     }
 
-    /** T205. The split cloud programs, whose frame draws the rain pass first. */
+    /**
+     * T205. The split cloud programs, whose frame draws the gate build and
+     * the rain pass first. T206: FINAL is one - and so are the T171 identity
+     * controls, which are byte-identical to it. A program that defines
+     * {@code PA_RAIN_SPLIT_COMPOSITE} must be listed here: it fetches the
+     * rain-pass texel unconditionally, and against no rain pass it would
+     * composite a zero transmittance into every pixel.
+     */
     public boolean rainSplitCloud() {
-        return this == T205_CLOUD_SPLIT || this == T205_CLOUD_SPLIT_MASK
+        return this == LEAN_FINAL || this == T171_DUP_A || this == T171_DUP_B
+                || this == T205_CLOUD_SPLIT_MASK
                 || this == T205_CLOUD_SPLIT_FINE || this == T205_CLOUD_SPLIT_FINE_MASK;
     }
 
-    /** T205. The rain pass program a split cloud program draws with. */
+    /**
+     * T205. The rain pass program a split cloud program draws with. T206: the
+     * production pass for FINAL and anything byte-identical to it; the
+     * campaign copies for the mask and fine-band diagnostics.
+     */
     public CoreCostDiagnosticProgram rainPassProgram() {
         return switch (this) {
             case T205_CLOUD_SPLIT_MASK -> T205_RAIN_PASS_MASK;
             case T205_CLOUD_SPLIT_FINE -> T205_RAIN_PASS_FINE;
             case T205_CLOUD_SPLIT_FINE_MASK -> T205_RAIN_PASS_FINE_MASK;
-            default -> T205_RAIN_PASS;
+            default -> RAIN_PASS;
         };
     }
 
@@ -1111,11 +1154,26 @@ public enum CoreCostDiagnosticProgram {
     }
 
     /**
-     * True for the two programs ordinary rendering needs. Everything else is a
+     * True for the programs ordinary rendering needs. Everything else is a
      * campaign arm and is loaded only while its campaign is active.
+     *
+     * <p>T206: four. FINAL's frame is three draws - the gate build, the rain
+     * pass, the split cloud - and the monolith stays for every debug view and
+     * every campaign's counters (it is never FINAL's fallback).
      */
     public boolean isProductionProgram() {
-        return this == DIAGNOSTIC_MONOLITH || this == LEAN_FINAL;
+        return this == DIAGNOSTIC_MONOLITH || this == LEAN_FINAL
+                || this == RAIN_PASS || this == RAIN_GATE_BUILD;
+    }
+
+    /**
+     * T206. True for the production programs a FINAL frame draws with but
+     * never binds as its own program: their link failure has to fail FINAL
+     * the way the lean program's does, rather than leave the frame without
+     * rain.
+     */
+    public boolean finalSupportProgram() {
+        return this == RAIN_PASS || this == RAIN_GATE_BUILD;
     }
 
     public static CoreCostDiagnosticProgram parse(String value) {

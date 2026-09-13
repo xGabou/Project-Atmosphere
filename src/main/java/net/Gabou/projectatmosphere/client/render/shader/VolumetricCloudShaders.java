@@ -45,10 +45,12 @@ public final class VolumetricCloudShaders {
     private static ShaderInstance volumeShader;
     private static ShaderInstance leanFinalVolumeShader;
     /**
-     * The generated diagnostic builds, keyed by the arm that selects them.
-     * There are several dozen; a field, a ResourceLocation, a registration
-     * line and a switch case per program meant every attribution campaign
-     * added four more places to forget.
+     * The generated builds, keyed by the program that selects them: the
+     * campaign arms, loaded only while their campaign is armed, and (T206)
+     * the two production programs FINAL draws with, loaded always. There are
+     * several dozen; a field, a ResourceLocation, a registration line and a
+     * switch case per program meant every attribution campaign added four
+     * more places to forget.
      */
     private static final java.util.Map<CoreCostDiagnosticProgram, ShaderInstance>
             diagnosticVolumeShaders =
@@ -89,6 +91,20 @@ public final class VolumetricCloudShaders {
                         logProgramBinarySize("lean_final", loaded);
                     });
             diagnosticVolumeShaders.clear();
+            // T206. FINAL's frame is three programs: the gate build and the
+            // rain pass draw before the split cloud program. They register
+            // unconditionally and inside this try: a link failure of either
+            // propagates to the catch below, which nulls the lean program so
+            // the renderer session-disables with the same loud status a
+            // failed FINAL link produces - never a FINAL frame without rain,
+            // never the monolith in its place.
+            int productionPrograms = 2;
+            for (CoreCostDiagnosticProgram program : CoreCostDiagnosticProgram.values()) {
+                if (program.finalSupportProgram()) {
+                    registerProductionVolumeProgram(event, program);
+                    productionPrograms++;
+                }
+            }
             // T191. Campaign arms are loaded only while their campaign is
             // armed. Every arm ever measured used to be compiled and linked on
             // every startup - 139 full-size fragment programs by T190 - which
@@ -124,14 +140,17 @@ public final class VolumetricCloudShaders {
             ProjectAtmosphere.LOGGER.info(
                     "T191_VARIANT_SCOPE declared={} activeCampaigns={} registered={}"
                             + " skipped={} crossCampaignControls={}"
-                            + " productionAlwaysLoaded=2",
-                    CoreCostDiagnosticProgram.values().length - 2,
+                            + " productionAlwaysLoaded={}",
+                    CoreCostDiagnosticProgram.values().length - productionPrograms,
                     activeCampaigns.isEmpty() ? "none" : String.join(",", activeCampaigns),
-                    registered, skipped, selectable.size());
+                    registered, skipped, selectable.size(), productionPrograms);
         } catch (IOException | RuntimeException failure) {
             leanFinalVolumeShader = null;
+            diagnosticVolumeShaders.remove(CoreCostDiagnosticProgram.RAIN_PASS);
+            diagnosticVolumeShaders.remove(CoreCostDiagnosticProgram.RAIN_GATE_BUILD);
             ProjectAtmosphere.LOGGER.error(
-                    "[VolumetricClouds] lean FINAL program {} failed to load;"
+                    "[VolumetricClouds] a production cloud program failed to load"
+                            + " (FINAL {} or one of its rain programs);"
                             + " the volumetric pass will session-disable rather than"
                             + " silently render FINAL with the diagnostic program",
                     LEAN_FINAL_VOLUME_ID, failure);
@@ -195,6 +214,27 @@ public final class VolumetricCloudShaders {
     }
 
     /**
+     * T206. Registers one production program FINAL's frame draws with. Unlike
+     * a diagnostic program, a failure here is not caught: it propagates to the
+     * caller's catch, which takes FINAL down with it. A FINAL frame drawn
+     * without its rain pass would be a frame without rain, and the monolith
+     * is never the fallback.
+     */
+    private static void registerProductionVolumeProgram(
+            RegisterShadersEvent event,
+            CoreCostDiagnosticProgram program) throws IOException {
+        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(
+                ProjectAtmosphere.MODID, program.resourceName());
+        event.registerShader(
+                new ShaderInstance(event.getResourceProvider(), id,
+                        DefaultVertexFormat.POSITION_TEX),
+                loaded -> {
+                    diagnosticVolumeShaders.put(program, loaded);
+                    logProgramBinarySize(program.serializedName(), loaded);
+                });
+    }
+
+    /**
      * Registers one generated diagnostic program. A diagnostic program that
      * fails to build must not take the renderer down with it, so the failure
      * is logged and the slot left empty; the campaign that selects it reports
@@ -240,9 +280,14 @@ public final class VolumetricCloudShaders {
         }
     }
 
-    /** True when the separately linked lean FINAL program is available. */
+    /**
+     * True when every program a FINAL frame draws with is available: the lean
+     * program and, since T206, the gate build and the rain pass.
+     */
     public static boolean leanFinalShaderReady() {
-        return leanFinalVolumeShader != null;
+        return leanFinalVolumeShader != null
+                && diagnosticVolumeShaders.get(CoreCostDiagnosticProgram.RAIN_PASS) != null
+                && diagnosticVolumeShaders.get(CoreCostDiagnosticProgram.RAIN_GATE_BUILD) != null;
     }
 
     public static ShaderInstance morphologySplatShader() {

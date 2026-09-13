@@ -43,6 +43,7 @@
     { "name": "StormLobeCount", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PuffShapeMode", "type": "int", "count": 1, "values": [ 1 ] },
     { "name": "PuffDensityStage", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PaDiagnosticStepBudget", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PuffTierFilter", "type": "int", "count": 1, "values": [ -1 ] },
     { "name": "LightDir", "type": "float", "count": 3, "values": [ 0.3, 0.9, 0.2 ] },
     { "name": "LightColor", "type": "float", "count": 3, "values": [ 1.0, 0.97, 0.9 ] },

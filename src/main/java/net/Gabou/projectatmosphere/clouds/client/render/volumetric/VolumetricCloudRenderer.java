@@ -204,6 +204,13 @@ public final class VolumetricCloudRenderer {
         GOVERNOR.reset();
         GPU_TIMER.close();
         RAIN_FIELD_TIMER.close();
+        // T206. The gate and rain-pass clocks are production clocks now and
+        // release their queries with the others.
+        RAIN_GATE_TIMER.close();
+        RAIN_PASS_TIMER.close();
+        lastRainFieldGpuMilliseconds = -1.0F;
+        lastRainGateGpuMilliseconds = -1.0F;
+        lastRainPassGpuMilliseconds = -1.0F;
         lastGpuMilliseconds = -1.0F;
         lastHistoryValid = false;
         lastHistoryConfidence = 0.0F;
@@ -725,9 +732,10 @@ public final class VolumetricCloudRenderer {
         // T188's field, a different build (selected by PaRainGateField in
         // the shader) and a different reader - the segment test's gate. The
         // monolith builds and reads it when a campaign forces the gate on.
+        // T206: FINAL's frame builds it every frame; its rain pass reads it.
         boolean paGateProgram = rainGateProgram(program);
         if (paGateProgram) {
-            // The build is its own program (T203_GATE_BUILD): the pass baked
+            // The build is its own program (RAIN_GATE_BUILD): the pass baked
             // on, the march absent. The first T203 run carried the build in
             // the ray program and the ray paid 2.5-4 ms for code it never
             // executed. The build program takes the frame's uniforms and
@@ -735,10 +743,21 @@ public final class VolumetricCloudRenderer {
             // more - so the field it writes is what the ray program's own
             // build branch would have written.
             ShaderInstance buildShader = VolumetricCloudShaders.volumeShader(
-                    CoreCostDiagnosticProgram.T203_GATE_BUILD);
+                    CoreCostDiagnosticProgram.RAIN_GATE_BUILD);
             RenderTarget rainGateTarget = buildShader == null ? null
                     : VolumetricCloudRenderTargets.prepareRainFieldTarget(
                             profile.weatherMapSize());
+            if (rainGateTarget == null && program.rainSplitCloud()) {
+                // T206. A split cloud program's rain pass bakes the gate on
+                // and reads it on every sample; without the build it would
+                // gate against zeros. FINAL never draws without its rain, and
+                // never draws the monolith instead: the same loud failure as
+                // a failed FINAL link.
+                throw new LeanFinalProgramUnavailableException(
+                        "rain gate build program (cloud_atmosphere_volume_rain_gate_build)"
+                                + (buildShader == null ? " failed to link" : "'s field target is unavailable")
+                                + "; FINAL's rain pass reads the gate and must not draw without it");
+            }
             if (rainGateTarget != null) {
                 copyFrameUniforms(shader, buildShader);
                 setFrameSamplers(buildShader);
@@ -910,12 +929,23 @@ public final class VolumetricCloudRenderer {
         // frame's uniforms and samplers (the gate field and the storm field
         // are both built by now): a rain-only march into a cloud-sized
         // target the cloud program then composites at the rain's depth.
+        // T206: the production render order is field build, gate build,
+        // rain pass, split cloud, then the composite/output path.
         if (program.rainSplitCloud()) {
             ShaderInstance rainShader = VolumetricCloudShaders.volumeShader(
                     program.rainPassProgram());
             RenderTarget rainPassTarget = rainShader == null ? null
                     : VolumetricCloudRenderTargets.prepareRainPassTarget(
                             cloudTarget.width, cloudTarget.height);
+            if (rainPassTarget == null && program.rainPassProgram().isProductionProgram()) {
+                // T206. The split cloud program fetches the rain-pass texel
+                // unconditionally; against no pass it would composite a zero
+                // transmittance into every pixel. Fail FINAL loudly instead.
+                throw new LeanFinalProgramUnavailableException(
+                        "rain pass program (cloud_atmosphere_volume_rain_pass)"
+                                + (rainShader == null ? " failed to link" : "'s target is unavailable")
+                                + "; FINAL composites the rain pass and must not draw without it");
+            }
             if (rainPassTarget != null) {
                 copyFrameUniforms(shader, rainShader);
                 setFrameSamplers(rainShader);

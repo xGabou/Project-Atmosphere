@@ -265,6 +265,12 @@ def leanFinalShaderJson =
         file('src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.json')
 def leanFinalGeneratedResources = layout.buildDirectory.dir('generated/leanFinalResources')
 def leanFinalShaderName = 'cloud_atmosphere_volume_final'
+// FINAL's source-level specialization, in one place so the programs that must
+// stay byte-identical to FINAL (the T171 identity controls) take the same list.
+// T163 precipitation-absent, T174 descriptor precompute, T206 the split: the
+// rain family out of the cloud program, the rain pass's result composited in.
+def leanFinalDefines = ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_RAIN_SPLIT_COMPOSITE 1']
 
 // uniform declaration -> replacement declaration. The value on the right is the
 // production value the renderer uploads for an ordinary FINAL frame; where a
@@ -391,12 +397,59 @@ def leanProgramVariants = [
         // The define also removes the old derivation: the two are #if/#else
         // branches, so the recomputation is not compiled into FINAL at all
         // rather than being left live alongside the read.
+        //
+        // T206 productionizes the T205 split. FINAL is the split cloud
+        // program: the rain family compiled out (PA_ARM_NO_RAIN_SEGMENT, the
+        // T182 define - 77 KB, 25% of the monolithic FINAL's binary) and one
+        // composite of the rain pass's texel at the rain's depth
+        // (PA_RAIN_SPLIT_COMPOSITE). Rain renders through the two production
+        // programs below it: the gate build, then the rain pass, both drawn
+        // before this program every FINAL frame. The pre-split FINAL survives
+        // as the T206 monolithic reference (t206_monolithic_ref) for quality
+        // comparison. PaRainGateField stays baked 0 here: the segment test
+        // is compiled out, so nothing in this program reads the gate.
         [name        : leanFinalShaderName,
+         defines     : leanFinalDefines,
+         keepUniforms: []],
+        // T206. The production rain pass: main returns from a rain-only
+        // march on the cloud march's own setup (slab, scene clip, coverage
+        // pretest, strides, jitter) at the coarse stride, the segment test
+        // with the T203 gate baked on, the production shaft, sampleLighting
+        // for the radiance, integrated against the rain's own transmittance;
+        // exports rgb + one float packing T_r and t_R into the RGBA32F
+        // rain-pass target. No fine band (PA_RAIN_PASS_FINE is the T205
+        // campaign's priced bound), no mask output.
+        [name        : 'cloud_atmosphere_volume_rain_pass',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_RAIN_PASS 1'],
+         keepUniforms: [],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        // T206 (T203's build program, promoted). The rain gate field's build
+        // pass as its own program - the pass and the gate baked on, the
+        // march never reached. It receives the ray program's uniforms and
+        // samplers at draw time (copyFrameUniforms). Its own program because
+        // T203 measured the build inside the ray program at 2.5-4 ms of
+        // codegen the ray never executed.
+        [name        : 'cloud_atmosphere_volume_rain_gate_build',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: [],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 2;',
+                        'uniform int PaRainFieldPass;':
+                                'const int PaRainFieldPass = 1;']],
+        // T206. The monolithic reference: FINAL's specialization before the
+        // split - the rain family inside the march, no composite. The
+        // quality anchor the production frame is judged against and the
+        // program the T202 comparator is byte-identical to; campaign-scoped.
+        [name        : 'cloud_atmosphere_volume_t206_monolithic_ref',
          defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: []],
-        // The T140 oracle family must stay bit-for-bit equivalent to FINAL, so
-        // it takes the same specialization - including the precompute, because
-        // these programs can render production frames.
+        // The T140 oracle family renders production frames and was documented
+        // as bit-for-bit equivalent to FINAL; since T206 it carries the
+        // monolithic (pre-split) FINAL specialization - the rain family in
+        // the march - because the oracle's whole-pixel rejection returns
+        // before the composite would run. It stays a historical campaign.
         [name: 'cloud_atmosphere_volume_t140_pixel',
          defines: ['PA_T140_ORACLE 1', 'PA_PRECIPITATION_ABSENT 1',
                    'PA_ARM_DESC_PRECOMPUTE 1'], keepUniforms: []],
@@ -1196,26 +1249,20 @@ def leanProgramVariants = [
          keepUniforms: ['PaStormFieldPass', 'PaDiagnosticEvalEpsilon'],
          overrides   : ['uniform int PaRainGateField;':
                                 'const int PaRainGateField = 1;']],
-        // T205. Rain as a separate pass. The split cloud program is FINAL's
+        // T205. Rain as a separate pass. The split cloud program was FINAL's
         // specialization with the rain family compiled out (T182's define)
         // and the composite of the rain pass's result; the rain pass program
         // returns from its own march before the cloud march, with the T203
-        // gate baked on. The mask pair renders the T188 rain mask through
-        // the split, on the mask reference's own defines.
-        [name        : 'cloud_atmosphere_volume_t205_cloud_split',
-         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                        'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_RAIN_SPLIT_COMPOSITE 1'],
-         keepUniforms: ['PaStormFieldPass']],
+        // gate baked on. T206 made that pair the production FINAL and the
+        // rain_pass program above, and retired the campaign copies
+        // (t205_cloud_split, t205_rain_pass) as redundant. What stays is
+        // campaign-scoped: the mask pair renders the T188 rain mask through
+        // the production split, on the mask reference's own defines; the
+        // fine-band pair is the priced bound.
         [name        : 'cloud_atmosphere_volume_t205_cloud_split_mask',
          defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
                         'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_RAIN_SPLIT_COMPOSITE 1'],
          keepUniforms: ['PaStormFieldPass']],
-        [name        : 'cloud_atmosphere_volume_t205_rain_pass',
-         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                        'PA_RAIN_PASS 1'],
-         keepUniforms: ['PaStormFieldPass'],
-         overrides   : ['uniform int PaRainGateField;':
-                                'const int PaRainGateField = 1;']],
         [name        : 'cloud_atmosphere_volume_t205_rain_pass_mask',
          defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
                         'PA_RAIN_PASS 1'],
@@ -1245,17 +1292,8 @@ def leanProgramVariants = [
          keepUniforms: ['PaStormFieldPass'],
          overrides   : ['uniform int PaRainGateField;':
                                 'const int PaRainGateField = 1;']],
-        // The build program: FINAL's specialization with the rain-field pass
-        // and the gate baked on, so main returns from the build branch and
-        // the march is dead code. It receives the ray program's uniforms and
-        // samplers at draw time.
-        [name        : 'cloud_atmosphere_volume_t203_gate_build',
-         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
-         keepUniforms: [],
-         overrides   : ['uniform int PaRainGateField;':
-                                'const int PaRainGateField = 2;',
-                        'uniform int PaRainFieldPass;':
-                                'const int PaRainFieldPass = 1;']],
+        // The gate build program (t203_gate_build) is production since T206:
+        // cloud_atmosphere_volume_rain_gate_build, beside FINAL above.
 
         // T192. The closed-form ownership bound as classification triage.
         // Three arms only, and the campaign-scoped loading T191 added means
@@ -1548,11 +1586,15 @@ def leanProgramVariants = [
         // identity and start measuring a shader difference instead. The T171
         // invariant asserts byte-identity and caught this the moment FINAL
         // changed.
+        //
+        // T206: FINAL is the split cloud program, so the duplicates take
+        // leanFinalDefines and the renderer draws the rain pass for them
+        // (CoreCostDiagnosticProgram.rainSplitCloud).
         [name        : 'cloud_atmosphere_volume_t171_dup_a',
-         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         defines     : leanFinalDefines,
          keepUniforms: []],
         [name        : 'cloud_atmosphere_volume_t171_dup_b',
-         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         defines     : leanFinalDefines,
          keepUniforms: []],
 
         [name        : 'cloud_atmosphere_volume_t170_stack8',
@@ -1576,6 +1618,14 @@ tasks.register('generateLeanFinalShader') {
                 leanFinalGeneratedResources.get().asFile,
                 'assets/projectatmosphere/shaders/core')
         shaderDirectory.mkdirs()
+        // T206. A retired variant's stale output would otherwise stay in the
+        // generated tree and ship in the jar; the directory holds nothing
+        // but this task's outputs, so it is emptied before regeneration.
+        shaderDirectory.listFiles().each { File stale ->
+            if (stale.name.startsWith('cloud_atmosphere_volume_')) {
+                stale.delete()
+            }
+        }
 
         String productionSource = leanFinalShaderSource.getText('UTF-8')
         def productionJson = new groovy.json.JsonSlurper().parse(leanFinalShaderJson, 'UTF-8')
@@ -1670,6 +1720,59 @@ tasks.register('generateLeanFinalShader') {
                     ? [] : variant.keepSamplers
             variantJson.samplers = variantJson.samplers.findAll {
                 keptSamplers.contains(it.name) || !leanFinalRemovedSamplers.contains(it.name)
+            }
+            // T206. The JSON must match the GLSL it binds. Minecraft resolves
+            // every uniform and sampler the JSON names at link; a name the
+            // generated program no longer declares is a "could not find
+            // uniform" warning under vanilla and a startup crash under
+            // Oculus, and a declared live uniform the JSON does not name is
+            // one safeGetUniform().set() silently drops (the T203 lesson).
+            // Both directions are checked for every generated program, so a
+            // bake or a strip that drifts from the JSON fails the build here
+            // rather than in a player's log.
+            java.util.regex.Matcher declared = java.util.regex.Pattern
+                    .compile(/(?m)^uniform\s+(\w+)\s+(\w+)\s*;/).matcher(variantSource)
+            Map<String, String> glslUniforms = new LinkedHashMap<>()
+            while (declared.find()) {
+                glslUniforms.put(declared.group(2), declared.group(1))
+            }
+            List<String> mismatches = []
+            variantJson.uniforms.each { uniform ->
+                String type = glslUniforms.get(uniform.name)
+                if (type == null) {
+                    mismatches.add('JSON uniform ' + uniform.name + ' is not declared in the GLSL')
+                } else if (type.startsWith('sampler')) {
+                    mismatches.add('JSON uniform ' + uniform.name + ' is a sampler in the GLSL')
+                }
+            }
+            variantJson.samplers.each { sampler ->
+                String type = glslUniforms.get(sampler.name)
+                if (type == null || !type.startsWith('sampler')) {
+                    mismatches.add('JSON sampler ' + sampler.name + ' is not a sampler in the GLSL')
+                }
+            }
+            // Manually bound samplers (units 12+) must not be JSON samplers:
+            // Minecraft tracks twelve and a thirteenth throws in apply().
+            Set<String> jsonSamplerNames = variantJson.samplers.collect { it.name } as Set
+            Set<String> jsonUniformNames = variantJson.uniforms.collect { it.name } as Set
+            glslUniforms.each { String name, String type ->
+                if (type.startsWith('sampler') && jsonSamplerNames.contains(name)
+                        && jsonSamplerNames.size() > 12) {
+                    mismatches.add('JSON names more than twelve samplers (' + name + ')')
+                }
+                if (!type.startsWith('sampler') && !jsonUniformNames.contains(name)
+                        && !name.startsWith('gl_')) {
+                    // A live uniform the JSON does not name cannot be set from
+                    // Java. Only the vanilla-managed pair is exempt: they are
+                    // written by VertexBuffer.drawWithShader, not by name.
+                    if (name != 'ProjMat' && name != 'ModelViewMat') {
+                        mismatches.add('GLSL uniform ' + name + ' is live but not in the JSON')
+                    }
+                }
+            }
+            if (!mismatches.isEmpty()) {
+                throw new GradleException('Shader JSON does not match the generated GLSL for '
+                        + programName + ': ' + mismatches.join('; '))
             }
             new File(shaderDirectory, programName + '.json').setText(
                     groovy.json.JsonOutput.prettyPrint(

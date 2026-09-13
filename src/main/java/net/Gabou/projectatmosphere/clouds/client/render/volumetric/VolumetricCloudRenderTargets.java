@@ -185,6 +185,13 @@ public final class VolumetricCloudRenderTargets {
      * T205. The rain pass's target, the cloud target's size: rgb the rain
      * radiance, a two 12-bit values packed exactly in a float, so RGBA32F
      * and unfiltered - the split cloud program fetches its own texel.
+     *
+     * <p>T206: production. Allocated on the first FINAL frame and whenever
+     * the cloud target's size changes (a resolution transition frees the old
+     * one here, on the spot), released with every other target in
+     * {@link #destroyAll} - resize, level change, resource reload, the pass
+     * disabled, shutdown. Each allocation and release is logged with the
+     * T199 pattern so a session log pairs them.
      */
     private static RenderTarget rainPassTarget;
 
@@ -192,11 +199,24 @@ public final class VolumetricCloudRenderTargets {
         if (rainPassTarget == null || rainPassTarget.width != width
                 || rainPassTarget.height != height) {
             if (rainPassTarget != null) {
+                net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                        "T206_RAIN_PASS_RELEASE reason=resize size={}x{}",
+                        rainPassTarget.width, rainPassTarget.height);
                 rainPassTarget.destroyBuffers();
+                rainPassTarget = null;
             }
             rainPassTarget = createFloatMap(width, height, GL11.GL_NEAREST);
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T206_RAIN_PASS_ALLOC format=RGBA32F size={}x{} bytes={}",
+                    width, height, (long) width * height * 16L);
         }
         return rainPassTarget;
+    }
+
+    /** T206. {@code "WxH"} of the resident rain-pass target, or {@code "none"}. */
+    public static String rainPassTargetSize() {
+        return rainPassTarget == null ? "none"
+                : rainPassTarget.width + "x" + rainPassTarget.height;
     }
 
     /**
@@ -466,6 +486,15 @@ public final class VolumetricCloudRenderTargets {
             stormFieldTarget = null;
             net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
                     "T199_FIELD_RELEASE reason={} xz={}", reason, stormFieldTargetXZ);
+        }
+        if (rainPassTarget != null) {
+            // T206. The T205 campaign never released this target; production
+            // frees it wherever the cloud targets are freed.
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T206_RAIN_PASS_RELEASE reason={} size={}x{}", reason,
+                    rainPassTarget.width, rainPassTarget.height);
+            rainPassTarget.destroyBuffers();
+            rainPassTarget = null;
         }
         releaseStormFieldOracleTarget();
         if (visibleVolumeOracleTarget != null) {

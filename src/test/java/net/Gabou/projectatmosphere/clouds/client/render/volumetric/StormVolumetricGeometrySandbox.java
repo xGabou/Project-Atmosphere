@@ -680,25 +680,28 @@ public final class StormVolumetricGeometrySandbox {
         runCorrected("T204 the shaft attribution arms compile, the runtime-false arms keep the"
                         + " live uniform and FINAL carries no T204 define",
                 StormVolumetricGeometrySandbox::validateT204ShaftArms);
-        runCorrected("T205 the split cloud and rain pass programs compile, pair by mask mode,"
-                        + " and FINAL carries no split",
+        runCorrected("T205 the campaign's split diagnostics compile, pair by mask mode,"
+                        + " and the redundant split pair is retired",
                 StormVolumetricGeometrySandbox::validateT205RainPass);
+        runCorrected("T206 the split is FINAL: three production programs, the rain pass's"
+                        + " specialization, the JSON matches the GLSL, the target is released",
+                StormVolumetricGeometrySandbox::validateT206ProductionSplit);
     }
 
     /**
-     * T205. The four split programs exist, define what their roles need (the
-     * cloud programs the family-out define and the composite, the rain
-     * programs the pass with the gate baked on), pair by mask mode through
-     * the enum, compile in GL; the renderer draws the rain pass before the
-     * split cloud and binds its output on its own unit; FINAL defines no
-     * split; and the texture-unit contract stays contiguous.
+     * T205. The campaign's split diagnostics exist, define what their roles
+     * need (the cloud programs the family-out define and the composite, the
+     * rain programs the pass with the gate baked on), pair by mask mode
+     * through the enum, compile in GL; the renderer draws the rain pass
+     * before the split cloud and binds its output on its own unit; the
+     * texture-unit contract stays contiguous. T206: the campaign's own split
+     * pair (t205_cloud_split, t205_rain_pass) is retired - FINAL and the
+     * production rain pass are that pair - and must not be generated.
      */
     private static void validateT205RainPass() {
         String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
         String[][] arms = {
-                {"t205_cloud_split", "PA_RAIN_SPLIT_COMPOSITE", "PA_ARM_NO_RAIN_SEGMENT", "false"},
                 {"t205_cloud_split_mask", "PA_RAIN_SPLIT_COMPOSITE", "PA_RAIN_MASK_OUTPUT", "false"},
-                {"t205_rain_pass", "PA_RAIN_PASS", "PA_RAIN_PASS", "true"},
                 {"t205_rain_pass_mask", "PA_RAIN_PASS", "PA_RAIN_MASK_OUTPUT", "true"},
                 {"t205_cloud_split_fine", "PA_RAIN_SPLIT_COMPOSITE", "PA_ARM_NO_RAIN_SEGMENT", "false"},
                 {"t205_cloud_split_fine_mask", "PA_RAIN_SPLIT_COMPOSITE", "PA_RAIN_MASK_OUTPUT", "false"},
@@ -720,22 +723,24 @@ public final class StormVolumetricGeometrySandbox {
                     arm[0] + " mixes the rain pass into a cloud program");
             compileFragmentShader(resolveMojImports(source), arm[0]);
         }
-        require(CoreCostDiagnosticProgram.T205_CLOUD_SPLIT.rainPassProgram()
-                        == CoreCostDiagnosticProgram.T205_RAIN_PASS
-                        && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_MASK.rainPassProgram()
+        require(CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_MASK.rainPassProgram()
                         == CoreCostDiagnosticProgram.T205_RAIN_PASS_MASK
                         && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_FINE.rainPassProgram()
                         == CoreCostDiagnosticProgram.T205_RAIN_PASS_FINE
                         && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_FINE_MASK.rainPassProgram()
                         == CoreCostDiagnosticProgram.T205_RAIN_PASS_FINE_MASK
-                        && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT.rainSplitCloud()
-                        && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT.rainGateGeneration()
+                        && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_FINE.rainSplitCloud()
+                        && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_FINE.rainGateGeneration()
                         && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_MASK.rainMaskCapture(),
                 "the split programs do not pair by mask mode through the enum");
-        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
-        require(!finalSource.contains("#define PA_RAIN_SPLIT_COMPOSITE")
-                        && !finalSource.contains("#define PA_RAIN_PASS"),
-                "FINAL carries the split");
+        // T206. The retired pair: not an enum entry, not a generated program.
+        require(CoreCostDiagnosticProgram.parse("t205_cloud_split") == null
+                        && CoreCostDiagnosticProgram.parse("t205_rain_pass") == null,
+                "the redundant T205 split pair is back in the enum; FINAL and rain_pass are it");
+        require(!Files.exists(workspacePath(base + "cloud_atmosphere_volume_t205_cloud_split.fsh"))
+                        && !Files.exists(workspacePath(base + "cloud_atmosphere_volume_t205_rain_pass.fsh")),
+                "the retired T205 split pair is still generated; the generator must clean"
+                        + " its output directory");
         String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
                 + "client/render/volumetric/VolumetricCloudRenderer.java");
         require(renderer.contains("copyFrameUniforms(shader, rainShader);")
@@ -744,7 +749,293 @@ public final class StormVolumetricGeometrySandbox {
                         && renderer.contains("RAIN_PASS_TEXTURE_UNIT,"),
                 "the renderer does not draw the rain pass before the split cloud on its own unit");
         CloudTextureUnitContract.selfCheck();
-        System.out.println("T205_RAIN_PASS programs=" + arms.length + " splitInFinal=false");
+        System.out.println("T205_RAIN_PASS campaignPrograms=" + arms.length
+                + " retiredPair=2 splitInFinal=true");
+    }
+
+    /**
+     * T206. The split is the production renderer.
+     *
+     * <ul>
+     *   <li>Four production programs, no more: the monolith, FINAL, the rain
+     *       pass, the gate build - each unconditional, none claiming a
+     *       campaign; every other program campaign-scoped.</li>
+     *   <li>FINAL's specialization: the rain family out
+     *       ({@code PA_ARM_NO_RAIN_SEGMENT}), the split composite in, the
+     *       refinement and the field consumers retained (bits 43), the gate
+     *       baked off (nothing in it reads the gate), no {@code PA_RAIN_PASS},
+     *       no T205 campaign define (the fine band, the mask output), no
+     *       diagnostic selector live.</li>
+     *   <li>The rain pass: the pass define, the gate baked on, the
+     *       precipitation and precompute specializations, the exact segment
+     *       test and shaft calls present, no fine band, no mask output.</li>
+     *   <li>The gate build: the field pass and the gate baked on.</li>
+     *   <li>The monolithic reference is FINAL's list minus the two split
+     *       defines, so the quality comparison isolates the split.</li>
+     *   <li>The enum: FINAL draws the production rain pass, the T171
+     *       identity controls do too (they are byte-identical to FINAL).</li>
+     *   <li>The JSON of each production program names exactly the uniforms
+     *       and samplers its GLSL declares live, no baked one, no manual
+     *       sampler; every uniform the renderer sets by name on the ray
+     *       program is in the monolith's JSON (the T203 lesson); the manual
+     *       samplers are declared in the GLSL and bound on the contract's
+     *       units.</li>
+     *   <li>Registration: the two support programs register unconditionally
+     *       inside FINAL's try, so a link failure fails FINAL; the renderer
+     *       throws rather than draws when either is missing; the profile
+     *       carries the rain pass's clock; the target is released on every
+     *       release path and the clocks close on shutdown.</li>
+     *   <li>All three compile in GL.</li>
+     * </ul>
+     */
+    private static void validateT206ProductionSplit() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        List<CoreCostDiagnosticProgram> production = new ArrayList<>();
+        for (CoreCostDiagnosticProgram program : CoreCostDiagnosticProgram.values()) {
+            if (program.isProductionProgram()) {
+                production.add(program);
+                require(program.campaignId() == null,
+                        "production program " + program.serializedName() + " claims a campaign");
+            }
+        }
+        require(production.equals(List.of(CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH,
+                        CoreCostDiagnosticProgram.LEAN_FINAL, CoreCostDiagnosticProgram.RAIN_PASS,
+                        CoreCostDiagnosticProgram.RAIN_GATE_BUILD)),
+                "the production set is not exactly monolith, FINAL, rain pass, gate build: "
+                        + production);
+        require(CoreCostDiagnosticProgram.RAIN_PASS.finalSupportProgram()
+                        && CoreCostDiagnosticProgram.RAIN_GATE_BUILD.finalSupportProgram()
+                        && !CoreCostDiagnosticProgram.LEAN_FINAL.finalSupportProgram()
+                        && !CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH.finalSupportProgram(),
+                "the FINAL support set is not the rain pass and the gate build");
+        require(CoreCostDiagnosticProgram.LEAN_FINAL.rainSplitCloud()
+                        && CoreCostDiagnosticProgram.LEAN_FINAL.rainGateGeneration()
+                        && CoreCostDiagnosticProgram.LEAN_FINAL.rainPassProgram()
+                        == CoreCostDiagnosticProgram.RAIN_PASS
+                        && CoreCostDiagnosticProgram.T171_DUP_A.rainSplitCloud()
+                        && CoreCostDiagnosticProgram.T171_DUP_B.rainSplitCloud()
+                        && !CoreCostDiagnosticProgram.T206_MONOLITHIC_REF.rainSplitCloud()
+                        && !CoreCostDiagnosticProgram.T206_MONOLITHIC_REF.rainGateGeneration(),
+                "FINAL (and its identity controls) do not draw the production rain pass, or"
+                        + " the monolithic reference does");
+
+        // FINAL's specialization.
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        for (String define : new String[] {"PA_PRECIPITATION_ABSENT", "PA_ARM_DESC_PRECOMPUTE",
+                "PA_ARM_NO_RAIN_SEGMENT", "PA_RAIN_SPLIT_COMPOSITE"}) {
+            require(finalSource.contains("#define " + define + " 1"),
+                    "FINAL does not define " + define);
+        }
+        for (String define : new String[] {"PA_RAIN_PASS", "PA_RAIN_PASS_FINE",
+                "PA_RAIN_MASK_OUTPUT", "PA_T140_ORACLE", "PA_LIGHT_AUDIT", "PA_PRIMARY_AUDIT"}) {
+            require(!finalSource.contains("#define " + define),
+                    "FINAL defines " + define);
+        }
+        require(finalSource.contains("const int PaRainGateField = 0;")
+                        && finalSource.contains("const int PaStormFieldEnabled = "
+                                + StormFieldGeometry.PRODUCTION_CONSUMER_BITS + ";")
+                        && finalSource.contains("uniform int PaStormFieldPass;")
+                        && finalSource.contains("const int DebugView = 0;")
+                        && finalSource.contains("const int PaDiagnosticOptimizationMode = 0;")
+                        && finalSource.contains("const int PaOraclePass = 0;"),
+                "FINAL's baked selectors are not production's");
+        require(finalSource.contains("texelFetch(RainPassSampler, ivec2(gl_FragCoord.xy), 0)")
+                        && finalSource.contains("if (rainSplitPending && rainSplitT < t + stepLength) {")
+                        && finalSource.contains("transmittance *= rainSplitTr;"),
+                "FINAL no longer composites the rain pass at the rain's depth");
+
+        // The rain pass.
+        String rainSource = readWorkspaceSource(base + "cloud_atmosphere_volume_rain_pass.fsh");
+        for (String define : new String[] {"PA_PRECIPITATION_ABSENT", "PA_ARM_DESC_PRECOMPUTE",
+                "PA_RAIN_PASS"}) {
+            require(rainSource.contains("#define " + define + " 1"),
+                    "the rain pass does not define " + define);
+        }
+        for (String define : new String[] {"PA_RAIN_PASS_FINE", "PA_RAIN_MASK_OUTPUT",
+                "PA_ARM_NO_RAIN_SEGMENT", "PA_RAIN_SPLIT_COMPOSITE", "PA_ARM_NO_RAIN_SHAFT",
+                "PA_ARM_RAIN_GATE_REJECT_ALL"}) {
+            require(!rainSource.contains("#define " + define),
+                    "the rain pass defines " + define);
+        }
+        require(rainSource.contains("const int PaRainGateField = 1;")
+                        && rainSource.contains("const int PaRainFieldPass = 0;")
+                        && rainSource.contains("rainSegmentMayContribute(rpP, rpEnd)")
+                        && rainSource.contains("rainShaftDensityOverSegment(rpP, rpEnd, 0.0)")
+                        && rainSource.contains("paRainPassPack(rpMeanT / MaxRenderDistance, rpTransmittance)"),
+                "the rain pass does not run the exact segment test and the production shaft"
+                        + " with the gate baked on, or does not export the packed depth");
+
+        // The gate build.
+        String buildSource = readWorkspaceSource(base + "cloud_atmosphere_volume_rain_gate_build.fsh");
+        require(buildSource.contains("const int PaRainGateField = 2;")
+                        && buildSource.contains("const int PaRainFieldPass = 1;")
+                        && !buildSource.contains("#define PA_RAIN_PASS")
+                        && !buildSource.contains("#define PA_RAIN_SPLIT_COMPOSITE"),
+                "the gate build does not bake the build pass and the gate on");
+
+        // The monolithic reference: FINAL minus the split.
+        String referenceSource = readWorkspaceSource(base + "cloud_atmosphere_volume_t206_monolithic_ref.fsh");
+        String finalBody = finalSource.substring(finalSource.indexOf("#version 150"));
+        String referenceBody = referenceSource.substring(referenceSource.indexOf("#version 150"));
+        require(finalBody.replace("#define PA_ARM_NO_RAIN_SEGMENT 1\n", "")
+                        .replace("#define PA_RAIN_SPLIT_COMPOSITE 1\n", "").equals(referenceBody),
+                "t206_monolithic_ref is not FINAL minus the two split defines");
+
+        // The JSON of each production program matches its GLSL.
+        String monolithJson = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.json");
+        java.util.Set<String> monolithUniforms = jsonNames(monolithJson, "uniforms");
+        String[][] programs = {
+                {"cloud_atmosphere_volume_final", finalSource},
+                {"cloud_atmosphere_volume_rain_pass", rainSource},
+                {"cloud_atmosphere_volume_rain_gate_build", buildSource}};
+        for (String[] program : programs) {
+            String json = readWorkspaceSource(base + program[0] + ".json");
+            java.util.Set<String> jsonUniforms = jsonNames(json, "uniforms");
+            java.util.Set<String> jsonSamplers = jsonNames(json, "samplers");
+            java.util.Map<String, String> live = liveUniforms(program[1]);
+            for (String name : jsonUniforms) {
+                require(live.containsKey(name) && !live.get(name).startsWith("sampler"),
+                        program[0] + ".json names uniform " + name + " the GLSL does not declare live");
+            }
+            for (String name : jsonSamplers) {
+                require(live.containsKey(name) && live.get(name).startsWith("sampler"),
+                        program[0] + ".json names sampler " + name + " the GLSL does not declare");
+            }
+            require(jsonSamplers.size() <= 12,
+                    program[0] + ".json names more than the twelve samplers Minecraft tracks");
+            for (java.util.Map.Entry<String, String> uniform : live.entrySet()) {
+                if (uniform.getValue().startsWith("sampler")) {
+                    continue;
+                }
+                require(jsonUniforms.contains(uniform.getKey()),
+                        program[0] + " declares live uniform " + uniform.getKey()
+                                + " its JSON does not name, so the renderer could never set it");
+            }
+            for (String manual : new String[] {"PuffCandidateMapSampler", "BaseNoiseSampler",
+                    "DetailNoiseSampler", "RainFieldSampler", "StormFieldSampler", "RainPassSampler"}) {
+                require(!jsonSamplers.contains(manual),
+                        program[0] + ".json names the manually bound " + manual);
+            }
+            require(!jsonSamplers.contains("OracleIntervalSampler"),
+                    program[0] + ".json keeps the oracle sampler no production program reads");
+            require(json.contains("\"fragment\": \"projectatmosphere:" + program[0] + "\""),
+                    program[0] + ".json does not name its own fragment program");
+        }
+        // The manual samplers FINAL and the rain pass read are declared, on the
+        // contract's units.
+        for (String[] program : programs) {
+            for (String manual : new String[] {"PuffCandidateMapSampler", "BaseNoiseSampler",
+                    "DetailNoiseSampler", "StormFieldSampler"}) {
+                require(liveUniforms(program[1]).getOrDefault(manual, "").startsWith("sampler"),
+                        program[0] + " no longer declares the manual " + manual);
+            }
+        }
+        // Every uniform the renderer sets by name exists in the monolith's
+        // JSON (a baked name is a dummy on FINAL by design, a missing name
+        // is a silent no-op on the monolith by accident).
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudRenderer.java");
+        java.util.regex.Matcher setByName = java.util.regex.Pattern
+                .compile("safeGetUniform\\(\"(\\w+)\"\\)").matcher(renderer);
+        List<String> undeclared = new ArrayList<>();
+        while (setByName.find()) {
+            if (!monolithUniforms.contains(setByName.group(1))) {
+                undeclared.add(setByName.group(1));
+            }
+        }
+        require(undeclared.isEmpty(),
+                "the renderer sets uniforms the monolith's JSON does not name, so set() is a"
+                        + " silent no-op there: " + undeclared);
+        require(CloudTextureUnitContract.RAIN_PASS_UNIT == 17
+                        && CloudTextureUnitContract.STORM_FIELD_UNIT == 16
+                        && CloudTextureUnitContract.RAIN_FIELD_UNIT == 15,
+                "the production texture units moved");
+        CloudTextureUnitContract.selfCheck();
+
+        // Registration, fail-fast, lifecycle.
+        String shaders = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "client/render/shader/VolumetricCloudShaders.java");
+        require(shaders.contains("if (program.finalSupportProgram()) {")
+                        && shaders.contains("registerProductionVolumeProgram(event, program);")
+                        && shaders.contains("diagnosticVolumeShaders.remove(CoreCostDiagnosticProgram.RAIN_PASS);"),
+                "the production rain programs are not registered unconditionally inside"
+                        + " FINAL's fail-fast block");
+        require(renderer.contains("\"rain pass program (cloud_atmosphere_volume_rain_pass)\"")
+                        && renderer.contains("\"rain gate build program (cloud_atmosphere_volume_rain_gate_build)\"")
+                        && renderer.contains("CoreCostDiagnosticProgram.RAIN_GATE_BUILD);"),
+                "the renderer does not fail FINAL when its rain programs are unavailable");
+        require(renderer.contains("RAIN_GATE_TIMER.close();")
+                        && renderer.contains("RAIN_PASS_TIMER.close();"),
+                "the rain clocks are not closed on shutdown");
+        String targets = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudRenderTargets.java");
+        int destroyAll = targets.indexOf("private static void destroyAll(String reason) {");
+        require(destroyAll >= 0
+                        && targets.indexOf("rainPassTarget.destroyBuffers();", destroyAll) > destroyAll
+                        && targets.contains("T206_RAIN_PASS_RELEASE reason={}")
+                        && targets.contains("T206_RAIN_PASS_ALLOC format=RGBA32F"),
+                "the rain-pass target is not released with the other targets, or its"
+                        + " lifecycle is not logged");
+        String profile = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/StormT135PerformanceProfile.java");
+        require(profile.contains("rainPassP50") && profile.contains("compositeP50"),
+                "the profile no longer carries the rain pass and composite clocks");
+        String driver = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/StormT132AutoDriver.java");
+        require(driver.contains("T206_SUPPORT_PROGRAMS = {")
+                        && driver.contains(": t206Run ? t206IsAnchor(arm)")
+                        && driver.contains("? CoreCostDiagnosticProgram.T206_MONOLITHIC_REF"),
+                "the T206 campaign does not anchor on the monolithic reference");
+
+        for (String[] program : programs) {
+            compileFragmentShader(resolveMojImports(program[1]), program[0]);
+        }
+        compileFragmentShader(resolveMojImports(referenceSource), "t206_monolithic_ref");
+        System.out.println("T206_PRODUCTION_SPLIT productionPrograms=" + production.size()
+                + "|finalDefines=split|rainPassGate=baked|jsonMatchesGlsl=true"
+                + "|rendererSetUniformsDeclared=" + undeclared.isEmpty()
+                + "|rainPassUnit=" + CloudTextureUnitContract.RAIN_PASS_UNIT
+                + "|targetReleased=true");
+    }
+
+    /** The {@code name} values of one array of a Minecraft shader JSON. */
+    private static java.util.Set<String> jsonNames(String json, String array) {
+        int start = json.indexOf("\"" + array + "\"");
+        require(start >= 0, "shader JSON has no " + array + " array");
+        int open = json.indexOf('[', start);
+        // The entries nest their own "values" arrays, so the array's end is
+        // found by depth, not by the first closing bracket.
+        int depth = 0;
+        int close = -1;
+        for (int i = open; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c == '[') {
+                depth++;
+            } else if (c == ']' && --depth == 0) {
+                close = i;
+                break;
+            }
+        }
+        require(close > open, "shader JSON " + array + " array is unterminated");
+        java.util.Set<String> names = new java.util.LinkedHashSet<>();
+        java.util.regex.Matcher name = java.util.regex.Pattern
+                .compile("\"name\"\\s*:\\s*\"(\\w+)\"").matcher(json.substring(open, close));
+        while (name.find()) {
+            names.add(name.group(1));
+        }
+        return names;
+    }
+
+    /** Every live {@code uniform <type> <name>;} of a GLSL source, name to type. */
+    private static java.util.Map<String, String> liveUniforms(String source) {
+        java.util.Map<String, String> uniforms = new java.util.LinkedHashMap<>();
+        java.util.regex.Matcher declared = java.util.regex.Pattern
+                .compile("(?m)^uniform\\s+(\\w+)\\s+(\\w+)\\s*;").matcher(source);
+        while (declared.find()) {
+            uniforms.put(declared.group(2), declared.group(1));
+        }
+        return uniforms;
     }
 
     /**
@@ -848,9 +1139,9 @@ public final class StormVolumetricGeometrySandbox {
             compileFragmentShader(resolveMojImports(source), arm[0]);
         }
         // The build program: the pass and the gate baked on, so main returns
-        // from the build branch; registered through the campaign's support
-        // table because no arm table selects it.
-        String buildPath = base + "cloud_atmosphere_volume_t203_gate_build.fsh";
+        // from the build branch. T206 promoted it to production
+        // (rain_gate_build); the campaign's support table still declares it.
+        String buildPath = base + "cloud_atmosphere_volume_rain_gate_build.fsh";
         if (!Files.exists(workspacePath(buildPath))) {
             throw new IllegalStateException(
                     "generated T203 build program missing; run generateLeanFinalShader: " + buildPath);
@@ -858,12 +1149,12 @@ public final class StormVolumetricGeometrySandbox {
         String buildSource = readWorkspaceSource(buildPath);
         require(buildSource.contains("const int PaRainFieldPass = 1;")
                         && buildSource.contains("const int PaRainGateField = 2;"),
-                "t203_gate_build does not bake the build pass and the gate on");
-        compileFragmentShader(resolveMojImports(buildSource), "t203_gate_build");
+                "rain_gate_build does not bake the build pass and the gate on");
+        compileFragmentShader(resolveMojImports(buildSource), "rain_gate_build");
         String driver = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
                 + "client/render/volumetric/StormT132AutoDriver.java");
         require(driver.contains("T203_SUPPORT_PROGRAMS = {")
-                        && driver.contains("CoreCostDiagnosticProgram.T203_GATE_BUILD"),
+                        && driver.contains("CoreCostDiagnosticProgram.RAIN_GATE_BUILD"),
                 "the build program is not in the campaign's support table");
         String registry = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
                 + "client/render/volumetric/StormCampaignRegistry.java");
@@ -1124,16 +1415,20 @@ public final class StormVolumetricGeometrySandbox {
         // behind a uniform, and the strip list is empty (build.gradle says why).
         require(!shader.contains("PA_STORM_FIELD_ORACLE"),
                 "the source gates the soundness oracle by define again; T199j measured that");
-        // T202. The comparator byte-identical to FINAL is the T202
-        // refinement arm: it is the program T202 accepted, so the T202 matrix
-        // priced FINAL's exact program against the FINAL of T201. The T198
-        // comparator (bits 11, the T199-T201 FINAL) and the T196 control
-        // still compile beside it.
+        // T202. The comparator byte-identical to the monolithic FINAL is the
+        // T202 refinement arm: it is the program T202 accepted, so the T202
+        // matrix priced that FINAL's exact program against the FINAL of
+        // T201. T206 split FINAL into three programs; the pre-split FINAL
+        // survives as t206_monolithic_ref, and the T202 comparator stays
+        // byte-identical to that. The T198 comparator (bits 11, the
+        // T199-T201 FINAL) and the T196 control still compile beside it.
         String[] hosts = {"t196_field_both", "t198_field_both_exact"};
         String comparator = readWorkspaceSource(base + "cloud_atmosphere_volume_t202_refine_field.fsh");
-        require(comparator.equals(finalSource),
-                "t202_refine_field is no longer byte-identical to FINAL;"
-                        + " the T202 comparator would measure a source difference");
+        String monolithicFinal = readWorkspaceSource(base + "cloud_atmosphere_volume_t206_monolithic_ref.fsh");
+        require(comparator.equals(monolithicFinal),
+                "t202_refine_field is no longer byte-identical to the monolithic FINAL"
+                        + " (t206_monolithic_ref); the T202 comparator would measure a source"
+                        + " difference");
         for (String host : hosts) {
             String source = readWorkspaceSource(base + "cloud_atmosphere_volume_" + host + ".fsh");
             compileFragmentShader(resolveMojImports(source), host);
@@ -1562,8 +1857,10 @@ public final class StormVolumetricGeometrySandbox {
                 scoped++;
             }
         }
-        require(production == 2,
-                "T191 expects exactly two unconditional production programs, found "
+        // T206: four - the monolith, FINAL, and the two programs FINAL's
+        // frame draws with (the gate build, the rain pass).
+        require(production == 4,
+                "T191 expects exactly four unconditional production programs, found "
                         + production);
         require(unreachable.isEmpty(),
                 "T191 campaign arms that no registered campaign can load, so they"
@@ -1603,7 +1900,8 @@ public final class StormVolumetricGeometrySandbox {
                         && shaders.contains("&& !selectable.contains(program)) {"),
                 "T191 shader registration is no longer scoped to the active campaign,"
                         + " so every historical arm compiles at startup again");
-        require(shaders.contains("if (program.isProductionProgram()) {"),
+        require(shaders.contains("if (program.isProductionProgram()) {")
+                        && shaders.contains("if (program.finalSupportProgram()) {"),
                 "T191 production programs are no longer registered unconditionally");
         require(shaders.contains("T191_VARIANT_SCOPE declared={}"),
                 "T191 startup no longer reports how many programs it loaded, so a"
@@ -8188,15 +8486,30 @@ public final class StormVolumetricGeometrySandbox {
      * <p>So compiling the reachability test out under that define would set
      * {@code localRainSegment} permanently false and delete rain from the
      * shipped program. This invariant fails the build if that is attempted.
+     *
+     * <p>T206. FINAL now compiles the reachability test out deliberately
+     * ({@code PA_ARM_NO_RAIN_SEGMENT}) - and rain still reaches the frame,
+     * because the production rain pass runs the test and the shaft in its
+     * own march and FINAL composites the result. The shipped path is
+     * therefore checked as a pair: the rain pass must carry both calls, and
+     * FINAL must carry the composite. The T140 oracle family keeps the
+     * monolithic march and is checked as before.
      */
     private static void validateRainRenderSurvivesPrecipitationSpecialization() {
         String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
         String[] specialized = {
-                "cloud_atmosphere_volume_final",
+                "cloud_atmosphere_volume_rain_pass",
                 "cloud_atmosphere_volume_t140_pixel",
                 "cloud_atmosphere_volume_t140_mask"
         };
         List<String> violations = new ArrayList<>();
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        if (!finalSource.contains("#define PA_RAIN_SPLIT_COMPOSITE 1")
+                || !finalSource.contains("accumulated += rainSplitRgb * transmittance;")) {
+            violations.add("cloud_atmosphere_volume_final compiles the rain family out but"
+                    + " no longer composites the rain pass, so precipitation cannot reach"
+                    + " the frame");
+        }
         for (String program : specialized) {
             String path = base + program + ".fsh";
             if (!Files.exists(workspacePath(path))) {
@@ -8204,7 +8517,13 @@ public final class StormVolumetricGeometrySandbox {
                         "generated program missing; run generateLeanFinalShader: " + path);
             }
             String generated = readWorkspaceSource(path);
-            if (!generated.contains("rainShaftDensityOverSegment(p, segmentEnd")) {
+            // The rain pass's march names its samples rpP/rpEnd; the cloud
+            // march p/segmentEnd.
+            boolean rainPass = program.endsWith("_rain_pass");
+            String shaftCall = rainPass ? "rainShaftDensityOverSegment(rpP, rpEnd"
+                    : "rainShaftDensityOverSegment(p, segmentEnd";
+            if (!generated.contains(shaftCall)
+                    || (rainPass && !generated.contains("#define PA_RAIN_PASS 1"))) {
                 violations.add(program + " no longer renders rain: the march's"
                         + " rainShaftDensityOverSegment call is gone, so precipitation"
                         + " cannot reach the frame");

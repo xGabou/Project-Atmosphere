@@ -3384,6 +3384,53 @@ implementation, while visual polish remains independently active.
   fresh baseline), then T207 = temporal on the ~7 ms frame. campaignGate x3, check build
   PASS; eight campaign-scoped programs, FINAL defines no split (asserted). Evidence in
   `validation/performance-rain-pass.md` and `validation/t205-campaign/`. [SC-005, SC-021]
+- [X] T206 [PERFORMANCE] [US3] Productionize the split rain renderer. FINAL is the T205 split:
+  `leanFinalDefines` (build.gradle) adds `PA_ARM_NO_RAIN_SEGMENT` and
+  `PA_RAIN_SPLIT_COMPOSITE` to FINAL's specialization, and two production programs are
+  registered beside it unconditionally - `rain_pass` (`PA_RAIN_PASS`, the gate baked 1, the
+  coarse stride, no fine band, no mask output) and `rain_gate_build` (T203's build program
+  promoted, gate 2 + field pass 1) - as `CoreCostDiagnosticProgram.finalSupportProgram()`
+  inside FINAL's fail-fast block in `VolumetricCloudShaders` (a link failure of either nulls
+  FINAL and session-disables; the renderer throws `LeanFinalProgramUnavailableException`
+  rather than draw FINAL without its gate or rain pass; the monolith is never the fallback).
+  Production render order every FINAL frame: storm field build -> gate build -> rain pass
+  (RGBA32F cloud-sized target, unit 17) -> split cloud (composites at the first step past
+  `t_R`, T205's semantics untouched) -> composite/output. `isProductionProgram()` is four
+  (monolith, FINAL, rain pass, gate build); `LEAN_FINAL.rainSplitCloud()`,
+  `rainGateGeneration()`, `rainPassProgram() == RAIN_PASS`. Lifecycle: the rain-pass target
+  is released in `destroyAll` (T205's campaign target never was - a leak on resize / reload
+  / shutdown, closed) with `T206_RAIN_PASS_ALLOC/RELEASE` lines on the T199 pattern; the
+  gate and rain-pass clocks close on `shutdown()`. JSON validation: `generateLeanFinalShader`
+  asserts every generated program's JSON matches its GLSL both ways (uniforms, samplers,
+  the twelve-sampler cap); the sandbox T206 invariant repeats it for the production three
+  and asserts every renderer `safeGetUniform` name is in the monolith's JSON - which found
+  `PaDiagnosticStepBudget` declared and set but never in the JSON (a silent no-op on the
+  monolith; added). The generator now empties its output directory, so retired variants
+  cannot ship. Retired: `t205_cloud_split` / `t205_rain_pass` (byte-identical to production;
+  the T205 campaign keeps the mask and fine-band pairs and prices them against FINAL). Added
+  `t206_monolithic_ref` (the pre-split FINAL: the quality anchor, and what the T202
+  comparator is byte-identical to); the T171 identity controls take FINAL's list and draw the
+  rain pass; the T140 oracle family keeps the pre-split specialization. Invariants flipped:
+  T191 (four production programs), T205 (split in FINAL, pair retired), T203 (build program
+  under its production name), T199/T202 (comparator vs the monolithic reference), T183 (the
+  shipped rain path checked as FINAL + rain pass). Campaign `T206`
+  (`run/t206-production-baseline.txt`, `productionBaselineRunRequested`, `t206Run`,
+  `T206_ARMS` - FINAL bracketed by the monolithic reference at 0.25 and 0.75 -
+  `T206_OPTIMIZATION_ARMS`, `T206_IMAGE_ARMS`, `T206_SUPPORT_PROGRAMS`, the T199 lifecycle
+  probe reused; `buildT206Report()` prints per pose and scale field / gate / rain pass /
+  cloud / composite / total against the reference and the budget to 10 and 8 ms), two
+  launches on 13Sep2026. RESULT: **PASS** - production FINAL binary 228,477 B (T205's split
+  size to the byte; rain pass 249,822, gate build 141,959, reference 302,615); 0.25 totals
+  **SIDE 7.24 / 7.26 ms (field 1.07-1.29, gate 0.12, rain 1.03-1.05, cloud 4.85-5.04,
+  composite 0.08-0.09), PLAY_VIS_NEAR 6.20 / 7.05 ms** against the reference's 14.0-15.5 /
+  12.2-14.6 (net 6.8-8.2 / 6.0-7.5, paired cloud-draw ratio 2.4-2.6 / 2.8-3.1); 0.75 totals
+  31.5-38.6 / 21.1-29.2 against 68.5-77.4 / 51.0-71.6. Frame exact-class: cloud SSIM
+  0.99997-1.0, edge SSIM 0.9995-0.99995, 0.07-0.54% pixels changed at 1.5e-4 to 1.5e-3 RMS,
+  hole retention >= 0.986. Thin-rain caveat documented: mask IoU 0.57-0.72 (the reference's
+  sub-ulp thin rain, sampled finely under the base, the fine-band / tile-mask follow-up).
+  Temporal budget at 0.25: 2.7-3.8 ms to 10, 0.7-1.8 ms to 8; **T207 ready: YES.**
+  campaignGate x2, check build PASS. Evidence in `validation/performance-production-split.md`
+  and `validation/t206-campaign/`. [SC-005, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
