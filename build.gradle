@@ -1196,6 +1196,55 @@ def leanProgramVariants = [
          keepUniforms: ['PaStormFieldPass', 'PaDiagnosticEvalEpsilon'],
          overrides   : ['uniform int PaRainGateField;':
                                 'const int PaRainGateField = 1;']],
+        // T205. Rain as a separate pass. The split cloud program is FINAL's
+        // specialization with the rain family compiled out (T182's define)
+        // and the composite of the rain pass's result; the rain pass program
+        // returns from its own march before the cloud march, with the T203
+        // gate baked on. The mask pair renders the T188 rain mask through
+        // the split, on the mask reference's own defines.
+        [name        : 'cloud_atmosphere_volume_t205_cloud_split',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_RAIN_SPLIT_COMPOSITE 1'],
+         keepUniforms: ['PaStormFieldPass']],
+        [name        : 'cloud_atmosphere_volume_t205_cloud_split_mask',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                        'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_RAIN_SPLIT_COMPOSITE 1'],
+         keepUniforms: ['PaStormFieldPass']],
+        [name        : 'cloud_atmosphere_volume_t205_rain_pass',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_RAIN_PASS 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        [name        : 'cloud_atmosphere_volume_t205_rain_pass_mask',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                        'PA_RAIN_PASS 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        // The fine-band pair: the split cloud unchanged under a second name
+        // (the renderer pairs cloud and rain programs by name), the rain
+        // pass with the fine stride in the attach band.
+        [name        : 'cloud_atmosphere_volume_t205_cloud_split_fine',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_RAIN_SPLIT_COMPOSITE 1'],
+         keepUniforms: ['PaStormFieldPass']],
+        [name        : 'cloud_atmosphere_volume_t205_cloud_split_fine_mask',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                        'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_RAIN_SPLIT_COMPOSITE 1'],
+         keepUniforms: ['PaStormFieldPass']],
+        [name        : 'cloud_atmosphere_volume_t205_rain_pass_fine',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_RAIN_PASS 1', 'PA_RAIN_PASS_FINE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        [name        : 'cloud_atmosphere_volume_t205_rain_pass_fine_mask',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                        'PA_RAIN_PASS 1', 'PA_RAIN_PASS_FINE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
         // The build program: FINAL's specialization with the rain-field pass
         // and the gate baked on, so main returns from the build branch and
         // the march is dead code. It receives the ray program's uniforms and

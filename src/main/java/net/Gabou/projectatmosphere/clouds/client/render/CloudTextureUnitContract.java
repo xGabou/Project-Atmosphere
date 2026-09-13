@@ -31,7 +31,9 @@ public final class CloudTextureUnitContract {
      * renderer checks the real count once and logs the shortfall.
      */
     public static final int STORM_FIELD_UNIT = 16;
-    public static final int MAX_PA_TOUCHED_UNIT = STORM_FIELD_UNIT;
+    /** T205. The rain pass's output, read by the split cloud program. */
+    public static final int RAIN_PASS_UNIT = 17;
+    public static final int MAX_PA_TOUCHED_UNIT = RAIN_PASS_UNIT;
     public static final int REQUIRED_FRAGMENT_TEXTURE_UNITS = MAX_PA_TOUCHED_UNIT + 1;
 
     private CloudTextureUnitContract() {
@@ -46,6 +48,7 @@ public final class CloudTextureUnitContract {
                 || DETAIL_NOISE_UNIT != BASE_NOISE_UNIT + 1
                 || RAIN_FIELD_UNIT != DETAIL_NOISE_UNIT + 1
                 || STORM_FIELD_UNIT != RAIN_FIELD_UNIT + 1
+                || RAIN_PASS_UNIT != STORM_FIELD_UNIT + 1
                 || REQUIRED_FRAGMENT_TEXTURE_UNITS != MAX_PA_TOUCHED_UNIT + 1) {
             throw new IllegalStateException("native cloud texture-unit contract is not contiguous");
         }

@@ -819,7 +819,33 @@ public enum CoreCostDiagnosticProgram {
     /** T204: the gate's reject-all skeleton with the shaft compiled out. */
     T204_SKELETON_SHAFT_OUT("t204_skeleton_shaft_out"),
     /** T204: the gate's reject-all skeleton with the shaft compiled in, runtime-false. */
-    T204_SKELETON_RUNTIME_FALSE("t204_skeleton_runtime_false");
+    T204_SKELETON_RUNTIME_FALSE("t204_skeleton_runtime_false"),
+
+    // -----------------------------------------------------------------------
+    // T205. Rain as a separate pass. The split cloud program is FINAL's
+    // specialization with the rain family compiled out and one composite of
+    // the rain pass's result at the rain's depth; the rain pass program is
+    // the same source with main returning from a rain-only march before the
+    // cloud march, the T203 gate baked on. The mask pair renders the T188
+    // rain mask through the split.
+    // -----------------------------------------------------------------------
+
+    /** T205: the cloud program without the rain family, compositing the rain pass. */
+    T205_CLOUD_SPLIT("t205_cloud_split"),
+    /** T205: the split cloud program's rain-mask capture. */
+    T205_CLOUD_SPLIT_MASK("t205_cloud_split_mask"),
+    /** T205: the rain pass - never selected as an arm, drawn before the split cloud. */
+    T205_RAIN_PASS("t205_rain_pass"),
+    /** T205: the rain pass in mask mode, drawn before the split mask. */
+    T205_RAIN_PASS_MASK("t205_rain_pass_mask"),
+    /** T205: the split cloud drawn with the fine-band rain pass. */
+    T205_CLOUD_SPLIT_FINE("t205_cloud_split_fine"),
+    /** T205: its rain-mask capture. */
+    T205_CLOUD_SPLIT_FINE_MASK("t205_cloud_split_fine_mask"),
+    /** T205: the rain pass with the fine stride in the attach band. */
+    T205_RAIN_PASS_FINE("t205_rain_pass_fine"),
+    /** T205: the fine-band rain pass in mask mode. */
+    T205_RAIN_PASS_FINE_MASK("t205_rain_pass_fine_mask");
 
 
     private final String serializedName;
@@ -1001,7 +1027,8 @@ public enum CoreCostDiagnosticProgram {
                 || this == T189_RAIN_MASK_STRICT
                 || this == T190_RAIN_MASK_SAFE
                 || this == T192_RAIN_MASK_BOUND
-                || this == T203_RAIN_MASK_GATE;
+                || this == T203_RAIN_MASK_GATE
+                || this == T205_CLOUD_SPLIT_MASK || this == T205_CLOUD_SPLIT_FINE_MASK;
     }
 
     /** T203. Programs whose frame builds the rain gate field. */
@@ -1010,7 +1037,25 @@ public enum CoreCostDiagnosticProgram {
                 || this == T203_RAIN_MASK_GATE
                 || this == T203_GATE_REJECT_ALL || this == T203_GATE_NO_FALLBACK
                 || this == T203_GATE_NO_SHAFT
-                || this == T204_SKELETON_SHAFT_OUT || this == T204_SKELETON_RUNTIME_FALSE;
+                || this == T204_SKELETON_SHAFT_OUT || this == T204_SKELETON_RUNTIME_FALSE
+                // T205. The rain pass reads the gate; its cloud program owns the frame.
+                || rainSplitCloud();
+    }
+
+    /** T205. The split cloud programs, whose frame draws the rain pass first. */
+    public boolean rainSplitCloud() {
+        return this == T205_CLOUD_SPLIT || this == T205_CLOUD_SPLIT_MASK
+                || this == T205_CLOUD_SPLIT_FINE || this == T205_CLOUD_SPLIT_FINE_MASK;
+    }
+
+    /** T205. The rain pass program a split cloud program draws with. */
+    public CoreCostDiagnosticProgram rainPassProgram() {
+        return switch (this) {
+            case T205_CLOUD_SPLIT_MASK -> T205_RAIN_PASS_MASK;
+            case T205_CLOUD_SPLIT_FINE -> T205_RAIN_PASS_FINE;
+            case T205_CLOUD_SPLIT_FINE_MASK -> T205_RAIN_PASS_FINE_MASK;
+            default -> T205_RAIN_PASS;
+        };
     }
 
     /** T203. Programs whose segment test reads the gate. */

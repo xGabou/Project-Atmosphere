@@ -2965,6 +2965,170 @@ final class StormT132AutoDriver {
     }
 
     // -----------------------------------------------------------------------
+    // T205. Rain as a separate pass. The split cloud program (the rain
+    // family compiled out, one composite of the rain pass's result at the
+    // rain's depth) against FINAL: the T188 rain mask through the split
+    // against the mask reference, the frame against the FINAL anchor with
+    // the quality harness, then anchor-bracketed timing of the split (its
+    // cloud draw and its rain pass on separate clocks) beside the two
+    // ceilings it is measured against - the rain family out and the shaft
+    // out - in the same session. Counters at production's bits, one
+    // capture a pose (the shaft's sparsity census, view 78).
+    // -----------------------------------------------------------------------
+
+    private static final Path T205_MARKER = Path.of("t205-rain-pass.txt");
+
+    private static final String[] T205_POSES = {"SIDE", "PLAY_VIS_NEAR"};
+
+    private static boolean t205Run;
+    private static boolean t205OriginalHistoryEnabled;
+
+    private static final T201Consumer[] T205_CONSUMERS = {
+            new T201Consumer(CoreCostDiagnosticProgram.T205_CLOUD_SPLIT, "rainSplit"),
+            new T201Consumer(CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_FINE, "rainSplitFine"),
+            new T201Consumer(CoreCostDiagnosticProgram.T182_NO_RAIN_SEGMENT, "ceilingFamilyOut(T182)"),
+            new T201Consumer(CoreCostDiagnosticProgram.T201_NO_RAIN_SHAFT, "ceilingShaftOut(T201)"),
+    };
+
+    private static final T166Arm[] T205_ARMS = buildT205Arms();
+
+    private static T166Arm[] buildT205Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        for (int repeat = 1; repeat <= 3; repeat++) {
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.T205_CLOUD_SPLIT, "r" + repeat, 60));
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                    String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_FINE, "r" + repeat, 60));
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                    String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        }
+        for (int i = 2; i < T205_CONSUMERS.length; i++) {
+            arms.add(new T166Arm(T205_CONSUMERS[i].program(), "r1", 60));
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                    String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t205Arm() {
+        return T205_ARMS[Math.max(0, Math.min(T205_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T205_OPTIMIZATION_ARMS =
+            buildT205OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT205OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T205_ARMS.length];
+        for (int i = 0; i < T205_ARMS.length; i++) {
+            modes[i] = T205_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /** T205. The rain ground truth, the mask through the split, the split's frame. */
+    private static final CoreCostDiagnosticProgram[] T205_IMAGE_ARMS = {
+            CoreCostDiagnosticProgram.T188_RAIN_MASK_REF,
+            CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_MASK,
+            CoreCostDiagnosticProgram.T205_CLOUD_SPLIT,
+            CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_FINE_MASK,
+            CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_FINE
+    };
+
+    /** T205. Drawn with by the split programs, never selected as arms. */
+    private static final CoreCostDiagnosticProgram[] T205_SUPPORT_PROGRAMS = {
+            CoreCostDiagnosticProgram.T203_GATE_BUILD,
+            CoreCostDiagnosticProgram.T205_RAIN_PASS,
+            CoreCostDiagnosticProgram.T205_RAIN_PASS_MASK,
+            CoreCostDiagnosticProgram.T205_RAIN_PASS_FINE,
+            CoreCostDiagnosticProgram.T205_RAIN_PASS_FINE_MASK
+    };
+
+    /** T205 marker predicate. */
+    private static boolean rainPassRunRequested() {
+        return Files.exists(T205_MARKER);
+    }
+
+    /**
+     * T205. The bracketed blocks and consumer lines (the arm's ray is the
+     * split cloud draw alone), then per pose the split's total against the
+     * anchors': cloud + field (storm field and gate build) + rain pass.
+     */
+    private static String buildT205Report() {
+        StringBuilder out = new StringBuilder(buildBracketedPricingReport(
+                "T205", "T205_RAIN_PASS_DECISION", T205_POSES, T205_ARMS,
+                T205_CONSUMERS[0].program()));
+        for (String pose : T205_POSES) {
+            for (T201Consumer consumer : T205_CONSUMERS) {
+                appendBracketedConsumer(out, "T205_CONSUMER", T205_ARMS, pose,
+                        consumer.consumer(), consumer.program().serializedName());
+            }
+            for (CoreCostDiagnosticProgram splitProgram : new CoreCostDiagnosticProgram[] {
+                    CoreCostDiagnosticProgram.T205_CLOUD_SPLIT,
+                    CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_FINE}) {
+            java.util.List<Double> cloud = new java.util.ArrayList<>();
+            java.util.List<Double> cloudP95 = new java.util.ArrayList<>();
+            java.util.List<Double> field = new java.util.ArrayList<>();
+            java.util.List<Double> gate = new java.util.ArrayList<>();
+            java.util.List<Double> rain = new java.util.ArrayList<>();
+            java.util.List<Double> rainP95 = new java.util.ArrayList<>();
+            java.util.List<Double> total = new java.util.ArrayList<>();
+            java.util.List<Double> anchorTotal = new java.util.ArrayList<>();
+            java.util.List<Double> anchorRay = new java.util.ArrayList<>();
+            java.util.List<Double> anchorField = new java.util.ArrayList<>();
+            for (T166Arm arm : T205_ARMS) {
+                StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
+                if (cell == null || cell.cloudP50() <= 0.0D) {
+                    continue;
+                }
+                if (t194IsAnchor(arm)) {
+                    anchorRay.add(cell.cloudP50());
+                    anchorField.add(Math.max(0.0D, cell.rainFieldP50()));
+                    anchorTotal.add(cell.cloudP50() + Math.max(0.0D, cell.rainFieldP50()));
+                    continue;
+                }
+                if (arm.program() != splitProgram) {
+                    continue;
+                }
+                cloud.add(cell.cloudP50());
+                cloudP95.add(cell.cloudP95());
+                field.add(Math.max(0.0D, cell.rainFieldP50()));
+                gate.add(Math.max(0.0D, cell.rainGateP50()));
+                rain.add(Math.max(0.0D, cell.rainPassP50()));
+                rainP95.add(Math.max(0.0D, cell.rainPassP95()));
+                total.add(cell.cloudP50() + Math.max(0.0D, cell.rainFieldP50())
+                        + Math.max(0.0D, cell.rainPassP50()));
+            }
+            T200Stat c = T200Stat.of(cloud);
+            T200Stat c95 = T200Stat.of(cloudP95);
+            T200Stat f = T200Stat.of(field);
+            T200Stat g = T200Stat.of(gate);
+            T200Stat r = T200Stat.of(rain);
+            T200Stat r95 = T200Stat.of(rainP95);
+            T200Stat tt = T200Stat.of(total);
+            T200Stat at = T200Stat.of(anchorTotal);
+            T200Stat ar = T200Stat.of(anchorRay);
+            T200Stat af = T200Stat.of(anchorField);
+            out.append(String.format(Locale.ROOT,
+                    "%nT205_SPLIT pose=%s split=%s cells=%d cloudMs=%.4f cloudP95=%.4f fieldMs=%.4f"
+                            + " gateBuildMs=%.4f rainPassMs=%.4f rainPassP95=%.4f totalMs=%.4f"
+                            + " totalMin=%.4f totalMax=%.4f anchors=%d anchorRayMs=%.4f"
+                            + " anchorFieldMs=%.4f anchorTotalMs=%.4f netSavedMs=%.4f"
+                            + " netRatio=%.4f",
+                    pose, splitProgram.serializedName(), c.n(), c.mean(), c95.mean(), f.mean(),
+                    g.mean(), r.mean(), r95.mean(),
+                    tt.mean(), tt.min(), tt.max(), at.n(), ar.mean(), af.mean(), at.mean(),
+                    at.mean() - tt.mean(),
+                    tt.mean() > 0.0D ? at.mean() / tt.mean() : Double.NaN));
+            }
+        }
+        return out.toString();
+    }
+
+    // -----------------------------------------------------------------------
     // T202B. After T202: the fresh FINAL baseline at 0.25 (Task 10) and the
     // rain segment test's ceiling on that FINAL (Task 11) - measurement
     // only. The T182 arm removes rainSegmentMayContribute uniformly (the
@@ -4263,7 +4427,7 @@ final class StormT132AutoDriver {
                 || t184Run || t185Run || t186Run || t187Run || t188Run
                 || t189Run || t190Run || t192Run || t193Run || t194Run
                 || t195Run || t196Run || t198Run || t199Run || t200Run
-                || t201Run || t202Run || t202bRun || t203Run || t204Run;
+                || t201Run || t202Run || t202bRun || t203Run || t204Run || t205Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -4521,7 +4685,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t204Run ? t204Arm()
+            T166Arm arm = t205Run ? t205Arm()
+                    : t204Run ? t204Arm()
                     : t203Run ? t203Arm()
                     : t202bRun ? t202bArm()
                     : t202Run ? t202Arm()
@@ -4637,6 +4802,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t205Run) {
+            return t205Arm().label();
+        }
         if (t204Run) {
             return t204Arm().label();
         }
@@ -4776,6 +4944,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t205Run) {
+            return T205_OPTIMIZATION_ARMS;
+        }
         if (t204Run) {
             return T204_OPTIMIZATION_ARMS;
         }
@@ -5046,6 +5217,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t205Run) {
+            return T205_POSES;
+        }
         if (t204Run) {
             return T204_POSES;
         }
@@ -5582,6 +5756,8 @@ final class StormT132AutoDriver {
                 VolumetricCloudDebugConfig.setRainGateForcedOnMonolith(false);
                 t204Run = shaftAttributionRunRequested();
                 t204OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t205Run = rainPassRunRequested();
+                t205OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 java.util.Arrays.fill(T202_AUDIT_CAPTURES, null);
                 // T188 Task 3 and Task 11. Counters come from the monolith, so
                 // the monolith has to be using the field for them to describe
@@ -5657,7 +5833,8 @@ final class StormT132AutoDriver {
                                 || t202Run
                                 || t202bRun
                                 || t203Run
-                                || t204Run;
+                                || t204Run
+                                || t205Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -5671,7 +5848,7 @@ final class StormT132AutoDriver {
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
                             && !t171Run && !t172Run && !t173Run && !t174Run
                             && !t175Run && !t176Run && !t177Run && !t178Run
-                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run && !t198Run && !t199Run && !t200Run && !t201Run && !t202Run && !t202bRun && !t203Run && !t204Run) {
+                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run && !t189Run && !t190Run && !t192Run && !t193Run && !t194Run && !t195Run && !t196Run && !t198Run && !t199Run && !t200Run && !t201Run && !t202Run && !t202bRun && !t203Run && !t204Run && !t205Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -5681,7 +5858,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t204Run ? "T204_SHAFT_ATTRIBUTION"
+                            t205Run ? "T205_RAIN_PASS"
+                                    : t204Run ? "T204_SHAFT_ATTRIBUTION"
                                     : t203Run ? "T203_RAIN_GATE"
                                     : t202bRun ? "T202B_POST_BASELINE"
                                     : t202Run ? "T202_PRIMARY_TRAVERSAL"
@@ -6066,7 +6244,8 @@ final class StormT132AutoDriver {
                         || (t202Run && t202Arm().program().fixedWork())
                         || (t202bRun && t202bArm().program().fixedWork())
                         || (t203Run && t203Arm().program().fixedWork())
-                        || (t204Run && t204Arm().program().fixedWork())) {
+                        || (t204Run && t204Arm().program().fixedWork())
+                        || (t205Run && t205Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -6137,7 +6316,7 @@ final class StormT132AutoDriver {
                         VolumetricCloudDebugConfig.setRainGateForcedOnMonolith(
                                 t203CounterPhase == 1);
                     }
-                    if (t204Run) {
+                    if (t204Run || t205Run) {
                         // Production's bits, the gate off: the shaft census
                         // describes the shipping renderer.
                         VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(
@@ -6191,7 +6370,7 @@ final class StormT132AutoDriver {
                                     ? T202_COUNTER_LABELS[t202CounterPhase]
                                     : t203Run
                                     ? T203_COUNTER_LABELS[t203CounterPhase]
-                                    : t204Run ? "|final"
+                                    : (t204Run || t205Run) ? "|final"
                                     : ""), line);
                     if (t199Run && t199CounterPhase == T199_COUNTER_BITS.length - 1) {
                         // T199. The production attribution is the share
@@ -6241,7 +6420,7 @@ final class StormT132AutoDriver {
                             VolumetricCloudDebugConfig.setRainGateForcedOnMonolith(false);
                             VolumetricCloudDebugConfig.resetStormFieldMonolithBits();
                         }
-                        if (t204Run) {
+                        if (t204Run || t205Run) {
                             VolumetricCloudDebugConfig.resetStormFieldMonolithBits();
                         }
                     }
@@ -6349,6 +6528,15 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
                     VolumetricCloudDebugConfig.setHistoryEnabled(
                             t202bOriginalHistoryEnabled);
+                }
+                if (t205Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT205Report());
+                    VolumetricCloudDebugConfig.resetStormFieldMonolithBits();
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(
+                            t205OriginalHistoryEnabled);
                 }
                 if (t204Run) {
                     ProjectAtmosphere.LOGGER.info(buildT204Report());
@@ -7382,6 +7570,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t205Run) {
+            return T205_IMAGE_ARMS;
+        }
         if (t204Run) {
             return T204_IMAGE_ARMS;
         }

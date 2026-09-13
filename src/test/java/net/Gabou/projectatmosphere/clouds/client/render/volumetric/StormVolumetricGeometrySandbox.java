@@ -680,6 +680,71 @@ public final class StormVolumetricGeometrySandbox {
         runCorrected("T204 the shaft attribution arms compile, the runtime-false arms keep the"
                         + " live uniform and FINAL carries no T204 define",
                 StormVolumetricGeometrySandbox::validateT204ShaftArms);
+        runCorrected("T205 the split cloud and rain pass programs compile, pair by mask mode,"
+                        + " and FINAL carries no split",
+                StormVolumetricGeometrySandbox::validateT205RainPass);
+    }
+
+    /**
+     * T205. The four split programs exist, define what their roles need (the
+     * cloud programs the family-out define and the composite, the rain
+     * programs the pass with the gate baked on), pair by mask mode through
+     * the enum, compile in GL; the renderer draws the rain pass before the
+     * split cloud and binds its output on its own unit; FINAL defines no
+     * split; and the texture-unit contract stays contiguous.
+     */
+    private static void validateT205RainPass() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String[][] arms = {
+                {"t205_cloud_split", "PA_RAIN_SPLIT_COMPOSITE", "PA_ARM_NO_RAIN_SEGMENT", "false"},
+                {"t205_cloud_split_mask", "PA_RAIN_SPLIT_COMPOSITE", "PA_RAIN_MASK_OUTPUT", "false"},
+                {"t205_rain_pass", "PA_RAIN_PASS", "PA_RAIN_PASS", "true"},
+                {"t205_rain_pass_mask", "PA_RAIN_PASS", "PA_RAIN_MASK_OUTPUT", "true"},
+                {"t205_cloud_split_fine", "PA_RAIN_SPLIT_COMPOSITE", "PA_ARM_NO_RAIN_SEGMENT", "false"},
+                {"t205_cloud_split_fine_mask", "PA_RAIN_SPLIT_COMPOSITE", "PA_RAIN_MASK_OUTPUT", "false"},
+                {"t205_rain_pass_fine", "PA_RAIN_PASS", "PA_RAIN_PASS_FINE", "true"},
+                {"t205_rain_pass_fine_mask", "PA_RAIN_PASS_FINE", "PA_RAIN_MASK_OUTPUT", "true"}};
+        for (String[] arm : arms) {
+            String path = base + "cloud_atmosphere_volume_" + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T205 program missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains("#define " + arm[1] + " 1") && source.contains("#define " + arm[2] + " 1"),
+                    arm[0] + " does not define " + arm[1] + " and " + arm[2]);
+            boolean rain = Boolean.parseBoolean(arm[3]);
+            require(source.contains("const int PaRainGateField = " + (rain ? "1" : "0") + ";"),
+                    arm[0] + (rain ? " does not bake the gate on" : " bakes the gate on"));
+            require(!source.contains("#define PA_RAIN_PASS 1") == !rain,
+                    arm[0] + " mixes the rain pass into a cloud program");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+        require(CoreCostDiagnosticProgram.T205_CLOUD_SPLIT.rainPassProgram()
+                        == CoreCostDiagnosticProgram.T205_RAIN_PASS
+                        && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_MASK.rainPassProgram()
+                        == CoreCostDiagnosticProgram.T205_RAIN_PASS_MASK
+                        && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_FINE.rainPassProgram()
+                        == CoreCostDiagnosticProgram.T205_RAIN_PASS_FINE
+                        && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_FINE_MASK.rainPassProgram()
+                        == CoreCostDiagnosticProgram.T205_RAIN_PASS_FINE_MASK
+                        && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT.rainSplitCloud()
+                        && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT.rainGateGeneration()
+                        && CoreCostDiagnosticProgram.T205_CLOUD_SPLIT_MASK.rainMaskCapture(),
+                "the split programs do not pair by mask mode through the enum");
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        require(!finalSource.contains("#define PA_RAIN_SPLIT_COMPOSITE")
+                        && !finalSource.contains("#define PA_RAIN_PASS"),
+                "FINAL carries the split");
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudRenderer.java");
+        require(renderer.contains("copyFrameUniforms(shader, rainShader);")
+                        && renderer.contains("RAIN_PASS_TIMER.begin();")
+                        && renderer.contains("\"RainPassSampler\"")
+                        && renderer.contains("RAIN_PASS_TEXTURE_UNIT,"),
+                "the renderer does not draw the rain pass before the split cloud on its own unit");
+        CloudTextureUnitContract.selfCheck();
+        System.out.println("T205_RAIN_PASS programs=" + arms.length + " splitInFinal=false");
     }
 
     /**

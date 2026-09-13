@@ -29,6 +29,13 @@ uniform sampler2D OracleIntervalSampler;
  * B = descriptor ownership as 0/1, A = 1 where a cell was written.
  */
 uniform sampler2D RainFieldSampler;
+/**
+ * T205. The rain pass's output, read by the split cloud program at its own
+ * pixel: rgb the rain radiance integrated against the rain's own
+ * transmittance, a the rain's total transmittance and its mass-weighted
+ * depth packed as two 12-bit values. Bound manually on its own unit.
+ */
+uniform sampler2D RainPassSampler;
 uniform sampler3D BaseNoiseSampler;   // bound manually (3D)
 uniform sampler3D DetailNoiseSampler; // bound manually (3D)
 
@@ -412,6 +419,8 @@ const float PA_RAIN_GATE_HEADROOM = PA_STORM_FIELD_LIPSCHITZ_HEADROOM;
 const float PA_RAIN_GATE_WARP_SLOPE = 0.0008;
 /** T203. The attach bounds' rounding pad, in blocks; see paRainGateBuildCell. */
 const float PA_RAIN_GATE_BOUND_PAD = 0.002;
+/** T205. The attach band the fine-stride rain pass samples at the cloud march's fine step. */
+const float PA_RAIN_PASS_FINE_BAND = 48.0;
 /**
  * Uploaded as exactly zero. The amplification arm perturbs its extra
  * evaluation by this, so the compiler cannot prove the second call redundant
@@ -1105,6 +1114,23 @@ bool paWorkloadCaptureActive() {
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
         || (DebugView >= 28 && DebugView <= 78);
+}
+
+/**
+ * T205. Two 12-bit values in one float, exact in a 24-bit mantissa: the
+ * rain's mass-weighted depth as a fraction of the render distance and its
+ * total transmittance (or, in mask mode, the run count).
+ */
+float paRainPassPack(float a01, float b01) {
+    float aQ = floor(clamp(a01, 0.0, 1.0) * 4095.0 + 0.5);
+    float bQ = floor(clamp(b01, 0.0, 1.0) * 4095.0 + 0.5);
+    return aQ * 4096.0 + bQ;
+}
+
+vec2 paRainPassUnpack(float packedValue) {
+    float aQ = floor(packedValue / 4096.0);
+    float bQ = packedValue - aQ * 4096.0;
+    return vec2(aQ, bQ) / 4095.0;
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -8694,6 +8720,162 @@ void main() {
         paMrBaseStep = baseStep;
         paMrOriginJitter = searchBlue * originJitterDistance;
     }
+#ifdef PA_RAIN_PASS
+    // T205. The rain pass. Everything above - the ray, the slab, the scene
+    // clip, the coverage pretest, the strides and the search jitter - is
+    // the cloud march's own setup, so this march starts where the cloud
+    // march starts and rejects the rays it rejects. It walks the coarse
+    // stride only (the cloud march keeps rain on coarse strides by
+    // construction: a precipitation sample resets sinceHit to 100), asks
+    // the segment test on every step, and integrates the shaft's radiance
+    // against its own transmittance. What it cannot know is the cloud's
+    // transmittance at the rain, so it exports the rain's mass-weighted
+    // depth beside its radiance and total transmittance, and the split
+    // cloud program composites the two at that depth against its live
+    // transmittance. Exact wherever rain and body do not share a step.
+    {
+        float rpTransmittance = 1.0;
+        vec3 rpAccumulated = vec3(0.0);
+        float rpWeightedT = 0.0;
+        float rpWeightSum = 0.0;
+        float rpT = t;
+        for (int rpI = 0; rpI < paStepCap; rpI++) {
+            if (rpT >= t1 || rpTransmittance < 0.015) {
+                break;
+            }
+            float rpGrowth = 1.0 + (rpT / max(MaxRenderDistance, 1.0)) * 2.2;
+            float rpStep = min(min(coarseStep * rpGrowth, coarseStepCap), t1 - rpT);
+            vec3 rpP = CameraPos + rayDir * rpT;
+#ifdef PA_RAIN_PASS_FINE
+            // The cloud march samples rain finely for six steps after a body
+            // sample - the band just under the base where rain attaches -
+            // and coarsely everywhere else; run 2's coarse-only pass lost
+            // 22-36% of the mask's thin rain there. The gate cell's attach
+            // bound marks that band without a body walk: fine stride from
+            // PA_RAIN_PASS_FINE_BAND blocks below the cell's highest attach
+            // height to just above it, on cells the gate could not prove dry.
+            vec4 rpCell;
+            if (paRainGateCellAt(rpP.xz, rpCell)
+                    && (int(rpCell.r + 0.5) & PA_RAIN_GATE_DRY) == 0
+                    && rpP.y > rpCell.b - PA_RAIN_PASS_FINE_BAND
+                    && rpP.y < rpCell.b + 8.0) {
+                rpStep = min(fineStep * (cameraInsideCloud ? rpGrowth : 1.0), t1 - rpT);
+            }
+#endif
+            vec3 rpEnd = CameraPos + rayDir * (rpT + rpStep);
+            float rpRain = 0.0;
+            if (PuffDensityStage == 0 && rainSegmentMayContribute(rpP, rpEnd)) {
+                rpRain = rainShaftDensityOverSegment(rpP, rpEnd, 0.0) * DensityMul;
+            }
+#ifdef PA_RAIN_MASK_OUTPUT
+            paRainMassAccum += rpRain * rpStep * rpTransmittance;
+            bool rpActiveNow = rpRain > 0.0008;
+            if (rpActiveNow) {
+                if (paRainOnsetY < 0.0) {
+                    paRainOnsetY = rpP.y;
+                }
+                paRainTerminationY = rpP.y;
+                if (!paRainPrevActive) {
+                    paRainRuns += 1.0;
+                }
+            }
+            paRainPrevActive = rpActiveNow;
+#endif
+            if (rpRain > 0.0008) {
+                // The cloud march's own classification of a precipitation
+                // sample, line for line: the raster base and top for the
+                // ambient height, the local storm and darkness scalars, the
+                // rain fraction of a sample below the base.
+                vec4 rpWeather = sampleWeather(rpP.xz);
+                vec4 rpMorphology = sampleMorphology(rpP.xz);
+                float rpSlabSpan = max(SlabTopY - SlabBaseY, 1.0);
+                float rpBaseY = SlabBaseY + rpWeather.g * rpSlabSpan;
+                float rpTopY = SlabBaseY + rpWeather.b * rpSlabSpan;
+                int rpProfileId = cloudProfileId(rpMorphology);
+                float rpPuffHeight01 = 0.0;
+                bool rpDirectPuffBody = rpProfileId == 3
+                    && PuffShapeMode != 0
+                    && dominantDirectPuffHeightAt(rpP, rpPuffHeight01);
+                float rpH01 = rpDirectPuffBody
+                    ? rpPuffHeight01
+                    : saturate((rpP.y - rpBaseY) / max(rpTopY - rpBaseY, 2.0));
+                float rpDarkness = rpMorphology.b;
+                float rpStorm = 0.0;
+                if (rpProfileId == 4 || rpProfileId == 7) {
+                    rpStorm = 0.20 + rpWeather.a * 0.52;
+                } else if (rpProfileId == 5) {
+                    rpStorm = rpMorphology.a * 0.52;
+                }
+                rpStorm = saturate(rpStorm + rpMorphology.a * 0.16);
+                float rpRainFraction = rpDirectPuffBody
+                    ? 0.0
+                    : saturate(0.25 + max(rpMorphology.a, MaxPrecipitation) * 0.75);
+                float rpExtinction = rpRain * ExtinctionScale;
+                float rpStepTrans = exp(-rpExtinction * rpStep);
+                paLodDistance01 = saturate(rpT / MaxRenderDistance);
+                paLodTransmittance = rpTransmittance;
+                paLodRayVerticality = abs(rayDir.y);
+                float rpUnusedOpticalDepth = 0.0;
+                vec3 rpRadiance = sampleLighting(
+                    rpP,
+                    rpRain,
+                    rpH01,
+                    cosTheta,
+                    saturate(rpT / MaxRenderDistance),
+                    rpStorm,
+                    rpDarkness,
+                    rpRainFraction,
+                    cameraStartsInsideSlab,
+                    cameraInsideCloud,
+                    rpUnusedOpticalDepth
+                );
+                float rpAlpha = rpTransmittance * (1.0 - rpStepTrans);
+                rpAccumulated += rpRadiance * rpAlpha;
+                rpWeightedT += rpT * rpAlpha;
+                rpWeightSum += rpAlpha;
+                rpTransmittance *= rpStepTrans;
+            }
+            rpT += rpStep;
+        }
+        float rpMeanT = rpWeightSum > 0.0 ? rpWeightedT / rpWeightSum : t1;
+        gl_FragDepth = 1.0;
+#ifdef PA_RAIN_MASK_OUTPUT
+        // The mask's four channels with the depth folded into the run
+        // count's spare range, so the split cloud's mask can weight the
+        // mass by its transmittance at the rain.
+        fragColor = vec4(
+            paRainMassAccum,
+            max(paRainOnsetY, 0.0),
+            max(paRainTerminationY, 0.0),
+            paRainRuns * 4096.0 + floor(clamp(rpMeanT / MaxRenderDistance, 0.0, 1.0) * 4095.0 + 0.5));
+#else
+        fragColor = vec4(
+            rpAccumulated,
+            paRainPassPack(rpMeanT / MaxRenderDistance, rpTransmittance));
+#endif
+        return;
+    }
+#endif
+#ifdef PA_RAIN_SPLIT_COMPOSITE
+    // T205. The split cloud program: the rain pass's result for this pixel,
+    // composited at the rain's depth against the live transmittance below.
+    vec4 rainSplitIn = texelFetch(RainPassSampler, ivec2(gl_FragCoord.xy), 0);
+#ifdef PA_RAIN_MASK_OUTPUT
+    float rainSplitInMass = rainSplitIn.r;
+    float rainSplitInRuns = floor(rainSplitIn.a / 4096.0);
+    float rainSplitT = (rainSplitIn.a - rainSplitInRuns * 4096.0) / 4095.0 * MaxRenderDistance;
+    vec3 rainSplitRgb = vec3(0.0);
+    float rainSplitTr = 1.0;
+    bool rainSplitPending = rainSplitInMass > 0.0;
+#else
+    vec2 rainSplitDepthTr = paRainPassUnpack(rainSplitIn.a);
+    float rainSplitT = rainSplitDepthTr.x * MaxRenderDistance;
+    vec3 rainSplitRgb = rainSplitIn.rgb;
+    float rainSplitTr = rainSplitDepthTr.y;
+    float rainSplitInMass = 0.0;
+    bool rainSplitPending = rainSplitTr < 0.9998 || dot(rainSplitRgb, vec3(1.0)) > 0.0;
+#endif
+#endif
     float lastClearT = t0;
     bool hasClearBracket = true;
     float transmittance = 1.0;
@@ -8867,6 +9049,26 @@ void main() {
 #endif
         // Never integrate optical depth past the scene/slab ray endpoint.
         stepLength = min(stepLength, t1 - t);
+#ifdef PA_RAIN_SPLIT_COMPOSITE
+        if (rainSplitPending && rainSplitT < t + stepLength) {
+            // The rain lies in this step: it sees the cloud in front of it
+            // and attenuates what follows. One composite, sub-step ordering
+            // resolved to before the step's own material.
+            accumulated += rainSplitRgb * transmittance;
+            float rainSplitAlpha = transmittance * (1.0 - rainSplitTr);
+            weightedT += rainSplitT * rainSplitAlpha;
+            weightSum += rainSplitAlpha;
+#ifdef PA_RAIN_MASK_OUTPUT
+            // The reference mask never integrates rain behind a ray it has
+            // already terminated (transmittance under 0.015), so the split
+            // mask applies the same rule: run 1 counted that invisible rain
+            // as 1,762 "false" pixels the frame comparison could not see.
+            paRainMassAccum = transmittance >= 0.015 ? rainSplitInMass * transmittance : 0.0;
+#endif
+            transmittance *= rainSplitTr;
+            rainSplitPending = false;
+        }
+#endif
 
         // Consume expired oracle intervals. A zero channel is the terminator;
         // an overflow flag invalidates the cell in the Java report rather
@@ -10360,6 +10562,22 @@ void main() {
         return;
     }
 
+#ifdef PA_RAIN_SPLIT_COMPOSITE
+    if (rainSplitPending) {
+        // The march ended before the rain's depth - opaque cloud in front,
+        // the step budget, or the ray's end - so the rain sits behind what
+        // was integrated.
+        accumulated += rainSplitRgb * transmittance;
+        float rainSplitAlpha = transmittance * (1.0 - rainSplitTr);
+        weightedT += rainSplitT * rainSplitAlpha;
+        weightSum += rainSplitAlpha;
+#ifdef PA_RAIN_MASK_OUTPUT
+        paRainMassAccum = transmittance >= 0.015 ? rainSplitInMass * transmittance : 0.0;
+#endif
+        transmittance *= rainSplitTr;
+        rainSplitPending = false;
+    }
+#endif
     float alpha = saturate(1.0 - transmittance);
     bool currentCloudHit = weightSum > 0.0005;
     float representativeT = currentCloudHit ? weightedT / weightSum : 0.0;
@@ -10472,12 +10690,19 @@ void main() {
     // height, A = contiguous rain runs. Zero mass is "no rain here", which is
     // what makes the pair of masks comparable as sets rather than as images.
     gl_FragDepth = 1.0;
+#ifdef PA_RAIN_SPLIT_COMPOSITE
+    // T205. The rain pass's mask, its mass weighted by this march's
+    // transmittance at the rain - what the reference's own integration did
+    // sample by sample.
+    fragColor = vec4(paRainMassAccum, rainSplitIn.g, rainSplitIn.b, rainSplitInRuns);
+#else
     fragColor = vec4(
         paRainMassAccum,
         max(paRainOnsetY, 0.0),
         max(paRainTerminationY, 0.0),
         paRainRuns
     );
+#endif
     return;
 #endif
     // Counter channels are unpremultiplied floating-point integers. The

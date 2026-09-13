@@ -182,6 +182,24 @@ public final class VolumetricCloudRenderTargets {
     }
 
     /**
+     * T205. The rain pass's target, the cloud target's size: rgb the rain
+     * radiance, a two 12-bit values packed exactly in a float, so RGBA32F
+     * and unfiltered - the split cloud program fetches its own texel.
+     */
+    private static RenderTarget rainPassTarget;
+
+    public static RenderTarget prepareRainPassTarget(int width, int height) {
+        if (rainPassTarget == null || rainPassTarget.width != width
+                || rainPassTarget.height != height) {
+            if (rainPassTarget != null) {
+                rainPassTarget.destroyBuffers();
+            }
+            rainPassTarget = createFloatMap(width, height, GL11.GL_NEAREST);
+        }
+        return rainPassTarget;
+    }
+
+    /**
      * T196. The field atlas: 8x4 tiles of one slice each, XZ nodes square.
      * T197. Sized from the resolution the campaign selects, so 256 is a
      * 2048x1024 atlas (8.4 MB), 384 is 3072x1536 (18.9 MB) and 512 is

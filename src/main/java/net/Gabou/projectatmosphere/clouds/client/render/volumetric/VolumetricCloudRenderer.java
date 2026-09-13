@@ -29,6 +29,9 @@ public final class VolumetricCloudRenderer {
     private static final int DETAIL_NOISE_TEXTURE_UNIT = CloudTextureUnitContract.DETAIL_NOISE_UNIT;
     private static final int RAIN_FIELD_TEXTURE_UNIT = CloudTextureUnitContract.RAIN_FIELD_UNIT;
     private static final int STORM_FIELD_TEXTURE_UNIT = CloudTextureUnitContract.STORM_FIELD_UNIT;
+    private static final int RAIN_PASS_TEXTURE_UNIT = CloudTextureUnitContract.RAIN_PASS_UNIT;
+    /** T205. The rain pass's texture for the frame being drawn, or 0. */
+    private static int rainPassTextureId;
     /**
      * T188. The field texture for the frame being drawn, or 0. Held here
      * because the manual bind has to happen after every shader.apply(),
@@ -55,6 +58,8 @@ public final class VolumetricCloudRenderer {
      * beside it so the gate's own cost is read directly.
      */
     private static final CloudGpuTimer RAIN_GATE_TIMER = new CloudGpuTimer();
+    /** T205. The rain pass on its own clock. */
+    private static final CloudGpuTimer RAIN_PASS_TIMER = new CloudGpuTimer();
     private static final CloudFrameTimeGovernor GOVERNOR = new CloudFrameTimeGovernor();
 
     private static final Matrix4f prevProj = new Matrix4f();
@@ -66,6 +71,7 @@ public final class VolumetricCloudRenderer {
     private static volatile float lastGpuMilliseconds = -1.0F;
     private static volatile float lastRainFieldGpuMilliseconds = -1.0F;
     private static volatile float lastRainGateGpuMilliseconds = -1.0F;
+    private static volatile float lastRainPassGpuMilliseconds = -1.0F;
     /**
      * T199e. The field rebuilds every frame; these only count how often it
      * need not have. A build's inputs are the descriptor set and candidate
@@ -125,6 +131,11 @@ public final class VolumetricCloudRenderer {
      */
     public static float lastRainGateGpuMilliseconds() {
         return lastRainGateGpuMilliseconds;
+    }
+
+    /** T205. Milliseconds the rain pass cost on the GPU, or 0 when the frame drew none. */
+    public static float lastRainPassGpuMilliseconds() {
+        return lastRainPassGpuMilliseconds;
     }
 
     /** Identifies a fresh completed GPU timestamp result without using a frame-time proxy. */
@@ -394,6 +405,10 @@ public final class VolumetricCloudRenderer {
         lastGpuMilliseconds = GPU_TIMER.getLastMilliseconds();
         RAIN_FIELD_TIMER.poll();
         RAIN_GATE_TIMER.poll();
+        RAIN_PASS_TIMER.poll();
+        lastRainPassGpuMilliseconds = program.rainSplitCloud()
+                ? Math.max(0.0F, RAIN_PASS_TIMER.getLastMilliseconds())
+                : 0.0F;
         // The timer holds its last resolved result, so a frame that builds no
         // field would otherwise report the previous arm's build cost and charge
         // a control for a pass it never ran. Zero unless this frame generated.
@@ -514,6 +529,7 @@ public final class VolumetricCloudRenderer {
         // T188. Not a JSON sampler; see bindManualTextures.
         rainFieldTextureId = 0;
         stormFieldTextureId = 0;
+        rainPassTextureId = 0;
 
         lastCloudProjection.set(projection);
         lastViewRotation.set(viewRotation);
@@ -890,6 +906,41 @@ public final class VolumetricCloudRenderer {
             }
         }
 
+        // T205. The rain pass, drawn before the split cloud program with the
+        // frame's uniforms and samplers (the gate field and the storm field
+        // are both built by now): a rain-only march into a cloud-sized
+        // target the cloud program then composites at the rain's depth.
+        if (program.rainSplitCloud()) {
+            ShaderInstance rainShader = VolumetricCloudShaders.volumeShader(
+                    program.rainPassProgram());
+            RenderTarget rainPassTarget = rainShader == null ? null
+                    : VolumetricCloudRenderTargets.prepareRainPassTarget(
+                            cloudTarget.width, cloudTarget.height);
+            if (rainPassTarget != null) {
+                copyFrameUniforms(shader, rainShader);
+                setFrameSamplers(rainShader);
+                VolumetricCloudRenderTargets.clearAndBind(rainPassTarget);
+                rainShader.safeGetUniform("PaStormFieldPass").set(0);
+                rainShader.apply();
+                PuffLobeSpatialIndex.uploadDescriptors(rainShader.getId());
+                bindManualTextures(rainShader, puffCandidateTarget.getColorTextureId());
+                RAIN_PASS_TIMER.begin();
+                try {
+                    FullscreenQuad.draw(rainShader);
+                } finally {
+                    RAIN_PASS_TIMER.end();
+                    unbindManualTextures();
+                    rainShader.clear();
+                }
+                VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
+                rainPassTextureId = rainPassTarget.getColorTextureId();
+            } else {
+                ProjectAtmosphere.LOGGER.warn(
+                        "[VolumetricClouds] rain pass program unavailable for {}",
+                        program.serializedName());
+            }
+        }
+
         lastProgram = program;
         shader.apply();
         PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
@@ -1100,6 +1151,13 @@ public final class VolumetricCloudRenderer {
                 "StormFieldSampler",
                 STORM_FIELD_TEXTURE_UNIT,
                 stormFieldTextureId
+        );
+        // T205. The rain pass's result, for the split cloud program only.
+        bind2dSampler(
+                program,
+                "RainPassSampler",
+                RAIN_PASS_TEXTURE_UNIT,
+                rainPassTextureId
         );
         bind3dSampler(
                 program,

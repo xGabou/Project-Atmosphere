@@ -3354,6 +3354,36 @@ implementation, while visual polish remains independently active.
   temporal after it: NO on the shaft alone (~11.8 raw), borderline-NO with the family moved
   (~9). One launch (5 min), campaignGate x3, check build PASS. Evidence in
   `validation/performance-shaft-attribution.md` and `validation/t204-campaign/`. [SC-005, SC-021]
+- [X] T205 [PERFORMANCE] [US3] Rain as a separate pass. The rain family moved out of the cloud
+  program: `t205_cloud_split` (FINAL's specialization with `PA_ARM_NO_RAIN_SEGMENT` and
+  `PA_RAIN_SPLIT_COMPOSITE`: one texel fetch of the rain pass's output, composited at the
+  first march step past the rain's mass-weighted depth - `accumulated += R * T`,
+  `T *= T_r` - with an after-loop catch-up) and `t205_rain_pass` (`PA_RAIN_PASS`: main returns
+  from a rain-only march on the cloud march's own setup - slab, scene clip, coverage pretest,
+  strides, jitter - at the coarse stride, the segment test with T203's gate baked on, the
+  production shaft, `sampleLighting` for the radiance, integrated against the rain's own
+  transmittance; exports rgb + one float packing `T_r` and `t_R` as two 12-bit values into an
+  RGBA32F cloud-sized target, unit 17 `RAIN_PASS_UNIT`). The renderer draws the rain pass with
+  the cloud program's uniforms and samplers (`copyFrameUniforms`) on `RAIN_PASS_TIMER` before
+  the split cloud; the profile carries `rainPassP50/P95`. Mask pair `_mask` renders the T188
+  rain mask through the split (the rain pass's mask with the depth folded into the run
+  channel, the split weighting mass by its transmittance at the rain, under the reference's
+  own 0.015 termination rule); a `_fine` pair prices a fine stride in the attach band.
+  Campaign `T205` (`run/t205-rain-pass.txt`, `rainPassRunRequested`, `t205Run`, `T205_ARMS`,
+  `T205_OPTIMIZATION_ARMS`, `T205_IMAGE_ARMS`, `T205_SUPPORT_PROGRAMS`), SIDE and
+  PLAY_VIS_NEAR, 0.25, three launches. RESULT: **PASS (major)** - split cloud draw 5.0-5.3 /
+  3.6-4.4 ms (the family-out class: binary 228.5 KB vs FINAL 302.6, T182 225.9), rain pass
+  1.0-1.1 / 1.5-1.6 ms fullscreen, field 1.06, **total 7.1-7.5 / 6.2-7.2 ms vs FINAL
+  13.9-15.0 / 13.8-14.2: net 6.8-7.6 ms saved (ratios 1.96-2.02 / 1.95-2.21)**, the
+  temporal reopen gate (<= 8 ms) met. Frame exact-class: cloud SSIM 0.99998, edge 0.99998,
+  0.1-0.4% pixels changed at 3e-4 RMS, thin 0.98-1.0, hole 1.0. Rain mask below its class
+  (IoU 0.60-0.75, 22-39% of the reference's sub-ulp thin pixels missed, false rain 1-6%,
+  continuity 0.79-0.99): the coarse pass loses the thin rain the reference samples finely
+  under the base; the fine-band variant recovers IoU +0.05 at 4.9 / 8.1 ms (a bound). Not
+  baked: T206 = productionize (FINAL = split cloud + rain pass + gate, invariants flipped,
+  fresh baseline), then T207 = temporal on the ~7 ms frame. campaignGate x3, check build
+  PASS; eight campaign-scoped programs, FINAL defines no split (asserted). Evidence in
+  `validation/performance-rain-pass.md` and `validation/t205-campaign/`. [SC-005, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

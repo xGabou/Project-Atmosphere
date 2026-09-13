@@ -121,6 +121,7 @@ public final class StormT135PerformanceProfile {
     /** T188. The rain-support field build, sampled alongside the march. */
     private static final float[] rainFieldMilliseconds = new float[SAMPLE_FRAMES];
     private static final float[] rainGateMilliseconds = new float[SAMPLE_FRAMES];
+    private static final float[] rainPassMilliseconds = new float[SAMPLE_FRAMES];
     private static float effectiveResolutionScale = Float.NaN;
     private static final List<Cell> results = new ArrayList<>();
 
@@ -165,7 +166,10 @@ public final class StormT135PerformanceProfile {
             // field column above; recorded beside it so the gate's cost
             // reads directly rather than as a difference of two builds.
             double rainGateP50,
-            double rainGateP95
+            double rainGateP95,
+            // T205. The rain pass's own clock, outside the field column.
+            double rainPassP50,
+            double rainPassP95
     ) {
         /**
          * T188. What the renderer actually spends on clouds: the march plus the
@@ -331,6 +335,7 @@ public final class StormT135PerformanceProfile {
         float compositeMs = CloudFieldCompositeRenderer.lastGpuMilliseconds();
         float rainFieldMs = VolumetricCloudRenderer.lastRainFieldGpuMilliseconds();
         float rainGateMs = VolumetricCloudRenderer.lastRainGateGpuMilliseconds();
+        float rainPassMs = VolumetricCloudRenderer.lastRainPassGpuMilliseconds();
         if (sampled < sampleTarget) {
             cloudMilliseconds[sampled] = cloudMs;
             frameMilliseconds[sampled] = frameMs;
@@ -339,6 +344,7 @@ public final class StormT135PerformanceProfile {
             // instead of poisoning it with a sentinel.
             rainFieldMilliseconds[sampled] = Math.max(0.0F, rainFieldMs);
             rainGateMilliseconds[sampled] = Math.max(0.0F, rainGateMs);
+            rainPassMilliseconds[sampled] = Math.max(0.0F, rainPassMs);
             // A pending composite query records as zero rather than as a
             // fabricated cost. The percentile then understates it, which is the
             // safe direction for a term used to argue a cost floor.
@@ -358,6 +364,8 @@ public final class StormT135PerformanceProfile {
             float[] rainField = Arrays.copyOf(rainFieldMilliseconds, sampled);
             float[] rainGate = Arrays.copyOf(rainGateMilliseconds, sampled);
             Arrays.sort(rainGate);
+            float[] rainPass = Arrays.copyOf(rainPassMilliseconds, sampled);
+            Arrays.sort(rainPass);
             Arrays.sort(cloud);
             Arrays.sort(frame);
             Arrays.sort(composite);
@@ -392,7 +400,9 @@ public final class StormT135PerformanceProfile {
                     percentile(rainField, 0.50D),
                     percentile(rainField, 0.95D),
                     percentile(rainGate, 0.50D),
-                    percentile(rainGate, 0.95D)
+                    percentile(rainGate, 0.95D),
+                    percentile(rainPass, 0.50D),
+                    percentile(rainPass, 0.95D)
             ));
             Cell recorded = results.get(results.size() - 1);
             ProjectAtmosphere.LOGGER.info(
@@ -407,6 +417,7 @@ public final class StormT135PerformanceProfile {
                             + " compositeP50={} compositeP95={}"
                             + " rainFieldP50={} rainFieldP95={}"
                             + " rainGateP50={} rainGateP95={}"
+                            + " rainPassP50={} rainPassP95={}"
                             + " cloudPlusFieldP50={}",
                     recorded.pose(), recorded.arm(), recorded.descriptors(),
                     recorded.mode(), recorded.raymarchSteps(),
@@ -423,6 +434,7 @@ public final class StormT135PerformanceProfile {
                     fmt(recorded.compositeP50()), fmt(recorded.compositeP95()),
                     fmt(recorded.rainFieldP50()), fmt(recorded.rainFieldP95()),
                     fmt(recorded.rainGateP50()), fmt(recorded.rainGateP95()),
+                    fmt(recorded.rainPassP50()), fmt(recorded.rainPassP95()),
                     fmt(recorded.cloudPlusFieldP50()));
         } else {
             ProjectAtmosphere.LOGGER.warn(
