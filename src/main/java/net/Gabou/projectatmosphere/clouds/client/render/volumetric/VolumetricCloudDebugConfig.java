@@ -190,6 +190,24 @@ public final class VolumetricCloudDebugConfig {
     private static volatile VolumetricPuffTierFilter puffTierFilter = VolumetricPuffTierFilter.ALL;
     private static volatile boolean historyEnabled = true;
     /**
+     * T207. Temporal lattice reconstruction. 0 off (one raw frame per frame,
+     * the T206 production path); 1 the four-phase lattice with coverage and
+     * depth validity; 2 the same plus the colour clip; 3 the current phase
+     * alone resolved through the lattice pass (the no-history baseline);
+     * 4 trust-all (diagnostic, ghosts by construction). The production
+     * default is {@link #PRODUCTION_TEMPORAL_MODE}; a campaign sets its arm.
+     * T207 banked mode 1: the resolve costs 0.1 ms, the lattice reaches
+     * 0.995 SSIM against production 0.50 at PLAY_VIS_NEAR (0.951 at SIDE,
+     * parity with the single frame, ahead on every structural term), and
+     * the moving-camera route keeps the mean ghost at 0.0007 with nothing
+     * older than the four-frame cycle. Set to 0 to ship the one-frame T206
+     * path.
+     */
+    public static final int PRODUCTION_TEMPORAL_MODE = 1;
+    private static volatile int temporalMode = PRODUCTION_TEMPORAL_MODE;
+    /** T207. 1 makes the resolve write its acceptance class map instead of clouds. */
+    private static volatile int temporalDebugOutput;
+    /**
      * Rank 1 reconstruction arm. False keeps the shipped composite accumulation
      * unchanged; true selects the coverage-alpha reconstruction, which removes
      * the resolution-scale beat by separating the silhouette's coverage from
@@ -360,6 +378,22 @@ public final class VolumetricCloudDebugConfig {
         return historyEnabled;
     }
 
+    public static int temporalMode() {
+        return temporalMode;
+    }
+
+    public static void setTemporalMode(int mode) {
+        temporalMode = Math.max(0, Math.min(4, mode));
+    }
+
+    public static int temporalDebugOutput() {
+        return temporalDebugOutput;
+    }
+
+    public static void setTemporalDebugOutput(int output) {
+        temporalDebugOutput = output;
+    }
+
     public static void setHistoryEnabled(boolean enabled) {
         historyEnabled = enabled;
     }
@@ -472,6 +506,8 @@ public final class VolumetricCloudDebugConfig {
         puffDensityStage = VolumetricPuffDensityStage.FINAL;
         puffTierFilter = VolumetricPuffTierFilter.ALL;
         historyEnabled = true;
+        temporalMode = PRODUCTION_TEMPORAL_MODE;
+        temporalDebugOutput = 0;
         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
         sentinelHeightsEnabled = false;
         fullResolutionEnabled = false;

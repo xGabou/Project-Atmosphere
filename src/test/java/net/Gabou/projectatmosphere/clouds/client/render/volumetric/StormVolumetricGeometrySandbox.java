@@ -686,6 +686,184 @@ public final class StormVolumetricGeometrySandbox {
         runCorrected("T206 the split is FINAL: three production programs, the rain pass's"
                         + " specialization, the JSON matches the GLSL, the target is released",
                 StormVolumetricGeometrySandbox::validateT206ProductionSplit);
+        runCorrected("T207 temporal reconstruction is non-recursive: only raw phases enter the"
+                        + " resolve, the lattice covers the pixel, rain stays current-frame,"
+                        + " the targets are released",
+                StormVolumetricGeometrySandbox::validateT207TemporalReconstruction);
+    }
+
+    /**
+     * T207. The four-phase temporal lattice.
+     *
+     * <ul>
+     *   <li><b>No recursive TAA.</b> The resolve's inputs are the four raw
+     *       phase targets (colour, depth, aux) and the rain pass - its JSON
+     *       names exactly those samplers, its GLSL declares exactly the aux
+     *       four beyond them, and nothing named after the resolved target or
+     *       the composite's source is read. The resolve renderer binds
+     *       {@code Phase<n>Color/Depth} from {@code phaseTarget(n)} and the
+     *       aux from {@code phaseAuxTexture(n)} only; the resolved target is
+     *       prepared in the resolve renderer alone, never bound as a sampler
+     *       anywhere, never recorded as a phase; a phase is recorded only
+     *       after a raw march ({@code temporal && renderedProductionFrame}),
+     *       and a temporal frame never blends the ping-pong history
+     *       ({@code historyValid = !temporal && ...}).</li>
+     *   <li><b>True screen-space jitter.</b> Four quarter-pixel offsets that
+     *       tile the 2x2 lattice, applied to the march's texture coordinate
+     *       before the ray is built and uploaded in texture-coordinate units;
+     *       the resolve's lattice index {@code (x&1) + 2*(y&1)} matches the
+     *       table's order.</li>
+     *   <li><b>Rain stays current-frame.</b> A phase defers the split rain
+     *       composite and exports (before, T_before) on the aux; the resolve
+     *       composites this frame's rain texel with the in-march equation.</li>
+     *   <li><b>JSON matches GLSL</b> for the resolve program; the volume
+     *       JSON names the two live temporal uniforms and FINAL keeps them.</li>
+     *   <li><b>Lifecycle.</b> The temporal targets release with every other
+     *       target, history invalidation drops the phases, allocation and
+     *       release are logged, the resolve's clock closes on shutdown.</li>
+     *   <li>The campaigns are registered and wired; the resolve compiles.</li>
+     * </ul>
+     */
+    private static void validateT207TemporalReconstruction() {
+        String base = "src/main/resources/assets/projectatmosphere/shaders/core/";
+        String resolveSource = readWorkspaceSource(base + "cloud_temporal_resolve.fsh");
+        String resolveJson = readWorkspaceSource(base + "cloud_temporal_resolve.json");
+        java.util.Set<String> jsonSamplers = jsonNames(resolveJson, "samplers");
+        java.util.Set<String> jsonUniforms = jsonNames(resolveJson, "uniforms");
+        java.util.Map<String, String> live = liveUniforms(resolveSource);
+        java.util.Set<String> expectedSamplers = new java.util.LinkedHashSet<>(List.of(
+                "Phase0Color", "Phase1Color", "Phase2Color", "Phase3Color",
+                "Phase0Depth", "Phase1Depth", "Phase2Depth", "Phase3Depth", "RainPassSampler"));
+        require(jsonSamplers.equals(expectedSamplers),
+                "the resolve's JSON samplers are not exactly the four raw phases and the rain"
+                        + " pass: " + jsonSamplers);
+        java.util.Set<String> glslSamplers = new java.util.LinkedHashSet<>();
+        for (java.util.Map.Entry<String, String> uniform : live.entrySet()) {
+            if (uniform.getValue().startsWith("sampler")) {
+                glslSamplers.add(uniform.getKey());
+            } else {
+                require(jsonUniforms.contains(uniform.getKey()),
+                        "resolve uniform " + uniform.getKey() + " is live but not in its JSON");
+            }
+        }
+        java.util.Set<String> expectedGlslSamplers = new java.util.LinkedHashSet<>(expectedSamplers);
+        expectedGlslSamplers.addAll(List.of("Phase0Aux", "Phase1Aux", "Phase2Aux", "Phase3Aux"));
+        require(glslSamplers.equals(expectedGlslSamplers),
+                "the resolve reads a sampler outside the raw phases and the rain pass: "
+                        + glslSamplers);
+        for (String name : jsonUniforms) {
+            require(live.containsKey(name), "resolve JSON names " + name + " the GLSL lacks");
+        }
+        require(!resolveSource.contains("CloudColorSampler") && !resolveSource.contains("HistorySampler")
+                        && !resolveSource.contains("Resolved"),
+                "the resolve names a resolved or history source");
+
+        String resolver = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/field/CloudTemporalResolveRenderer.java");
+        require(resolver.contains("RenderTarget target = VolumetricCloudRenderTargets.phaseTarget(phase);")
+                        && resolver.contains("shader.setSampler(\"Phase\" + phase + \"Color\", target.getColorTextureId());")
+                        && resolver.contains("shader.setSampler(\"Phase\" + phase + \"Depth\", target.getDepthTextureId());")
+                        && resolver.contains("int texture = VolumetricCloudRenderTargets.phaseAuxTexture(phase);")
+                        && !resolver.contains("temporalResolvedTargetOrNull")
+                        && !resolver.contains("CloudTemporalPhaseState.record("),
+                "the resolve renderer binds something other than the raw phases, or records a phase");
+        java.util.regex.Matcher resolvedAsSampler = java.util.regex.Pattern
+                .compile("setSampler\\([^)]*[Rr]esolved").matcher(resolver);
+        require(!resolvedAsSampler.find(), "the resolved target is bound as a sampler");
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudRenderer.java");
+        require(renderer.contains("if (temporal && renderedProductionFrame) {")
+                        && renderer.contains("CloudTemporalPhaseState.record(")
+                        && renderer.contains("boolean historyValid = !temporal")
+                        && renderer.contains("cloudTarget = VolumetricCloudRenderTargets.phaseTarget(")
+                        && !renderer.contains("prepareTemporalResolvedTarget"),
+                "the march does not write raw phases only, or blends history into a phase");
+        String hook = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudRenderHook.java");
+        require(hook.contains("CloudTemporalResolveRenderer.resolve(")
+                        && hook.contains("compositeSource = resolved != null")
+                        && hook.contains("tryCaptureStormReferenceImage(compositeSource)"),
+                "the hook does not resolve before the composite, or captures the wrong target");
+        String targets = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudRenderTargets.java");
+        int prepareResolved = targets.indexOf("public static RenderTarget prepareTemporalResolvedTarget(");
+        require(prepareResolved > 0 && resolver.contains("prepareTemporalResolvedTarget("),
+                "the resolved target is not owned by the resolve pass");
+        int destroyAll = targets.indexOf("private static void destroyAll(String reason) {");
+        require(destroyAll > 0 && targets.indexOf("releaseTemporalTargets(reason);", destroyAll) > destroyAll
+                        && targets.contains("T207_PHASES_ALLOC") && targets.contains("T207_PHASES_RELEASE")
+                        && targets.contains("T207_RESOLVED_ALLOC") && targets.contains("T207_RESOLVED_RELEASE"),
+                "the temporal targets are not released with the others, or their lifecycle is not logged");
+        require(renderer.contains("CloudTemporalPhaseState.invalidateAll();")
+                        && renderer.indexOf("CloudTemporalPhaseState.invalidateAll();")
+                        > renderer.indexOf("public static void invalidateHistory() {"),
+                "history invalidation does not drop the phases");
+        String lifecycle = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudClientLifecycle.java");
+        require(lifecycle.contains("CloudTemporalResolveRenderer.shutdown();"),
+                "the resolve's clock is not closed on shutdown");
+
+        // The jitter: four quarter-pixel offsets tiling the 2x2 lattice, in
+        // the order the resolve's lattice index expects.
+        int[][] expected = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+        for (int phase = 0; phase < CloudTemporalPhaseState.PHASES; phase++) {
+            require(Math.abs(CloudTemporalPhaseState.jitterX(phase) - expected[phase][0] * 0.25F) < 1e-6F
+                            && Math.abs(CloudTemporalPhaseState.jitterY(phase) - expected[phase][1] * 0.25F) < 1e-6F,
+                    "phase " + phase + " jitter is not the quarter-pixel lattice offset");
+        }
+        require(resolveSource.contains("int lattice = (pixel.x & 1) + 2 * (pixel.y & 1);")
+                        && resolveSource.contains("vec2 coord = uv * vec2(size) - vec2(0.5) - phaseJitter(phase);"),
+                "the resolve's lattice index or jitter correction changed");
+        String shader = readWorkspaceSource(base + "cloud_atmosphere_volume.fsh");
+        require(shader.contains(": texCoord + PaSampleJitter;")
+                        && renderer.contains("CloudTemporalPhaseState.jitterX(phase) / Math.max(1.0F, cloudTarget.width)"),
+                "the jitter is not a screen-space offset of the ray in texture-coordinate units");
+        require(CloudTemporalPhaseState.MAX_AGE_FRAMES == 3,
+                "a phase older than the four-frame cycle is accepted");
+
+        // Rain stays current-frame.
+        require(shader.contains("if (PaTemporalPhase != 0) {")
+                        && shader.contains("rainSplitBeforeRgb = accumulated;")
+                        && shader.contains("fragTemporalAux = vec4(rainSplitBeforeRgb, rainSplitBeforeT);")
+                        && shader.contains("if (rainSplitPending && PaTemporalPhase == 0) {"),
+                "a temporal phase composites the rain in-march instead of deferring it");
+        require(resolveSource.contains("outRgb = aux.rgb + aux.a * rainRgb + rainTr * (body.rgb - aux.rgb);")
+                        && resolveSource.contains("outAlpha = 1.0 - bodyTransmittance * rainTr;")
+                        && resolveSource.contains("texelFetch(RainPassSampler, currentCoord, 0)"),
+                "the resolve does not composite the current frame's rain with the in-march equation");
+        String generated = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(generated + "cloud_atmosphere_volume_final.fsh");
+        String finalJson = readWorkspaceSource(generated + "cloud_atmosphere_volume_final.json");
+        require(finalSource.contains("uniform vec2 PaSampleJitter;")
+                        && finalSource.contains("uniform int PaTemporalPhase;")
+                        && finalJson.contains("\"PaSampleJitter\"") && finalJson.contains("\"PaTemporalPhase\""),
+                "FINAL does not keep the temporal uniforms live");
+        String volumeJson = readWorkspaceSource(base + "cloud_atmosphere_volume.json");
+        require(volumeJson.contains("\"PaSampleJitter\"") && volumeJson.contains("\"PaTemporalPhase\""),
+                "the volume JSON does not name the temporal uniforms");
+
+        // The campaigns.
+        String driver = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/StormT132AutoDriver.java");
+        require(driver.contains("\"t207-temporal.txt\"") && driver.contains("\"t207-temporal-motion.txt\"")
+                        && driver.contains("t207IsAnchor(arm)") && driver.contains("reportT207Classes(")
+                        && driver.contains("StormT152MovingCameraFixture.ArmSet.TEMPORAL"),
+                "the T207 campaigns are not wired");
+        String fixture = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/StormT152MovingCameraFixture.java");
+        require(fixture.contains("PRODUCTION_050(\"production_050\", false, 0, 0.50F)")
+                        && fixture.contains("TEMPORAL_025(\"temporal_025\", false, 1, 0.25F)"),
+                "the motion route's temporal pair is not the 0.50 reference against the 0.25 lattice");
+        String config = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudDebugConfig.java");
+        require(config.contains("PRODUCTION_TEMPORAL_MODE"),
+                "the production temporal default is not declared");
+
+        compileFragmentShader(resolveMojImports(resolveSource), "cloud_temporal_resolve");
+        System.out.println("T207_TEMPORAL phases=" + CloudTemporalPhaseState.PHASES
+                + "|resolveInputs=rawPhases+rainPass|resolvedNeverRebound=true"
+                + "|latticeJitter=quarterPixel|rainCurrentFrame=true|targetsReleased=true"
+                + "|productionTemporalMode=" + VolumetricCloudDebugConfig.PRODUCTION_TEMPORAL_MODE);
     }
 
     /**

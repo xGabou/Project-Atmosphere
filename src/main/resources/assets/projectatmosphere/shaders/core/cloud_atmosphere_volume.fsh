@@ -1328,6 +1328,19 @@ uniform int PaDiagnosticLightingMode;
 uniform int PaRayTraceMode;
 uniform vec2 PaRayTraceNdc;
 uniform vec2 PaRayTraceFragCoord;
+// T207. The temporal phase's subpixel ray offset, in texture-coordinate
+// units (the phase jitter in cloud-target pixels divided by the target size
+// on the CPU). It moves the RAY, not the sub-step phase along it: consecutive
+// frames trace different lines through the medium and sample structure the
+// previous frame had no information about (T165). Zero on every frame that
+// is not a temporal phase, which keeps the non-temporal march byte-identical.
+uniform vec2 PaSampleJitter;
+// T207. 1 while the march writes a raw temporal phase: the split rain
+// composite is deferred to the resolve pass, and the body's accumulation and
+// transmittance at the rain's depth are exported on the aux attachment so the
+// resolve can composite the CURRENT frame's rain onto a history phase's body
+// exactly (rain is never reconstructed from history). 0 composites in-march.
+uniform int PaTemporalPhase;
 
 bool paRayTraceActive() {
     return PaRayTraceMode != 0;
@@ -1480,6 +1493,12 @@ uniform vec4 Funnel1B;
 
 in vec2 texCoord;
 out vec4 fragColor;
+// T207. The temporal phase's aux attachment: rgb the body's accumulation
+// before the rain's depth, a its transmittance there (the whole body when
+// the ray carries no rain). Location 1 has no draw buffer on an ordinary
+// cloud target, so the write is discarded there and only a phase target
+// keeps it.
+out vec4 fragTemporalAux;
 
 const int MAX_STEPS = 128;
 // Ceiling for the T098 diagnostic budget arm. Only PaDiagnosticStepBudget can
@@ -8284,7 +8303,8 @@ void main() {
         ? PaRayTraceNdc * 0.5 + 0.5
         : paOracleCapture
             ? paOracleSourceFrag / max(PaOracleBaseSize, vec2(1.0))
-            : texCoord;
+            : texCoord + PaSampleJitter;
+    fragTemporalAux = vec4(0.0, 0.0, 0.0, 1.0);
     paViewFragCoord = paRayTraceActive()
         ? PaRayTraceFragCoord
         : paOracleCapture ? paOracleSourceFrag : gl_FragCoord.xy;
@@ -8875,6 +8895,11 @@ void main() {
     float rainSplitInMass = 0.0;
     bool rainSplitPending = rainSplitTr < 0.9998 || dot(rainSplitRgb, vec3(1.0)) > 0.0;
 #endif
+    // T207. The body's state at the rain's depth, exported by a temporal
+    // phase instead of composited (PaTemporalPhase != 0).
+    vec3 rainSplitBeforeRgb = vec3(0.0);
+    float rainSplitBeforeT = 1.0;
+    bool rainSplitDeferred = false;
 #endif
     float lastClearT = t0;
     bool hasClearBracket = true;
@@ -9054,6 +9079,13 @@ void main() {
             // The rain lies in this step: it sees the cloud in front of it
             // and attenuates what follows. One composite, sub-step ordering
             // resolved to before the step's own material.
+            if (PaTemporalPhase != 0) {
+                // T207. Deferred: the resolve composites the current frame's
+                // rain at this point from the exported (before, T_before).
+                rainSplitBeforeRgb = accumulated;
+                rainSplitBeforeT = transmittance;
+                rainSplitDeferred = true;
+            } else {
             accumulated += rainSplitRgb * transmittance;
             float rainSplitAlpha = transmittance * (1.0 - rainSplitTr);
             weightedT += rainSplitT * rainSplitAlpha;
@@ -9066,6 +9098,7 @@ void main() {
             paRainMassAccum = transmittance >= 0.015 ? rainSplitInMass * transmittance : 0.0;
 #endif
             transmittance *= rainSplitTr;
+            }
             rainSplitPending = false;
         }
 #endif
@@ -10563,7 +10596,7 @@ void main() {
     }
 
 #ifdef PA_RAIN_SPLIT_COMPOSITE
-    if (rainSplitPending) {
+    if (rainSplitPending && PaTemporalPhase == 0) {
         // The march ended before the rain's depth - opaque cloud in front,
         // the step budget, or the ray's end - so the rain sits behind what
         // was integrated.
@@ -10576,6 +10609,15 @@ void main() {
 #endif
         transmittance *= rainSplitTr;
         rainSplitPending = false;
+    }
+    if (PaTemporalPhase != 0) {
+        // T207. A ray the march finished before the rain's depth (or one
+        // carrying no rain) splits at its end: the whole body is "before".
+        if (!rainSplitDeferred) {
+            rainSplitBeforeRgb = accumulated;
+            rainSplitBeforeT = transmittance;
+        }
+        fragTemporalAux = vec4(rainSplitBeforeRgb, rainSplitBeforeT);
     }
 #endif
     float alpha = saturate(1.0 - transmittance);

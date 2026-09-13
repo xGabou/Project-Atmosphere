@@ -403,8 +403,35 @@ public final class VolumetricCloudRenderHook {
         // 6. Depth-aware upsample composite into the main target. The debug
         // mode from /pa system cloudFieldVolume composite <mode> applies here
         // too, so the raw volumetric buffer can be inspected in-game.
+        //
+        // T207. With temporal reconstruction on, the march wrote this
+        // frame's raw phase; the four phases are resolved into the lattice
+        // target (twice the phase resolution, the current frame's rain
+        // composited on) and THAT is what the composite upsamples. A resolve
+        // that cannot run composites the current phase directly, so the
+        // frame is never left without clouds or handed stale content.
+        RenderTarget compositeSource = VolumetricCloudRenderTargets.currentCloudTarget();
+        if (VolumetricCloudRenderer.temporalPhaseActive()) {
+            RenderTarget resolved = net.Gabou.projectatmosphere.clouds.client.render.field
+                    .CloudTemporalResolveRenderer.resolve(
+                            VolumetricCloudRenderTargets.rainPassTargetOrNull(),
+                            VolumetricCloudRenderer.lastInvProj(),
+                            VolumetricCloudRenderer.lastInvViewRot(),
+                            VolumetricCloudRenderer.lastViewProj(),
+                            cameraPosF,
+                            VolumetricCloudRenderer.lastMaxRenderDistance(),
+                            VolumetricCloudRenderer.renderedFrameIndex() - 1L);
+            compositeSource = resolved != null
+                    ? resolved
+                    : VolumetricCloudRenderTargets.phaseTarget(
+                            net.Gabou.projectatmosphere.clouds.client.render.volumetric
+                                    .CloudTemporalPhaseState.currentPhase());
+        } else {
+            net.Gabou.projectatmosphere.clouds.client.render.field
+                    .CloudTemporalResolveRenderer.markUnused();
+        }
         boolean composited = CloudFieldCompositeRenderer.composite(
-                VolumetricCloudRenderTargets.currentCloudTarget(),
+                compositeSource,
                 mainTarget,
                 CloudFieldVolumeRenderConfig.compositeDebugMode(),
                 VolumetricCloudDebugConfig.depthCompositeEnabled(),
@@ -439,8 +466,11 @@ public final class VolumetricCloudRenderHook {
         VolumetricCloudFrameDiagnostics.tryCaptureStormProductionRayTrace(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryCaptureStormMaterialTrace(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryCaptureStormWorkload(cloudTarget);
-        VolumetricCloudFrameDiagnostics.tryCaptureStormReferenceImage(cloudTarget);
-        VolumetricCloudFrameDiagnostics.tryCaptureStormMovingCamera(cloudTarget);
+        // T207. The image and moving-camera captures read what the composite
+        // read: the resolved lattice on a temporal frame, the cloud target
+        // otherwise.
+        VolumetricCloudFrameDiagnostics.tryCaptureStormReferenceImage(compositeSource);
+        VolumetricCloudFrameDiagnostics.tryCaptureStormMovingCamera(compositeSource);
         VolumetricCloudFrameDiagnostics.tryDispatchStabilityCapture(
                 cloudTarget,
                 sceneDepth,

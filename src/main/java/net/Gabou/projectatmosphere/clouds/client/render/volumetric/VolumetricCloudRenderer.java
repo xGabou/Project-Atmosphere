@@ -108,6 +108,16 @@ public final class VolumetricCloudRenderer {
     private static boolean lastTransformValid;
     private static VolumetricHistoryValidity.Key previousHistoryKey = VolumetricHistoryValidity.Key.EMPTY;
     private static volatile boolean historyResetBeforeNextComposite;
+    /**
+     * T207. True while the last march wrote a raw temporal phase; the hook
+     * then resolves the four phases before the composite. The matrices of
+     * that frame are kept for the resolve.
+     */
+    private static volatile boolean temporalPhaseActive;
+    private static final Matrix4f lastInvProj = new Matrix4f();
+    private static final Matrix4f lastInvViewRot = new Matrix4f();
+    private static final Matrix4f lastViewProj = new Matrix4f();
+    private static float lastMaxRenderDistance = 2000.0F;
 
     private VolumetricCloudRenderer() {
     }
@@ -136,6 +146,32 @@ public final class VolumetricCloudRenderer {
     /** T205. Milliseconds the rain pass cost on the GPU, or 0 when the frame drew none. */
     public static float lastRainPassGpuMilliseconds() {
         return lastRainPassGpuMilliseconds;
+    }
+
+    /** T207. True when the last march wrote a temporal phase the hook must resolve. */
+    public static boolean temporalPhaseActive() {
+        return temporalPhaseActive;
+    }
+
+    public static Matrix4f lastInvProj() {
+        return lastInvProj;
+    }
+
+    public static Matrix4f lastInvViewRot() {
+        return lastInvViewRot;
+    }
+
+    public static Matrix4f lastViewProj() {
+        return lastViewProj;
+    }
+
+    public static float lastMaxRenderDistance() {
+        return lastMaxRenderDistance;
+    }
+
+    /** T207. The rendered-frame counter the phases are aged against. */
+    public static long renderedFrameIndex() {
+        return frameIndex;
     }
 
     /** Identifies a fresh completed GPU timestamp result without using a frame-time proxy. */
@@ -186,6 +222,11 @@ public final class VolumetricCloudRenderer {
     public static void invalidateHistory() {
         historyResetBeforeNextComposite = false;
         hasPrevFrame = false;
+        // T207. Whatever invalidates the ping-pong history - a camera cut, a
+        // resize, a reload, a level change, a teleport - invalidates the raw
+        // phases for the same reason: their samples no longer correspond to
+        // what this camera sees.
+        CloudTemporalPhaseState.invalidateAll();
         lastHistoryValid = false;
         VolumetricCloudRenderTargets.invalidateHistory();
         renderedProductionFrame = false;
@@ -456,6 +497,33 @@ public final class VolumetricCloudRenderer {
 
         RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
         RenderTarget historyTarget = VolumetricCloudRenderTargets.historyCloudTarget();
+        // T207. Temporal reconstruction: the march writes this frame's raw
+        // phase into its own target (same dimensions, so every downstream
+        // uniform is unchanged; only the destination differs) at that phase's
+        // subpixel offset, and the hook resolves the four phases afterwards.
+        // Only a FINAL-class frame is a phase: a debug view or a campaign
+        // program that is not FINAL's image must not enter the phase set.
+        boolean temporal = VolumetricCloudDebugConfig.temporalMode() != 0
+                && profile.temporalEnabled()
+                && program.normalProductionOutput()
+                && debugView == VolumetricCloudRaymarchDebugView.FINAL
+                && !StormProductionRayTrace.active()
+                && !optimizationMode.t153Oracle();
+        if (temporal) {
+            // Advanced before the target is chosen, so the phase marched this
+            // frame is the one the resolve treats as current.
+            CloudTemporalPhaseState.advance();
+            if (VolumetricCloudRenderTargets.preparePhaseTargets(
+                    cloudTarget.width, cloudTarget.height)) {
+                cloudTarget = VolumetricCloudRenderTargets.phaseTarget(
+                        CloudTemporalPhaseState.currentPhase());
+            } else {
+                temporal = false;
+            }
+        } else if (VolumetricCloudDebugConfig.temporalMode() == 0) {
+            VolumetricCloudRenderTargets.releaseTemporalTargets("temporalOff");
+        }
+        temporalPhaseActive = temporal;
         boolean t153Oracle = optimizationMode.t153Oracle();
         RenderTarget oracleTarget = t153Oracle
                 ? VolumetricCloudRenderTargets.prepareVisibleVolumeOracleTarget(
@@ -468,7 +536,11 @@ public final class VolumetricCloudRenderer {
         // last frame's clouds and no camera cut/resize/no-cloud frame
         // invalidated it since. Everything else ghosts.
         Tuning safeTuning = tuning == null ? Tuning.CELLS : tuning;
-        boolean historyValid = VolumetricCloudDebugConfig.historyEnabled()
+        // T207. A raw phase never blends the ping-pong history: the phases
+        // are original march output, and the resolve is the only temporal
+        // combination.
+        boolean historyValid = !temporal
+                && VolumetricCloudDebugConfig.historyEnabled()
                 && profile.temporalEnabled()
                 && hasPrevFrame
                 && historyTarget != null
@@ -508,7 +580,7 @@ public final class VolumetricCloudRenderer {
             return false;
         }
 
-        VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
+        bindMarchTarget(cloudTarget, temporal);
         RenderSystem.disableBlend();
         RenderSystem.enableDepthTest();
         RenderSystem.depthFunc(GL11.GL_ALWAYS);
@@ -614,6 +686,18 @@ public final class VolumetricCloudRenderer {
         long uploadedFrameIndex = frameIndex;
         float uploadedFrameIndexValue = (float) (uploadedFrameIndex % 1024L);
         shader.safeGetUniform("FrameIndex").set(uploadedFrameIndexValue);
+        // T207. The phase's screen-space ray offset in texture-coordinate
+        // units, and the deferred rain split; both zero on a non-temporal
+        // frame so the march is byte-identical to T206's. Uniform state
+        // persists between frames, so both are uploaded every frame.
+        int phase = CloudTemporalPhaseState.currentPhase();
+        shader.safeGetUniform("PaSampleJitter").set(
+                temporal ? CloudTemporalPhaseState.jitterX(phase) / Math.max(1.0F, cloudTarget.width) : 0.0F,
+                temporal ? CloudTemporalPhaseState.jitterY(phase) / Math.max(1.0F, cloudTarget.height) : 0.0F);
+        shader.safeGetUniform("PaTemporalPhase").set(temporal ? 1 : 0);
+        lastInvProj.set(invProj);
+        lastInvViewRot.set(invViewRot);
+        lastViewProj.set(projection).mul(viewRotation);
         shader.safeGetUniform("RaymarchSteps").set(profile.raymarchSteps());
         shader.safeGetUniform("LightSteps").set(profile.lightSteps());
         shader.safeGetUniform("ScatterOctaves").set(profile.scatterOctaves());
@@ -627,6 +711,7 @@ public final class VolumetricCloudRenderer {
                 PuffLobeSpatialIndex.exteriorFineStepWorld(profile.raymarchSteps(), stepScale)
         );
         float uploadedMaxRenderDistance = Math.max(300.0F, maxRenderDistance);
+        lastMaxRenderDistance = uploadedMaxRenderDistance;
         boolean uploadedUseSceneDepth = sceneRayLimitEnabled && safeSceneDepth.valid();
         boolean uploadedCoveragePretestEnabled = VolumetricCloudDebugConfig.coveragePretestEnabled();
         int uploadedCoveragePretestSamples = VolumetricCloudDebugConfig.coveragePretestSamples();
@@ -715,7 +800,7 @@ public final class VolumetricCloudRenderer {
                 shader.clear();
             }
 
-            VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
+            bindMarchTarget(cloudTarget, temporal);
             shader.setSampler("OracleIntervalSampler", oracleTarget.getColorTextureId());
             shader.safeGetUniform("DebugView").set(debugView.shaderId());
             shader.safeGetUniform("PaOraclePass").set(0);
@@ -774,7 +859,7 @@ public final class VolumetricCloudRenderer {
                     unbindManualTextures();
                     buildShader.clear();
                 }
-                VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
+                bindMarchTarget(cloudTarget, temporal);
                 rainFieldTextureId = rainGateTarget.getColorTextureId();
                 // The ray programs bake the value; the monolith is told. 2
                 // would keep the gate off in the segment test (the build-cost
@@ -835,7 +920,7 @@ public final class VolumetricCloudRenderer {
                     shader.clear();
                 }
 
-                VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
+                bindMarchTarget(cloudTarget, temporal);
                 rainFieldTextureId = rainFieldTarget.getColorTextureId();
                 shader.safeGetUniform("PaRainFieldPass").set(0);
                 shader.safeGetUniform("PaRainFieldConservative").set(paConservative);
@@ -918,7 +1003,7 @@ public final class VolumetricCloudRenderer {
                     unbindManualTextures();
                     shader.clear();
                 }
-                VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
+                bindMarchTarget(cloudTarget, temporal);
                 stormFieldTextureId = stormFieldTarget.getColorTextureId();
                 shader.safeGetUniform("PaStormFieldPass").set(0);
                 shader.safeGetUniform("PaStormFieldEnabled").set(enabledBits);
@@ -951,6 +1036,12 @@ public final class VolumetricCloudRenderer {
                 setFrameSamplers(rainShader);
                 VolumetricCloudRenderTargets.clearAndBind(rainPassTarget);
                 rainShader.safeGetUniform("PaStormFieldPass").set(0);
+                // T207. Rain is current-frame and unjittered: the rain pass
+                // marches the block-centre ray whatever phase the cloud march
+                // is on, so the texel a block composites is the same on
+                // every frame of the cycle (a jittered rain pass rotated
+                // through four subpixel rays - a four-frame rain flicker).
+                rainShader.safeGetUniform("PaSampleJitter").set(0.0F, 0.0F);
                 rainShader.apply();
                 PuffLobeSpatialIndex.uploadDescriptors(rainShader.getId());
                 bindManualTextures(rainShader, puffCandidateTarget.getColorTextureId());
@@ -962,7 +1053,7 @@ public final class VolumetricCloudRenderer {
                     unbindManualTextures();
                     rainShader.clear();
                 }
-                VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
+                bindMarchTarget(cloudTarget, temporal);
                 rainPassTextureId = rainPassTarget.getColorTextureId();
             } else {
                 ProjectAtmosphere.LOGGER.warn(
@@ -1037,8 +1128,27 @@ public final class VolumetricCloudRenderer {
             previousHistoryKey = currentHistoryKey;
             hasPrevFrame = true;
         }
+        if (temporal && renderedProductionFrame) {
+            // T207. The raw phase just marched, with the camera it was seen
+            // from and the frame it was rendered on. Only a raw march is ever
+            // recorded; the resolve's output never comes through here.
+            CloudTemporalPhaseState.record(
+                    CloudTemporalPhaseState.currentPhase(), lastViewProj, cameraPos, frameIndex);
+        }
         frameIndex++;
         return true;
+    }
+
+    /**
+     * T207. Binds the march's destination: the ping-pong cloud target, or
+     * the raw phase target with its aux attachment drawn and cleared.
+     */
+    private static void bindMarchTarget(RenderTarget target, boolean temporal) {
+        if (temporal) {
+            VolumetricCloudRenderTargets.clearAndBindPhase(target);
+        } else {
+            VolumetricCloudRenderTargets.clearAndBind(target);
+        }
     }
 
     /**

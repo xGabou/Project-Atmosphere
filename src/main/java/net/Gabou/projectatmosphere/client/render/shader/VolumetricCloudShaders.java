@@ -275,6 +275,15 @@ public final class VolumetricCloudShaders {
             int bytes = org.lwjgl.opengl.GL41.glGetProgrami(shader.getId(),
                     org.lwjgl.opengl.GL41.GL_PROGRAM_BINARY_LENGTH);
             ProjectAtmosphere.LOGGER.info("T204_PROGRAM_BINARY program={} bytes={}", name, bytes);
+            if ("lean_final".equals(name)) {
+                // T207. The phase's aux attachment is fragment output 1; the
+                // linker assigns the locations, so the assignment is evidence
+                // rather than an assumption.
+                ProjectAtmosphere.LOGGER.info("T207_FRAG_DATA program={} fragColor={} fragTemporalAux={}",
+                        name,
+                        org.lwjgl.opengl.GL30.glGetFragDataLocation(shader.getId(), "fragColor"),
+                        org.lwjgl.opengl.GL30.glGetFragDataLocation(shader.getId(), "fragTemporalAux"));
+            }
         } catch (RuntimeException failure) {
             ProjectAtmosphere.LOGGER.debug("program binary length unavailable for {}", name, failure);
         }

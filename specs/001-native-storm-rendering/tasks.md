@@ -3431,6 +3431,49 @@ implementation, while visual polish remains independently active.
   Temporal budget at 0.25: 2.7-3.8 ms to 10, 0.7-1.8 ms to 8; **T207 ready: YES.**
   campaignGate x2, check build PASS. Evidence in `validation/performance-production-split.md`
   and `validation/t206-campaign/`. [SC-005, SC-021]
+- [X] T207 [PERFORMANCE] [US3] Temporal reconstruction + history validity. The four-phase
+  lattice of T165 (`experiment/cloud-temporal-reconstruction`) productionized on the T206
+  split renderer with the correspondence model T165's report asked for. Each frame marches
+  one raw phase into its own target (`CloudTemporalPhaseState`, quarter-pixel screen-space
+  offsets of the ray via `PaSampleJitter` on `paViewTexCoord`; RGBA16F body + depth + an
+  RGBA16F aux MRT `fragTemporalAux` carrying the body's accumulation and transmittance at the
+  rain's depth, `PaTemporalPhase` deferring the split rain composite); the four phases are
+  resolved once per frame into a target of twice the phase resolution
+  (`cloud_temporal_resolve.fsh`, `CloudTemporalResolveRenderer`, 960x540 at 0.25) that the
+  existing composite upsamples. The current phase is fetched exactly; each history phase is
+  reprojected ONCE from its own recorded camera and validated against the CURRENT phase's
+  3x3 neighbourhood - coverage and linear-distance intervals carried through the warp, new
+  sky / new cloud, a parallax guard (camera moved > 10% of the sampled distance), the age
+  rule (three rendered frames), offscreen - judged only once the reprojection moved the
+  sample past half a texel (sub-texel disagreement is lattice structure: the 191-233 thin
+  wisps T165's kind of test rejected at PLAY_VIS_NEAR). Rejected sites fall back to the
+  current phase's jitter-corrected bilinear; rain is the CURRENT frame's, composited in the
+  resolve with the in-march equation from the aux (exact, never reconstructed; the rain
+  pass runs unjittered on a temporal frame - a jittered one was a four-frame rain flicker).
+  No recursion: the resolved target is never a phase input or recorded (sandbox
+  `validateT207TemporalReconstruction`); the shipped ping-pong blend is never applied to a
+  phase. Lifecycle: phases and the resolved target in `destroyAll`, every history
+  invalidation drops the phase set (`T207_PHASES_*`/`T207_RESOLVED_*`, the T199 probe).
+  Campaigns `T207` (`run/t207-temporal.txt`, `temporalRunRequested`, `t207Run`,
+  `T207_ARMS` with `T166Arm.temporal`, `T207_IMAGE_ARMS`, the validity class map ->
+  `T207_VALIDITY`, `buildT207Report()`) and `T207M` (`run/t207-temporal-motion.txt`, the
+  T152 route under `StormT152MovingCameraFixture.ArmSet.TEMPORAL`: production 0.50 against
+  the temporal 0.25 lattice frame by frame); the profile carries `temporalResolveP50/P95`.
+  Four static and two motion launches on 13Sep2026. RESULT: **PASS** - resolve **0.10 ms**
+  (reconstruction 0.03 + validation 0.07), totals **SIDE 7.4-8.0 / PLAY_VIS_NEAR 6.8-7.7 ms**
+  (anchors 7.4-7.7 / 6.8-7.5), the phase march at 0.98-1.02x the production march. Static
+  vs production 0.50: **PLAY_VIS_NEAR SSIM 0.9952 / edge 0.9931** (single frame 0.813 /
+  0.693; trust-all ceiling 0.9954), holes 0.60 -> 0.98, pockets 0.35 -> 0.71; SIDE 0.9514
+  (single frame 0.9545 - not resolution-limited, rain at phase resolution), edge 0.895 ->
+  0.931, holes 0.71 -> 0.85, pockets 0.34 -> 0.59. Validity 99.994-99.999% accepted
+  statically (the validated lattice = trust-all to four digits). Motion (T152 route):
+  ghost mean 0.0007 vs 0.50 production, p95 0.0014, bias <= +0.0005, flicker 0.00214 vs
+  0.00199, 11 of 2200 frames above 0.02 mean alpha error (in-cloud openings; nothing older
+  than the cycle). `PRODUCTION_TEMPORAL_MODE = 1`: the lattice is the production path.
+  campaignGate x5, check build PASS. Evidence in
+  `validation/performance-temporal-reconstruction.md` and `validation/t207-campaign/`.
+  Next: rain at lattice resolution / the in-cloud fallback, then the reopened pixel-scaling
+  question (a 0.125 phase reconstructing the 0.25 image). [SC-005, SC-006, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 
 /**
@@ -213,10 +214,179 @@ public final class VolumetricCloudRenderTargets {
         return rainPassTarget;
     }
 
+    public static RenderTarget rainPassTargetOrNull() {
+        return rainPassTarget;
+    }
+
     /** T206. {@code "WxH"} of the resident rain-pass target, or {@code "none"}. */
     public static String rainPassTargetSize() {
         return rainPassTarget == null ? "none"
                 : rainPassTarget.width + "x" + rainPassTarget.height;
+    }
+
+    /**
+     * T207. The four raw temporal phase targets, at the cloud (phase)
+     * resolution: RGBA16F body + depth, plus an RGBA16F aux attachment
+     * (the body's accumulation and transmittance at the rain's depth) on
+     * colour attachment 1. Raw march output only - nothing resolved is ever
+     * written into one - so each can be reprojected once from its own origin
+     * frame. LINEAR, because the resolve reads history at non-integer
+     * positions; its exact lattice fetch uses texelFetch, which ignores the
+     * filter. Allocated on the first temporal frame, released with every
+     * other target.
+     */
+    private static final RenderTarget[] phaseTargets =
+            new RenderTarget[CloudTemporalPhaseState.PHASES];
+    private static final int[] phaseAuxTextures = new int[CloudTemporalPhaseState.PHASES];
+    /**
+     * T207. The resolved lattice: twice the phase resolution, RGBA16F +
+     * depth, the composite's source when temporal reconstruction is on.
+     * Consumed by the composite and the captures; never bound as a phase
+     * (the sandbox asserts it).
+     */
+    private static RenderTarget temporalResolvedTarget;
+
+    public static boolean preparePhaseTargets(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return false;
+        }
+        RenderTarget current = phaseTargets[0];
+        if (current == null || current.width != width || current.height != height) {
+            destroyPhaseTargets("resize");
+            for (int i = 0; i < phaseTargets.length; i++) {
+                RenderTarget target = new TextureTarget(width, height, true, Minecraft.ON_OSX);
+                target.setFilterMode(GL11.GL_LINEAR);
+                configureClamp(target.getColorTextureId());
+                upgradeColorToRgba16f(target.getColorTextureId(), width, height);
+                configureDepth(target.getDepthTextureId());
+                target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+                phaseTargets[i] = target;
+                phaseAuxTextures[i] = createAuxTexture(width, height);
+                target.bindWrite(true);
+                GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT1,
+                        GL11.GL_TEXTURE_2D, phaseAuxTextures[i], 0);
+                target.unbindWrite();
+            }
+            // New buffers hold nothing; resolving against them would read
+            // the clear colour as content.
+            CloudTemporalPhaseState.invalidateAll();
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T207_PHASES_ALLOC phases={} format=RGBA16F+depth+RGBA16Faux size={}x{}"
+                            + " bytes={}",
+                    phaseTargets.length, width, height,
+                    (long) phaseTargets.length * width * height * (8L + 4L + 8L));
+        }
+        return true;
+    }
+
+    public static RenderTarget phaseTarget(int phase) {
+        return phaseTargets[phase & 3];
+    }
+
+    public static int phaseAuxTexture(int phase) {
+        return phaseAuxTextures[phase & 3];
+    }
+
+    public static boolean phaseTargetsReady() {
+        return phaseTargets[0] != null && phaseAuxTextures[0] != 0;
+    }
+
+    /**
+     * T207. Binds a phase target for the march with both colour attachments
+     * drawn and the aux cleared to "no rain split" (before = 0, T = 1).
+     */
+    public static void clearAndBindPhase(RenderTarget target) {
+        clearAndBind(target);
+        GL20.glDrawBuffers(new int[] {GL30.GL_COLOR_ATTACHMENT0, GL30.GL_COLOR_ATTACHMENT1});
+        GL30.glClearBufferfv(GL11.GL_COLOR, 1, new float[] {0.0F, 0.0F, 0.0F, 1.0F});
+    }
+
+    public static RenderTarget prepareTemporalResolvedTarget(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        if (temporalResolvedTarget == null || temporalResolvedTarget.width != width
+                || temporalResolvedTarget.height != height) {
+            if (temporalResolvedTarget != null) {
+                net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                        "T207_RESOLVED_RELEASE reason=resize size={}x{}",
+                        temporalResolvedTarget.width, temporalResolvedTarget.height);
+                temporalResolvedTarget.destroyBuffers();
+                temporalResolvedTarget = null;
+            }
+            RenderTarget target = new TextureTarget(width, height, true, Minecraft.ON_OSX);
+            target.setFilterMode(GL11.GL_LINEAR);
+            configureClamp(target.getColorTextureId());
+            upgradeColorToRgba16f(target.getColorTextureId(), width, height);
+            configureDepth(target.getDepthTextureId());
+            target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+            temporalResolvedTarget = target;
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T207_RESOLVED_ALLOC format=RGBA16F+depth size={}x{} bytes={}",
+                    width, height, (long) width * height * 12L);
+        }
+        return temporalResolvedTarget;
+    }
+
+    public static RenderTarget temporalResolvedTargetOrNull() {
+        return temporalResolvedTarget;
+    }
+
+    /** T207. {@code "phases=N WxH resolved=WxH"} for lifecycle evidence. */
+    public static String temporalTargetStatus() {
+        return "phases=" + (phaseTargets[0] == null ? "none"
+                : phaseTargets[0].width + "x" + phaseTargets[0].height)
+                + " resolved=" + (temporalResolvedTarget == null ? "none"
+                : temporalResolvedTarget.width + "x" + temporalResolvedTarget.height);
+    }
+
+    /** Releases the temporal targets alone (temporal reconstruction switched off). */
+    public static void releaseTemporalTargets(String reason) {
+        destroyPhaseTargets(reason);
+        if (temporalResolvedTarget != null) {
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T207_RESOLVED_RELEASE reason={} size={}x{}", reason,
+                    temporalResolvedTarget.width, temporalResolvedTarget.height);
+            temporalResolvedTarget.destroyBuffers();
+            temporalResolvedTarget = null;
+        }
+    }
+
+    private static void destroyPhaseTargets(String reason) {
+        if (phaseTargets[0] == null) {
+            return;
+        }
+        net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                "T207_PHASES_RELEASE reason={} phases={} size={}x{}", reason,
+                phaseTargets.length, phaseTargets[0].width, phaseTargets[0].height);
+        for (int i = 0; i < phaseTargets.length; i++) {
+            if (phaseTargets[i] != null) {
+                phaseTargets[i].destroyBuffers();
+                phaseTargets[i] = null;
+            }
+            if (phaseAuxTextures[i] != 0) {
+                GL11.glDeleteTextures(phaseAuxTextures[i]);
+                phaseAuxTextures[i] = 0;
+            }
+        }
+        CloudTemporalPhaseState.invalidateAll();
+    }
+
+    private static int createAuxTexture(int width, int height) {
+        int texture = GL11.glGenTextures();
+        int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        try {
+            RenderSystem.bindTexture(texture);
+            GlStateManager._texImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_RGBA16F, width, height, 0,
+                    GL11.GL_RGBA, GL30.GL_HALF_FLOAT, null);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
+        } finally {
+            RenderSystem.bindTexture(previousTexture);
+        }
+        return texture;
     }
 
     /**
@@ -497,6 +667,9 @@ public final class VolumetricCloudRenderTargets {
             rainPassTarget = null;
         }
         releaseStormFieldOracleTarget();
+        // T207. The temporal phases and the resolved lattice, on every
+        // release path with the rest.
+        releaseTemporalTargets(reason);
         if (visibleVolumeOracleTarget != null) {
             visibleVolumeOracleTarget.destroyBuffers();
             visibleVolumeOracleTarget = null;

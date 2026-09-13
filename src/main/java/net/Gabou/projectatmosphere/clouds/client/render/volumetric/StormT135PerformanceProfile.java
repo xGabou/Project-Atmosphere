@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeRenderer;
+import net.Gabou.projectatmosphere.clouds.client.render.field.CloudTemporalResolveRenderer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 import java.util.ArrayList;
@@ -122,6 +123,8 @@ public final class StormT135PerformanceProfile {
     private static final float[] rainFieldMilliseconds = new float[SAMPLE_FRAMES];
     private static final float[] rainGateMilliseconds = new float[SAMPLE_FRAMES];
     private static final float[] rainPassMilliseconds = new float[SAMPLE_FRAMES];
+    /** T207. The temporal resolve's own clock; zero on a non-temporal frame. */
+    private static final float[] temporalResolveMilliseconds = new float[SAMPLE_FRAMES];
     private static float effectiveResolutionScale = Float.NaN;
     private static final List<Cell> results = new ArrayList<>();
 
@@ -169,7 +172,11 @@ public final class StormT135PerformanceProfile {
             double rainGateP95,
             // T205. The rain pass's own clock, outside the field column.
             double rainPassP50,
-            double rainPassP95
+            double rainPassP95,
+            // T207. The temporal resolve (lattice + rain composite), its own
+            // clock; zero when the frame resolved nothing.
+            double temporalResolveP50,
+            double temporalResolveP95
     ) {
         /**
          * T188. What the renderer actually spends on clouds: the march plus the
@@ -336,6 +343,8 @@ public final class StormT135PerformanceProfile {
         float rainFieldMs = VolumetricCloudRenderer.lastRainFieldGpuMilliseconds();
         float rainGateMs = VolumetricCloudRenderer.lastRainGateGpuMilliseconds();
         float rainPassMs = VolumetricCloudRenderer.lastRainPassGpuMilliseconds();
+        float temporalResolveMs = CloudTemporalResolveRenderer.lastFrameResolved()
+                ? CloudTemporalResolveRenderer.lastGpuMilliseconds() : 0.0F;
         if (sampled < sampleTarget) {
             cloudMilliseconds[sampled] = cloudMs;
             frameMilliseconds[sampled] = frameMs;
@@ -345,6 +354,7 @@ public final class StormT135PerformanceProfile {
             rainFieldMilliseconds[sampled] = Math.max(0.0F, rainFieldMs);
             rainGateMilliseconds[sampled] = Math.max(0.0F, rainGateMs);
             rainPassMilliseconds[sampled] = Math.max(0.0F, rainPassMs);
+            temporalResolveMilliseconds[sampled] = Math.max(0.0F, temporalResolveMs);
             // A pending composite query records as zero rather than as a
             // fabricated cost. The percentile then understates it, which is the
             // safe direction for a term used to argue a cost floor.
@@ -366,6 +376,8 @@ public final class StormT135PerformanceProfile {
             Arrays.sort(rainGate);
             float[] rainPass = Arrays.copyOf(rainPassMilliseconds, sampled);
             Arrays.sort(rainPass);
+            float[] temporalResolve = Arrays.copyOf(temporalResolveMilliseconds, sampled);
+            Arrays.sort(temporalResolve);
             Arrays.sort(cloud);
             Arrays.sort(frame);
             Arrays.sort(composite);
@@ -402,7 +414,9 @@ public final class StormT135PerformanceProfile {
                     percentile(rainGate, 0.50D),
                     percentile(rainGate, 0.95D),
                     percentile(rainPass, 0.50D),
-                    percentile(rainPass, 0.95D)
+                    percentile(rainPass, 0.95D),
+                    percentile(temporalResolve, 0.50D),
+                    percentile(temporalResolve, 0.95D)
             ));
             Cell recorded = results.get(results.size() - 1);
             ProjectAtmosphere.LOGGER.info(
@@ -418,6 +432,7 @@ public final class StormT135PerformanceProfile {
                             + " rainFieldP50={} rainFieldP95={}"
                             + " rainGateP50={} rainGateP95={}"
                             + " rainPassP50={} rainPassP95={}"
+                            + " temporalResolveP50={} temporalResolveP95={}"
                             + " cloudPlusFieldP50={}",
                     recorded.pose(), recorded.arm(), recorded.descriptors(),
                     recorded.mode(), recorded.raymarchSteps(),
@@ -435,6 +450,7 @@ public final class StormT135PerformanceProfile {
                     fmt(recorded.rainFieldP50()), fmt(recorded.rainFieldP95()),
                     fmt(recorded.rainGateP50()), fmt(recorded.rainGateP95()),
                     fmt(recorded.rainPassP50()), fmt(recorded.rainPassP95()),
+                    fmt(recorded.temporalResolveP50()), fmt(recorded.temporalResolveP95()),
                     fmt(recorded.cloudPlusFieldP50()));
         } else {
             ProjectAtmosphere.LOGGER.warn(

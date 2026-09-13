@@ -98,6 +98,8 @@
     { "name": "PaRayTraceMode", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaRayTraceNdc", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
     { "name": "PaRayTraceFragCoord", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
+    { "name": "PaSampleJitter", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
+    { "name": "PaTemporalPhase", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "DensityMul", "type": "float", "count": 1, "values": [ 1.0 ] },
     { "name": "CoverageMul", "type": "float", "count": 1, "values": [ 1.0 ] },
     { "name": "ExtinctionScale", "type": "float", "count": 1, "values": [ 0.09 ] },

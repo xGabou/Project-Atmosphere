@@ -299,7 +299,16 @@ public final class StormCampaignRegistry {
                     "T205_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
             new Campaign("T206", "t206-production-baseline.txt",
                     "productionBaselineRunRequested", "t206Run",
-                    "T206_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "T206_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            // T207M. The moving-camera route under the temporal pair; drives
+            // the T152 phase machine, not the arm sweep. Declared before the
+            // sweep so the wiring proof's "newest campaign" is a sweep.
+            new Campaign("T207M", "t207-temporal-motion.txt",
+                    "temporalMotionRunRequested", "t207mRun",
+                    null, Routing.PERFORMANCE_ONLY),
+            new Campaign("T207", "t207-temporal.txt",
+                    "temporalRunRequested", "t207Run",
+                    "T207_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.
