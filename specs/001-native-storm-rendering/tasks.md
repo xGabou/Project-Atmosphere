@@ -3517,6 +3517,39 @@ implementation, while visual polish remains independently active.
   and `validation/t208-campaign/`. Next: T209 spatial upscale evaluation (control = today's
   bilinear composite, FSR1/EASU, one depth-guided 2x alternative; body-only beside full-frame at
   SIDE; the T152 route against native). [SC-005, SC-006, SC-021]
+- [X] T209 [PERFORMANCE] [US3] Spatial upscale evaluation: the 960x540 temporal lattice to the
+  1920x1080 display against the NATIVE production render (FINAL at 1.0). New pass
+  `cloud_spatial_upscale.fsh` / `CloudSpatialUpscaleRenderer` between the resolve and the
+  composite (`VolumetricCloudDebugConfig.spatialUpscaleMethod`, `PRODUCTION_SPATIAL_UPSCALE`; its
+  own clock `spatialUpscaleP50/P95`; layer `spatialUpscaleTarget` RGBA16F premultiplied + depth,
+  released with the rest), three methods on the premultiplied field with ONE kernel for all four
+  channels - 0 the fused composite's PA bilinear (the control), 1 FSR1 EASU (luma + coverage edge
+  feature, Reinhard-max + sqrt colour domain, 2x2 clamp on every channel), 2 a depth-guided
+  Catmull-Rom (taps on another surface or scene-occluded dropped, weights renormalised) - the PA
+  depth selection for all, depth through GL_ALWAYS, and a TWO-SIDED premultiplied guard (straight
+  colour clamped to the valid centre taps' range: the first launch's one-sided guard let the
+  kernels' negative lobes drive premultiplied rgb to zero under positive alpha - a dark halo on
+  every silhouette, caught by the new edge-luma diagnostic `edgeLumaP001 = 0`). The composite
+  fetches a display-size source one-to-one (`OneToOne`, never filtered twice). Harness:
+  `T166Arm.upscale`, `T209_IMAGE_ARMS` (native / native without rain / native body; the lattice
+  against native downsampled 2x; the layers full-frame and body-only), `T209_RAIN` (rain-mask
+  metrics), `T209_CAPTURE` edge-luma tail, `buildT209Report`, `ArmSet.UPSCALE` on the T152 route.
+  Campaigns `T209` (`run/t209-spatial-upscale.txt`, `spatialUpscaleRunRequested`, `t209Run`) and
+  `T209M` (`run/t209-spatial-motion.txt`, `spatialMotionRunRequested`, `t209mRun`). Two static
+  launches and one route on 13Sep2026. RESULT: **CASE C - the depth-aware bilinear stays
+  production; no candidate clearly improves on it.** Static vs native (run 2): SIDE bilinear
+  **0.9387 / edge 0.833**, EASU 0.9210 / 0.774, bicubic 0.9074 / 0.721 (run 1 agreed); PVN
+  bilinear 0.9370 / 0.788, EASU 0.9423 / 0.790 (+0.005 SSIM, thin retention 0.944 -> 0.856),
+  bicubic 0.9373; body-only ranks the same. Rain (rain-light fixtures, 0.14-0.37%): the bilinear
+  thickens least (+0.019 vs +0.034 / +0.051) and loses the least thin rain (9% vs 11-14%). Motion
+  vs native: bilinear flicker 0.00209 (native 0.00198), ghost 0.00064, 6 frames > 0.02; EASU /
+  bicubic 0.00215 / 0.00217, 0.00069, **19 / 18** frames, interior ghost 0.0013 vs 0.0009. Cost:
+  0.10 / 0.14 / 0.14 ms per pass (all excellent), totals 7.4-7.8 ms, budget to 10 ms 2.4-3.0.
+  `PRODUCTION_SPATIAL_UPSCALE = -1` (the sandbox pins it); the pass stays as a diagnostic. RCAS
+  not tested (EASU did not pass). campaignGate x2, check build PASS. Evidence in
+  `validation/performance-spatial-upscale.md` and `validation/t209-campaign/`. Next: the
+  representation residuals T208 named - the rain pass at phase resolution, then the on-axis
+  in-cloud parallax term. [SC-005, SC-006, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

@@ -430,6 +430,27 @@ public final class VolumetricCloudRenderHook {
             net.Gabou.projectatmosphere.clouds.client.render.field
                     .CloudTemporalResolveRenderer.markUnused();
         }
+        // T209. The spatial upscale of the lattice to the display, when armed:
+        // the composite then reads the layer one-to-one. A pass that cannot
+        // run leaves the source as it was - the T207 path.
+        int upscaleMethod = VolumetricCloudDebugConfig.spatialUpscaleMethod();
+        if (upscaleMethod >= 0 && compositeSource != null
+                && (compositeSource.width < mainTarget.width
+                        || compositeSource.height < mainTarget.height)) {
+            RenderTarget upscaled = net.Gabou.projectatmosphere.clouds.client.render.field
+                    .CloudSpatialUpscaleRenderer.upscale(
+                            compositeSource, mainTarget.width, mainTarget.height,
+                            sceneDepth, upscaleMethod);
+            if (upscaled != null) {
+                compositeSource = upscaled;
+            }
+        } else {
+            net.Gabou.projectatmosphere.clouds.client.render.field
+                    .CloudSpatialUpscaleRenderer.markUnused();
+            if (upscaleMethod < 0) {
+                VolumetricCloudRenderTargets.releaseSpatialUpscaleTarget("upscaleOff");
+            }
+        }
         boolean composited = CloudFieldCompositeRenderer.composite(
                 compositeSource,
                 mainTarget,

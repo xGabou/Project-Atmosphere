@@ -317,7 +317,16 @@ public final class StormCampaignRegistry {
                     null, Routing.PERFORMANCE_ONLY),
             new Campaign("T208", "t208-temporal-cleanup.txt",
                     "temporalCleanupRunRequested", "t208Run",
-                    "T208_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "T208_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            // T209M. The T152 route with native 1.0 as the reference and the
+            // three upscaled layers as candidates; before the sweep for the
+            // same reason as T207M.
+            new Campaign("T209M", "t209-spatial-motion.txt",
+                    "spatialMotionRunRequested", "t209mRun",
+                    null, Routing.PERFORMANCE_ONLY),
+            new Campaign("T209", "t209-spatial-upscale.txt",
+                    "spatialUpscaleRunRequested", "t209Run",
+                    "T209_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.

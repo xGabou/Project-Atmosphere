@@ -224,6 +224,16 @@ public final class VolumetricCloudDebugConfig {
      */
     private static volatile boolean deferredSplitForced;
     /**
+     * T209. The spatial upscale of the temporal lattice to the display
+     * (cloud_spatial_upscale.fsh): -1 off - the composite reads the lattice
+     * directly, as T207 shipped it; 0 the PA bilinear moved into its own pass
+     * (the control); 1 EASU on the premultiplied field; 2 depth-guided
+     * Catmull-Rom. The production default is {@link #PRODUCTION_SPATIAL_UPSCALE};
+     * a campaign sets its arm.
+     */
+    public static final int PRODUCTION_SPATIAL_UPSCALE = -1;
+    private static volatile int spatialUpscaleMethod = PRODUCTION_SPATIAL_UPSCALE;
+    /**
      * Rank 1 reconstruction arm. False keeps the shipped composite accumulation
      * unchanged; true selects the coverage-alpha reconstruction, which removes
      * the resolution-scale beat by separating the silhouette's coverage from
@@ -422,6 +432,14 @@ public final class VolumetricCloudDebugConfig {
         return deferredSplitForced;
     }
 
+    public static int spatialUpscaleMethod() {
+        return spatialUpscaleMethod;
+    }
+
+    public static void setSpatialUpscaleMethod(int method) {
+        spatialUpscaleMethod = Math.max(-1, Math.min(2, method));
+    }
+
     public static void setDeferredSplitForced(boolean forced) {
         deferredSplitForced = forced;
     }
@@ -542,6 +560,7 @@ public final class VolumetricCloudDebugConfig {
         temporalDebugOutput = 0;
         rainDisabled = false;
         deferredSplitForced = false;
+        spatialUpscaleMethod = PRODUCTION_SPATIAL_UPSCALE;
         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
         sentinelHeightsEnabled = false;
         fullResolutionEnabled = false;

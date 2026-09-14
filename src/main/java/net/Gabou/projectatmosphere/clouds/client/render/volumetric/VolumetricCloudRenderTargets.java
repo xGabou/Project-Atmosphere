@@ -245,6 +245,12 @@ public final class VolumetricCloudRenderTargets {
      * (the sandbox asserts it).
      */
     private static RenderTarget temporalResolvedTarget;
+    /**
+     * T209. The spatial upscale's layer at the display size: RGBA16F
+     * premultiplied + depth, the composite's one-to-one source when the
+     * upscale is on. Never bound as a phase or resolve input.
+     */
+    private static RenderTarget spatialUpscaleTarget;
 
     public static boolean preparePhaseTargets(int width, int height) {
         if (width <= 0 || height <= 0) {
@@ -332,12 +338,50 @@ public final class VolumetricCloudRenderTargets {
         return temporalResolvedTarget;
     }
 
+    public static RenderTarget prepareSpatialUpscaleTarget(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        if (spatialUpscaleTarget == null || spatialUpscaleTarget.width != width
+                || spatialUpscaleTarget.height != height) {
+            releaseSpatialUpscaleTarget("resize");
+            RenderTarget target = new TextureTarget(width, height, true, Minecraft.ON_OSX);
+            target.setFilterMode(GL11.GL_NEAREST);
+            configureClamp(target.getColorTextureId());
+            upgradeColorToRgba16f(target.getColorTextureId(), width, height);
+            configureDepth(target.getDepthTextureId());
+            target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+            spatialUpscaleTarget = target;
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T209_UPSCALE_ALLOC format=RGBA16F+depth size={}x{} bytes={}",
+                    width, height, (long) width * height * 12L);
+        }
+        return spatialUpscaleTarget;
+    }
+
+    public static RenderTarget spatialUpscaleTargetOrNull() {
+        return spatialUpscaleTarget;
+    }
+
+    /** T209. Releases the upscale layer alone (the upscale switched off, a resize). */
+    public static void releaseSpatialUpscaleTarget(String reason) {
+        if (spatialUpscaleTarget != null) {
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T209_UPSCALE_RELEASE reason={} size={}x{}", reason,
+                    spatialUpscaleTarget.width, spatialUpscaleTarget.height);
+            spatialUpscaleTarget.destroyBuffers();
+            spatialUpscaleTarget = null;
+        }
+    }
+
     /** T207. {@code "phases=N WxH resolved=WxH"} for lifecycle evidence. */
     public static String temporalTargetStatus() {
         return "phases=" + (phaseTargets[0] == null ? "none"
                 : phaseTargets[0].width + "x" + phaseTargets[0].height)
                 + " resolved=" + (temporalResolvedTarget == null ? "none"
-                : temporalResolvedTarget.width + "x" + temporalResolvedTarget.height);
+                : temporalResolvedTarget.width + "x" + temporalResolvedTarget.height)
+                + " upscale=" + (spatialUpscaleTarget == null ? "none"
+                : spatialUpscaleTarget.width + "x" + spatialUpscaleTarget.height);
     }
 
     /** Releases the temporal targets alone (temporal reconstruction switched off). */
@@ -670,6 +714,8 @@ public final class VolumetricCloudRenderTargets {
         // T207. The temporal phases and the resolved lattice, on every
         // release path with the rest.
         releaseTemporalTargets(reason);
+        // T209. The upscale layer, on every release path with the rest.
+        releaseSpatialUpscaleTarget(reason);
         if (visibleVolumeOracleTarget != null) {
             visibleVolumeOracleTarget.destroyBuffers();
             visibleVolumeOracleTarget = null;

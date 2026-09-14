@@ -9,6 +9,10 @@ uniform int SceneDepthValid;
 // Rank 1 reconstruction arm. 0 keeps the shipped accumulation exactly; 1
 // separates coverage from colour, which removes the resolution-scale beat.
 uniform int CoverageAlphaReconstruction;
+// T209. 1 when the source is already at the destination size (the spatial
+// upscale wrote it): one exact texel per pixel, the scene test, no filter -
+// so the layer is never reconstructed twice.
+uniform int OneToOne;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -29,6 +33,31 @@ void main() {
     ivec2 depthSize = textureSize(CloudDepthSampler, 0);
     if (sourceSize.x <= 0 || sourceSize.y <= 0 || depthSize != sourceSize) {
         discard;
+    }
+
+    if (OneToOne != 0 && (CompositeMode == 0 || CompositeMode == 5)) {
+        ivec2 pixel = clampCoord(ivec2(gl_FragCoord.xy), sourceSize);
+        vec4 texel = texelFetch(CloudColorSampler, pixel, 0);
+        float depth = texelFetch(CloudDepthSampler, pixel, 0).r;
+        if (texel.a <= ALPHA_EPSILON || depth >= 1.0) {
+            discard;
+        }
+        if (SceneDepthValid != 0) {
+            ivec2 sceneSize = textureSize(SceneDepthSampler, 0);
+            if (sceneSize.x > 0 && sceneSize.y > 0) {
+                ivec2 sceneCoord = clampCoord(ivec2(texCoord * vec2(sceneSize)), sceneSize);
+                float scene = texelFetch(SceneDepthSampler, sceneCoord, 0).r;
+                float sceneRight = texelFetch(SceneDepthSampler, clampCoord(sceneCoord + ivec2(1, 0), sceneSize), 0).r;
+                float sceneUp = texelFetch(SceneDepthSampler, clampCoord(sceneCoord + ivec2(0, 1), sceneSize), 0).r;
+                float bias = 0.00002 + min(max(abs(scene - sceneRight), abs(scene - sceneUp)) * 0.25, 0.00035);
+                if (scene < 0.99999 && depth > scene + bias) {
+                    discard;
+                }
+            }
+        }
+        fragColor = vec4(texel.rgb / max(texel.a, ALPHA_EPSILON), clamp(texel.a, 0.0, 1.0));
+        gl_FragDepth = depth;
+        return;
     }
 
     vec2 sourcePosition = texCoord * vec2(sourceSize) - vec2(0.5);

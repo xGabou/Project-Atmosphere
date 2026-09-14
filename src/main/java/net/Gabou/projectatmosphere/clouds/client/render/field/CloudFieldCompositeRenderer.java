@@ -100,6 +100,12 @@ public final class CloudFieldCompositeRenderer {
         shader.safeGetUniform("CoverageAlphaReconstruction").set(
                 net.Gabou.projectatmosphere.clouds.client.render.volumetric
                         .VolumetricCloudDebugConfig.coverageAlphaReconstruction() ? 1 : 0);
+        // T209. A source already at the destination size (the spatial upscale
+        // layer) is fetched one texel per pixel, never filtered again.
+        boolean oneToOne = source.width == destinationViewport[2]
+                && source.height == destinationViewport[3];
+        shader.safeGetUniform("OneToOne").set(oneToOne ? 1 : 0);
+        lastOneToOne = oneToOne;
         shader.apply();
 
         GPU_TIMER.begin();
@@ -127,6 +133,13 @@ public final class CloudFieldCompositeRenderer {
 
     public static LastDrawInputs lastDrawInputs() {
         return lastDrawInputs;
+    }
+
+    private static boolean lastOneToOne;
+
+    /** T209. True when the last composite fetched its source one-to-one. */
+    public static boolean lastOneToOne() {
+        return lastOneToOne;
     }
 
     /**

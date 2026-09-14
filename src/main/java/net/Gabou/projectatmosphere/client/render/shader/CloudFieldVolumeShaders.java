@@ -29,6 +29,10 @@ public final class CloudFieldVolumeShaders {
     private static ShaderInstance shader;
     private static ShaderInstance compositeShader;
     private static ShaderInstance temporalResolveShader;
+    /** T209. The spatial upscale of the lattice to the display, beside the composite. */
+    private static final ResourceLocation SPATIAL_UPSCALE_SHADER_ID =
+            ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_spatial_upscale");
+    private static ShaderInstance spatialUpscaleShader;
 
     private CloudFieldVolumeShaders() {
     }
@@ -53,6 +57,10 @@ public final class CloudFieldVolumeShaders {
             temporalResolveShader = loaded;
             ProjectAtmosphere.LOGGER.info("[CloudFieldVolume] shaderReload.ready temporalResolve={}", TEMPORAL_RESOLVE_SHADER_ID);
         });
+        event.registerShader(new ShaderInstance(event.getResourceProvider(), SPATIAL_UPSCALE_SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> {
+            spatialUpscaleShader = loaded;
+            ProjectAtmosphere.LOGGER.info("[CloudFieldVolume] shaderReload.ready spatialUpscale={}", SPATIAL_UPSCALE_SHADER_ID);
+        });
     }
 
     /**
@@ -71,6 +79,11 @@ public final class CloudFieldVolumeShaders {
     /** T207. The temporal lattice resolve, or null when it failed to link. */
     public static ShaderInstance getTemporalResolveShader() {
         return temporalResolveShader;
+    }
+
+    /** T209. The spatial upscale, or null when it failed to link. */
+    public static ShaderInstance getSpatialUpscaleShader() {
+        return spatialUpscaleShader;
     }
 
     /**

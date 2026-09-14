@@ -172,6 +172,7 @@ public final class VolumetricCloudClientLifecycle {
         CloudFieldVolumeRenderer.shutdown();
         CloudFieldCompositeRenderer.shutdown();
         CloudTemporalResolveRenderer.shutdown();
+        net.Gabou.projectatmosphere.clouds.client.render.field.CloudSpatialUpscaleRenderer.shutdown();
         FullscreenQuad.shutdown();
         SceneDepthResolver.shutdown();
         CloudCellAnalyticsPass.shutdown();

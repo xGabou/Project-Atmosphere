@@ -694,7 +694,111 @@ public final class StormVolumetricGeometrySandbox {
                         + " and ambiguity together, the attribution switches never reach a"
                         + " timing cell, the route judges the guard beside the T207 control",
                 StormVolumetricGeometrySandbox::validateT208TemporalCleanup);
+        runCorrected("T209 the spatial upscale keeps the field premultiplied (one kernel for"
+                        + " all four channels, the straight-colour guard), selects depth, writes"
+                        + " the layer the composite reads one-to-one, is off in production until"
+                        + " chosen, and compiles",
+                StormVolumetricGeometrySandbox::validateT209SpatialUpscale);
     }
+
+    /**
+     * T209. The spatial upscale of the lattice to the display: its JSON
+     * names exactly the lattice colour, the lattice depth and the scene
+     * depth (no phase, no history - the pass never touches the temporal
+     * inputs); every method applies one weight to the whole premultiplied
+     * texel ({@code aC += c * w} on a vec4, {@code sum += texel * w}) and
+     * clamps every channel to the 2x2 footprint; the straight-colour guard
+     * bounds the output's colour by the brightest valid centre tap; depth is
+     * the PA selection and is written through GL_ALWAYS; the composite reads
+     * a same-size source one-to-one and reports it; the production default is
+     * what T209 chose; the campaigns are wired; the shader compiles.
+     */
+    private static void validateT209SpatialUpscale() {
+        String base = "src/main/resources/assets/projectatmosphere/shaders/core/";
+        String source = readWorkspaceSource(base + "cloud_spatial_upscale.fsh");
+        String json = readWorkspaceSource(base + "cloud_spatial_upscale.json");
+        java.util.Set<String> jsonSamplers = jsonNames(json, "samplers");
+        java.util.Set<String> jsonUniforms = jsonNames(json, "uniforms");
+        java.util.Map<String, String> live = liveUniforms(source);
+        java.util.Set<String> expectedSamplers = new java.util.LinkedHashSet<>(List.of(
+                "CloudColorSampler", "CloudDepthSampler", "SceneDepthSampler"));
+        require(jsonSamplers.equals(expectedSamplers),
+                "the upscale's JSON samplers are not exactly the lattice and the scene depth: "
+                        + jsonSamplers);
+        java.util.Set<String> glslSamplers = new java.util.LinkedHashSet<>();
+        for (java.util.Map.Entry<String, String> uniform : live.entrySet()) {
+            if (uniform.getValue().startsWith("sampler")) {
+                glslSamplers.add(uniform.getKey());
+            } else {
+                require(jsonUniforms.contains(uniform.getKey()),
+                        "upscale uniform " + uniform.getKey() + " is live but not in its JSON");
+            }
+        }
+        require(glslSamplers.equals(expectedSamplers),
+                "the upscale reads a sampler outside the lattice and the scene depth: " + glslSamplers);
+        require(!source.contains("Phase") && !source.contains("History"),
+                "the upscale touches a temporal input");
+        require(source.contains("void easuTap(") && source.contains("inout vec4 aC,")
+                        && source.contains("    aC += c * w;") && source.contains("    aW += w;")
+                        && source.contains("vec4 encoded = clamp(aC / max(aW, 1e-6), mn4, mx4);"),
+                "EASU does not apply one weight to the whole premultiplied texel with the clamp on every channel");
+        require(source.contains("                    sum += texel * w;")
+                        && source.contains("outTexel = clamp(filtered, centreMin, centreMax);"),
+                "the depth-guided kernel does not apply one weight to the whole texel with the 2x2 clamp");
+        require(source.contains("vec3 outColor = clamp(outTexel.rgb, outAlpha * straightMin, outAlpha * straightMax);"),
+                "the straight-colour guard is not two-sided");
+        require(source.contains("gl_FragDepth = selectedDepth;")
+                        && source.contains("float score = weights[i] * colors[i].a;"),
+                "depth is not the PA selection");
+        require(source.contains("if (UpscaleMethod == 1) {") && source.contains("} else if (UpscaleMethod == 2) {"),
+                "the three methods are not all present");
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/field/CloudSpatialUpscaleRenderer.java");
+        require(renderer.contains("RenderSystem.depthFunc(GL11.GL_ALWAYS);")
+                        && renderer.contains("RenderSystem.depthMask(true);")
+                        && renderer.contains("shader.setSampler(\"CloudColorSampler\", source.getColorTextureId());")
+                        && !renderer.contains("phaseTarget("),
+                "the upscale pass does not write depth through GL_ALWAYS, or binds a phase");
+        String composite = readWorkspaceSource(base + "cloud_field_composite.fsh");
+        require(composite.contains("uniform int OneToOne;")
+                        && composite.contains("if (OneToOne != 0 && (CompositeMode == 0 || CompositeMode == 5)) {")
+                        && composite.contains("vec4 texel = texelFetch(CloudColorSampler, pixel, 0);"),
+                "the composite has no one-to-one fetch for a display-size source");
+        String compositeRenderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/field/CloudFieldCompositeRenderer.java");
+        require(compositeRenderer.contains("boolean oneToOne = source.width == destinationViewport[2]")
+                        && compositeRenderer.contains("shader.safeGetUniform(\"OneToOne\").set(oneToOne ? 1 : 0);"),
+                "the composite renderer does not arm the one-to-one fetch by size");
+        String hook = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudRenderHook.java");
+        require(hook.contains("int upscaleMethod = VolumetricCloudDebugConfig.spatialUpscaleMethod();")
+                        && hook.contains("compositeSource = upscaled;"),
+                "the hook does not route the composite through the upscale layer");
+        String targets = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/VolumetricCloudRenderTargets.java");
+        require(targets.contains("releaseSpatialUpscaleTarget(reason);")
+                        && targets.contains("\"T209_UPSCALE_ALLOC format=RGBA16F+depth size={}x{} bytes={}\""),
+                "the upscale layer is not released with the other targets");
+        String driver = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/StormT132AutoDriver.java");
+        require(driver.contains("\"t209-spatial-upscale.txt\"") && driver.contains("\"t209-spatial-motion.txt\"")
+                        && driver.contains("VolumetricCloudDebugConfig.setSpatialUpscaleMethod(arm.upscale());"),
+                "the T209 campaigns are not wired, or a timing arm can inherit an upscale method");
+        String fixture = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/StormT152MovingCameraFixture.java");
+        require(fixture.contains("UPSCALE(Arm.PRODUCTION_100, Arm.UPSCALE_BILINEAR, Arm.UPSCALE_EASU, Arm.UPSCALE_DEPTH)")
+                        && fixture.contains("PRODUCTION_100(\"production_100\", false, 0, 1.0F, -1)"),
+                "the motion route's upscale set is not native 1.0 against the three layers");
+        require(VolumetricCloudDebugConfig.PRODUCTION_SPATIAL_UPSCALE == T209_EXPECTED_PRODUCTION_UPSCALE,
+                "the production upscale default is not the one T209 chose");
+        compileFragmentShader(resolveMojImports(source), "cloud_spatial_upscale");
+        System.out.println("T209_SPATIAL_UPSCALE methods=pa|easu|depthGuided|premultiplied=oneKernelAllChannels"
+                + "|straightGuard=true|depth=paSelected|compositeOneToOne=true"
+                + "|productionUpscale=" + VolumetricCloudDebugConfig.PRODUCTION_SPATIAL_UPSCALE);
+    }
+
+    /** T209. The production upscale the campaign decided on (-1 until it has). */
+    private static final int T209_EXPECTED_PRODUCTION_UPSCALE = -1;
 
     /**
      * T208. The near-field guard ships in the production mode (mode 5 is

@@ -206,18 +206,31 @@ final class StormT152MovingCameraFixture {
          * near-field guard (T207) - through the same fixture, so the guard is
          * judged against the T207 validity frame by frame, not across sessions.
          */
-        TEMPORAL_025_NOGUARD("temporal_025_noguard", false, 5, 0.25F);
+        TEMPORAL_025_NOGUARD("temporal_025_noguard", false, 5, 0.25F),
+        /** T209M reference: production (no temporal) at native 1.0 - 1920x1080. */
+        PRODUCTION_100("production_100", false, 0, 1.0F, -1),
+        /** T209M candidates: the 0.25 lattice through each upscale method's layer. */
+        UPSCALE_BILINEAR("upscale_bilinear", false, 1, 0.25F, 0),
+        UPSCALE_EASU("upscale_easu", false, 1, 0.25F, 1),
+        UPSCALE_DEPTH("upscale_depth", false, 1, 0.25F, 2);
 
         private final String label;
         private final boolean history;
         private final int temporal;
         private final float resolutionScale;
+        /** T209. The spatial upscale method, -1 for none. */
+        private final int upscale;
 
         Arm(String label, boolean history, int temporal, float resolutionScale) {
+            this(label, history, temporal, resolutionScale, -1);
+        }
+
+        Arm(String label, boolean history, int temporal, float resolutionScale, int upscale) {
             this.label = label;
             this.history = history;
             this.temporal = temporal;
             this.resolutionScale = resolutionScale;
+            this.upscale = upscale;
         }
 
         String label() {
@@ -235,7 +248,9 @@ final class StormT152MovingCameraFixture {
      */
     enum ArmSet {
         HISTORY(Arm.HISTORY_OFF, Arm.HISTORY_ON),
-        TEMPORAL(Arm.PRODUCTION_050, Arm.TEMPORAL_025, Arm.TEMPORAL_025_NOGUARD);
+        TEMPORAL(Arm.PRODUCTION_050, Arm.TEMPORAL_025, Arm.TEMPORAL_025_NOGUARD),
+        /** T209M: native 1.0 against the three upscaled layers of the 0.25 lattice. */
+        UPSCALE(Arm.PRODUCTION_100, Arm.UPSCALE_BILINEAR, Arm.UPSCALE_EASU, Arm.UPSCALE_DEPTH);
 
         private final Arm[] arms;
 
@@ -283,6 +298,7 @@ final class StormT152MovingCameraFixture {
     private static boolean originalHistoryEnabled = true;
     private static int originalTemporalMode;
     private static float originalResolutionScale = Float.NaN;
+    private static int originalUpscaleMethod = -1;
     private static boolean historyOverrideApplied;
     private static ArmSet armSet = ArmSet.HISTORY;
     private static boolean cameraModeApplied;
@@ -375,6 +391,7 @@ final class StormT152MovingCameraFixture {
         originalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
         originalTemporalMode = VolumetricCloudDebugConfig.temporalMode();
         originalResolutionScale = VolumetricCloudDebugConfig.fixedResolutionScale();
+        originalUpscaleMethod = VolumetricCloudDebugConfig.spatialUpscaleMethod();
         referenceGhostFrames = new byte[ROUTE_FRAMES][];
         arm = armSet.first();
         routeIndex = 0;
@@ -397,8 +414,8 @@ final class StormT152MovingCameraFixture {
                 fmt(angularStep), fmt(SURFACE_SCALE_FLOOR), fmt(SURFACE_SCALE_CEILING),
                 fmt(INTERIOR_SCALE_CEILING), fmt(minStepBlocks()), fmt(maxStepBlocks()));
         ProjectAtmosphere.LOGGER.info(
-                "T152_ARM_BEGIN arm={} history={} temporal={} scale={}", arm.label(),
-                arm.history, arm.temporal, arm.resolutionScale);
+                "T152_ARM_BEGIN arm={} history={} temporal={} scale={} upscale={}", arm.label(),
+                arm.history, arm.temporal, arm.resolutionScale, arm.upscale);
         status = "t152_started";
         return status;
     }
@@ -504,8 +521,8 @@ final class StormT152MovingCameraFixture {
             state = State.SETTLE;
             applyArmHistory();
             ProjectAtmosphere.LOGGER.info(
-                    "T152_ARM_BEGIN arm={} history={} temporal={} scale={}", arm.label(),
-                    arm.history, arm.temporal, arm.resolutionScale);
+                    "T152_ARM_BEGIN arm={} history={} temporal={} scale={} upscale={}", arm.label(),
+                    arm.history, arm.temporal, arm.resolutionScale, arm.upscale);
             placeCamera(player, 0);
             return;
         }
@@ -533,6 +550,7 @@ final class StormT152MovingCameraFixture {
             VolumetricCloudDebugConfig.setTemporalMode(arm.temporal);
             VolumetricCloudDebugConfig.setTemporalDebugOutput(0);
             VolumetricCloudDebugConfig.setFixedResolutionScale(arm.resolutionScale);
+            VolumetricCloudDebugConfig.setSpatialUpscaleMethod(arm.upscale);
             VolumetricCloudRenderer.invalidateHistory();
         }
         historyOverrideApplied = true;
@@ -544,6 +562,7 @@ final class StormT152MovingCameraFixture {
             if (armSet != ArmSet.HISTORY) {
                 VolumetricCloudDebugConfig.setTemporalMode(originalTemporalMode);
                 VolumetricCloudDebugConfig.setFixedResolutionScale(originalResolutionScale);
+                VolumetricCloudDebugConfig.setSpatialUpscaleMethod(originalUpscaleMethod);
             }
             historyOverrideApplied = false;
         }
