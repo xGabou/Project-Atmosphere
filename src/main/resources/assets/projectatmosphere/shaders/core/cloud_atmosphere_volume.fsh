@@ -1263,25 +1263,25 @@ void paOracleRecordAfterAlpha(
     if (!paWorkloadCaptureActive()) {
         return;
     }
-    ivec4 active = ivec4(
+    ivec4 bandActive = ivec4(
         alphaBefore >= 0.50 ? 1 : 0,
         alphaBefore >= 0.90 ? 1 : 0,
         alphaBefore >= 0.95 ? 1 : 0,
         alphaBefore >= 0.98 ? 1 : 0
     );
     if (paWorkloadCaptureActive())
-        paOracleStepsAfterAlpha += active;
+        paOracleStepsAfterAlpha += bandActive;
     if (paWorkloadCaptureActive())
-        paOracleDescriptorAfterAlpha += active
+        paOracleDescriptorAfterAlpha += bandActive
             * (paDescriptorEvaluations - descriptorBefore);
     if (paWorkloadCaptureActive())
-        paOracleDensityAfterAlpha += active
+        paOracleDensityAfterAlpha += bandActive
             * (paCloudDensityCalls - densityBefore);
     if (paWorkloadCaptureActive())
-        paOracleLightAfterAlpha += active
+        paOracleLightAfterAlpha += bandActive
             * (paLightMarchDensityEvaluations - lightBefore);
     if (paWorkloadCaptureActive())
-        paOracleDetailAfterAlpha += active
+        paOracleDetailAfterAlpha += bandActive
             * (paDetailOctaveEvaluations - detailBefore);
 }
 // T128 on-demand centre-line trace uniforms. They are inert unless DebugView
@@ -3614,8 +3614,8 @@ bool directStormSegmentMayIntersect(vec3 segmentStart, vec3 segmentEnd) {
         paSegmentTestCalls++;
     }
     int groupVisited = 0;
-    for (int sample = 0; sample < 3; sample++) {
-        float fraction = sample == 0 ? 0.0 : (sample == 1 ? 0.5 : 1.0);
+    for (int sampleIndex = 0; sampleIndex < 3; sampleIndex++) {
+        float fraction = sampleIndex == 0 ? 0.0 : (sampleIndex == 1 ? 0.5 : 1.0);
         vec4 candidates = stormCandidatesAt(mix(segmentStart.xz, segmentEnd.xz, fraction));
         for (int rank = 0; rank < STORM_CANDIDATES_PER_TILE; rank++) {
             int witnessIndex = decodeStormCandidate(candidates, rank);
