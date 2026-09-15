@@ -1,3 +1,7 @@
+# Project Atmosphere 0.9.4
+## Shader Crash Fix
+* Fixed a startup crash where one of the mod's shader programs failed to compile on stricter GPU drivers, which aborted mod loading.
+---
 # Project Atmosphere 0.9.3.1
 ## Compat with Project Landscape
 * Fixed a stall bug when loading world with PA and Project Landscape.
