@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.region;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +29,18 @@ public final class ForecastRegion {
     private final RegionInstanceKey id;
     private final BlockPos anchor;
     private final Map<ResourceLocation, Integer> biomeWeights;
+    /**
+     * Per-biome weekly temperature curves, derived from the region's samples at
+     * aggregation time. The region curve above is the weighted mean across every
+     * sample; collapsing to it alone discards the biome-specific temperatures
+     * that {@code BiomeTempConfig} (and the user's biome_temps.json overrides)
+     * produced per sample, which is what the client's per-biome display needs.
+     *
+     * <p>Derived, never serialized: {@code ForecastDataStorage} persists the
+     * samples and re-runs {@link #aggregate} on load, so this map rebuilds
+     * itself with no save-format change.</p>
+     */
+    private final Map<ResourceLocation, float[][]> biomeTemperatureWeeks;
     private RegionCurves curves;
 
     private float[][] temperature;
@@ -48,6 +61,14 @@ public final class ForecastRegion {
                           @Nullable BlockPos anchor,
                           @Nullable RegionCurves curves,
                           @Nullable Map<ResourceLocation, Integer> biomeWeights) {
+        this(id, anchor, curves, biomeWeights, null);
+    }
+
+    public ForecastRegion(RegionInstanceKey id,
+                          @Nullable BlockPos anchor,
+                          @Nullable RegionCurves curves,
+                          @Nullable Map<ResourceLocation, Integer> biomeWeights,
+                          @Nullable Map<ResourceLocation, float[][]> biomeTemperatureWeeks) {
         this.id = id;
         this.anchor = anchor == null && id != null ? id.center() : anchor;
         this.curves = curves;
@@ -56,6 +77,14 @@ public final class ForecastRegion {
             biomeWeights.forEach((key, value) -> {
                 if (key != null && value != null && value > 0) {
                     this.biomeWeights.merge(key, value, Integer::sum);
+                }
+            });
+        }
+        this.biomeTemperatureWeeks = new HashMap<>();
+        if (biomeTemperatureWeeks != null) {
+            biomeTemperatureWeeks.forEach((key, week) -> {
+                if (key != null && week != null) {
+                    this.biomeTemperatureWeeks.put(key, week);
                 }
             });
         }
@@ -80,6 +109,15 @@ public final class ForecastRegion {
 
     public Map<ResourceLocation, Integer> getBiomeWeights() {
         return biomeWeights;
+    }
+
+    /**
+     * Returns this region's per-biome weekly temperature curves, keyed by biome
+     * id. Empty for regions built without samples (the fallback path), in which
+     * case callers should fall back to {@link #getTemperature()}.
+     */
+    public Map<ResourceLocation, float[][]> getBiomeTemperatureWeeks() {
+        return biomeTemperatureWeeks;
     }
 
     public ResourceLocation getDominantBiome() {
@@ -166,6 +204,7 @@ public final class ForecastRegion {
         }
 
         Map<ResourceLocation, Integer> weights = new HashMap<>();
+        Map<ResourceLocation, List<GeneratedSample>> samplesByBiome = new HashMap<>();
         int totalWeight = 0;
         for (GeneratedSample sample : samples) {
             if (sample == null || sample.sample() == null) {
@@ -173,7 +212,11 @@ public final class ForecastRegion {
             }
             int weight = Math.max(1, sample.sample().weight());
             totalWeight += weight;
-            weights.merge(sample.sample().biomeId(), weight, Integer::sum);
+            ResourceLocation biomeId = sample.sample().biomeId();
+            weights.merge(biomeId, weight, Integer::sum);
+            if (biomeId != null) {
+                samplesByBiome.computeIfAbsent(biomeId, ignored -> new ArrayList<>()).add(sample);
+            }
         }
         if (totalWeight <= 0) {
             return new ForecastRegion(id, anchor);
@@ -184,7 +227,22 @@ public final class ForecastRegion {
         float[][] pressure = weightedWeek(samples, GeneratedSample::pressure, totalWeight, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
         WindVector[] wind = weightedWind(samples, totalWeight);
         RegionCurves curves = new DefaultRegionCurves(temperature, humidity, pressure, wind, stormWeek == null ? new float[0] : stormWeek);
-        return new ForecastRegion(id, anchor, curves, weights);
+
+        // The same weighted reduction, run once per biome over only that biome's
+        // samples, so each biome keeps the temperature its own climate range
+        // produced instead of the region-wide mean.
+        Map<ResourceLocation, float[][]> biomeTemperatures = new HashMap<>(samplesByBiome.size());
+        for (Map.Entry<ResourceLocation, List<GeneratedSample>> entry : samplesByBiome.entrySet()) {
+            int biomeWeight = weights.getOrDefault(entry.getKey(), 0);
+            if (biomeWeight <= 0) {
+                continue;
+            }
+            biomeTemperatures.put(entry.getKey(), weightedWeek(
+                    entry.getValue(), GeneratedSample::temperature, biomeWeight,
+                    MIN_TEMPERATURE_C, MAX_TEMPERATURE_C));
+        }
+
+        return new ForecastRegion(id, anchor, curves, weights, biomeTemperatures);
     }
 
     private void syncFromCurvesOrFallback() {

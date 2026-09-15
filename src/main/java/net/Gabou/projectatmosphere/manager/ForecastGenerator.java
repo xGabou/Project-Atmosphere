@@ -301,9 +301,17 @@ public class ForecastGenerator {
                 }
                 continue;
             }
+            // Each biome contributes its own curve. Using the region mean here
+            // gave every biome in a region an identical temperature and made
+            // per-biome climate ranges - including biome_temps.json overrides -
+            // invisible to the client. The region mean stays as the fallback for
+            // biomes whose samples did not survive aggregation.
+            Map<ResourceLocation, float[][]> biomeWeeks = region.getBiomeTemperatureWeeks();
             for (Map.Entry<ResourceLocation, Integer> entry : weights.entrySet()) {
+                float[][] biomeWeek = biomeWeeks.get(entry.getKey());
+                float value = biomeWeek == null ? representative : averageDailyMidpoint(biomeWeek);
                 grouped.computeIfAbsent(entry.getKey(), ignored -> new WeightedTemperature())
-                        .add(representative, Math.max(1, entry.getValue()));
+                        .add(value, Math.max(1, entry.getValue()));
             }
         }
 

@@ -8,6 +8,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class BiomeClientTemperatureCache {
     private static volatile Map<ResourceLocation, float[]> DAILY_FORECASTS = new ConcurrentHashMap<>();
+    /**
+     * Mean of every cached biome forecast, used when a biome has no entry of its
+     * own. A biome is missing whenever no loaded region sampled it, which is
+     * routine near the edge of the loaded area. The previous fixed 0.5 was worse
+     * than useless: it reads as a plausible 0.5 degrees C rather than "unknown",
+     * and {@code BiomeFreezingMixin} treats it as just above freezing.
+     */
+    private static volatile float FALLBACK_CELSIUS = 0.0F;
 
     // ---------------------------------------------------------------------
     // Cache updates
@@ -19,10 +27,37 @@ public class BiomeClientTemperatureCache {
         Map<ResourceLocation, float[]> next = new ConcurrentHashMap<>(newData.size());
         next.putAll(newData);
         DAILY_FORECASTS = next;
+        FALLBACK_CELSIUS = meanOf(next);
     }
 
     public static void replaceDayForecasts(Map<ResourceLocation, float[]> newData) {
-        DAILY_FORECASTS = new ConcurrentHashMap<>(newData);
+        Map<ResourceLocation, float[]> next = new ConcurrentHashMap<>(newData);
+        DAILY_FORECASTS = next;
+        FALLBACK_CELSIUS = meanOf(next);
+    }
+
+    /**
+     * Returns whether the client actually has a forecast for this biome, so
+     * callers can distinguish a real reading from the fallback.
+     */
+    public static boolean hasTemperature(ResourceLocation biome) {
+        float[] arr = DAILY_FORECASTS.get(biome);
+        return arr != null && arr.length > 0;
+    }
+
+    private static float meanOf(Map<ResourceLocation, float[]> data) {
+        double sum = 0.0D;
+        int count = 0;
+        for (float[] arr : data.values()) {
+            if (arr == null || arr.length == 0) {
+                continue;
+            }
+            for (float value : arr) {
+                sum += value;
+                count++;
+            }
+        }
+        return count == 0 ? 0.0F : (float) (sum / count);
     }
 
     // ---------------------------------------------------------------------
@@ -38,7 +73,7 @@ public class BiomeClientTemperatureCache {
      */
     public static float getTemperature(ResourceLocation biome, Level level) {
         float[] arr = DAILY_FORECASTS.get(biome);
-        if (arr == null || arr.length == 0) return 0.5F;
+        if (arr == null || arr.length == 0) return FALLBACK_CELSIUS;
         if (level == null) return arr[0];
 
         // Convert in-game time (ticks) -> array index
@@ -69,5 +104,6 @@ public class BiomeClientTemperatureCache {
      */
     public static void clear() {
         DAILY_FORECASTS = new ConcurrentHashMap<>();
+        FALLBACK_CELSIUS = 0.0F;
     }
 }
