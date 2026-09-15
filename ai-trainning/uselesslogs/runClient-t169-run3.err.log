@@ -1,0 +1,92 @@
+Note: SpongePowered MIXIN Annotation Processor Version=0.8.5 (MixinGradle Version=0.7.38)
+Note: Supported obfuscation types: ObfuscationServiceMCP supports [notch] ObfuscationServiceFG3 supports [searge]
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\mixin\compat\auroras\AuroraRendererMixin.java:16: warning: Mixin target auroras.util.AuroraRenderer is public and should be specified in value
+@Mixin(targets = "auroras.util.AuroraRenderer", remap = false)
+^
+Note: Loading searge mappings from C:\Users\matga\Downloads\Project-Atmosphere\build\createMcpToSrg\output.tsrg
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\mixin\compat\rainbows\RainbowsRendererParticleMixin.java:15: warning: Mixin target rainbows.util.RainbowsRendererParticle is public and should be specified in value
+@Mixin(targets = "rainbows.util.RainbowsRendererParticle", remap = false)
+^
+Note: Writing refmap to C:\Users\matga\Downloads\Project-Atmosphere\build\tmp\compileJava\compileJava-refmap.json
+Note: Writing refmap to C:\Users\matga\Downloads\Project-Atmosphere\build\tmp\compileJava\compileJava-refmap.json
+Note: Writing searge composite mappings to C:\Users\matga\Downloads\Project-Atmosphere\build\tmp\compileJava\compileJava-mappings.tsrg
+Note: Writing refmap to C:\Users\matga\Downloads\Project-Atmosphere\build\tmp\compileJava\compileJava-refmap.json
+Note: Writing refmap to C:\Users\matga\Downloads\Project-Atmosphere\build\tmp\compileJava\compileJava-refmap.json
+Note: Writing searge composite mappings to C:\Users\matga\Downloads\Project-Atmosphere\build\tmp\compileJava\compileJava-mappings.tsrg
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\modules\temperature\config\BiomeTempConfig.java:55: warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+            new ResourceLocation("minecraft:plains");
+            ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\api\common\cloud\region\TornadoDescriptor.java:183: warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+                ? new ResourceLocation(tag.getString(KEY_CONTROLLER)) : null;
+                  ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\ProjectAtmosphere.java:67: warning: [removal] get() in FMLJavaModLoadingContext has been deprecated and marked for removal
+        FMLJavaModLoadingContext context = FMLJavaModLoadingContext.get();
+                                                                   ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\clouds\state\CloudRegionState.java:469: warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+        ResourceLocation dimensionLocation = new ResourceLocation(dimensionId);
+                                             ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\clouds\state\CloudClusterState.java:627: warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+        ResourceLocation dimensionLocation = new ResourceLocation(dimensionId);
+                                             ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\seasons\SeasonSnapshot.java:34: warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+        return new SeasonSnapshot(new ResourceLocation("projectatmosphere", "neutral"),
+                                  ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\modules\seasonaltrees\integration\DynamicTreesDormancyHelper.java:255: warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+        LeavesProperties bare = LeavesProperties.REGISTRY.getOptional(new ResourceLocation("dynamictrees", "bare")).orElse(null);
+                                                                      ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\registry\ClientBootstrap.java:26: warning: [removal] get() in FMLJavaModLoadingContext has been deprecated and marked for removal
+        FMLJavaModLoadingContext context = FMLJavaModLoadingContext.get();
+                                                                   ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\seasons\EclipticSeasonsSeasonDelegate.java:59: warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+                new ResourceLocation("eclipticseasons", "season"),
+                ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\seasons\SeasonProviderRegistry.java:28: warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+        ResourceLocation prevId = previous == null ? null : new ResourceLocation(previous.id());
+                                                            ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\seasons\SeasonProviderRegistry.java:55: warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+        private static final ResourceLocation ID = new ResourceLocation("projectatmosphere", "neutral");
+                                                   ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\seasons\SeasonTimeHelper.java:103: warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+        private static final ResourceLocation ID = new ResourceLocation("projectatmosphere", "neutral");
+                                                   ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\seasons\SereneSeasonsSeasonDelegate.java:48: warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+        return new SeasonSnapshot(new ResourceLocation("sereneseasons", "season"),
+                                  ^
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\mixin\MultiRegionCloudMeshGeneratorMixin.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+15 warnings
+java.util.concurrent.RejectedExecutionException: Server already shutting down
+	at TRANSFORMER/minecraft@1.20.1/net.minecraft.server.MinecraftServer.executeIfPossible(MinecraftServer.java:1279)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.forge.plugin.ForgeServerSparkPlugin.executeSync(ForgeServerSparkPlugin.java:222)
+	at java.base/java.util.concurrent.CompletableFuture.asyncSupplyStage(CompletableFuture.java:1782)
+	at java.base/java.util.concurrent.CompletableFuture.supplyAsync(CompletableFuture.java:2005)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.platform.world.AsyncWorldInfoProvider.async(AsyncWorldInfoProvider.java:54)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.platform.world.AsyncWorldInfoProvider.pollCounts(AsyncWorldInfoProvider.java:76)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.platform.world.AsyncWorldInfoProvider.getCounts(AsyncWorldInfoProvider.java:84)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.sampler.window.WindowStatisticsCollector.measure(WindowStatisticsCollector.java:185)
+	at java.base/java.util.concurrent.ConcurrentHashMap.computeIfAbsent(ConcurrentHashMap.java:1708)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.sampler.window.WindowStatisticsCollector.measureNow(WindowStatisticsCollector.java:123)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.sampler.java.JavaSampler.stop(JavaSampler.java:115)
+	at TRANSFORMER/spark@1.10.53/me.lucko.spark.common.sampler.java.JavaSampler.run(JavaSampler.java:138)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:305)
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:305)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':runClient'.
+> Process 'command 'C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot\bin\java.exe'' finished with non-zero exit value -1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 9m 42s

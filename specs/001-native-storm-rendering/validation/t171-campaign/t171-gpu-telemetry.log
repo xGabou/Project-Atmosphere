@@ -1,0 +1,28 @@
+GPU telemetry summary, nvidia-smi 1 Hz, 641 samples
+NVIDIA GeForce RTX 4070 Laptop GPU, SM clock range 210-3105 MHz
+
+smClockMHz: n=840 min=210 p25=210 p50=2340 p75=2340 max=2355
+tempC: min=44 max=63   meanPowerW=31.6694
+pstate counts:
+  P3: 28
+  P4: 3
+  P5: 5
+  P8: 308
+  P0: 496
+throttle reasons:
+  0x0000000000000001: 322
+  0x0000000000000000: 518
+
+--- GPU state spanning the anomalous SIDE cell (t170_fpmax5#e1, completes 17:43:37) ---
+17:43:33.539 sm=2340 temp=55 util=100 pw=45.09 ps=P0
+17:43:34.652 sm=2340 temp=54 util=100 pw=45.61 ps=P0
+17:43:35.758 sm=2340 temp=53 util=96 pw=32.50 ps=P3
+17:43:36.866 sm=2340 temp=55 util=100 pw=53.71 ps=P0
+17:43:37.991 sm=2340 temp=53 util=100 pw=40.92 ps=P0
+17:43:39.099 sm=2340 temp=53 util=97 pw=32.20 ps=P3
+17:43:40.199 sm=2340 temp=56 util=100 pw=51.03 ps=P0
+17:43:41.309 sm=2340 temp=53 util=95 pw=34.25 ps=P3
+17:43:42.423 sm=2340 temp=56 util=100 pw=42.43 ps=P0
+17:43:43.537 sm=2340 temp=54 util=95 pw=47.47 ps=P0
+17:43:44.641 sm=2340 temp=55 util=96 pw=34.17 ps=P0
+17:43:45.760 sm=2340 temp=56 util=100 pw=40.27 ps=P0

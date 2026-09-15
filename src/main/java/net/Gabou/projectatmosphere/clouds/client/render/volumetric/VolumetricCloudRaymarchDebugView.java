@@ -52,7 +52,184 @@ public enum VolumetricCloudRaymarchDebugView {
     /** T153 lighting evaluations after alpha 50/90/95/98 percent. */
     STORM_WORKLOAD_ORACLE_ALPHA_LIGHT(33, "storm_workload_oracle_alpha_light"),
     /** T153 detail-octave evaluations after alpha 50/90/95/98 percent. */
-    STORM_WORKLOAD_ORACLE_ALPHA_DETAIL(34, "storm_workload_oracle_alpha_detail");
+    STORM_WORKLOAD_ORACLE_ALPHA_DETAIL(34, "storm_workload_oracle_alpha_detail"),
+    /** T169 lighting attribution: cone marches, cone taps, cone early-outs, cheap probes. */
+    STORM_WORKLOAD_LIGHT_ATTRIBUTION(35, "storm_workload_light_attribution"),
+    /** T169 detail attribution: primary fetches, light fetches, second octave, opaque marches. */
+    STORM_WORKLOAD_DETAIL_ATTRIBUTION(36, "storm_workload_detail_attribution"),
+    /**
+     * T175 primary density histogram, part 1: calls, exactly zero, negligible,
+     * low. Primary body samples only - the light march is excluded by
+     * construction, since these are counted at the single body call site.
+     */
+    STORM_WORKLOAD_PRIMARY_DENSITY_A(37, "storm_workload_primary_density_a"),
+    /** T175 primary density histogram, part 2: medium, high, material runs, zero runs. */
+    STORM_WORKLOAD_PRIMARY_DENSITY_B(38, "storm_workload_primary_density_b"),
+
+    /**
+     * T177. Primary-to-light group reuse validity: how often the group a light
+     * tap actually needs was already resolved by the primary sample that
+     * spawned the cone march.
+     */
+    STORM_WORKLOAD_REUSE_A(39, "storm_workload_reuse_a"),
+
+    /** T177. Reuse misses, groups entered inside taps, and ordinals 1-2. */
+    STORM_WORKLOAD_REUSE_B(40, "storm_workload_reuse_b"),
+
+    /** T177. Reuse validity for tap ordinals 3-4. */
+    STORM_WORKLOAD_REUSE_C(41, "storm_workload_reuse_c"),
+
+    /**
+     * T178. Separates a lobe visit from an expensive lobe evaluation: exact
+     * SDFs, exact SDFs that did not move the union, and the light march's share
+     * of both.
+     */
+    STORM_WORKLOAD_LOBE_A(42, "storm_workload_lobe_a"),
+
+    /** T178. Light-attributed cheap rejects and support-bound rejects. */
+    STORM_WORKLOAD_LOBE_B(43, "storm_workload_lobe_b"),
+
+    /**
+     * T179. The dominance histogram: what each exact SDF actually did to the
+     * accumulated union, binned by magnitude of change.
+     */
+    STORM_WORKLOAD_DOMINANCE_A(44, "storm_workload_dominance_a"),
+
+    /** T179. Zero-change SDFs by consumer, and the slack in the T121 bound. */
+    STORM_WORKLOAD_DOMINANCE_B(45, "storm_workload_dominance_b"),
+
+    /**
+     * T180. Direct attribution of the descriptor walk to its real production
+     * consumers, replacing T175's estimate by subtraction.
+     */
+    STORM_WORKLOAD_CONSUMER_A(46, "storm_workload_consumer_a"),
+
+    /** T180. Bracket bisection and unattributed consumers. */
+    STORM_WORKLOAD_CONSUMER_B(47, "storm_workload_consumer_b"),
+
+    /** T180. Exact SDFs charged to unattributed consumers. */
+    STORM_WORKLOAD_CONSUMER_C(48, "storm_workload_consumer_c"),
+
+    /** T181. Refinement events, scan events, material hits and cap hits. */
+    STORM_WORKLOAD_SCAN_A(49, "storm_workload_scan_a"),
+
+    /** T181. How many probes each scan actually consumed. */
+    STORM_WORKLOAD_SCAN_B(50, "storm_workload_scan_b"),
+
+    /** T181. Probes spent in scans that then re-marched the same lattice. */
+    STORM_WORKLOAD_SCAN_C(51, "storm_workload_scan_c"),
+
+    /** T182. directStormShape calls by consumer: primary, light, probe, bracket. */
+    STORM_WORKLOAD_SHAPE_A(52, "storm_workload_shape_a"),
+
+    /** T182. Refinement, rain segment, rain shaft and camera-inside. */
+    STORM_WORKLOAD_SHAPE_B(53, "storm_workload_shape_b"),
+
+    /** T182. Light forward probe, and the untagged residual that must be zero. */
+    STORM_WORKLOAD_SHAPE_C(54, "storm_workload_shape_c"),
+
+    /** T184. Rain-support calls, T145 prunes, and exact/block reuse hits. */
+    STORM_WORKLOAD_RAIN_A(55, "storm_workload_rain_a"),
+
+    /** T184. Rain-support reuse at weather-tile granularity. */
+    STORM_WORKLOAD_RAIN_B(56, "storm_workload_rain_b"),
+
+    /** T185. Each half of the T145 conjunct, plus tighter-box and exact tests. */
+    STORM_WORKLOAD_RAIN_C(57, "storm_workload_rain_c"),
+
+    /** T185. Columns the prune accepted that carried no support anyway. */
+    STORM_WORKLOAD_RAIN_D(58, "storm_workload_rain_d"),
+
+    /** T186. Segment-test invocations and the per-sample support split. */
+    STORM_WORKLOAD_RAIN_E(59, "storm_workload_rain_e"),
+
+    /** T186. Which sample actually found the rain. */
+    STORM_WORKLOAD_RAIN_F(60, "storm_workload_rain_f"),
+
+    /** T188. Rain-field fetches, and the out-of-domain columns that still walk. */
+    STORM_WORKLOAD_RAIN_FIELD_A(61, "storm_workload_rain_field_a"),
+
+    /**
+     * T188. The descriptor work ONE field cell costs to build, so the
+     * generation pass can be priced with the same counters the ray uses.
+     */
+    STORM_WORKLOAD_RAIN_FIELD_B(62, "storm_workload_rain_field_b"),
+
+    /**
+     * T189. The field's error against the exact function: support delta,
+     * attach-height delta where both paths agree on ownership, ownership
+     * disagreements, and the count of columns both own.
+     */
+    STORM_WORKLOAD_RAIN_FIELD_C(63, "storm_workload_rain_field_c"),
+
+    /**
+     * T189. Whether the field texture is filtered at all: fractional ownership
+     * samples, and the filtered-minus-exact delta on the ownership and support
+     * channels. Tests the premise T188's diagnosis rested on.
+     */
+    STORM_WORKLOAD_RAIN_FIELD_D(64, "storm_workload_rain_field_d"),
+
+    /** T190. Why a column disagrees: ownership, support cutoff, or attach height. */
+    STORM_WORKLOAD_RAIN_FIELD_E(65, "storm_workload_rain_field_e"),
+
+    /** T190. The mixed-cell census, sampled off the field the build wrote. */
+    STORM_WORKLOAD_RAIN_FIELD_F(66, "storm_workload_rain_field_f"),
+
+    /**
+     * T196. The shared storm field's probe audit: the field's verdict against
+     * production's at every probe, in the four agreement classes. Only this
+     * view evaluates production beside the field.
+     */
+    STORM_WORKLOAD_STORM_FIELD_A(67, "storm_workload_storm_field_a"),
+
+    /** T196. What building one field node costs, in the ray's own counters. */
+    STORM_WORKLOAD_STORM_FIELD_B(68, "storm_workload_storm_field_b"),
+
+    /** T196. Fetches the field served, and the probe's two field-only verdicts. */
+    STORM_WORKLOAD_STORM_FIELD_C(69, "storm_workload_storm_field_c"),
+
+    /**
+     * T202. The body consumers on the field: fetches served to the primary
+     * body density and to the refinement, and each one's fallbacks to the
+     * exact walk.
+     */
+    STORM_WORKLOAD_STORM_FIELD_D(70, "storm_workload_storm_field_d"),
+
+    /**
+     * T203. The rain-support walk's outcomes: unowned, owned without a BASE
+     * support, owned with support but no coverage at the support height,
+     * owned with coverage but eroded under the cutoff.
+     */
+    STORM_WORKLOAD_RAIN_GATE_A(71, "storm_workload_rain_gate_a"),
+
+    /** T203. Supported walks, and the height window's decisions on them. */
+    STORM_WORKLOAD_RAIN_GATE_B(72, "storm_workload_rain_gate_b"),
+
+    /** T203. The gate's census on the ray: fetches, dry and window rejects, fallbacks. */
+    STORM_WORKLOAD_RAIN_GATE_C(73, "storm_workload_rain_gate_c"),
+
+    /** T203. Out-of-domain columns, raster deferrals, and the fallbacks' precision. */
+    STORM_WORKLOAD_RAIN_GATE_D(74, "storm_workload_rain_gate_d"),
+
+    /**
+     * T203. The gate's soundness oracle: the exact samples that violate a
+     * dry claim or an attach bound, and the bound misses' excess in blocks
+     * per side. Only this view evaluates production beside the gate field.
+     */
+    STORM_WORKLOAD_RAIN_GATE_E(75, "storm_workload_rain_gate_e"),
+
+    /** T203. The census of the field's proofs by reason, and the raster deferrals. */
+    STORM_WORKLOAD_RAIN_GATE_F(76, "storm_workload_rain_gate_f"),
+
+    /** T203. What building one gate cell costs, in the ray's own counters. */
+    STORM_WORKLOAD_RAIN_GATE_G(77, "storm_workload_rain_gate_g"),
+
+    /**
+     * T204. The shaft path per pixel - true segment tests, shaft samples,
+     * positive segments - which the capture reads as an image and censuses
+     * in warp-shaped tiles for the any-lane divergence estimate.
+     */
+    STORM_WORKLOAD_RAIN_SHAFT_LANES(78, "storm_workload_rain_shaft_lanes");
 
     private final int shaderId;
     private final String serializedName;

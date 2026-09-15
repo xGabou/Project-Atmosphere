@@ -17,6 +17,12 @@ public final class BiomeSampler {
     private final BiomeSource biomeSource;
     private final Climate.Sampler sampler;
 
+    /** Use the world's bound density context; custom generators cannot use a detached RandomState. */
+    public BiomeSampler(net.minecraft.server.level.ServerLevel level, BiomeSource biomeSource) {
+        this.biomeSource = biomeSource;
+        this.sampler = level.getChunkSource().randomState().sampler();
+    }
+
     public BiomeSampler(long seed, RegistryAccess registryAccess, BiomeSource biomeSource) {
         // 1. Grab overworld noise generator settings
         Holder<NoiseGeneratorSettings> settingsHolder =

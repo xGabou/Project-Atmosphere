@@ -1,0 +1,31 @@
+T173 phase 1 - SIDE stability, 20 identical cells, one program (22:02-22:04)
+
+T173_CELL arm=lean_final#s01 samples=60 duplicatesRejected=0 cloudP50=23.4885 cloudP95=26.1796 cloudMean=23.6929 cloudSd=1.1369 cloudCv=0.04798 cloudMin=22.1911 cloudMax=27.2189
+T173_CELL arm=lean_final#s02 samples=60 duplicatesRejected=0 cloudP50=23.5704 cloudP95=25.7229 cloudMean=23.6953 cloudSd=0.9969 cloudCv=0.04207 cloudMin=21.5173 cloudMax=26.5114
+T173_CELL arm=lean_final#s03 samples=60 duplicatesRejected=0 cloudP50=23.6595 cloudP95=25.4505 cloudMean=23.7887 cloudSd=1.1377 cloudCv=0.04782 cloudMin=21.6934 cloudMax=26.9015
+T173_CELL arm=lean_final#s04 samples=60 duplicatesRejected=0 cloudP50=23.9002 cloudP95=25.4689 cloudMean=23.7972 cloudSd=1.0614 cloudCv=0.04460 cloudMin=21.7170 cloudMax=25.9185
+T173_CELL arm=lean_final#s05 samples=60 duplicatesRejected=0 cloudP50=23.4148 cloudP95=25.7669 cloudMean=23.6407 cloudSd=1.2104 cloudCv=0.05120 cloudMin=21.5091 cloudMax=28.6290
+T173_CELL arm=lean_final#s06 samples=60 duplicatesRejected=0 cloudP50=23.7404 cloudP95=25.8191 cloudMean=23.8304 cloudSd=1.0581 cloudCv=0.04440 cloudMin=21.8501 cloudMax=26.3363
+T173_CELL arm=lean_final#s07 samples=60 duplicatesRejected=0 cloudP50=23.4824 cloudP95=25.0399 cloudMean=23.6312 cloudSd=0.7972 cloudCv=0.03373 cloudMin=21.8696 cloudMax=26.0454
+T173_CELL arm=lean_final#s08 samples=60 duplicatesRejected=0 cloudP50=23.5397 cloudP95=25.2498 cloudMean=23.5909 cloudSd=0.9983 cloudCv=0.04232 cloudMin=21.7477 cloudMax=25.9113
+T173_CELL arm=lean_final#s09 samples=60 duplicatesRejected=0 cloudP50=23.6831 cloudP95=25.6061 cloudMean=23.7515 cloudSd=0.8629 cloudCv=0.03633 cloudMin=22.4379 cloudMax=26.4376
+T173_CELL arm=lean_final#s10 samples=60 duplicatesRejected=0 cloudP50=23.5725 cloudP95=24.8904 cloudMean=23.6301 cloudSd=0.9515 cloudCv=0.04027 cloudMin=22.0344 cloudMax=26.6435
+T173_CELL arm=lean_final#s11 samples=60 duplicatesRejected=0 cloudP50=23.6196 cloudP95=25.2252 cloudMean=23.7076 cloudSd=1.0598 cloudCv=0.04470 cloudMin=21.8870 cloudMax=27.4473
+T173_CELL arm=lean_final#s12 samples=60 duplicatesRejected=0 cloudP50=23.6329 cloudP95=26.3434 cloudMean=23.8431 cloudSd=1.2329 cloudCv=0.05171 cloudMin=21.2644 cloudMax=27.6500
+T173_CELL arm=lean_final#s13 samples=60 duplicatesRejected=0 cloudP50=23.4732 cloudP95=24.9723 cloudMean=23.5357 cloudSd=0.9385 cloudCv=0.03987 cloudMin=21.9484 cloudMax=25.9482
+T173_CELL arm=lean_final#s14 samples=60 duplicatesRejected=0 cloudP50=23.4824 cloudP95=25.2119 cloudMean=23.6539 cloudSd=1.1010 cloudCv=0.04654 cloudMin=21.7498 cloudMax=27.9419
+T173_CELL arm=lean_final#s15 samples=60 duplicatesRejected=0 cloudP50=23.6728 cloudP95=25.5652 cloudMean=23.8724 cloudSd=0.9812 cloudCv=0.04110 cloudMin=21.9044 cloudMax=26.4540
+T173_CELL arm=lean_final#s16 samples=60 duplicatesRejected=0 cloudP50=23.3943 cloudP95=25.3491 cloudMean=23.5962 cloudSd=1.0340 cloudCv=0.04382 cloudMin=21.6525 cloudMax=25.9144
+T173_CELL arm=lean_final#s17 samples=60 duplicatesRejected=0 cloudP50=23.5817 cloudP95=25.7475 cloudMean=23.7775 cloudSd=0.9626 cloudCv=0.04048 cloudMin=21.9279 cloudMax=26.8554
+T173_CELL arm=lean_final#s18 samples=60 duplicatesRejected=0 cloudP50=23.3001 cloudP95=25.1341 cloudMean=23.5106 cloudSd=0.9321 cloudCv=0.03965 cloudMin=22.1010 cloudMax=25.9133
+T173_CELL arm=lean_final#s19 samples=60 duplicatesRejected=0 cloudP50=23.4895 cloudP95=25.2324 cloudMean=23.5795 cloudSd=0.8802 cloudCv=0.03733 cloudMin=21.9228 cloudMax=26.5892
+T173_CELL arm=lean_final#s20 samples=60 duplicatesRejected=0 cloudP50=23.5172 cloudP95=24.7450 cloudMean=23.4660 cloudSd=0.8151 cloudCv=0.03473 cloudMin=21.9136 cloudMax=24.8074
+T173_SUMMARY cells=20 mean=23.5608 sd=0.1345 cv=0.00571 min=23.3001 max=23.9002 range=0.0255 consecutivePairsAccepted=19 rejected=0 verdict=SIDE_MEASURABLE
+
+--- per-cell state (constant across all 20 except gameTime) ---
+T173_STATE pose=SIDE arm=lean_final#s01 descriptorSignature=08328807b4eb6fed lobes=10 camera=(1182.05,567.97,-6.02) yaw=90.00 pitch=0.00 cloudTarget=480x270 framebuffer=1920x1080 fixedScale=NaN governorScale=0.50 program=lean_final history=false descriptorLimit=-1 gameTime=2077 dayTime=6000
+T173_STATE pose=SIDE arm=lean_final#s02 descriptorSignature=08328807b4eb6fed lobes=10 camera=(1182.05,567.97,-6.02) yaw=90.00 pitch=0.00 cloudTarget=480x270 framebuffer=1920x1080 fixedScale=NaN governorScale=0.50 program=lean_final history=false descriptorLimit=-1 gameTime=2154 dayTime=6000
+T173_STATE pose=SIDE arm=lean_final#s03 descriptorSignature=08328807b4eb6fed lobes=10 camera=(1182.05,567.97,-6.02) yaw=90.00 pitch=0.00 cloudTarget=480x270 framebuffer=1920x1080 fixedScale=NaN governorScale=0.50 program=lean_final history=false descriptorLimit=-1 gameTime=2232 dayTime=6000
+...
+distinct state lines ignoring gameTime:
+T173_STATE pose=SIDE descriptorSignature=08328807b4eb6fed lobes=10 camera=(1182.05,567.97,-6.02) yaw=90.00 pitch=0.00 cloudTarget=480x270 framebuffer=1920x1080 fixedScale=NaN governorScale=0.50 program=lean_final history=false descriptorLimit=-1 dayTime=6000

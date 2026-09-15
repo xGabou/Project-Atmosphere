@@ -66,3 +66,7 @@ Thumbs.db
 *.tmp
 *.swp
 .vscode/
+
+/phase2a-*.log
+# Local multi-account Codex CLI homes and helper scripts.
+/.pa-agents/

@@ -1,0 +1,103 @@
+[10:27:18] [Render thread/INFO] [projectatmosphere/]: T191_VARIANT_SCOPE declared=155 activeCampaigns=T200 registered=0 skipped=155 crossCampaignControls=1 productionAlwaysLoaded=2
+[10:27:18] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN armed by C:\Users\matga\Downloads\Project-Atmosphere\run\t132-autorun.txt
+[10:27:18] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA_BEGIN source=pa-t132-autogen-source restored=pa-t132-autogen-restored template=C:\Users\matga\Downloads\Project-Atmosphere\run\t132-fixtures\pristine-current
+[10:27:18] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA world seed overridden by marker: 5510001
+[10:27:51] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA create_requested world=pa-t132-autogen-source
+[10:27:53] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA source_entered world=pa-t132-autogen-source player=-8.50, 107.00, 6.50
+[10:27:53] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA source_halt_requested
+[10:27:56] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA source_cleanly_unloaded
+[10:27:56] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA snapshot valid path=C:\Users\matga\Downloads\Project-Atmosphere\run\t132-fixtures\pristine-current dataVersion=3465 sessionLockExcluded=true
+[10:27:56] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA restore valid path=C:\Users\matga\Downloads\Project-Atmosphere\run\saves\pa-t132-autogen-restored dataVersion=3465 sessionLockExcluded=true
+[10:27:57] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA restore_load_requested world=pa-t132-autogen-restored snapshotDataVersion=3465
+[10:27:57] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA accepting normal current-registry confirmation screen=net.minecraft.client.gui.screens.ConfirmScreen
+[10:28:02] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRASTRUCTURE_VALID source=pa-t132-autogen-source restored=pa-t132-autogen-restored restoredEntry=-8.50, 107.00, 6.50 autoQuickPlay=true
+[10:28:22] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL cloudMovementFrozen=true priorValue=true restoredOnExit=true
+[10:28:22] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL daylightCycleFrozen=true dayTime=6000 restoredOnExit=true
+[10:28:22] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL fixedResolutionScale=0.75000 priorValue=adaptive restoredOnExit=true
+[10:28:22] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL raymarchQuality=ULTRA(96/6) priorValue=ULTRA restoredOnExit=true
+[10:28:22] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN spawn requested at -8.50,107.00,6.50
+[10:28:22] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN descriptors adopted lobeCount=10 after 3 frames
+[10:29:38] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN storm mature: topologyGeneration=166 stable for 900 frames
+[10:29:38] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL fixedResolutionScaleRestored=adaptive
+[10:29:38] [Render thread/INFO] [projectatmosphere/]: T200_PIXEL_SCALING_BEGIN poses=3 arms=15 mode=ULTRA steps=96 resolutionScale=NaN target=1920x1080
+[10:29:54] [Render thread/INFO] [projectatmosphere/]: T150_VISIBILITY_GEOMETRY pose=SIDE descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=464.3 projectedFraction=0.8109 valid=true reason=ok
+[10:29:55] [Render thread/INFO] [projectatmosphere/]: T150_VISIBILITY_CONFIRMED pose=SIDE cloudDensityCalls=27537.38 perPixel=0.21
+[10:31:29] [Render thread/WARN] [projectatmosphere/]: T150_VISIBILITY_REJECT pose=PLAY_NEAR descriptors=false withinRenderDistance=true inFrustum=true nearestDistance=1989.9 projectedFraction=0.3112 valid=false reason=no_descriptors
+[10:31:29] [Render thread/INFO] [projectatmosphere/]: T150_VISIBILITY retrying PLAY_NEAR after no_descriptors (attempt 2)
+[10:31:39] [Render thread/WARN] [projectatmosphere/]: T153_ORACLE restarting complete pose=PLAY_NEAR reason=fixture_identity_changed expected=4fa861b0-33d8-434d-ab3e-02dd6d796766/82848bf01e621c58 actual=91650ab8-97c9-4609-8dc4-b18bd2f64121/c816934794565ad2
+[10:31:47] [Render thread/INFO] [projectatmosphere/]: T150_VISIBILITY_GEOMETRY pose=PLAY_NEAR descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1888.4 projectedFraction=0.3160 valid=true reason=ok
+[10:31:47] [Render thread/WARN] [projectatmosphere/]: T150_VISIBILITY_REJECT pose=PLAY_NEAR rendered no storm: cloudDensityCalls=228.19 marchedPixels=129600
+[10:31:47] [Render thread/INFO] [projectatmosphere/]: T150_VISIBILITY retrying PLAY_NEAR after rendered_no_storm (attempt 3)
+[10:32:03] [Render thread/INFO] [projectatmosphere/]: T150_VISIBILITY_GEOMETRY pose=PLAY_NEAR descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1949.6 projectedFraction=0.3131 valid=true reason=ok
+[10:32:04] [Render thread/WARN] [projectatmosphere/]: T150_VISIBILITY_REJECT pose=PLAY_NEAR rendered no storm: cloudDensityCalls=74.14 marchedPixels=129600
+[10:32:04] [Render thread/WARN] [projectatmosphere/]: T150_VISIBILITY abandoning pose PLAY_NEAR: rendered_no_storm after 3 attempts. No cell is recorded for it rather than an empty-sky one.
+[10:32:10] [Render thread/INFO] [projectatmosphere/]: T150_VISIBILITY_GEOMETRY pose=FAR descriptors=true withinRenderDistance=true inFrustum=true nearestDistance=1060.4 projectedFraction=0.4973 valid=true reason=ok
+[10:32:11] [Render thread/INFO] [projectatmosphere/]: T150_VISIBILITY_CONFIRMED pose=FAR cloudDensityCalls=3961.88 perPixel=0.03
+T135_CELL|SIDE|lean_final@r0.2500#r1|10|ULTRA|96|0.250|1920x1080|480x270|129600|60|13.5629|14.4046|15.9065|17.2573|2.3436|0.0819|0.0870
+T135_CELL|SIDE|lean_final@r0.3750#r1|10|ULTRA|96|0.375|1920x1080|720x405|291600|60|27.0193|30.2551|29.2863|32.7633|2.2670|0.0799|0.0911
+T135_CELL|SIDE|lean_final@r0.5000#r1|10|ULTRA|96|0.500|1920x1080|960x540|518400|60|39.0226|40.7378|41.1073|43.6134|2.0847|0.0799|0.0829
+T135_CELL|SIDE|lean_final@r0.7500#r1|10|ULTRA|96|0.750|1920x1080|1440x810|1166400|60|74.9629|80.7567|76.6595|85.3475|1.6966|0.0819|0.0911
+T135_CELL|SIDE|lean_final@r1.0000#r1|10|ULTRA|96|1.000|1920x1080|1920x1080|2073600|60|124.1600|134.6601|126.7043|138.8222|2.5443|0.0850|0.0942
+T135_CELL|SIDE|lean_final@r0.2500#r2|10|ULTRA|96|0.250|1920x1080|480x270|129600|60|13.7380|14.4486|16.0958|17.8616|2.3578|0.0829|0.0881
+T135_CELL|SIDE|lean_final@r0.3750#r2|10|ULTRA|96|0.375|1920x1080|720x405|291600|60|27.2200|29.3806|28.8017|33.1658|1.5817|0.0799|0.0911
+T135_CELL|SIDE|lean_final@r0.5000#r2|10|ULTRA|96|0.500|1920x1080|960x540|518400|60|39.1598|42.2769|41.8325|45.4795|2.6727|0.0819|0.0932
+T135_CELL|SIDE|lean_final@r0.7500#r2|10|ULTRA|96|0.750|1920x1080|1440x810|1166400|60|78.9576|83.9844|81.2989|88.6208|2.3413|0.0870|0.0993
+T135_CELL|SIDE|lean_final@r1.0000#r2|10|ULTRA|96|1.000|1920x1080|1920x1080|2073600|60|121.2621|128.1444|123.7058|130.9667|2.4437|0.0850|0.0891
+T135_CELL|SIDE|lean_final@r0.2500#r3|10|ULTRA|96|0.250|1920x1080|480x270|129600|60|13.2925|14.3739|15.9303|18.7746|2.6378|0.0860|0.0891
+T135_CELL|SIDE|lean_final@r0.3750#r3|10|ULTRA|96|0.375|1920x1080|720x405|291600|60|26.5288|29.5229|28.8542|33.0688|2.3254|0.0799|0.0911
+T135_CELL|SIDE|lean_final@r0.5000#r3|10|ULTRA|96|0.500|1920x1080|960x540|518400|60|38.3908|40.1275|40.4810|43.0765|2.0902|0.0799|0.0840
+T135_CELL|SIDE|lean_final@r0.7500#r3|10|ULTRA|96|0.750|1920x1080|1440x810|1166400|60|71.4086|77.4513|72.9571|79.8301|1.5485|0.0799|0.0840
+T135_CELL|SIDE|lean_final@r1.0000#r3|10|ULTRA|96|1.000|1920x1080|1920x1080|2073600|60|122.5175|135.7056|124.6591|137.4788|2.1416|0.0850|0.0922
+T135_CELL|FAR|lean_final@r0.2500#r1|10|ULTRA|96|0.250|1920x1080|480x270|129600|60|10.7715|10.9711|13.1873|15.3760|2.4158|0.0840|0.0911
+T135_CELL|FAR|lean_final@r0.3750#r1|10|ULTRA|96|0.375|1920x1080|720x405|291600|60|15.4481|16.1720|17.5822|19.5343|2.1341|0.0799|0.0870
+T135_CELL|FAR|lean_final@r0.5000#r1|10|ULTRA|96|0.500|1920x1080|960x540|518400|60|21.4692|24.6938|23.9596|28.3667|2.4904|0.0819|0.0952
+T135_CELL|FAR|lean_final@r0.7500#r1|10|ULTRA|96|0.750|1920x1080|1440x810|1166400|60|36.8753|45.6827|39.5996|47.8610|2.7243|0.0809|0.0881
+T135_CELL|FAR|lean_final@r1.0000#r1|10|ULTRA|96|1.000|1920x1080|1920x1080|2073600|60|64.7229|73.0184|66.6870|76.9504|1.9641|0.0911|0.0973
+T135_CELL|FAR|lean_final@r0.2500#r2|10|ULTRA|96|0.250|1920x1080|480x270|129600|60|10.6772|10.8677|12.9555|14.8605|2.2783|0.0819|0.0860
+T135_CELL|FAR|lean_final@r0.3750#r2|10|ULTRA|96|0.375|1920x1080|720x405|291600|60|15.6467|17.6445|18.1785|21.0860|2.5318|0.0840|0.0942
+T135_CELL|FAR|lean_final@r0.5000#r2|10|ULTRA|96|0.500|1920x1080|960x540|518400|60|21.0575|23.4537|23.5120|26.6497|2.4545|0.0788|0.0860
+T135_CELL|FAR|lean_final@r0.7500#r2|10|ULTRA|96|0.750|1920x1080|1440x810|1166400|60|39.3800|46.9985|43.2842|51.4674|3.9042|0.0952|0.1024
+T135_CELL|FAR|lean_final@r1.0000#r2|10|ULTRA|96|1.000|1920x1080|1920x1080|2073600|60|58.6004|69.1026|61.0792|72.3257|2.4788|0.0809|0.0860
+T135_CELL|FAR|lean_final@r0.2500#r3|10|ULTRA|96|0.250|1920x1080|480x270|129600|60|10.7356|10.9507|13.0048|14.4919|2.2692|0.0819|0.0850
+T135_CELL|FAR|lean_final@r0.3750#r3|10|ULTRA|96|0.375|1920x1080|720x405|291600|60|15.4962|17.1346|17.9008|19.5512|2.4046|0.0788|0.0840
+T135_CELL|FAR|lean_final@r0.5000#r3|10|ULTRA|96|0.500|1920x1080|960x540|518400|60|21.0780|23.0851|23.4940|25.8816|2.4160|0.0788|0.0819
+T135_CELL|FAR|lean_final@r0.7500#r3|10|ULTRA|96|0.750|1920x1080|1440x810|1166400|60|36.2107|42.7940|38.3173|44.7388|2.1066|0.0809|0.0932
+T135_CELL|FAR|lean_final@r1.0000#r3|10|ULTRA|96|1.000|1920x1080|1920x1080|2073600|60|67.6526|70.1194|70.9620|73.8601|3.3094|0.0911|0.0952
+[10:33:01] [Render thread/INFO] [projectatmosphere/]: T200_PIXEL_SCALING_DECISION
+T200_SCALE MEASURED pose=SIDE scale=0.2500 target=480x270 expected=480x270 pixels=129600 cells=3 rayP50=13.5311 rayP50Min=13.2925 rayP50Max=13.7380 rayP50Spread=0.0329 rayP95=14.4090 fieldP50=1.6541 fieldP95=1.9968 compositeP50=0.0836 compositeP95=0.0881 combinedP50=15.1852 combinedP95=16.4058 frameP50=15.9775
+T200_SCALE MEASURED pose=SIDE scale=0.3750 target=720x405 expected=720x405 pixels=291600 cells=3 rayP50=26.9227 rayP50Min=26.5288 rayP50Max=27.2200 rayP50Spread=0.0257 rayP95=29.7196 fieldP50=1.7657 fieldP95=2.3371 compositeP50=0.0799 compositeP95=0.0911 combinedP50=28.6884 combinedP95=32.0567 frameP50=28.9807
+T200_SCALE MEASURED pose=SIDE scale=0.5000 target=960x540 expected=960x540 pixels=518400 cells=3 rayP50=38.8577 rayP50Min=38.3908 rayP50Max=39.1598 rayP50Spread=0.0198 rayP95=41.0474 fieldP50=1.7299 fieldP95=2.1951 compositeP50=0.0806 compositeP95=0.0867 combinedP50=40.5876 combinedP95=43.2425 frameP50=41.1403
+T200_SCALE MEASURED pose=SIDE scale=0.7500 target=1440x810 expected=1440x810 pixels=1166400 cells=3 rayP50=75.1097 rayP50Min=71.4086 rayP50Max=78.9576 rayP50Spread=0.1005 rayP95=80.7308 fieldP50=1.8732 fieldP95=2.1729 compositeP50=0.0829 compositeP95=0.0915 combinedP50=76.9830 combinedP95=82.9037 frameP50=76.9718
+T200_SCALE MEASURED pose=SIDE scale=1.0000 target=1920x1080 expected=1920x1080 pixels=2073600 cells=3 rayP50=122.6465 rayP50Min=121.2621 rayP50Max=124.1600 rayP50Spread=0.0236 rayP95=132.8367 fieldP50=1.8749 fieldP95=2.1613 compositeP50=0.0850 compositeP95=0.0918 combinedP50=124.5215 combinedP95=134.9980 frameP50=125.0231
+T200_FIXED MEASURED pose=SIDE fieldBuildMean=1.7796 fieldBuildMin=1.6517 fieldBuildMax=1.9866 fieldBuildSpreadAcrossScales=0.1882 cells=15
+T200_RATIO MEASURED pose=SIDE pixels075over025=9.0000 rayP50Ratio=5.5509 combinedP50Ratio=5.0696
+T200_ALPHA DERIVED pose=SIDE method=twoPoint025to075 alphaRay=0.7801 alphaCombined=0.7388
+T200_ALPHA DERIVED pose=SIDE method=logLogFit scales=5 alphaRay=0.7847 kRay=1.326500e-03 r2Ray=0.9985 alphaCombinedNoFixed=0.7499 r2Combined=0.9981
+T200_MODEL DERIVED pose=SIDE fixedMs=1.7796 k=1.326500e-03 alpha=0.7847 predicted025=15.4117 predicted0375=27.5382 predicted050=42.2372 predicted075=78.2261 predicted100=121.8501
+T200_BUDGET DERIVED pose=SIDE rawScale=0.2500 rawCloudMs=15.1852 (ray=13.5311 field=1.6541) budgetTo10ms=-5.1852 budgetTo8ms=-7.1852
+T200_BUDGET DERIVED pose=SIDE rawScale=0.3750 rawCloudMs=28.6884 (ray=26.9227 field=1.7657) budgetTo10ms=-18.6884 budgetTo8ms=-20.6884
+T200_BUDGET DERIVED pose=SIDE rawScale=0.5000 rawCloudMs=40.5876 (ray=38.8577 field=1.7299) budgetTo10ms=-30.5876 budgetTo8ms=-32.5876
+T200_SCALE MEASURED pose=PLAY_NEAR scale=0.2500 target=480x270 expected=480x270 pixels=129600 cells=0 rayP50=NaN rayP50Min=NaN rayP50Max=NaN rayP50Spread=NaN rayP95=NaN fieldP50=NaN fieldP95=NaN compositeP50=NaN compositeP95=NaN combinedP50=NaN combinedP95=NaN frameP50=NaN
+T200_SCALE MEASURED pose=PLAY_NEAR scale=0.3750 target=720x405 expected=720x405 pixels=291600 cells=0 rayP50=NaN rayP50Min=NaN rayP50Max=NaN rayP50Spread=NaN rayP95=NaN fieldP50=NaN fieldP95=NaN compositeP50=NaN compositeP95=NaN combinedP50=NaN combinedP95=NaN frameP50=NaN
+T200_SCALE MEASURED pose=PLAY_NEAR scale=0.5000 target=960x540 expected=960x540 pixels=518400 cells=0 rayP50=NaN rayP50Min=NaN rayP50Max=NaN rayP50Spread=NaN rayP95=NaN fieldP50=NaN fieldP95=NaN compositeP50=NaN compositeP95=NaN combinedP50=NaN combinedP95=NaN frameP50=NaN
+T200_SCALE MEASURED pose=PLAY_NEAR scale=0.7500 target=1440x810 expected=1440x810 pixels=1166400 cells=0 rayP50=NaN rayP50Min=NaN rayP50Max=NaN rayP50Spread=NaN rayP95=NaN fieldP50=NaN fieldP95=NaN compositeP50=NaN compositeP95=NaN combinedP50=NaN combinedP95=NaN frameP50=NaN
+T200_SCALE MEASURED pose=PLAY_NEAR scale=1.0000 target=1920x1080 expected=1920x1080 pixels=2073600 cells=0 rayP50=NaN rayP50Min=NaN rayP50Max=NaN rayP50Spread=NaN rayP95=NaN fieldP50=NaN fieldP95=NaN compositeP50=NaN compositeP95=NaN combinedP50=NaN combinedP95=NaN frameP50=NaN
+T200_FIXED MEASURED pose=PLAY_NEAR fieldBuildMean=NaN fieldBuildMin=NaN fieldBuildMax=NaN fieldBuildSpreadAcrossScales=NaN cells=0
+T200_SCALE MEASURED pose=FAR scale=0.2500 target=480x270 expected=480x270 pixels=129600 cells=3 rayP50=10.7281 rayP50Min=10.6772 rayP50Max=10.7715 rayP50Spread=0.0088 rayP95=10.9298 fieldP50=1.6183 fieldP95=2.0548 compositeP50=0.0826 compositeP95=0.0874 combinedP50=12.3464 combinedP95=12.9847 frameP50=13.0492
+T200_SCALE MEASURED pose=FAR scale=0.3750 target=720x405 expected=720x405 pixels=291600 cells=3 rayP50=15.5303 rayP50Min=15.4481 rayP50Max=15.6467 rayP50Spread=0.0128 rayP95=16.9837 fieldP50=1.5537 fieldP95=2.0057 compositeP50=0.0809 compositeP95=0.0884 combinedP50=17.0841 combinedP95=18.9894 frameP50=17.8872
+T200_SCALE MEASURED pose=FAR scale=0.5000 target=960x540 expected=960x540 pixels=518400 cells=3 rayP50=21.2016 rayP50Min=21.0575 rayP50Max=21.4692 rayP50Spread=0.0194 rayP95=23.7442 fieldP50=1.6640 fieldP95=1.8999 compositeP50=0.0799 compositeP95=0.0877 combinedP50=22.8656 combinedP95=25.6440 frameP50=23.6552
+T200_SCALE MEASURED pose=FAR scale=0.7500 target=1440x810 expected=1440x810 pixels=1166400 cells=3 rayP50=37.4886 rayP50Min=36.2107 rayP50Max=39.3800 rayP50Spread=0.0845 rayP95=45.1584 fieldP50=2.1920 fieldP95=2.7624 compositeP50=0.0857 compositeP95=0.0945 combinedP50=39.6807 combinedP95=47.9208 frameP50=40.4004
+T200_SCALE MEASURED pose=FAR scale=1.0000 target=1920x1080 expected=1920x1080 pixels=2073600 cells=3 rayP50=63.6587 rayP50Min=58.6004 rayP50Max=67.6526 rayP50Spread=0.1422 rayP95=70.7468 fieldP50=1.8033 fieldP95=2.3340 compositeP50=0.0877 compositeP95=0.0928 combinedP50=65.4619 combinedP95=73.0808 frameP50=66.2427
+T200_FIXED MEASURED pose=FAR fieldBuildMean=1.7663 fieldBuildMin=1.5514 fieldBuildMax=2.8703 fieldBuildSpreadAcrossScales=0.7467 cells=15
+T200_RATIO MEASURED pose=FAR pixels075over025=9.0000 rayP50Ratio=3.4944 combinedP50Ratio=3.2140
+T200_ALPHA DERIVED pose=FAR method=twoPoint025to075 alphaRay=0.5694 alphaCombined=0.5314
+T200_ALPHA DERIVED pose=FAR method=logLogFit scales=5 alphaRay=0.6384 kRay=5.293523e-03 r2Ray=0.9811 alphaCombinedNoFixed=0.6004 r2Combined=0.9772
+T200_MODEL DERIVED pose=FAR fixedMs=1.7663 k=5.293523e-03 alpha=0.6384 predicted025=11.4878 predicted0375=18.0809 predicted050=25.3223 predicted075=41.2978 predicted100=58.8445
+T200_BUDGET DERIVED pose=FAR rawScale=0.2500 rawCloudMs=12.3464 (ray=10.7281 field=1.6183) budgetTo10ms=-2.3464 budgetTo8ms=-4.3464
+T200_BUDGET DERIVED pose=FAR rawScale=0.3750 rawCloudMs=17.0841 (ray=15.5303 field=1.5537) budgetTo10ms=-7.0841 budgetTo8ms=-9.0841
+T200_BUDGET DERIVED pose=FAR rawScale=0.5000 rawCloudMs=22.8656 (ray=21.2016 field=1.6640) budgetTo10ms=-12.8656 budgetTo8ms=-14.8656
+[10:33:01] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL cloudMovementFreezeRestored=true
+[10:33:01] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL daylightCycleRestored=true
+[10:33:01] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL raymarchQualityRestored=ULTRA
+[10:33:01] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FINISHED outcome=program_arm_complete frames=6054
+[10:33:02] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_EXIT stopping the client, armed by C:\Users\matga\Downloads\Project-Atmosphere\run\t132-autorun-exit.txt

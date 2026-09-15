@@ -1,0 +1,31 @@
+T191 - shader variant scope, startup measurements
+Branch experiment/cloud-descriptor-k, base 1deb75f (T190). Not merged.
+Infrastructure only. No production shader source changed, so no image or
+performance campaign was run.
+
+=== BEFORE: shader registration window, from the T189 and T190 campaign logs ===
+T190 run: Reloading ResourceManager 20:58:08 -> shader programs registered 21:04:54  = 6m 46s
+T189 run: Reloading ResourceManager 19:01:41 -> shader programs registered 19:08:13  = 6m 32s
+140 fragment programs compiled and linked on every startup.
+This is also the window the T187 launch died in, six minutes into shader loading.
+
+=== AFTER: launch 1, ordinary (no campaign marker) ===
+[22:40:32] [Render thread/INFO] [minecraft/ReloadableResourceManager]: Reloading ResourceManager: mod_resources, vanilla
+[22:40:37] [Render thread/INFO] [projectatmosphere/]: T191_VARIANT_SCOPE declared=139 activeCampaigns=none registered=0 skipped=139 productionAlwaysLoaded=2
+[22:40:37] [Render thread/INFO] [projectatmosphere/]: [VolumetricClouds] shader programs registered
+
+=== AFTER: launch 2, T190 armed - the counter-test that scoping still loads arms ===
+[22:42:01] [Render thread/INFO] [minecraft/ReloadableResourceManager]: Reloading ResourceManager: mod_resources, vanilla
+[22:42:06] [Render thread/INFO] [projectatmosphere/]: T191_VARIANT_SCOPE declared=139 activeCampaigns=T190 registered=3 skipped=136 productionAlwaysLoaded=2
+[22:42:06] [Render thread/INFO] [projectatmosphere/]: [VolumetricClouds] shader programs registered
+(no 'diagnostic program ... failed to load' lines:)
+0
+
+=== AFTER: launch 3, ordinary, repeat ===
+[22:43:09] [Render thread/INFO] [minecraft/ReloadableResourceManager]: Reloading ResourceManager: mod_resources, vanilla
+[22:43:13] [Render thread/INFO] [projectatmosphere/]: T191_VARIANT_SCOPE declared=139 activeCampaigns=none registered=0 skipped=139 productionAlwaysLoaded=2
+[22:43:13] [Render thread/INFO] [projectatmosphere/]: [VolumetricClouds] shader programs registered
+
+=== production equality ===
+git diff 1deb75f -- src/main/resources/assets/projectatmosphere/shaders/ build.gradle
+(empty = no production shader or variant-declaration change)

@@ -1,0 +1,121 @@
+T192 - closed-form ownership bound, final rain-field campaign
+Branch experiment/cloud-descriptor-k, base 63e3cf0 (T191). Not merged.
+Ultra, raw scale 0.2500, cloud target 480x270, framebuffer 1920x1080,
+96 steps, 60 samples per cell, three anchor-bracketed blocks per arm per pose.
+
+Two earlier runs died as infrastructure_invalid:world_entry_lost_during_T135_SAMPLE
+with zero cells recorded. Cause was a T191 defect, not memory and not T192:
+registration scoped by name prefix left T192's cross-campaign controls
+(T190_FIELD_SAFE, T172_STACK_PRE) unregistered. Fixed by taking the union with
+the active campaign's arm tables; this run is the first with that fix.
+
+=== variant scope, with the cross-campaign fix ===
+T191_VARIANT_SCOPE declared=142 activeCampaigns=T192 registered=7 skipped=135 crossCampaignControls=8 productionAlwaysLoaded=2
+
+=== arms, classifier cost and stack ===
+T192_RAIN_FIELD_BOUND_BEGIN poses=2 arms=25 mode=ULTRA steps=96 resolutionScale=NaN target=1920x1080
+T192_BOUND_DECISION
+T192_BLOCK pose=SIDE block=1 arm=t192_field_bound#r1 anchorBefore=32.9851 anchorAfter=32.3584 anchorDrift=0.0192 cloudP50=28.9772 cloudP95=32.2806 fieldP50=0.6011 fieldP95=0.6216 cloudPlusFieldP50=29.5782 localRatio=1.1275 localNetRatio=1.1046 blockVerdict=accepted
+T192_BLOCK pose=SIDE block=1 arm=t190_field_safe#r1 anchorBefore=32.3584 anchorAfter=31.7645 anchorDrift=0.0185 cloudP50=30.0206 cloudP95=33.3343 fieldP50=0.8704 fieldP95=0.8796 cloudPlusFieldP50=30.8910 localRatio=1.0680 localNetRatio=1.0379 blockVerdict=accepted
+T192_BLOCK pose=SIDE block=1 arm=t172_stack_pre#r1 anchorBefore=31.7645 anchorAfter=32.3471 anchorDrift=0.0182 cloudP50=17.3138 cloudP95=19.1836 fieldP50=0.0000 fieldP95=0.0000 cloudPlusFieldP50=17.3138 localRatio=1.8515 localNetRatio=1.8515 blockVerdict=accepted
+T192_BLOCK pose=SIDE block=1 arm=t192_stack_bound#r1 anchorBefore=32.3471 anchorAfter=31.8044 anchorDrift=0.0169 cloudP50=14.2858 cloudP95=15.7522 fieldP50=0.6021 fieldP95=0.6226 cloudPlusFieldP50=14.8879 localRatio=2.2453 localNetRatio=2.1545 blockVerdict=accepted
+T192_BLOCK pose=SIDE block=2 arm=t192_field_bound#r2 anchorBefore=31.8044 anchorAfter=32.5130 anchorDrift=0.0220 cloudP50=29.6745 cloudP95=33.6189 fieldP50=0.6001 fieldP95=0.6205 cloudPlusFieldP50=30.2746 localRatio=1.0837 localNetRatio=1.0622 blockVerdict=accepted
+T192_BLOCK pose=SIDE block=2 arm=t190_field_safe#r2 anchorBefore=32.5130 anchorAfter=32.3072 anchorDrift=0.0064 cloudP50=29.9868 cloudP95=31.6774 fieldP50=0.8653 fieldP95=0.8765 cloudPlusFieldP50=30.8521 localRatio=1.0808 localNetRatio=1.0505 blockVerdict=accepted
+T192_BLOCK pose=SIDE block=2 arm=t172_stack_pre#r2 anchorBefore=32.3072 anchorAfter=32.0399 anchorDrift=0.0083 cloudP50=17.5841 cloudP95=18.8058 fieldP50=0.0000 fieldP95=0.0000 cloudPlusFieldP50=17.5841 localRatio=1.8297 localNetRatio=1.8297 blockVerdict=accepted
+T192_BLOCK pose=SIDE block=2 arm=t192_stack_bound#r2 anchorBefore=32.0399 anchorAfter=32.0932 anchorDrift=0.0017 cloudP50=14.1414 cloudP95=16.5243 fieldP50=0.6042 fieldP95=0.6164 cloudPlusFieldP50=14.7456 localRatio=2.2676 localNetRatio=2.1747 blockVerdict=accepted
+T192_BLOCK pose=SIDE block=3 arm=t192_field_bound#r3 anchorBefore=32.0932 anchorAfter=31.8915 anchorDrift=0.0063 cloudP50=29.2721 cloudP95=31.4532 fieldP50=0.6052 fieldP95=0.6236 cloudPlusFieldP50=29.8772 localRatio=1.0929 localNetRatio=1.0708 blockVerdict=accepted
+T192_BLOCK pose=SIDE block=3 arm=t190_field_safe#r3 anchorBefore=31.8915 anchorAfter=32.3103 anchorDrift=0.0130 cloudP50=29.9192 cloudP95=31.6375 fieldP50=0.8694 fieldP95=0.8817 cloudPlusFieldP50=30.7886 localRatio=1.0729 localNetRatio=1.0426 blockVerdict=accepted
+T192_BLOCK pose=SIDE block=3 arm=t172_stack_pre#r3 anchorBefore=32.3103 anchorAfter=31.8300 anchorDrift=0.0150 cloudP50=17.7531 cloudP95=19.0116 fieldP50=0.0000 fieldP95=0.0000 cloudPlusFieldP50=17.7531 localRatio=1.8065 localNetRatio=1.8065 blockVerdict=accepted
+T192_BLOCK pose=SIDE block=3 arm=t192_stack_bound#r3 anchorBefore=31.8300 anchorAfter=32.2714 anchorDrift=0.0138 cloudP50=14.3749 cloudP95=15.5515 fieldP50=0.6042 fieldP95=0.6226 cloudPlusFieldP50=14.9791 localRatio=2.2296 localNetRatio=2.1397 blockVerdict=accepted
+T192_ARM pose=SIDE arm=t192_field_bound blocks=3 ratioMin=1.0837 ratioMax=1.1275 ratioMean=1.1014 ratioSpread=0.0398 netRatioMin=1.0622 netRatioMax=1.1046 netRatioMean=1.0792 netRatioSpread=0.0392 sessionLocalP50=29.3079 sessionLocalP95=33.6189 sessionLocalFieldP50=0.6021 sessionLocalCloudPlusFieldP50=29.9100 verdict=REJECTED_ratio_spread netVerdict=REJECTED_ratio_spread hardGate=FAIL_net_below_1.10
+T192_ARM pose=SIDE arm=t190_field_safe blocks=3 ratioMin=1.0680 ratioMax=1.0808 ratioMean=1.0739 ratioSpread=0.0119 netRatioMin=1.0379 netRatioMax=1.0505 netRatioMean=1.0437 netRatioSpread=0.0121 sessionLocalP50=29.9756 sessionLocalP95=33.3343 sessionLocalFieldP50=0.8684 sessionLocalCloudPlusFieldP50=30.8439 verdict=accepted netVerdict=accepted hardGate=n/a
+T192_ARM pose=SIDE arm=t172_stack_pre blocks=3 ratioMin=1.8065 ratioMax=1.8515 ratioMean=1.8292 ratioSpread=0.0246 netRatioMin=1.8065 netRatioMax=1.8515 netRatioMean=1.8292 netRatioSpread=0.0246 sessionLocalP50=17.5503 sessionLocalP95=19.1836 sessionLocalFieldP50=0.0000 sessionLocalCloudPlusFieldP50=17.5503 verdict=accepted netVerdict=accepted hardGate=n/a
+T192_ARM pose=SIDE arm=t192_stack_bound blocks=3 ratioMin=2.2296 ratioMax=2.2676 ratioMean=2.2475 ratioSpread=0.0169 netRatioMin=2.1397 netRatioMax=2.1747 netRatioMean=2.1563 netRatioSpread=0.0162 sessionLocalP50=14.2674 sessionLocalP95=16.5243 sessionLocalFieldP50=0.6035 sessionLocalCloudPlusFieldP50=14.8709 verdict=accepted netVerdict=accepted hardGate=n/a
+T192_CLASSIFIER_COST pose=SIDE arm=t192_field_bound vsControl=t190_field_safe blocks=3 ratioMin=1.0191 ratioMax=1.0444 ratioMean=1.0313 ratioSpread=0.0245 basis=cloudPlusField verdict=accepted
+T192_WITHIN_BLOCK pose=SIDE arm=t192_stack_bound vsControl=t172_stack_pre blocks=3 ratioMin=1.1629 ratioMax=1.1925 ratioMean=1.1802 ratioSpread=0.0250 basis=cloudPlusField verdict=accepted
+T192_BLOCK pose=FAR block=1 arm=t192_field_bound#r1 anchorBefore=26.8134 anchorAfter=20.8527 anchorDrift=0.2501 cloudP50=18.7720 cloudP95=21.0248 fieldP50=0.4905 fieldP95=0.4987 cloudPlusFieldP50=19.2625 localRatio=1.2696 localNetRatio=1.2373 blockVerdict=REJECTED_anchor_drift
+T192_BLOCK pose=FAR block=1 arm=t190_field_safe#r1 anchorBefore=20.8527 anchorAfter=20.4585 anchorDrift=0.0191 cloudP50=19.0474 cloudP95=21.1098 fieldP50=0.8038 fieldP95=0.8212 cloudPlusFieldP50=19.8513 localRatio=1.0844 localNetRatio=1.0405 blockVerdict=accepted
+T192_BLOCK pose=FAR block=1 arm=t172_stack_pre#r1 anchorBefore=20.4585 anchorAfter=20.3459 anchorDrift=0.0055 cloudP50=7.6759 cloudP95=8.5473 fieldP50=0.0000 fieldP95=0.0000 cloudPlusFieldP50=7.6759 localRatio=2.6580 localNetRatio=2.6580 blockVerdict=accepted
+T192_BLOCK pose=FAR block=1 arm=t192_stack_bound#r1 anchorBefore=20.3459 anchorAfter=20.7012 anchorDrift=0.0173 cloudP50=7.3155 cloudP95=8.1715 fieldP50=0.4884 fieldP95=0.5120 cloudPlusFieldP50=7.8039 localRatio=2.8055 localNetRatio=2.6299 blockVerdict=accepted
+T192_BLOCK pose=FAR block=2 arm=t192_field_bound#r2 anchorBefore=20.7012 anchorAfter=26.7776 anchorDrift=0.2560 cloudP50=19.3516 cloudP95=21.6689 fieldP50=0.4946 fieldP95=0.5048 cloudPlusFieldP50=19.8461 localRatio=1.2267 localNetRatio=1.1962 blockVerdict=REJECTED_anchor_drift
+T192_BLOCK pose=FAR block=2 arm=t190_field_safe#r2 anchorBefore=26.7776 anchorAfter=20.5947 anchorDrift=0.2610 cloudP50=19.3249 cloudP95=20.8476 fieldP50=0.8049 fieldP95=0.8253 cloudPlusFieldP50=20.1298 localRatio=1.2257 localNetRatio=1.1767 blockVerdict=REJECTED_anchor_drift
+T192_BLOCK pose=FAR block=2 arm=t172_stack_pre#r2 anchorBefore=20.5947 anchorAfter=20.0202 anchorDrift=0.0283 cloudP50=9.9850 cloudP95=10.2994 fieldP50=0.0000 fieldP95=0.0000 cloudPlusFieldP50=9.9850 localRatio=2.0338 localNetRatio=2.0338 blockVerdict=accepted
+T192_BLOCK pose=FAR block=2 arm=t192_stack_bound#r2 anchorBefore=20.0202 anchorAfter=19.8072 anchorDrift=0.0107 cloudP50=6.9356 cloudP95=8.0466 fieldP50=0.4905 fieldP95=0.5007 cloudPlusFieldP50=7.4260 localRatio=2.8713 localNetRatio=2.6816 blockVerdict=accepted
+T192_BLOCK pose=FAR block=3 arm=t192_field_bound#r3 anchorBefore=19.8072 anchorAfter=20.6705 anchorDrift=0.0427 cloudP50=19.1508 cloudP95=21.2756 fieldP50=0.4936 fieldP95=0.5018 cloudPlusFieldP50=19.6444 localRatio=1.0568 localNetRatio=1.0303 blockVerdict=REJECTED_anchor_drift
+T192_BLOCK pose=FAR block=3 arm=t190_field_safe#r3 anchorBefore=20.6705 anchorAfter=26.8134 anchorDrift=0.2587 cloudP50=19.3741 cloudP95=22.1921 fieldP50=0.8038 fieldP95=0.8212 cloudPlusFieldP50=20.1779 localRatio=1.2254 localNetRatio=1.1766 blockVerdict=REJECTED_anchor_drift
+T192_BLOCK pose=FAR block=3 arm=t172_stack_pre#r3 anchorBefore=26.8134 anchorAfter=19.5185 anchorDrift=0.3149 cloudP50=12.6996 cloudP95=12.9260 fieldP50=0.0000 fieldP95=0.0000 cloudPlusFieldP50=12.6996 localRatio=1.8241 localNetRatio=1.8241 blockVerdict=REJECTED_anchor_drift
+T192_BLOCK pose=FAR block=3 arm=t192_stack_bound#r3 anchorBefore=19.5185 anchorAfter=19.8144 anchorDrift=0.0150 cloudP50=7.5264 cloudP95=8.4029 fieldP50=0.4895 fieldP95=0.4977 cloudPlusFieldP50=8.0159 localRatio=2.6130 localNetRatio=2.4534 blockVerdict=accepted
+T192_ARM pose=FAR arm=t190_field_safe blocks=1 ratioMin=1.0844 ratioMax=1.0844 ratioMean=1.0844 ratioSpread=1.0000 netRatioMin=1.0405 netRatioMax=1.0405 netRatioMean=1.0405 netRatioSpread=1.0000 sessionLocalP50=19.0474 sessionLocalP95=21.1098 sessionLocalFieldP50=0.8038 sessionLocalCloudPlusFieldP50=19.8513 verdict=REJECTED_insufficient_blocks netVerdict=REJECTED_insufficient_blocks hardGate=n/a
+T192_ARM pose=FAR arm=t172_stack_pre blocks=2 ratioMin=2.0338 ratioMax=2.6580 ratioMean=2.3459 ratioSpread=0.2661 netRatioMin=2.0338 netRatioMax=2.6580 netRatioMean=2.3459 netRatioSpread=0.2661 sessionLocalP50=8.8305 sessionLocalP95=10.2994 sessionLocalFieldP50=0.0000 sessionLocalCloudPlusFieldP50=8.8305 verdict=REJECTED_ratio_spread netVerdict=REJECTED_ratio_spread hardGate=n/a
+T192_ARM pose=FAR arm=t192_stack_bound blocks=3 ratioMin=2.6130 ratioMax=2.8713 ratioMean=2.7632 ratioSpread=0.0935 netRatioMin=2.4534 netRatioMax=2.6816 netRatioMean=2.5883 netRatioSpread=0.0882 sessionLocalP50=7.2591 sessionLocalP95=8.4029 sessionLocalFieldP50=0.4895 sessionLocalCloudPlusFieldP50=7.7486 verdict=REJECTED_ratio_spread netVerdict=REJECTED_ratio_spread hardGate=n/a
+T192_CLASSIFIER_COST pose=FAR arm=t192_field_bound vsControl=t190_field_safe blocks=3 ratioMin=1.0143 ratioMax=1.0306 ratioMean=1.0240 ratioSpread=0.0159 basis=cloudPlusField verdict=accepted
+T192_WITHIN_BLOCK pose=FAR arm=t192_stack_bound vsControl=t172_stack_pre blocks=3 ratioMin=0.9836 ratioMax=1.5843 ratioMean=1.3042 ratioSpread=0.4606 basis=cloudPlusField verdict=REJECTED_ratio_spread
+T192_FLOOR ratioTolerance=0.030
+T192_REJECTED count=0 none
+
+=== rain-only quality: T190 sampled vs T192 closed form vs exact reference ===
+T188_RAIN_MASK pose=SIDE reference referenceImage view=t166_t188_rain_mask_ref_SIDE target=480x270 historyBypassed=true worldTimePinned=true liveWorldTime=2108.55981 effectiveReferenceWorldTime=2087.69995 digest=075419818f2d06e4 renderInputs={comparisonUniformSignature=2229e1dc49ab0dfd weatherMapInputSignature=6a8feadc14e5361a namedUniformGroups=20} projectionStability={requiredStableFrames=3 observedFrames=7 projectionChanges=0 finalStableFrames=7 projectionSignature=754f5f9dd84196a0 inverseProjectionSignature=e2241cee8b19b751 stabilized=true} contentStability={requiredStableFrames=3 observedFrames=5 changes=0 finalStableFrames=5 stabilized=true puffCandidateSignature=504146465f454d50 puffContentSignature=8328807b4eb6fed weatherMapSignature=6a8feadc14e5361a stormContentSignature=7683de577b086ad7 stormDescriptorCount=10 puffLobeCount=0 changedSignatures=none} cloudContent={puffLobeCount=0 puffDescriptorSignature=8328807b4eb6fed puffCandidateSignature=504146465f454d50 stormLobeCount=10 stormDescriptorCount=10 stormGroupCount=1 fixtureDescriptorCount=0 foreignStormDescriptorCount=10 stormContentSignature=7683de577b086ad7}
+T188_RAIN_MASK_AB pose=SIDE arm=t190_rain_mask_safe a=t188_rain_mask_ref capturedView=t166_t190_rain_mask_safe_SIDE captureFresh=true capturedDigest=9c9ecbbe09fd46b7 t188RainMask evaluated=true comparedPixels=129600 referenceRainPixels=1321 candidateRainPixels=1381 intersectionPixels=1311 missedRainPixels=10 falseRainPixels=70 rainIoU=0.942487 missedRainFraction=0.007570 falseRainFraction=0.052990 thinRainRetention=0.974619 meanAbsMassError=3.485246e-04 maxAbsMassError=1.093750e+00 meanOnsetHeightError=1.1488 maxOnsetHeightError=158.7500 meanTerminationHeightError=1.4697 maxTerminationHeightError=158.7500 referenceGapRays=124 candidateGapRays=130 shaftContinuity=0.980931 newGapRays=25 digestsEqual=false
+T188_RAIN_MASK_AB pose=SIDE arm=t192_rain_mask_bound a=t188_rain_mask_ref capturedView=t166_t192_rain_mask_bound_SIDE captureFresh=true capturedDigest=9c9ecbbe09fd46b7 t188RainMask evaluated=true comparedPixels=129600 referenceRainPixels=1321 candidateRainPixels=1381 intersectionPixels=1311 missedRainPixels=10 falseRainPixels=70 rainIoU=0.942487 missedRainFraction=0.007570 falseRainFraction=0.052990 thinRainRetention=0.974619 meanAbsMassError=3.485246e-04 maxAbsMassError=1.093750e+00 meanOnsetHeightError=1.1488 maxOnsetHeightError=158.7500 meanTerminationHeightError=1.4697 maxTerminationHeightError=158.7500 referenceGapRays=124 candidateGapRays=130 shaftContinuity=0.980931 newGapRays=25 digestsEqual=false
+T188_RAIN_MASK pose=FAR reference referenceImage view=t166_t188_rain_mask_ref_FAR target=480x270 historyBypassed=true worldTimePinned=true liveWorldTime=7172.39990 effectiveReferenceWorldTime=2087.69995 digest=5ede68e1db67666e renderInputs={comparisonUniformSignature=da122cfb2ce1e878 weatherMapInputSignature=783a77a9356b5d92 namedUniformGroups=20} projectionStability={requiredStableFrames=3 observedFrames=7 projectionChanges=0 finalStableFrames=7 projectionSignature=754f5f9dd84196a0 inverseProjectionSignature=e2241cee8b19b751 stabilized=true} contentStability={requiredStableFrames=3 observedFrames=5 changes=0 finalStableFrames=5 stabilized=true puffCandidateSignature=504146465f454d50 puffContentSignature=8328807b4eb6fed weatherMapSignature=783a77a9356b5d92 stormContentSignature=7683de577b086ad7 stormDescriptorCount=10 puffLobeCount=0 changedSignatures=none} cloudContent={puffLobeCount=0 puffDescriptorSignature=8328807b4eb6fed puffCandidateSignature=504146465f454d50 stormLobeCount=10 stormDescriptorCount=10 stormGroupCount=1 fixtureDescriptorCount=0 foreignStormDescriptorCount=10 stormContentSignature=7683de577b086ad7}
+T188_RAIN_MASK_AB pose=FAR arm=t190_rain_mask_safe a=t188_rain_mask_ref capturedView=t166_t190_rain_mask_safe_FAR captureFresh=true capturedDigest=a1c2750bac33628d t188RainMask evaluated=true comparedPixels=129600 referenceRainPixels=370 candidateRainPixels=385 intersectionPixels=369 missedRainPixels=1 falseRainPixels=16 rainIoU=0.955959 missedRainFraction=0.002703 falseRainFraction=0.043243 thinRainRetention=0.988372 meanAbsMassError=8.844262e-05 maxAbsMassError=8.066406e-01 meanOnsetHeightError=0.2120 maxOnsetHeightError=36.2500 meanTerminationHeightError=0.4405 maxTerminationHeightError=36.2500 referenceGapRays=85 candidateGapRays=82 shaftContinuity=0.991870 newGapRays=3 digestsEqual=false
+T188_RAIN_MASK_AB pose=FAR arm=t192_rain_mask_bound a=t188_rain_mask_ref capturedView=t166_t192_rain_mask_bound_FAR captureFresh=true capturedDigest=a1c2750bac33628d t188RainMask evaluated=true comparedPixels=129600 referenceRainPixels=370 candidateRainPixels=385 intersectionPixels=369 missedRainPixels=1 falseRainPixels=16 rainIoU=0.955959 missedRainFraction=0.002703 falseRainFraction=0.043243 thinRainRetention=0.988372 meanAbsMassError=8.844262e-05 maxAbsMassError=8.066406e-01 meanOnsetHeightError=0.2120 maxOnsetHeightError=36.2500 meanTerminationHeightError=0.4405 maxTerminationHeightError=36.2500 referenceGapRays=85 candidateGapRays=82 shaftContinuity=0.991870 newGapRays=3 digestsEqual=false
+
+=== closed-form triage rate and mixed-cell census ===
+
+=== fallback rate and field error ===
+rainFieldSafeHits=1968977 rainFieldMixedFallbacks=113323 fallbackFraction=0.0544 fallbacksPerPixel=0.874406
+rainFieldSafeHits=1969054 rainFieldMixedFallbacks=113322 fallbackFraction=0.0544 fallbacksPerPixel=0.874398
+rainFieldSafeHits=1969093 rainFieldMixedFallbacks=113343 fallbackFraction=0.0544 fallbacksPerPixel=0.874560
+rainFieldSafeHits=1969101 rainFieldMixedFallbacks=113462 fallbackFraction=0.0545 fallbacksPerPixel=0.875478
+rainFieldSafeHits=1969268 rainFieldMixedFallbacks=113490 fallbackFraction=0.0545 fallbacksPerPixel=0.875694
+rainFieldSafeHits=1969562 rainFieldMixedFallbacks=113341 fallbackFraction=0.0544 fallbacksPerPixel=0.874545
+rainFieldSafeHits=1969693 rainFieldMixedFallbacks=113350 fallbackFraction=0.0544 fallbacksPerPixel=0.874614
+rainFieldSafeHits=1969898 rainFieldMixedFallbacks=113388 fallbackFraction=0.0544 fallbacksPerPixel=0.874907
+rainFieldSafeHits=1969902 rainFieldMixedFallbacks=113389 fallbackFraction=0.0544 fallbacksPerPixel=0.874915
+rainFieldSafeHits=1969928 rainFieldMixedFallbacks=113487 fallbackFraction=0.0545 fallbacksPerPixel=0.875671
+rainFieldSafeHits=1969937 rainFieldMixedFallbacks=113303 fallbackFraction=0.0544 fallbacksPerPixel=0.874252
+rainFieldSafeHits=1969996 rainFieldMixedFallbacks=113502 fallbackFraction=0.0545 fallbacksPerPixel=0.875787
+rainFieldSafeHits=1970004 rainFieldMixedFallbacks=113273 fallbackFraction=0.0544 fallbacksPerPixel=0.874020
+rainFieldSafeHits=1970006 rainFieldMixedFallbacks=113267 fallbackFraction=0.0544 fallbacksPerPixel=0.873974
+rainFieldSafeHits=1970038 rainFieldMixedFallbacks=113282 fallbackFraction=0.0544 fallbacksPerPixel=0.874090
+rainFieldSafeHits=1970042 rainFieldMixedFallbacks=113267 fallbackFraction=0.0544 fallbacksPerPixel=0.873974
+rainFieldSafeHits=1970077 rainFieldMixedFallbacks=113484 fallbackFraction=0.0545 fallbacksPerPixel=0.875648
+rainFieldSafeHits=1970111 rainFieldMixedFallbacks=113482 fallbackFraction=0.0545 fallbacksPerPixel=0.875633
+rainFieldSafeHits=1970235 rainFieldMixedFallbacks=113400 fallbackFraction=0.0544 fallbacksPerPixel=0.875000
+rainFieldSafeHits=1970274 rainFieldMixedFallbacks=113495 fallbackFraction=0.0545 fallbacksPerPixel=0.875733
+rainFieldSafeHits=1970276 rainFieldMixedFallbacks=113353 fallbackFraction=0.0544 fallbacksPerPixel=0.874637
+rainFieldSafeHits=1970301 rainFieldMixedFallbacks=113396 fallbackFraction=0.0544 fallbacksPerPixel=0.874969
+rainFieldSafeHits=1970314 rainFieldMixedFallbacks=113380 fallbackFraction=0.0544 fallbacksPerPixel=0.874846
+rainFieldSafeHits=1970353 rainFieldMixedFallbacks=113382 fallbackFraction=0.0544 fallbacksPerPixel=0.874861
+rainFieldSafeHits=1970450 rainFieldMixedFallbacks=113460 fallbackFraction=0.0544 fallbacksPerPixel=0.875463
+rainFieldSafeHits=612806 rainFieldMixedFallbacks=23393 fallbackFraction=0.0368 fallbacksPerPixel=0.180502
+rainFieldSafeHits=612830 rainFieldMixedFallbacks=23380 fallbackFraction=0.0367 fallbacksPerPixel=0.180401
+rainFieldSafeHits=612853 rainFieldMixedFallbacks=23418 fallbackFraction=0.0368 fallbacksPerPixel=0.180694
+rainFieldSafeHits=612918 rainFieldMixedFallbacks=23422 fallbackFraction=0.0368 fallbacksPerPixel=0.180725
+rainFieldSafeHits=612986 rainFieldMixedFallbacks=23376 fallbackFraction=0.0367 fallbacksPerPixel=0.180370
+rainFieldSafeHits=613144 rainFieldMixedFallbacks=23411 fallbackFraction=0.0368 fallbacksPerPixel=0.180640
+rainFieldSafeHits=613178 rainFieldMixedFallbacks=23386 fallbackFraction=0.0367 fallbacksPerPixel=0.180448
+rainFieldSafeHits=613226 rainFieldMixedFallbacks=23381 fallbackFraction=0.0367 fallbacksPerPixel=0.180409
+rainFieldSafeHits=613262 rainFieldMixedFallbacks=23389 fallbackFraction=0.0367 fallbacksPerPixel=0.180471
+rainFieldSafeHits=613297 rainFieldMixedFallbacks=23388 fallbackFraction=0.0367 fallbacksPerPixel=0.180463
+rainFieldSafeHits=613457 rainFieldMixedFallbacks=23406 fallbackFraction=0.0368 fallbacksPerPixel=0.180602
+rainFieldSafeHits=613480 rainFieldMixedFallbacks=23394 fallbackFraction=0.0367 fallbacksPerPixel=0.180509
+rainFieldSafeHits=613512 rainFieldMixedFallbacks=23386 fallbackFraction=0.0367 fallbacksPerPixel=0.180448
+rainFieldSafeHits=613523 rainFieldMixedFallbacks=23383 fallbackFraction=0.0367 fallbacksPerPixel=0.180424
+rainFieldSafeHits=613539 rainFieldMixedFallbacks=23382 fallbackFraction=0.0367 fallbacksPerPixel=0.180417
+rainFieldSafeHits=613539 rainFieldMixedFallbacks=23405 fallbackFraction=0.0367 fallbacksPerPixel=0.180594
+rainFieldSafeHits=613544 rainFieldMixedFallbacks=23406 fallbackFraction=0.0367 fallbacksPerPixel=0.180602
+rainFieldSafeHits=613613 rainFieldMixedFallbacks=23378 fallbackFraction=0.0367 fallbacksPerPixel=0.180386
+rainFieldSafeHits=613674 rainFieldMixedFallbacks=23394 fallbackFraction=0.0367 fallbacksPerPixel=0.180509
+rainFieldSafeHits=613711 rainFieldMixedFallbacks=23420 fallbackFraction=0.0368 fallbacksPerPixel=0.180710
+rainFieldSafeHits=613744 rainFieldMixedFallbacks=23420 fallbackFraction=0.0368 fallbacksPerPixel=0.180710
+rainFieldSafeHits=613759 rainFieldMixedFallbacks=23365 fallbackFraction=0.0367 fallbacksPerPixel=0.180285
+rainFieldSafeHits=613938 rainFieldMixedFallbacks=23431 fallbackFraction=0.0368 fallbacksPerPixel=0.180795
+rainFieldSafeHits=613940 rainFieldMixedFallbacks=23385 fallbackFraction=0.0367 fallbacksPerPixel=0.180440
+rainFieldSafeHits=613953 rainFieldMixedFallbacks=23376 fallbackFraction=0.0367 fallbacksPerPixel=0.180370
+fieldOwnershipDisagreements=0 fieldOwnershipDisagreementFraction=0.0000 fieldBothOwnSamples=14766 fieldSupportErrorSum=124 fieldMeanSupportError=0.0010 fieldAttachErrorSum=182 fieldMeanAttachError=0.0123
+fieldOwnershipDisagreements=0 fieldOwnershipDisagreementFraction=0.0000 fieldBothOwnSamples=20438 fieldSupportErrorSum=143 fieldMeanSupportError=0.0011 fieldAttachErrorSum=273 fieldMeanAttachError=0.0134
+
+=== bound soundness proof (headless, before any timing) ===
+T192_OWNERSHIP_BOUND trials=40000|provablyDry=12699|notProvable=27301|falseSafe=0|sqrtFree=true|dryDirectionOnly=true

@@ -27,9 +27,39 @@ public final class VolumetricCloudRenderer {
             CloudTextureUnitContract.PUFF_CANDIDATE_UNIT;
     private static final int BASE_NOISE_TEXTURE_UNIT = CloudTextureUnitContract.BASE_NOISE_UNIT;
     private static final int DETAIL_NOISE_TEXTURE_UNIT = CloudTextureUnitContract.DETAIL_NOISE_UNIT;
+    private static final int RAIN_FIELD_TEXTURE_UNIT = CloudTextureUnitContract.RAIN_FIELD_UNIT;
+    private static final int STORM_FIELD_TEXTURE_UNIT = CloudTextureUnitContract.STORM_FIELD_UNIT;
+    private static final int RAIN_PASS_TEXTURE_UNIT = CloudTextureUnitContract.RAIN_PASS_UNIT;
+    /** T205. The rain pass's texture for the frame being drawn, or 0. */
+    private static int rainPassTextureId;
+    /**
+     * T188. The field texture for the frame being drawn, or 0. Held here
+     * because the manual bind has to happen after every shader.apply(),
+     * which resets the sampler uniforms Minecraft knows about.
+     */
+    private static int rainFieldTextureId;
+    /** T196. The storm field atlas; T203 gave it its own unit beside the rain gate. */
+    private static int stormFieldTextureId;
     private static final int REQUIRED_FRAGMENT_TEXTURE_UNITS =
             CloudTextureUnitContract.REQUIRED_FRAGMENT_TEXTURE_UNITS;
     private static final CloudGpuTimer GPU_TIMER = new CloudGpuTimer();
+    /**
+     * T188. The rain-field generation pass is timed separately from the march,
+     * because the decision the field has to win is build + lookup against the
+     * old repeated traversal - and a cloud-ray saving on its own would hide
+     * exactly the half of that trade the field pays for.
+     */
+    private static final CloudGpuTimer RAIN_FIELD_TIMER = new CloudGpuTimer();
+    /**
+     * T203. The rain gate field's build, on its own clock: the storm field
+     * and the gate build in the same frame, and one timer holds one result.
+     * The campaign's field column carries both builds (the net accounting
+     * charges the arm its gate build) and the profile records this one
+     * beside it so the gate's own cost is read directly.
+     */
+    private static final CloudGpuTimer RAIN_GATE_TIMER = new CloudGpuTimer();
+    /** T205. The rain pass on its own clock. */
+    private static final CloudGpuTimer RAIN_PASS_TIMER = new CloudGpuTimer();
     private static final CloudFrameTimeGovernor GOVERNOR = new CloudFrameTimeGovernor();
 
     private static final Matrix4f prevProj = new Matrix4f();
@@ -39,6 +69,24 @@ public final class VolumetricCloudRenderer {
     private static boolean hasPrevFrame;
     private static long frameIndex;
     private static volatile float lastGpuMilliseconds = -1.0F;
+    private static volatile float lastRainFieldGpuMilliseconds = -1.0F;
+    private static volatile float lastRainGateGpuMilliseconds = -1.0F;
+    private static volatile float lastRainPassGpuMilliseconds = -1.0F;
+    /**
+     * T199e. The field rebuilds every frame; these only count how often it
+     * need not have. A build's inputs are the descriptor set and candidate
+     * grid, the weather rasters' generation, the weather origin and slab, and
+     * the material advection offset; when none of them moved since the last
+     * build the previous atlas was exact. Reuse is deliberately not
+     * implemented here - T196 Task 11's moving-fixture measurement was never
+     * taken - so a future task starts from these numbers, not from a hunch.
+     */
+    private static long stormFieldInputSignature;
+    private static long lastStormFieldDescriptorSignature;
+    private static boolean stormFieldInputSignatureValid;
+    private static long stormFieldBuilds;
+    private static long stormFieldBuildsInputsUnchanged;
+    private static long stormFieldBuildsDescriptorsUnchanged;
     private static volatile boolean lastHistoryValid;
     private static volatile float lastHistoryConfidence;
     private static volatile float lastResolutionScale = 1.0F;
@@ -60,12 +108,70 @@ public final class VolumetricCloudRenderer {
     private static boolean lastTransformValid;
     private static VolumetricHistoryValidity.Key previousHistoryKey = VolumetricHistoryValidity.Key.EMPTY;
     private static volatile boolean historyResetBeforeNextComposite;
+    /**
+     * T207. True while the last march wrote a raw temporal phase; the hook
+     * then resolves the four phases before the composite. The matrices of
+     * that frame are kept for the resolve.
+     */
+    private static volatile boolean temporalPhaseActive;
+    private static final Matrix4f lastInvProj = new Matrix4f();
+    private static final Matrix4f lastInvViewRot = new Matrix4f();
+    private static final Matrix4f lastViewProj = new Matrix4f();
+    private static float lastMaxRenderDistance = 2000.0F;
 
     private VolumetricCloudRenderer() {
     }
 
     public static float lastGpuMilliseconds() {
         return lastGpuMilliseconds;
+    }
+
+    /**
+     * T188. Milliseconds the rain-support field generation pass cost on the
+     * GPU, or -1 when no program generated one this frame.
+     */
+    public static float lastRainFieldGpuMilliseconds() {
+        return lastRainFieldGpuMilliseconds;
+    }
+
+    /**
+     * T203. Milliseconds the rain gate field's build cost on the GPU, or -1
+     * when no program built one this frame. Already included in
+     * {@link #lastRainFieldGpuMilliseconds()} for a frame that built both.
+     */
+    public static float lastRainGateGpuMilliseconds() {
+        return lastRainGateGpuMilliseconds;
+    }
+
+    /** T205. Milliseconds the rain pass cost on the GPU, or 0 when the frame drew none. */
+    public static float lastRainPassGpuMilliseconds() {
+        return lastRainPassGpuMilliseconds;
+    }
+
+    /** T207. True when the last march wrote a temporal phase the hook must resolve. */
+    public static boolean temporalPhaseActive() {
+        return temporalPhaseActive;
+    }
+
+    public static Matrix4f lastInvProj() {
+        return lastInvProj;
+    }
+
+    public static Matrix4f lastInvViewRot() {
+        return lastInvViewRot;
+    }
+
+    public static Matrix4f lastViewProj() {
+        return lastViewProj;
+    }
+
+    public static float lastMaxRenderDistance() {
+        return lastMaxRenderDistance;
+    }
+
+    /** T207. The rendered-frame counter the phases are aged against. */
+    public static long renderedFrameIndex() {
+        return frameIndex;
     }
 
     /** Identifies a fresh completed GPU timestamp result without using a frame-time proxy. */
@@ -116,6 +222,11 @@ public final class VolumetricCloudRenderer {
     public static void invalidateHistory() {
         historyResetBeforeNextComposite = false;
         hasPrevFrame = false;
+        // T207. Whatever invalidates the ping-pong history - a camera cut, a
+        // resize, a reload, a level change, a teleport - invalidates the raw
+        // phases for the same reason: their samples no longer correspond to
+        // what this camera sees.
+        CloudTemporalPhaseState.invalidateAll();
         lastHistoryValid = false;
         VolumetricCloudRenderTargets.invalidateHistory();
         renderedProductionFrame = false;
@@ -133,6 +244,14 @@ public final class VolumetricCloudRenderer {
         invalidateHistory();
         GOVERNOR.reset();
         GPU_TIMER.close();
+        RAIN_FIELD_TIMER.close();
+        // T206. The gate and rain-pass clocks are production clocks now and
+        // release their queries with the others.
+        RAIN_GATE_TIMER.close();
+        RAIN_PASS_TIMER.close();
+        lastRainFieldGpuMilliseconds = -1.0F;
+        lastRainGateGpuMilliseconds = -1.0F;
+        lastRainPassGpuMilliseconds = -1.0F;
         lastGpuMilliseconds = -1.0F;
         lastHistoryValid = false;
         lastHistoryConfidence = 0.0F;
@@ -332,6 +451,32 @@ public final class VolumetricCloudRenderer {
 
         GPU_TIMER.poll();
         lastGpuMilliseconds = GPU_TIMER.getLastMilliseconds();
+        RAIN_FIELD_TIMER.poll();
+        RAIN_GATE_TIMER.poll();
+        RAIN_PASS_TIMER.poll();
+        lastRainPassGpuMilliseconds = program.rainSplitCloud()
+                ? Math.max(0.0F, RAIN_PASS_TIMER.getLastMilliseconds())
+                : 0.0F;
+        // The timer holds its last resolved result, so a frame that builds no
+        // field would otherwise report the previous arm's build cost and charge
+        // a control for a pass it never ran. Zero unless this frame generated.
+        lastRainFieldGpuMilliseconds = program.rainFieldGeneration()
+                || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                    && VolumetricCloudDebugConfig.rainFieldForcedOnMonolith())
+                // T196. The storm field builds on the same clock, so the
+                // campaign report's field column is its build cost; T199: on
+                // FINAL this is the production build, every frame.
+                || stormFieldProgram(program)
+                ? RAIN_FIELD_TIMER.getLastMilliseconds()
+                : 0.0F;
+        // T203. The gate build on its own clock, and added to the field
+        // column so a gate arm's net delta against a FINAL anchor charges it.
+        lastRainGateGpuMilliseconds = rainGateProgram(program)
+                ? Math.max(0.0F, RAIN_GATE_TIMER.getLastMilliseconds())
+                : 0.0F;
+        if (rainGateProgram(program) && lastRainFieldGpuMilliseconds >= 0.0F) {
+            lastRainFieldGpuMilliseconds += lastRainGateGpuMilliseconds;
+        }
         float stepScale = GOVERNOR.update(lastGpuMilliseconds);
 
         // Camera cuts and rapid turns poison reprojection. Gentle movement
@@ -352,6 +497,33 @@ public final class VolumetricCloudRenderer {
 
         RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
         RenderTarget historyTarget = VolumetricCloudRenderTargets.historyCloudTarget();
+        // T207. Temporal reconstruction: the march writes this frame's raw
+        // phase into its own target (same dimensions, so every downstream
+        // uniform is unchanged; only the destination differs) at that phase's
+        // subpixel offset, and the hook resolves the four phases afterwards.
+        // Only a FINAL-class frame is a phase: a debug view or a campaign
+        // program that is not FINAL's image must not enter the phase set.
+        boolean temporal = VolumetricCloudDebugConfig.temporalMode() != 0
+                && profile.temporalEnabled()
+                && program.normalProductionOutput()
+                && debugView == VolumetricCloudRaymarchDebugView.FINAL
+                && !StormProductionRayTrace.active()
+                && !optimizationMode.t153Oracle();
+        if (temporal) {
+            // Advanced before the target is chosen, so the phase marched this
+            // frame is the one the resolve treats as current.
+            CloudTemporalPhaseState.advance();
+            if (VolumetricCloudRenderTargets.preparePhaseTargets(
+                    cloudTarget.width, cloudTarget.height)) {
+                cloudTarget = VolumetricCloudRenderTargets.phaseTarget(
+                        CloudTemporalPhaseState.currentPhase());
+            } else {
+                temporal = false;
+            }
+        } else if (VolumetricCloudDebugConfig.temporalMode() == 0) {
+            VolumetricCloudRenderTargets.releaseTemporalTargets("temporalOff");
+        }
+        temporalPhaseActive = temporal;
         boolean t153Oracle = optimizationMode.t153Oracle();
         RenderTarget oracleTarget = t153Oracle
                 ? VolumetricCloudRenderTargets.prepareVisibleVolumeOracleTarget(
@@ -364,7 +536,11 @@ public final class VolumetricCloudRenderer {
         // last frame's clouds and no camera cut/resize/no-cloud frame
         // invalidated it since. Everything else ghosts.
         Tuning safeTuning = tuning == null ? Tuning.CELLS : tuning;
-        boolean historyValid = VolumetricCloudDebugConfig.historyEnabled()
+        // T207. A raw phase never blends the ping-pong history: the phases
+        // are original march output, and the resolve is the only temporal
+        // combination.
+        boolean historyValid = !temporal
+                && VolumetricCloudDebugConfig.historyEnabled()
                 && profile.temporalEnabled()
                 && hasPrevFrame
                 && historyTarget != null
@@ -404,7 +580,7 @@ public final class VolumetricCloudRenderer {
             return false;
         }
 
-        VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
+        bindMarchTarget(cloudTarget, temporal);
         RenderSystem.disableBlend();
         RenderSystem.enableDepthTest();
         RenderSystem.depthFunc(GL11.GL_ALWAYS);
@@ -412,19 +588,27 @@ public final class VolumetricCloudRenderer {
         RenderSystem.disableCull();
         RenderSystem.setShader(() -> shader);
 
-        shader.setSampler("WeatherMapSampler", weatherTarget.getColorTextureId());
-        shader.setSampler("MorphologyMapSampler", morphologyTarget.getColorTextureId());
-        shader.setSampler("CumulusStageSupportMapSampler", cumulusStageSupportTarget.getColorTextureId());
-        shader.setSampler("CumulusStageBaseMapSampler", cumulusStageBaseTarget.getColorTextureId());
-        shader.setSampler("CumulusStageTopMapSampler", cumulusStageTopTarget.getColorTextureId());
-        shader.setSampler("StormCandidateMapSampler", stormCandidateTarget.getColorTextureId());
-        shader.setSampler("StormDescriptorSampler", stormDescriptorTarget.getColorTextureId());
-        shader.setSampler("BlueNoiseSampler", CloudNoiseTextureManager.blueNoiseTextureId());
         SceneDepthFrame safeSceneDepth = sceneDepth == null ? SceneDepthFrame.INVALID : sceneDepth;
-        shader.setSampler("SceneDepthSampler", safeSceneDepth.valid() ? safeSceneDepth.textureId() : 0);
-        shader.setSampler("HistorySampler", historyValid ? historyTarget.getColorTextureId() : 0);
-        shader.setSampler("HistoryDepthSampler", historyValid ? historyTarget.getDepthTextureId() : 0);
-        shader.setSampler("OracleIntervalSampler", 0);
+        // T203. Recorded so the gate build program can be given the same
+        // samplers as the ray program without a second list to maintain.
+        frameSamplers.clear();
+        frameSamplers.put("WeatherMapSampler", weatherTarget.getColorTextureId());
+        frameSamplers.put("MorphologyMapSampler", morphologyTarget.getColorTextureId());
+        frameSamplers.put("CumulusStageSupportMapSampler", cumulusStageSupportTarget.getColorTextureId());
+        frameSamplers.put("CumulusStageBaseMapSampler", cumulusStageBaseTarget.getColorTextureId());
+        frameSamplers.put("CumulusStageTopMapSampler", cumulusStageTopTarget.getColorTextureId());
+        frameSamplers.put("StormCandidateMapSampler", stormCandidateTarget.getColorTextureId());
+        frameSamplers.put("StormDescriptorSampler", stormDescriptorTarget.getColorTextureId());
+        frameSamplers.put("BlueNoiseSampler", CloudNoiseTextureManager.blueNoiseTextureId());
+        frameSamplers.put("SceneDepthSampler", safeSceneDepth.valid() ? safeSceneDepth.textureId() : 0);
+        frameSamplers.put("HistorySampler", historyValid ? historyTarget.getColorTextureId() : 0);
+        frameSamplers.put("HistoryDepthSampler", historyValid ? historyTarget.getDepthTextureId() : 0);
+        frameSamplers.put("OracleIntervalSampler", 0);
+        setFrameSamplers(shader);
+        // T188. Not a JSON sampler; see bindManualTextures.
+        rainFieldTextureId = 0;
+        stormFieldTextureId = 0;
+        rainPassTextureId = 0;
 
         lastCloudProjection.set(projection);
         lastViewRotation.set(viewRotation);
@@ -441,7 +625,24 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("WeatherExtent").set(CloudWeatherMapRenderer.WEATHER_EXTENT);
         shader.safeGetUniform("SlabBaseY").set(weather.slabBaseY());
         shader.safeGetUniform("SlabTopY").set(weather.slabTopY());
-        shader.safeGetUniform("MaxPrecipitation").set(weather.maxPrecipitation());
+        // T188 Task 0. The rain-heavy fixture, as a precipitation forcing on
+        // the existing deterministic storm rather than a second world.
+        //
+        // Descriptor-owned columns take their intensity from MaxPrecipitation,
+        // so raising it makes every column the storm owns rain-bearing while
+        // leaving raster-precipitation columns exactly as they were. That is
+        // precisely the population the rain field governs, and T186 could not
+        // measure missed rain because the ordinary fixture leaves it almost
+        // empty - 11,028 rain-positive segments in a frame is too sparse for
+        // continuity or onset statistics to mean anything.
+        //
+        // Applied only to the rain-only capture pair, and identically to both
+        // sides of it, so it changes what is visible and not what is compared.
+        float paMaxPrecipitation = weather.maxPrecipitation();
+        if (program.rainMaskCapture()) {
+            paMaxPrecipitation = Math.max(paMaxPrecipitation, 0.85F);
+        }
+        shader.safeGetUniform("MaxPrecipitation").set(paMaxPrecipitation);
         shader.safeGetUniform("PuffLobeCount").set(PuffLobeSpatialIndex.lobeCount());
         // T162 scaling arm: a positive cap tells the shader about fewer
         // descriptors than are resident. Diagnostic only; the default is no cap.
@@ -485,6 +686,21 @@ public final class VolumetricCloudRenderer {
         long uploadedFrameIndex = frameIndex;
         float uploadedFrameIndexValue = (float) (uploadedFrameIndex % 1024L);
         shader.safeGetUniform("FrameIndex").set(uploadedFrameIndexValue);
+        // T207. The phase's screen-space ray offset in texture-coordinate
+        // units, and the deferred rain split; both zero on a non-temporal
+        // frame so the march is byte-identical to T206's. Uniform state
+        // persists between frames, so both are uploaded every frame.
+        int phase = CloudTemporalPhaseState.currentPhase();
+        shader.safeGetUniform("PaSampleJitter").set(
+                temporal ? CloudTemporalPhaseState.jitterX(phase) / Math.max(1.0F, cloudTarget.width) : 0.0F,
+                temporal ? CloudTemporalPhaseState.jitterY(phase) / Math.max(1.0F, cloudTarget.height) : 0.0F);
+        // T208 attribution: the body-only reference is a non-temporal frame
+        // with the split deferred and never composited.
+        shader.safeGetUniform("PaTemporalPhase").set(
+                temporal || VolumetricCloudDebugConfig.deferredSplitForced() ? 1 : 0);
+        lastInvProj.set(invProj);
+        lastInvViewRot.set(invViewRot);
+        lastViewProj.set(projection).mul(viewRotation);
         shader.safeGetUniform("RaymarchSteps").set(profile.raymarchSteps());
         shader.safeGetUniform("LightSteps").set(profile.lightSteps());
         shader.safeGetUniform("ScatterOctaves").set(profile.scatterOctaves());
@@ -498,6 +714,7 @@ public final class VolumetricCloudRenderer {
                 PuffLobeSpatialIndex.exteriorFineStepWorld(profile.raymarchSteps(), stepScale)
         );
         float uploadedMaxRenderDistance = Math.max(300.0F, maxRenderDistance);
+        lastMaxRenderDistance = uploadedMaxRenderDistance;
         boolean uploadedUseSceneDepth = sceneRayLimitEnabled && safeSceneDepth.valid();
         boolean uploadedCoveragePretestEnabled = VolumetricCloudDebugConfig.coveragePretestEnabled();
         int uploadedCoveragePretestSamples = VolumetricCloudDebugConfig.coveragePretestSamples();
@@ -586,10 +803,275 @@ public final class VolumetricCloudRenderer {
                 shader.clear();
             }
 
-            VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
+            bindMarchTarget(cloudTarget, temporal);
             shader.setSampler("OracleIntervalSampler", oracleTarget.getColorTextureId());
             shader.safeGetUniform("DebugView").set(debugView.shaderId());
             shader.safeGetUniform("PaOraclePass").set(0);
+        }
+
+        // T188. The monolith is the only program that can read workload
+        // counters, so the campaign forces the field onto it to measure the
+        // ray-side fetch count and the post-field attribution. Never applied to
+        // a timed arm: an anchor would then pay for a pass it does not run.
+        boolean paFieldProgram = program.rainFieldGeneration()
+                || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                    && VolumetricCloudDebugConfig.rainFieldForcedOnMonolith());
+        // T203. The rain gate field: the same target, pass and unit as
+        // T188's field, a different build (selected by PaRainGateField in
+        // the shader) and a different reader - the segment test's gate. The
+        // monolith builds and reads it when a campaign forces the gate on.
+        // T206: FINAL's frame builds it every frame; its rain pass reads it.
+        boolean paGateProgram = rainGateProgram(program);
+        if (paGateProgram) {
+            // The build is its own program (RAIN_GATE_BUILD): the pass baked
+            // on, the march absent. The first T203 run carried the build in
+            // the ray program and the ray paid 2.5-4 ms for code it never
+            // executed. The build program takes the frame's uniforms and
+            // samplers from the ray program - the same values, uploaded once
+            // more - so the field it writes is what the ray program's own
+            // build branch would have written.
+            ShaderInstance buildShader = VolumetricCloudShaders.volumeShader(
+                    CoreCostDiagnosticProgram.RAIN_GATE_BUILD);
+            RenderTarget rainGateTarget = buildShader == null ? null
+                    : VolumetricCloudRenderTargets.prepareRainFieldTarget(
+                            profile.weatherMapSize());
+            if (rainGateTarget == null && program.rainSplitCloud()) {
+                // T206. A split cloud program's rain pass bakes the gate on
+                // and reads it on every sample; without the build it would
+                // gate against zeros. FINAL never draws without its rain, and
+                // never draws the monolith instead: the same loud failure as
+                // a failed FINAL link.
+                throw new LeanFinalProgramUnavailableException(
+                        "rain gate build program (cloud_atmosphere_volume_rain_gate_build)"
+                                + (buildShader == null ? " failed to link" : "'s field target is unavailable")
+                                + "; FINAL's rain pass reads the gate and must not draw without it");
+            }
+            if (rainGateTarget != null) {
+                copyFrameUniforms(shader, buildShader);
+                setFrameSamplers(buildShader);
+                VolumetricCloudRenderTargets.clearAndBind(rainGateTarget);
+                buildShader.safeGetUniform("PaStormFieldPass").set(0);
+                buildShader.apply();
+                PuffLobeSpatialIndex.uploadDescriptors(buildShader.getId());
+                bindManualTextures(buildShader, puffCandidateTarget.getColorTextureId());
+                RAIN_GATE_TIMER.begin();
+                try {
+                    FullscreenQuad.draw(buildShader);
+                } finally {
+                    RAIN_GATE_TIMER.end();
+                    unbindManualTextures();
+                    buildShader.clear();
+                }
+                bindMarchTarget(cloudTarget, temporal);
+                rainFieldTextureId = rainGateTarget.getColorTextureId();
+                // The ray programs bake the value; the monolith is told. 2
+                // would keep the gate off in the segment test (the build-cost
+                // arm bakes it), the monolith reads.
+                shader.safeGetUniform("PaRainGateField").set(1);
+            } else if (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH) {
+                shader.safeGetUniform("PaRainGateField").set(0);
+            }
+        } else if (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH) {
+            // Uniform state persists on the monolith between frames (T196):
+            // a campaign that stops forcing the gate must see it off.
+            shader.safeGetUniform("PaRainGateField").set(0);
+        }
+        if (paFieldProgram) {
+            // T188. One untimed-by-GPU_TIMER draw over the 512x512 weather
+            // domain, writing the descriptor-derived rain triple per column.
+            // It runs the same directStormRainSupportAt the ray used to call
+            // per sample, so nothing here can drift from what the march would
+            // have computed - the two are one function in one program.
+            //
+            // Timed on its own clock instead, because the architecture is only
+            // worth having if build + lookup beats the traversal it replaced.
+            RenderTarget rainFieldTarget =
+                    VolumetricCloudRenderTargets.prepareRainFieldTarget(
+                            profile.weatherMapSize());
+            if (rainFieldTarget != null) {
+                VolumetricCloudRenderTargets.clearAndBind(rainFieldTarget);
+                shader.safeGetUniform("PaRainFieldPass").set(1);
+                shader.safeGetUniform("PaRainFieldEnabled").set(0);
+                // T190. Classification is part of the build, so it is set for
+                // the generation pass and for the lookup alike. The monolith
+                // gets it too when the campaign forces the field onto it, or
+                // every mixed-cell counter would read zero for want of a
+                // classified field rather than for want of mixed cells.
+                int paConservative = program.rainFieldConservative()
+                        || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                            && VolumetricCloudDebugConfig.rainFieldForcedOnMonolith())
+                        ? 1 : 0;
+                shader.safeGetUniform("PaRainFieldConservative").set(paConservative);
+                // T192. The closed-form triage, on the same rule: the
+                // monolith gets it too when the campaign forces the field
+                // onto it, or the census counters would describe a
+                // classifier the run never used.
+                int paClosedForm = program.rainFieldClosedForm()
+                        || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                            && VolumetricCloudDebugConfig.rainFieldForcedOnMonolith())
+                        ? 1 : 0;
+                shader.safeGetUniform("PaRainFieldClosedForm").set(paClosedForm);
+                shader.apply();
+                PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
+                bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
+                RAIN_FIELD_TIMER.begin();
+                try {
+                    FullscreenQuad.draw(shader);
+                } finally {
+                    RAIN_FIELD_TIMER.end();
+                    unbindManualTextures();
+                    shader.clear();
+                }
+
+                bindMarchTarget(cloudTarget, temporal);
+                rainFieldTextureId = rainFieldTarget.getColorTextureId();
+                shader.safeGetUniform("PaRainFieldPass").set(0);
+                shader.safeGetUniform("PaRainFieldConservative").set(paConservative);
+                shader.safeGetUniform("PaRainFieldClosedForm").set(paClosedForm);
+                shader.safeGetUniform("PaRainFieldEnabled").set(
+                        program.rainFieldLookup()
+                                || program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                                ? 1 : 0);
+            }
+        }
+
+        // T196. Uniform state persists on a program between frames, so the
+        // monolith must be told every frame whether it reads the field: the
+        // first campaign run's FAR production capture kept the previous
+        // forced frame's lookups enabled against no field at all.
+        shader.safeGetUniform("PaStormFieldPass").set(0);
+        shader.safeGetUniform("PaStormFieldEnabled").set(0);
+        // T197 varied the grid; T199 pinned it. Every lean program bakes the
+        // constant, and the monolith is uploaded the same value here so its
+        // node mapping and the atlas below can never disagree.
+        int stormFieldXZ = StormFieldGeometry.DEFAULT_XZ;
+        shader.safeGetUniform("PaStormFieldXZ").set(stormFieldXZ);
+        // T198. The audit's selectors ride with the field uniforms; only the
+        // audit program declares them.
+        shader.safeGetUniform("PaLightAuditVariant").set(
+                VolumetricCloudDebugConfig.lightAuditVariant());
+        shader.safeGetUniform("PaLightAuditOutput").set(
+                VolumetricCloudDebugConfig.lightAuditOutput());
+        // T196. The shared storm field. One draw over the atlas - XZ-square
+        // by 32 nodes, each the storm body's threshold and height, the probe
+        // floor and a detail-free density - before the timed draw, on the
+        // field clock. T199: FINAL runs it every frame (its consumer bits are
+        // baked on), the monolith runs it at production's bits unless a
+        // campaign overrides them, so the counters describe the post-field
+        // workload and a debug view renders FINAL's image.
+        if (stormFieldProgram(program)) {
+            RenderTarget stormFieldTarget =
+                    VolumetricCloudRenderTargets.prepareStormFieldTarget(stormFieldXZ);
+            if (stormFieldTarget == null
+                    && program == CoreCostDiagnosticProgram.LEAN_FINAL) {
+                // The lean program reads the atlas unconditionally, so a frame
+                // without one would light the cone and probe the scan against
+                // zeros: wrong, and silently so. Same loud fallback as a
+                // failed link.
+                throw new LeanFinalProgramUnavailableException(
+                        "storm field atlas (" + StormFieldGeometry.describe(stormFieldXZ)
+                                + ") unavailable; FINAL bakes the field consumers on"
+                                + " and must not draw without it");
+            }
+            if (stormFieldTarget != null) {
+                int enabledBits = program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                        ? VolumetricCloudDebugConfig.stormFieldForcedOnMonolith()
+                        : program.lightAuditCapture()
+                        // T198. The audit measures whichever lookup the
+                        // campaign selects; its consumer bits are live.
+                        ? VolumetricCloudDebugConfig.lightAuditFieldBits()
+                        : program.stormFieldEnabledBits();
+                if (VolumetricCloudDebugConfig.consumeStormFieldSoundnessRequest()) {
+                    runStormFieldSoundnessOracle(shader, puffCandidateTarget, stormFieldXZ);
+                }
+                VolumetricCloudRenderTargets.clearAndBind(stormFieldTarget);
+                shader.safeGetUniform("PaStormFieldPass").set(1);
+                // T202. The build reads the consumer bits too: bit 32 decides
+                // what the node's A channel carries (the refinement's
+                // clearance floor, or the node density). FINAL bakes the bits,
+                // so its build has always seen them; the monolith is uploaded
+                // the same value here so its atlas matches FINAL's. The build
+                // pass returns before any consumer lookup, so nothing in it
+                // reads the atlas it is writing.
+                shader.safeGetUniform("PaStormFieldEnabled").set(enabledBits);
+                shader.apply();
+                PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
+                bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
+                countStormFieldBuild(weather, materialOffsetX, materialOffsetZ);
+                RAIN_FIELD_TIMER.begin();
+                try {
+                    FullscreenQuad.draw(shader);
+                } finally {
+                    RAIN_FIELD_TIMER.end();
+                    unbindManualTextures();
+                    shader.clear();
+                }
+                bindMarchTarget(cloudTarget, temporal);
+                stormFieldTextureId = stormFieldTarget.getColorTextureId();
+                shader.safeGetUniform("PaStormFieldPass").set(0);
+                shader.safeGetUniform("PaStormFieldEnabled").set(enabledBits);
+            }
+        }
+
+        // T205. The rain pass, drawn before the split cloud program with the
+        // frame's uniforms and samplers (the gate field and the storm field
+        // are both built by now): a rain-only march into a cloud-sized
+        // target the cloud program then composites at the rain's depth.
+        // T206: the production render order is field build, gate build,
+        // rain pass, split cloud, then the composite/output path.
+        if (program.rainSplitCloud()) {
+            ShaderInstance rainShader = VolumetricCloudShaders.volumeShader(
+                    program.rainPassProgram());
+            RenderTarget rainPassTarget = rainShader == null ? null
+                    : VolumetricCloudRenderTargets.prepareRainPassTarget(
+                            cloudTarget.width, cloudTarget.height);
+            if (rainPassTarget == null && program.rainPassProgram().isProductionProgram()) {
+                // T206. The split cloud program fetches the rain-pass texel
+                // unconditionally; against no pass it would composite a zero
+                // transmittance into every pixel. Fail FINAL loudly instead.
+                throw new LeanFinalProgramUnavailableException(
+                        "rain pass program (cloud_atmosphere_volume_rain_pass)"
+                                + (rainShader == null ? " failed to link" : "'s target is unavailable")
+                                + "; FINAL composites the rain pass and must not draw without it");
+            }
+            if (rainPassTarget != null && VolumetricCloudDebugConfig.rainDisabled()) {
+                // T208 attribution. No rain pass: the target is cleared to
+                // "no rain" (rgb 0, packed T_r = 1) so the split cloud
+                // program and the resolve composite nothing. Diagnostic only.
+                rainPassTarget.setClearColor(0.0F, 0.0F, 0.0F, 4095.0F);
+                VolumetricCloudRenderTargets.clearAndBind(rainPassTarget);
+                rainPassTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+                bindMarchTarget(cloudTarget, temporal);
+                rainPassTextureId = rainPassTarget.getColorTextureId();
+            } else if (rainPassTarget != null) {
+                copyFrameUniforms(shader, rainShader);
+                setFrameSamplers(rainShader);
+                VolumetricCloudRenderTargets.clearAndBind(rainPassTarget);
+                rainShader.safeGetUniform("PaStormFieldPass").set(0);
+                // T207. Rain is current-frame and unjittered: the rain pass
+                // marches the block-centre ray whatever phase the cloud march
+                // is on, so the texel a block composites is the same on
+                // every frame of the cycle (a jittered rain pass rotated
+                // through four subpixel rays - a four-frame rain flicker).
+                rainShader.safeGetUniform("PaSampleJitter").set(0.0F, 0.0F);
+                rainShader.apply();
+                PuffLobeSpatialIndex.uploadDescriptors(rainShader.getId());
+                bindManualTextures(rainShader, puffCandidateTarget.getColorTextureId());
+                RAIN_PASS_TIMER.begin();
+                try {
+                    FullscreenQuad.draw(rainShader);
+                } finally {
+                    RAIN_PASS_TIMER.end();
+                    unbindManualTextures();
+                    rainShader.clear();
+                }
+                bindMarchTarget(cloudTarget, temporal);
+                rainPassTextureId = rainPassTarget.getColorTextureId();
+            } else {
+                ProjectAtmosphere.LOGGER.warn(
+                        "[VolumetricClouds] rain pass program unavailable for {}",
+                        program.serializedName());
+            }
         }
 
         lastProgram = program;
@@ -658,8 +1140,27 @@ public final class VolumetricCloudRenderer {
             previousHistoryKey = currentHistoryKey;
             hasPrevFrame = true;
         }
+        if (temporal && renderedProductionFrame) {
+            // T207. The raw phase just marched, with the camera it was seen
+            // from and the frame it was rendered on. Only a raw march is ever
+            // recorded; the resolve's output never comes through here.
+            CloudTemporalPhaseState.record(
+                    CloudTemporalPhaseState.currentPhase(), lastViewProj, cameraPos, frameIndex);
+        }
         frameIndex++;
         return true;
+    }
+
+    /**
+     * T207. Binds the march's destination: the ping-pong cloud target, or
+     * the raw phase target with its aux attachment drawn and cleared.
+     */
+    private static void bindMarchTarget(RenderTarget target, boolean temporal) {
+        if (temporal) {
+            VolumetricCloudRenderTargets.clearAndBindPhase(target);
+        } else {
+            VolumetricCloudRenderTargets.clearAndBind(target);
+        }
     }
 
     /**
@@ -703,7 +1204,19 @@ public final class VolumetricCloudRenderer {
                 && !StormMaterialRuntimeTrace.active()
                 && !VolumetricCloudDebugConfig.t098LegacyHitDepth()
                 && !VolumetricCloudDebugConfig.t098LegacyFinePromotion()
-                && !VolumetricCloudDebugConfig.t136ConstantLighting();
+                && !VolumetricCloudDebugConfig.t136ConstantLighting()
+                // T199. The field rows of leanFinalConstants: consumer bits
+                // 11 and the audit selectors 0 (the grid, 256, has no runtime
+                // state since T199h). A campaign that moves the monolith off
+                // production's lookup or takes an audit capture is uploading
+                // a value FINAL has baked differently and takes the monolith.
+                && VolumetricCloudDebugConfig.stormFieldForcedOnMonolith()
+                        == StormFieldGeometry.PRODUCTION_CONSUMER_BITS
+                && VolumetricCloudDebugConfig.lightAuditVariant() == 0
+                && VolumetricCloudDebugConfig.lightAuditOutput() == 0
+                // T203. FINAL bakes the rain gate off; a campaign forcing it
+                // on the monolith is uploading a value FINAL cannot take.
+                && !VolumetricCloudDebugConfig.rainGateForcedOnMonolith();
     }
 
     /**
@@ -772,6 +1285,32 @@ public final class VolumetricCloudRenderer {
                 PUFF_CANDIDATE_TEXTURE_UNIT,
                 puffCandidateTextureId
         );
+        // T188. Bound here rather than through the shader JSON: Minecraft
+        // assigns JSON samplers to consecutive units from 0 and tracks only
+        // twelve, so a thirteenth throws inside ShaderInstance.apply. A
+        // PA-owned unit is the same mechanism the puff candidate map and both
+        // noise volumes already use.
+        bind2dSampler(
+                program,
+                "RainFieldSampler",
+                RAIN_FIELD_TEXTURE_UNIT,
+                rainFieldTextureId
+        );
+        // T196. T203: on its own unit, since the gate programs keep both
+        // fields; bind2dSampler skips a zero texture id and a missing uniform.
+        bind2dSampler(
+                program,
+                "StormFieldSampler",
+                STORM_FIELD_TEXTURE_UNIT,
+                stormFieldTextureId
+        );
+        // T205. The rain pass's result, for the split cloud program only.
+        bind2dSampler(
+                program,
+                "RainPassSampler",
+                RAIN_PASS_TEXTURE_UNIT,
+                rainPassTextureId
+        );
         bind3dSampler(
                 program,
                 "BaseNoiseSampler",
@@ -816,8 +1355,322 @@ public final class VolumetricCloudRenderer {
         GL20.glUniform1i(location, unit);
     }
 
+    /**
+     * T196. Programs that build the field this frame: every program whose
+     * consumer bits are baked (T199: FINAL and its lean variants), plus the
+     * monolith whenever its uploaded bits are non-zero - production's by
+     * default, a campaign's override otherwise.
+     */
+    /** T199e. Count-only, see the field declarations; never skips a build. */
+    private static void countStormFieldBuild(
+            CloudWeatherMapRenderer.Result weather, float materialOffsetX, float materialOffsetZ) {
+        long descriptors = PuffLobeSpatialIndex.descriptorSignatureForDiagnostics() * 31L
+                + PuffLobeSpatialIndex.candidateSignatureForDiagnostics();
+        long signature = descriptors;
+        signature = signature * 31L + CloudWeatherMapRenderer.cacheMisses();
+        signature = signature * 31L + Double.doubleToLongBits(weather.originX());
+        signature = signature * 31L + Double.doubleToLongBits(weather.originZ());
+        signature = signature * 31L + Float.floatToIntBits(weather.slabBaseY());
+        signature = signature * 31L + Float.floatToIntBits(materialOffsetX);
+        signature = signature * 31L + Float.floatToIntBits(materialOffsetZ);
+        stormFieldBuilds++;
+        if (stormFieldInputSignatureValid) {
+            if (signature == stormFieldInputSignature) {
+                stormFieldBuildsInputsUnchanged++;
+            }
+            if (descriptors == lastStormFieldDescriptorSignature) {
+                stormFieldBuildsDescriptorsUnchanged++;
+            }
+        }
+        stormFieldInputSignature = signature;
+        lastStormFieldDescriptorSignature = descriptors;
+        stormFieldInputSignatureValid = true;
+    }
+
+    /** T199e. {@code builds=.. unchangedInputs=.. unchangedDescriptors=..} since the last reset. */
+    public static String stormFieldRebuildStatus() {
+        return "builds=" + stormFieldBuilds
+                + " unchangedInputs=" + stormFieldBuildsInputsUnchanged
+                + " unchangedDescriptors=" + stormFieldBuildsDescriptorsUnchanged;
+    }
+
+    public static void resetStormFieldRebuildCounters() {
+        stormFieldBuilds = 0L;
+        stormFieldBuildsInputsUnchanged = 0L;
+        stormFieldBuildsDescriptorsUnchanged = 0L;
+        stormFieldInputSignatureValid = false;
+    }
+
+    private static boolean stormFieldProgram(CoreCostDiagnosticProgram program) {
+        return program.stormFieldGeneration()
+                || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                    && VolumetricCloudDebugConfig.stormFieldForcedOnMonolith() != 0);
+    }
+
+    /** T203. The frame's JSON samplers by name, for the ray program and the gate build program. */
+    private static final java.util.Map<String, Integer> frameSamplers =
+            new java.util.LinkedHashMap<>();
+
+    private static void setFrameSamplers(ShaderInstance target) {
+        for (java.util.Map.Entry<String, Integer> sampler : frameSamplers.entrySet()) {
+            target.setSampler(sampler.getKey(), sampler.getValue());
+        }
+    }
+
+    /**
+     * T203. The names of every uniform the monolith declares, read once from
+     * its JSON: the set the frame uploads to whichever program draws, and so
+     * the set the gate build program can receive from the ray program.
+     */
+    private static java.util.List<String> monolithUniformNames;
+
+    private static java.util.List<String> monolithUniformNames() {
+        if (monolithUniformNames != null) {
+            return monolithUniformNames;
+        }
+        java.util.List<String> names = new java.util.ArrayList<>();
+        try (java.io.Reader reader = new java.io.InputStreamReader(
+                net.minecraft.client.Minecraft.getInstance().getResourceManager()
+                        .getResourceOrThrow(net.minecraft.resources.ResourceLocation
+                                .fromNamespaceAndPath(ProjectAtmosphere.MODID,
+                                        "shaders/core/cloud_atmosphere_volume.json"))
+                        .open(),
+                java.nio.charset.StandardCharsets.UTF_8)) {
+            com.google.gson.JsonObject json =
+                    com.google.gson.JsonParser.parseReader(reader).getAsJsonObject();
+            for (com.google.gson.JsonElement uniform : json.getAsJsonArray("uniforms")) {
+                names.add(uniform.getAsJsonObject().get("name").getAsString());
+            }
+        } catch (java.io.IOException | RuntimeException failure) {
+            ProjectAtmosphere.LOGGER.error(
+                    "[VolumetricClouds] could not read the volume shader's uniform list;"
+                            + " the rain gate build program would draw with stale uniforms",
+                    failure);
+        }
+        monolithUniformNames = names;
+        return names;
+    }
+
+    /**
+     * T203. Copies every uniform value the frame set on {@code from} to the
+     * same-named uniform of {@code to}, by the uniform's own type: ints by
+     * component, floats and matrices as the flat buffer. A uniform either
+     * program baked away is skipped - the constant it bakes is the value.
+     */
+    private static void copyFrameUniforms(ShaderInstance from, ShaderInstance to) {
+        for (String name : monolithUniformNames()) {
+            com.mojang.blaze3d.shaders.Uniform source = from.getUniform(name);
+            com.mojang.blaze3d.shaders.Uniform target = to.getUniform(name);
+            if (source == null || target == null || source.getType() != target.getType()) {
+                continue;
+            }
+            int type = source.getType();
+            if (type <= com.mojang.blaze3d.shaders.Uniform.UT_INT4) {
+                java.nio.IntBuffer ints = source.getIntBuffer();
+                int count = source.getCount();
+                target.setSafe(
+                        ints.get(0),
+                        count > 1 ? ints.get(1) : 0,
+                        count > 2 ? ints.get(2) : 0,
+                        count > 3 ? ints.get(3) : 0);
+            } else {
+                java.nio.FloatBuffer floats = source.getFloatBuffer();
+                float[] values = new float[source.getCount()];
+                for (int i = 0; i < values.length; i++) {
+                    values[i] = floats.get(i);
+                }
+                target.set(values);
+            }
+        }
+    }
+
+    /** T203. Programs that build the rain gate field this frame. */
+    private static boolean rainGateProgram(CoreCostDiagnosticProgram program) {
+        return program.rainGateGeneration()
+                || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                    && VolumetricCloudDebugConfig.rainGateForcedOnMonolith());
+    }
+
+    /**
+     * T196 Task 2. The probe floor's soundness, measured on every node. The
+     * shader writes (floor, dense reference minimum, fraction of reference
+     * samples that could carry material) per node into a float target; this
+     * reads it back once and counts. A node whose floor exceeds its reference
+     * is an underestimate - a probe there could declare empty where production
+     * finds material - and the count must be zero.
+     */
+    private static void runStormFieldSoundnessOracle(
+            ShaderInstance shader, RenderTarget puffCandidateTarget, int stormFieldXZ) {
+        RenderTarget oracle =
+                VolumetricCloudRenderTargets.prepareStormFieldOracleTarget(stormFieldXZ);
+        if (oracle == null) {
+            return;
+        }
+        try {
+            VolumetricCloudRenderTargets.clearAndBind(oracle);
+            shader.safeGetUniform("PaStormFieldPass").set(2);
+            shader.safeGetUniform("PaStormFieldEnabled").set(0);
+            shader.apply();
+            PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
+            bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
+            try {
+                FullscreenQuad.draw(shader);
+            } finally {
+                unbindManualTextures();
+                shader.clear();
+            }
+            int width = oracle.width;
+            int height = oracle.height;
+            java.nio.FloatBuffer pixels =
+                    org.lwjgl.BufferUtils.createFloatBuffer(width * height * 4);
+            int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+            try {
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, oracle.getColorTextureId());
+                GL11.glGetTexImage(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, GL11.GL_FLOAT, pixels);
+            } finally {
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, previousTexture);
+            }
+            long nodes = 0L;
+            long uncovered = 0L;
+            long fieldEmpty = 0L;
+            long referenceEmpty = 0L;
+            long boundary = 0L;
+            long underestimates = 0L;
+            long boundaryUnderestimates = 0L;
+            double worstUnderestimate = 0.0D;
+            long usefulEmpty = 0L;
+            long[] overestimateHistogram = new long[8];
+            double overestimateSum = 0.0D;
+            long overestimateSamples = 0L;
+            // The union distance's measured drop per block, by axis, over
+            // every node that walked: the constants the dilation assumes
+            // have to sit above the whole distribution.
+            double maxLipschitzY = 0.0D;
+            long[] lipschitzYHistogram = new long[10];
+            long lipschitzSamples = 0L;
+            long binaryMisses = 0L;
+            long[] binaryMissSlack = new long[8];
+            double worstBinarySlack = 0.0D;
+            for (int index = 0; index < width * height; index++) {
+                float floor = pixels.get(index * 4);
+                float reference = pixels.get(index * 4 + 1);
+                float slack = pixels.get(index * 4 + 2);
+                float packed = pixels.get(index * 4 + 3);
+                float materialCount = (float) Math.floor(packed / 1000.0F);
+                float lipschitzY = packed - materialCount * 1000.0F;
+                float materialFraction = materialCount / 43.0F;
+                nodes++;
+                if (floor > -5.0F && floor < 1.0F - 1.0e-6F) {
+                    // Only nodes whose walk entered a group carry a drop.
+                    lipschitzSamples++;
+                    maxLipschitzY = Math.max(maxLipschitzY, lipschitzY);
+                    lipschitzYHistogram[(int) Math.max(0.0D, Math.min(9.0D,
+                            Math.floor(lipschitzY / 0.5D)))]++;
+                }
+                if (floor <= -5.0F) {
+                    uncovered++;
+                    continue;
+                }
+                boolean mixed = materialFraction > 0.0F && materialFraction < 1.0F;
+                if (mixed) {
+                    boundary++;
+                }
+                if (floor >= 1.0F) {
+                    fieldEmpty++;
+                }
+                if (reference >= 1.0F) {
+                    referenceEmpty++;
+                    if (floor >= 1.0F) {
+                        usefulEmpty++;
+                    }
+                }
+                double gap = floor - reference;
+                if (gap > 1.0e-4D) {
+                    underestimates++;
+                    if (mixed) {
+                        boundaryUnderestimates++;
+                    }
+                    worstUnderestimate = Math.max(worstUnderestimate, gap);
+                    if (floor >= 1.0F) {
+                        // A binary miss: the node believed the whole cell was
+                        // outside the envelope. How far outside it believed
+                        // itself is the margin that would have covered it.
+                        binaryMisses++;
+                        int bucket = slack > 1.0e8F ? 7
+                                : (int) Math.max(0.0D, Math.min(6.0D,
+                                        Math.floor(Math.log(Math.max(slack, 1.0F)) / Math.log(2.0D))));
+                        binaryMissSlack[bucket]++;
+                        worstBinarySlack = Math.max(worstBinarySlack,
+                                slack > 1.0e8F ? -1.0D : slack);
+                    }
+                } else if (reference < 1.0F) {
+                    // How far below the true threshold the floor sits where
+                    // material is possible: the price of the bound.
+                    double over = Math.max(0.0D, -gap);
+                    overestimateSum += over;
+                    overestimateSamples++;
+                    int bucket = (int) Math.max(0.0D, Math.min(7.0D, Math.floor(over / 0.1D)));
+                    overestimateHistogram[bucket]++;
+                }
+            }
+            StringBuilder histogram = new StringBuilder();
+            for (int bucket = 0; bucket < overestimateHistogram.length; bucket++) {
+                histogram.append(bucket == 0 ? "" : ",").append(overestimateHistogram[bucket]);
+            }
+            StringBuilder lipschitzY = new StringBuilder();
+            for (int bucket = 0; bucket < lipschitzYHistogram.length; bucket++) {
+                lipschitzY.append(bucket == 0 ? "" : ",").append(lipschitzYHistogram[bucket]);
+            }
+            StringBuilder missSlack = new StringBuilder();
+            for (int bucket = 0; bucket < binaryMissSlack.length; bucket++) {
+                missSlack.append(bucket == 0 ? "" : ",").append(binaryMissSlack[bucket]);
+            }
+            // T197. The resolution and its geometry lead the line, so the
+            // oracles of one launch can be told apart.
+            ProjectAtmosphere.LOGGER.info(
+                    "T196_SOUNDNESS xz={} voxelXZ={} halfCellXZ={} atlas={}x{}"
+                            + " nodes={} uncovered={} covered={} boundaryNodes={}"
+                            + " referenceSamplesPerNode=43 underestimates={}"
+                            + " boundaryUnderestimates={} worstUnderestimate={}"
+                            + " fieldEmpty={} referenceEmpty={} usefulEmptyRetained={}"
+                            + " usefulEmptyFraction={} overestimateSamples={}"
+                            + " overestimateMean={} overestimateHistogram0.1={}"
+                            + " lipschitzNodes={} maxLipschitzY={} lipschitzYHistogram0.5={}"
+                            + " binaryMisses={} binaryMissSlackLog2={} worstBinarySlack={}",
+                    stormFieldXZ,
+                    String.format(java.util.Locale.ROOT, "%.4f",
+                            StormFieldGeometry.voxelXZ(stormFieldXZ)),
+                    String.format(java.util.Locale.ROOT, "%.4f",
+                            StormFieldGeometry.halfCellXZ(stormFieldXZ)),
+                    width, height,
+                    nodes, uncovered, nodes - uncovered, boundary, underestimates,
+                    boundaryUnderestimates,
+                    String.format(java.util.Locale.ROOT, "%.5f", worstUnderestimate),
+                    fieldEmpty, referenceEmpty, usefulEmpty,
+                    String.format(java.util.Locale.ROOT, "%.4f",
+                            referenceEmpty == 0L ? 0.0D
+                                    : (double) usefulEmpty / (double) referenceEmpty),
+                    overestimateSamples,
+                    String.format(java.util.Locale.ROOT, "%.4f",
+                            overestimateSamples == 0L ? 0.0D
+                                    : overestimateSum / (double) overestimateSamples),
+                    histogram, lipschitzSamples,
+                    String.format(java.util.Locale.ROOT, "%.3f", maxLipschitzY),
+                    lipschitzY, binaryMisses, missSlack,
+                    String.format(java.util.Locale.ROOT, "%.2f", worstBinarySlack));
+        } catch (RuntimeException failure) {
+            // A diagnostic must never take the renderer down with it: the
+            // campaign that asked for it still has a sweep to run.
+            ProjectAtmosphere.LOGGER.error("T196_SOUNDNESS failed; the field build continues", failure);
+        } finally {
+            VolumetricCloudRenderTargets.releaseStormFieldOracleTarget();
+        }
+    }
+
     private static void unbindManualTextures() {
         GlStateManager._activeTexture(GL13.GL_TEXTURE0 + PUFF_CANDIDATE_TEXTURE_UNIT);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        GlStateManager._activeTexture(GL13.GL_TEXTURE0 + RAIN_FIELD_TEXTURE_UNIT);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
         GlStateManager._activeTexture(GL13.GL_TEXTURE0 + BASE_NOISE_TEXTURE_UNIT);
         GL11.glBindTexture(GL12.GL_TEXTURE_3D, 0);

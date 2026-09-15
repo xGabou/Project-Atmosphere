@@ -10,6 +10,7 @@ import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
 import net.Gabou.projectatmosphere.clouds.client.render.ClientCloudRenderOwnership;
 import net.Gabou.projectatmosphere.clouds.client.render.depth.SceneDepthResolver;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeRenderer;
+import net.Gabou.projectatmosphere.clouds.client.render.field.CloudTemporalResolveRenderer;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldRenderTargetManager;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderer;
 import net.Gabou.projectatmosphere.clouds.api.CloudShadowMapAccess;
@@ -170,6 +171,8 @@ public final class VolumetricCloudClientLifecycle {
         CloudFieldRenderTargetManager.shutdown();
         CloudFieldVolumeRenderer.shutdown();
         CloudFieldCompositeRenderer.shutdown();
+        CloudTemporalResolveRenderer.shutdown();
+        net.Gabou.projectatmosphere.clouds.client.render.field.CloudSpatialUpscaleRenderer.shutdown();
         FullscreenQuad.shutdown();
         SceneDepthResolver.shutdown();
         CloudCellAnalyticsPass.shutdown();

@@ -4,7 +4,7 @@ plugins {
     id 'idea'
     id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
     id 'org.spongepowered.mixin' version '0.7.+'
-    id 'com.matthewprenger.cursegradle' version '1.4.0' // CurseForge uploader
+    id 'com.hypherionmc.modutils.modpublisher' version '2.2.1' // CurseForge uploader
     id "com.modrinth.minotaur" version "2.8.10" // Modrinth uploader
     id 'maven-publish'
 }
@@ -47,6 +47,22 @@ minecraft {
         client {
             property 'forge.enabledGameTestNamespaces', mod_id
 
+            // Benchmark-owned heap cap. Opt-in only: without -PpaBenchHeap the
+            // dev client keeps stock JVM ergonomics, so ordinary `runClient` is
+            // untouched. The stock ergonomic Xmx on this 32 GB host is 7.93 GB
+            // (MaxHeapSize=8510242816) with Xms 508 MB, which lets G1 drift the
+            // committed heap far above the live set during a long campaign.
+            // -PpaBenchHeap bounds it; -PpaBenchGcLog turns on GC logging so a
+            // timing cell that overlapped a pause can be rejected after the fact.
+            // Neither flag touches renderer, fixture or shader behaviour.
+            if (project.hasProperty('paBenchHeap')) {
+                jvmArgs '-Xms1G', "-Xmx${project.property('paBenchHeap')}".toString()
+            }
+            if (project.hasProperty('paBenchGcLog')) {
+                jvmArg('-Xlog:gc*:file='
+                        + rootProject.file(project.property('paBenchGcLog')).absolutePath
+                        + ':time,uptime,level,tags')
+            }
         }
 
         server {
@@ -125,7 +141,7 @@ dependencies {
 
     // Core dependencies
     implementation fg.deobf("curse.maven:architectury-api-419699:5137938")
-    implementation fg.deobf("curse.maven:gabous-libs-1367332:8280104")
+    implementation fg.deobf("curse.maven:gabous-libs-1367332:8774253")
     implementation fg.deobf("curse.maven:spark-361579:4738952")
     implementation fg.deobf("curse.maven:cloth-config-348521:5729105")
 
@@ -147,19 +163,26 @@ dependencies {
     // Simple Clouds and its libraries are optional as one runtime unit. The
     // compile-only branch is the default so a missing integration dependency
     // is exercised by normal development launches.
-    def enableSimpleCloudsRuntime = project.findProperty("enableSimpleCloudsRuntime") == "true"
+    def enableSimpleCloudsRuntime =
+            project.findProperty("enableSimpleCloudsRuntime") == "true" ||
+                    gradle.startParameter.taskNames.any {
+                        it == "runSimpleClouds" || it.endsWith(":runSimpleClouds")
+                    }
     if (enableSimpleCloudsRuntime) {
         implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
         implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
+        implementation fg.deobf("curse.maven:better-simple-clouds-1606950:8802325")
         implementation fg.deobf("nonamecrackers2:simpleclouds:0.7.3+1.20.1-forge")
     } else {
         compileOnly fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
         compileOnly fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
         compileOnly fg.deobf("nonamecrackers2:simpleclouds:0.7.3+1.20.1-forge")
+        compileOnly fg.deobf("curse.maven:better-simple-clouds-1606950:8802325")
     }
 
     compileOnly fg.deobf("curse.maven:oculus-for-simpleclouds-1386686:7870940")
     compileOnly fg.deobf("curse.maven:simple-clouds-1121215:6928978")
+    compileOnly fg.deobf("curse.maven:better-simple-clouds-1606950:8802325")
     //implementation fg.deobf("curse.maven:oculus-for-simpleclouds-1386686:8234238")
 
     // World generation dependencies
@@ -242,6 +265,12 @@ def leanFinalShaderJson =
         file('src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.json')
 def leanFinalGeneratedResources = layout.buildDirectory.dir('generated/leanFinalResources')
 def leanFinalShaderName = 'cloud_atmosphere_volume_final'
+// FINAL's source-level specialization, in one place so the programs that must
+// stay byte-identical to FINAL (the T171 identity controls) take the same list.
+// T163 precipitation-absent, T174 descriptor precompute, T206 the split: the
+// rain family out of the cloud program, the rain pass's result composited in.
+def leanFinalDefines = ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_RAIN_SPLIT_COMPOSITE 1']
 
 // uniform declaration -> replacement declaration. The value on the right is the
 // production value the renderer uploads for an ordinary FINAL frame; where a
@@ -266,7 +295,48 @@ def leanFinalConstants = [
         'uniform int PaDiagnosticLightingMode;'    : 'const int PaDiagnosticLightingMode = 0;',
         'uniform int PaRayTraceMode;'              : 'const int PaRayTraceMode = 0;',
         'uniform vec2 PaRayTraceNdc;'              : 'const vec2 PaRayTraceNdc = vec2(0.0);',
-        'uniform vec2 PaRayTraceFragCoord;'        : 'const vec2 PaRayTraceFragCoord = vec2(0.0);'
+        'uniform vec2 PaRayTraceFragCoord;'        : 'const vec2 PaRayTraceFragCoord = vec2(0.0);',
+        // T188. Every program that does not generate or read the rain
+        // field bakes both to 0, so neither the generation pass above
+        // main's march nor the lookup branch inside localRainSupportAt
+        // is compiled into it. FINAL is therefore unchanged by T188.
+        'uniform int PaRainFieldPass;'             : 'const int PaRainFieldPass = 0;',
+        'uniform int PaRainFieldEnabled;'          : 'const int PaRainFieldEnabled = 0;',
+        // T190. The certainty flag and its fallback are compiled out of
+        // every program that does not opt in, so the mixed-cell branch
+        // is absent rather than merely unentered.
+        'uniform int PaRainFieldConservative;'     : 'const int PaRainFieldConservative = 0;',
+        'uniform int PaRainFieldClosedForm;'       : 'const int PaRainFieldClosedForm = 0;',
+        // T203. The rain gate field: its build branch and the segment
+        // test's gate are compiled out of every program that does not opt
+        // in; the T203 arms override the row to 1 (build and read) or 2
+        // (build only), and the monolith uploads it live.
+        'uniform int PaRainGateField;'             : 'const int PaRainGateField = 0;',
+        // T196-T199. The shared storm field is production: FINAL builds it
+        // before every timed draw and both consumers read it. PaStormFieldPass
+        // is therefore NOT in this map - the renderer uploads 1 for the build
+        // draw and 0 for the render, so it stays a live uniform in FINAL and
+        // in every variant, and the generated JSON keeps it. The consumer
+        // bits are baked: 1 light, 2 probe, 8 the T198 exact-noise tap
+        // (StormFieldGeometry.PRODUCTION_CONSUMER_BITS); bit 4, the T196
+        // hybrid, is statically false at this value. An arm that measures
+        // another lookup overrides the row; the T196 build-cost arm overrides
+        // it to 0. The T196 soundness oracle (pass 2) stays compiled into
+        // FINAL behind the live pass, which the renderer never uploads as 2
+        // there: T199 measured that compiling it out costs 30% at SIDE.
+        // T202. 32: the refinement's clearance floor from A
+        // (StormFieldGeometry.PRODUCTION_CONSUMER_BITS = 43). The T202 arms
+        // bake their bits explicitly; t202_refine_field is now the program
+        // FINAL is byte-identical to. Bit 16 (the primary body from the
+        // field) failed the body's quality bar and stays a campaign arm.
+        'uniform int PaStormFieldEnabled;'         : 'const int PaStormFieldEnabled = 43;',
+        // T197. The field's horizontal resolution, closed at T196's grid:
+        // 384 and 512 did not recover the shadow pockets, T198 did.
+        'uniform int PaStormFieldXZ;'              : 'const int PaStormFieldXZ = 256;',
+        // T198. The light-tap audit's selectors; the audit itself is behind
+        // PA_LIGHT_AUDIT, so these are inert everywhere but that program.
+        'uniform int PaLightAuditVariant;'         : 'const int PaLightAuditVariant = 0;',
+        'uniform int PaLightAuditOutput;'          : 'const int PaLightAuditOutput = 0;'
 ]
 
 // The oracle interval texture is read only by the T153 ground-truth replay,
@@ -276,6 +346,24 @@ def leanFinalConstants = [
 // also the clearest single proof that the specialization really did eliminate
 // the diagnostic paths rather than merely hide them.
 def leanFinalRemovedSamplers = ['OracleIntervalSampler']
+
+// T199. Source-level defines the monolith carries and lean programs do not.
+// The raw source would define each of these at its top, so the
+// un-specialized monolith - the program every campaign's counters and
+// oracles run on - keeps the measurement; the generator strips the
+// definition from every lean variant, and a variant that hosts the
+// measurement lists the same name in its defines to put it back.
+//
+// Empty since T199j. T199c used it for PA_STORM_FIELD_ORACLE, the field's
+// soundness oracle (PaStormFieldPass == 2), and the T199 campaign then
+// measured FINAL-without-the-oracle 30% slower at SIDE and 12% at FAR than
+// t198_field_both_exact, whose generated source differed by that one define
+// alone (T171 excludes program identity). A compiler artifact, but the
+// program T198 accepted is the one with the dead branch in, so FINAL keeps
+// it behind the live pass the renderer never uploads as 2. The mechanism
+// stays for the next monolith-only measurement, with that lesson attached:
+// re-time FINAL before trusting that removing dead code is free.
+def leanFinalStrippedDefines = []
 
 // The uniform names the lean program no longer declares. Minecraft binds every
 // uniform named in the JSON, so the generated JSON must drop them; the renderer
@@ -296,46 +384,118 @@ def leanFinalRemovedUniforms = leanFinalConstants.keySet().collect {
 // capture path it normally serves remains dead.
 def leanProgramVariants = [
         // T163: FINAL no longer carries the unreachable precipitation branch.
-        [name: leanFinalShaderName,
-         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
-        // The T140 oracle family must stay bit-for-bit equivalent to FINAL, so
-        // it takes the same specialization.
-        [name: 'cloud_atmosphere_volume_t140_pixel',
-         defines: ['PA_T140_ORACLE 1', 'PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t140_mask',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_MASK 1', 'PA_PRECIPITATION_ABSENT 1'],
+        //
+        // T174 productionizes the T172 descriptor-invariant precompute.
+        // PA_ARM_DESC_PRECOMPUTE makes the march read edge width and the
+        // ownership radii out of descriptor texel 3 instead of deriving them
+        // once per descriptor per density sample. The values are written by
+        // StormLobeDescriptor.writePrecomputedInvariants when the descriptor is
+        // built, and T172 proved the substitution bit-identical at both poses -
+        // 0 changed pixels, maxAbsRGBA 0.0 - so this changes cost and nothing
+        // else. T173 measured it at 1.133x on the binding SIDE pose.
+        //
+        // The define also removes the old derivation: the two are #if/#else
+        // branches, so the recomputation is not compiled into FINAL at all
+        // rather than being left live alongside the read.
+        //
+        // T206 productionizes the T205 split. FINAL is the split cloud
+        // program: the rain family compiled out (PA_ARM_NO_RAIN_SEGMENT, the
+        // T182 define - 77 KB, 25% of the monolithic FINAL's binary) and one
+        // composite of the rain pass's texel at the rain's depth
+        // (PA_RAIN_SPLIT_COMPOSITE). Rain renders through the two production
+        // programs below it: the gate build, then the rain pass, both drawn
+        // before this program every FINAL frame. The pre-split FINAL survives
+        // as the T206 monolithic reference (t206_monolithic_ref) for quality
+        // comparison. PaRainGateField stays baked 0 here: the segment test
+        // is compiled out, so nothing in this program reads the gate.
+        [name        : leanFinalShaderName,
+         defines     : leanFinalDefines,
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t140_tile8',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 8', 'PA_PRECIPITATION_ABSENT 1'],
+        // T206. The production rain pass: main returns from a rain-only
+        // march on the cloud march's own setup (slab, scene clip, coverage
+        // pretest, strides, jitter) at the coarse stride, the segment test
+        // with the T203 gate baked on, the production shaft, sampleLighting
+        // for the radiance, integrated against the rain's own transmittance;
+        // exports rgb + one float packing T_r and t_R into the RGBA32F
+        // rain-pass target. No fine band (PA_RAIN_PASS_FINE is the T205
+        // campaign's priced bound), no mask output.
+        [name        : 'cloud_atmosphere_volume_rain_pass',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_RAIN_PASS 1'],
+         keepUniforms: [],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        // T206 (T203's build program, promoted). The rain gate field's build
+        // pass as its own program - the pass and the gate baked on, the
+        // march never reached. It receives the ray program's uniforms and
+        // samplers at draw time (copyFrameUniforms). Its own program because
+        // T203 measured the build inside the ray program at 2.5-4 ms of
+        // codegen the ray never executed.
+        [name        : 'cloud_atmosphere_volume_rain_gate_build',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: [],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 2;',
+                        'uniform int PaRainFieldPass;':
+                                'const int PaRainFieldPass = 1;']],
+        // T206. The monolithic reference: FINAL's specialization before the
+        // split - the rain family inside the march, no composite. The
+        // quality anchor the production frame is judged against and the
+        // program the T202 comparator is byte-identical to; campaign-scoped.
+        [name        : 'cloud_atmosphere_volume_t206_monolithic_ref',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: []],
+        // The T140 oracle family renders production frames and was documented
+        // as bit-for-bit equivalent to FINAL; since T206 it carries the
+        // monolithic (pre-split) FINAL specialization - the rain family in
+        // the march - because the oracle's whole-pixel rejection returns
+        // before the composite would run. It stays a historical campaign.
+        [name: 'cloud_atmosphere_volume_t140_pixel',
+         defines: ['PA_T140_ORACLE 1', 'PA_PRECIPITATION_ABSENT 1',
+                   'PA_ARM_DESC_PRECOMPUTE 1'], keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t140_mask',
+         defines     : ['PA_T140_ORACLE 1', 'PA_T140_MASK 1', 'PA_PRECIPITATION_ABSENT 1',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t140_tile8',
+         defines     : ['PA_T140_ORACLE 1', 'PA_T140_TILE 8', 'PA_PRECIPITATION_ABSENT 1',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
-        [name: 'cloud_atmosphere_volume_t140_tile16',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 16', 'PA_PRECIPITATION_ABSENT 1'],
+        [name        : 'cloud_atmosphere_volume_t140_tile16',
+         defines     : ['PA_T140_ORACLE 1', 'PA_T140_TILE 16', 'PA_PRECIPITATION_ABSENT 1',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
+        // T174 control: FINAL with the precompute explicitly off. This is the
+        // only way to A/B the productionized path against itself, and it is
+        // what proves FINAL actually consumes the precomputed fields rather
+        // than merely declaring the define.
+        [name   : 'cloud_atmosphere_volume_t174_no_precompute',
+         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
         // The pre-T163 FINAL, kept so the optimization can be measured and
         // compared against back to back rather than against a remembered number.
         [name: 'cloud_atmosphere_volume_t163_withrain', defines: [], keepUniforms: []],
         // T162 production-context attribution arms. These render the real
         // raymarch; only one cost class is compiled out of each.
-        [name: 'cloud_atmosphere_volume_t162_nolight', defines: [], keepUniforms: [],
+        [name     : 'cloud_atmosphere_volume_t162_nolight', defines: [], keepUniforms: [],
          overrides: ['uniform int PaDiagnosticLightingMode;':
-                     'const int PaDiagnosticLightingMode = 1;']],
-        [name: 'cloud_atmosphere_volume_t162_norain',
+                             'const int PaDiagnosticLightingMode = 1;']],
+        [name   : 'cloud_atmosphere_volume_t162_norain',
          defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
         // T162 fixed-work ladder. Every arm evaluates the same 64 points per
         // fragment, so the deltas between them are attributable.
-        [name: 'cloud_atmosphere_volume_t162_fw1_address',
+        [name   : 'cloud_atmosphere_volume_t162_fw1_address',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 1'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t162_fw2_candidate',
+        [name   : 'cloud_atmosphere_volume_t162_fw2_candidate',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 2'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t162_fw3_descriptor',
+        [name   : 'cloud_atmosphere_volume_t162_fw3_descriptor',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 3'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t162_fw4_shape',
+        [name   : 'cloud_atmosphere_volume_t162_fw4_shape',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 4'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t162_fw5_nodetail',
+        [name   : 'cloud_atmosphere_volume_t162_fw5_nodetail',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 5'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t162_fw6_norain',
+        [name   : 'cloud_atmosphere_volume_t162_fw6_norain',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 6'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t162_fw7_density',
+        [name   : 'cloud_atmosphere_volume_t162_fw7_density',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 7'], keepUniforms: []],
 
         // ------------------------------------------------------------------
@@ -349,21 +509,21 @@ def leanProgramVariants = [
         // ------------------------------------------------------------------
 
         // Production-context cost attribution.
-        [name: 'cloud_atmosphere_volume_t166_nolight',
-         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: [],
+        [name     : 'cloud_atmosphere_volume_t166_nolight',
+         defines  : ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: [],
          overrides: ['uniform int PaDiagnosticLightingMode;':
-                     'const int PaDiagnosticLightingMode = 1;']],
-        [name: 'cloud_atmosphere_volume_t166_nodetail',
+                             'const int PaDiagnosticLightingMode = 1;']],
+        [name   : 'cloud_atmosphere_volume_t166_nodetail',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_NO_DETAIL 1'], keepUniforms: []],
 
         // PM idea C - cheaper lighting density, one lever per arm.
-        [name: 'cloud_atmosphere_volume_t166_lightnodetail',
+        [name   : 'cloud_atmosphere_volume_t166_lightnodetail',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_NO_DETAIL 1'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_lightsteps2',
+        [name   : 'cloud_atmosphere_volume_t166_lightsteps2',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEPS 2'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_lightwide',
+        [name   : 'cloud_atmosphere_volume_t166_lightwide',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEP_WIDE 1.6'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_lightearlyout',
+        [name   : 'cloud_atmosphere_volume_t166_lightearlyout',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_EARLY_OUT 3.0'], keepUniforms: []],
         // The combined PMWeather-shaped lighting evaluator.
         [name: 'cloud_atmosphere_volume_t166_lightcheap',
@@ -372,15 +532,15 @@ def leanProgramVariants = [
                    'PA_ARM_LIGHT_EARLY_OUT 3.0'], keepUniforms: []],
 
         // PM ideas A, B, D, E, F.
-        [name: 'cloud_atmosphere_volume_t166_diststep',
+        [name   : 'cloud_atmosphere_volume_t166_diststep',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DISTANCE_STEP 1.0'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_emptyjump',
+        [name   : 'cloud_atmosphere_volume_t166_emptyjump',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_EMPTY_JUMP 4.0'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_distlod',
+        [name   : 'cloud_atmosphere_volume_t166_distlod',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DISTANCE_LOD 0.35'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_earlyterm',
+        [name   : 'cloud_atmosphere_volume_t166_earlyterm',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_EARLY_TERM 0.06'], keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_noscenelimit',
+        [name   : 'cloud_atmosphere_volume_t166_noscenelimit',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_NO_SCENE_LIMIT 1'], keepUniforms: []],
 
         // Stacking arm. The only way to measure overlap rather than assume it.
@@ -393,23 +553,23 @@ def leanProgramVariants = [
         // Post-T163 fixed-work ladder. Identical control flow to the T162
         // ladder, but with the rain branch compiled out so the rungs describe
         // the density call production actually makes today.
-        [name: 'cloud_atmosphere_volume_t166_fw1_address',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 1'],
+        [name        : 'cloud_atmosphere_volume_t166_fw1_address',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 1'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_fw2_candidate',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 2'],
+        [name        : 'cloud_atmosphere_volume_t166_fw2_candidate',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 2'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_fw3_descriptor',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 3'],
+        [name        : 'cloud_atmosphere_volume_t166_fw3_descriptor',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 3'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_fw4_shape',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 4'],
+        [name        : 'cloud_atmosphere_volume_t166_fw4_shape',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 4'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_fw5_nodetail',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 5'],
+        [name        : 'cloud_atmosphere_volume_t166_fw5_nodetail',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 5'],
          keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t166_fw6_density',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 6'],
+        [name        : 'cloud_atmosphere_volume_t166_fw6_density',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 6'],
          keepUniforms: []],
 
         // T153 empty-space oracle, re-derived on a lean program. The historical
@@ -417,24 +577,1031 @@ def leanProgramVariants = [
         // current. These keep the oracle selector, its base size and its
         // interval sampler, because the capture pass and the timed replay both
         // run on this one program exactly as the monolith runs them.
-        [name: 'cloud_atmosphere_volume_t166_oracle_empty',
-         defines: ['PA_PRECIPITATION_ABSENT 1'],
+        [name        : 'cloud_atmosphere_volume_t166_oracle_empty',
+         defines     : ['PA_PRECIPITATION_ABSENT 1'],
          keepUniforms: ['PaOraclePass', 'PaOracleBaseSize'],
          keepSamplers: ['OracleIntervalSampler'],
-         overrides: ['uniform int PaDiagnosticOptimizationMode;':
-                     'const int PaDiagnosticOptimizationMode = 4096;']],
-        [name: 'cloud_atmosphere_volume_t166_oracle_intervals',
-         defines: ['PA_PRECIPITATION_ABSENT 1'],
+         overrides   : ['uniform int PaDiagnosticOptimizationMode;':
+                                'const int PaDiagnosticOptimizationMode = 4096;']],
+        [name        : 'cloud_atmosphere_volume_t166_oracle_intervals',
+         defines     : ['PA_PRECIPITATION_ABSENT 1'],
          keepUniforms: ['PaOraclePass', 'PaOracleBaseSize'],
          keepSamplers: ['OracleIntervalSampler'],
-         overrides: ['uniform int PaDiagnosticOptimizationMode;':
-                     'const int PaDiagnosticOptimizationMode = 8192;']],
-        [name: 'cloud_atmosphere_volume_t166_oracle_combined',
-         defines: ['PA_PRECIPITATION_ABSENT 1'],
+         overrides   : ['uniform int PaDiagnosticOptimizationMode;':
+                                'const int PaDiagnosticOptimizationMode = 8192;']],
+        [name        : 'cloud_atmosphere_volume_t166_oracle_combined',
+         defines     : ['PA_PRECIPITATION_ABSENT 1'],
          keepUniforms: ['PaOraclePass', 'PaOracleBaseSize'],
          keepSamplers: ['OracleIntervalSampler'],
-         overrides: ['uniform int PaDiagnosticOptimizationMode;':
-                     'const int PaDiagnosticOptimizationMode = 28672;']]
+         overrides   : ['uniform int PaDiagnosticOptimizationMode;':
+                                'const int PaDiagnosticOptimizationMode = 28672;']],
+
+        // ------------------------------------------------------------------
+        // T167. Three independent questions, measured separately before any
+        // combination: a graded replacement for T166's over-aggressive
+        // distance step, a nearest-K cap on descriptor owners, and a safer
+        // early-termination threshold.
+        //
+        // Every arm carries PA_PRECIPITATION_ABSENT, so each is FINAL minus
+        // exactly one thing, on the same terms as the T166 set.
+        // ------------------------------------------------------------------
+
+        // Task 1. Graded exterior fine-step curves. Each keeps PaOracleBaseSize
+        // as a uniform because the footprint curve needs the live cloud-target
+        // height, and the renderer uploads it on every frame.
+        [name        : 'cloud_atmosphere_volume_t167_curve_a_late',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t167_curve_b_smooth',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 2'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t167_curve_c_capped',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 3'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t167_curve_d_footprint',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 4'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // The same footprint curve with the empty-span scan held at production
+        // spacing, to separate scan-lattice misses from coarser integration as
+        // the source of the thin-material loss.
+        [name        : 'cloud_atmosphere_volume_t167_curve_d_scanfixed',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 4',
+                        'PA_ARM_SCAN_LATTICE_FIXED 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // Task 2. Nearest-K descriptor owner cap.
+        [name   : 'cloud_atmosphere_volume_t167_k1',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 1'], keepUniforms: []],
+        [name   : 'cloud_atmosphere_volume_t167_k2',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 2'], keepUniforms: []],
+        [name   : 'cloud_atmosphere_volume_t167_k3',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 3'], keepUniforms: []],
+        [name   : 'cloud_atmosphere_volume_t167_k4',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 4'], keepUniforms: []],
+        [name   : 'cloud_atmosphere_volume_t167_k6',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 6'], keepUniforms: []],
+
+        // Task 3. Safer early-termination thresholds. Production is 0.015 and
+        // T166 measured 0.06; these fill the interval.
+        [name   : 'cloud_atmosphere_volume_t167_term030',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_EARLY_TERM 0.030'], keepUniforms: []],
+        [name   : 'cloud_atmosphere_volume_t167_term045',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_EARLY_TERM 0.045'], keepUniforms: []],
+
+        // Task 4. The combined stacks. Descriptor nearest-K is deliberately
+        // absent: it was slower than FULL at every K measured, so there is
+        // nothing to combine.
+        //
+        // BALANCED keeps the footprint curve's integration growth but holds the
+        // empty-span scan at production spacing, which is where most of the
+        // thin-material loss was traced to, and adds the safer termination
+        // floor.
+        [name        : 'cloud_atmosphere_volume_t167_stack_balanced',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 4',
+                        'PA_ARM_SCAN_LATTICE_FIXED 1', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // SAFE takes the late-ramp curve, which recovered essentially all thin
+        // material, and the same termination floor.
+        [name        : 'cloud_atmosphere_volume_t167_stack_safe',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 1',
+                        'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // ------------------------------------------------------------------
+        // T168 footprint step LOD. PA_ARM_FOOTPRINT is the target sample
+        // spacing in cloud-target pixels; the growth it implies is linear in
+        // ray distance, so the march loop pays one multiply and one clamp.
+        // PaOracleBaseSize carries the live cloud-target height the derivation
+        // needs and must survive specialization.
+        // ------------------------------------------------------------------
+        [name        : 'cloud_atmosphere_volume_t168_fp_conservative',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.35',
+                        'PA_ARM_FOOTPRINT_MAX 4.0'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t168_fp_balanced',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.50',
+                        'PA_ARM_FOOTPRINT_MAX 4.0'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t168_fp_aggressive',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // Combined stacks: a footprint curve plus the reconfirmed termination
+        // floor. Two, so the winning curve is not guessed before the run.
+        [name        : 'cloud_atmosphere_volume_t168_stack',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.35',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t168_stack_balanced',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.50',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // ------------------------------------------------------------------
+        // T169. Lighting and detail, the workload T168 pointed at: SIDE spends
+        // 14.83 light and 35.99 detail evaluations per pixel against FAR's
+        // 1.74 and 4.57.
+        //
+        // Tap reduction is deliberately conservative. The earlier global
+        // 6 -> 2 cut was fast and visibly flattened self-shadowing, so 5 and 4
+        // are measured separately instead of repeating it.
+        // ------------------------------------------------------------------
+        [name        : 'cloud_atmosphere_volume_t169_lightsteps5',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEPS 5'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t169_lightsteps4',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEPS 4'],
+         keepUniforms: []],
+        // Cone early-out at the validated transmittance floor rather than the
+        // 28.0 optical depth no exterior cone ever reaches.
+        [name        : 'cloud_atmosphere_volume_t169_lightearlyout2',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_EARLY_OUT 2.0'],
+         keepUniforms: []],
+
+        // Detail gated by projected footprint - the T168 relation applied to
+        // the detail wavelength. PaOracleBaseSize carries the live target
+        // height the derivation needs and must survive specialization.
+        [name        : 'cloud_atmosphere_volume_t169_detailfp_conservative',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DETAIL_FOOTPRINT 0.5'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t169_detailfp_balanced',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DETAIL_FOOTPRINT 1.0'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t169_detailfp_aggressive',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DETAIL_FOOTPRINT 1.5'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // Ceiling: all detail removed. Not shippable, it bounds what any
+        // detail LOD can return.
+        [name        : 'cloud_atmosphere_volume_t169_nodetail',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_NO_DETAIL 1'],
+         keepUniforms: []],
+
+        // Task 5 stacks. Both carry the T168 winners plus the lighting and
+        // detail candidates, so the combination is measured rather than
+        // multiplied out of the independent arms.
+        [name        : 'cloud_atmosphere_volume_t169_stack_safe',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.35',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 5'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t169_stack_fast',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // ------------------------------------------------------------------
+        // T170. The primary march. T169 bounded lighting at 19.5% and detail
+        // at 15.2% of SIDE cloud cost; with both removed SIDE would still cost
+        // ~14.7 ms against a 10 ms budget, so what remains is the march and
+        // the descriptor work each primary density sample pays.
+        //
+        // Task 1 - is PA_ARM_FOOTPRINT_MAX limiting SIDE? The clamp caps the
+        // step multiplier at clamp(coefficient * t, 1.0, MAX). At the SIDE
+        // pose the storm sits ~914 m out and the march runs to ~1600 m, so
+        // with P=0.75 the unclamped multiplier passes 4 at roughly t=1030 and
+        // the clamp binds over most of the traversal. The sweep measures
+        // whether releasing it keeps paying, and what it costs structurally.
+        // The projected-footprint formulation itself is unchanged; only the
+        // ceiling moves, so no arithmetic enters the inner loop.
+        // ------------------------------------------------------------------
+        // Run 2 sweeps the clamp DOWN. Run 1 showed max5/max6/max8 rendering
+        // identical images - the clamp no longer binds above ~5 - while max4,
+        // where it does bind, was 41% faster at FAR than any of them. The
+        // ceiling was never the limit; the step growth itself is.
+        [name        : 'cloud_atmosphere_volume_t170_fpmax3',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 3.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // Ceiling, not a candidate: PA_ARM_DESC_HOIST substitutes a constant
+        // edge width and so renders an invalid image. A real hoist computes
+        // the same value once per descriptor per frame and is image-identical.
+        // This measures whether the stack plus a perfect hoist reaches budget.
+        [name        : 'cloud_atmosphere_volume_t170_stack_hoist',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_HOIST 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t170_stack3',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 3.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t170_fpmax4',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t170_fpmax5',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 5.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t170_fpmax6',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 6.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t170_fpmax8',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 8.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // Tasks 2/3/4 - attribution of what a primary density sample pays per
+        // descriptor. Each arm removes exactly one stage of the group walk and
+        // keeps the iteration count and control shape intact, so the deltas
+        // are attributable and, where they overlap, comparably measured.
+        //
+        // Every one of these is visually invalid by construction. They bound
+        // cost; none is a production candidate, and the sandbox invariant
+        // keeps all of them out of FINAL.
+        [name        : 'cloud_atmosphere_volume_t170_desc_constfetch',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_CONST_FETCH 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t170_desc_constedge',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_CONST_EDGE 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t170_desc_cheapowner',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_CHEAP_OWNERSHIP 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t170_desc_nosdf',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_NO_EXACT_SDF 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t170_desc_hardunion',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_HARD_UNION 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t170_desc_hoist',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_HOIST 1'],
+         keepUniforms: []],
+
+        // Task 6 stacks. T169's stack_fast carried forward unchanged except
+        // for the clamp, so the campaign's own lever is the only difference
+        // from the banked configuration. Two, so the clamp is not guessed
+        // before the sweep reports.
+        [name        : 'cloud_atmosphere_volume_t170_stack',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 6.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // ------------------------------------------------------------------
+        // T171 program-identity controls. Exactly FINAL's defines and
+        // keepUniforms, so the generated GLSL differs from
+        // cloud_atmosphere_volume_final.fsh only in its file name. Two of them,
+        // separately linked, so "same logic, different GL program" can be
+        // separated from "same GL program, measured twice".
+        // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+        // T172. The real hoist. T170's desc_constedge and desc_hoist bounded
+        // what removing the invariant arithmetic was worth by substituting
+        // constants, which made them fast and visually wrong. These read the
+        // identical values from texel 3, where the CPU wrote them when the
+        // descriptor was built, so they must be image-equivalent as well as
+        // faster - and the campaign checks both.
+        // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+        // T173. The T121 bound. PA_ARM_BOX_BOUND forces paT141BoxBound() true
+        // at compile time, which is the only way to reach it: FINAL bakes
+        // PaDiagnosticOptimizationMode to 0, so the shipped renderer uses the
+        // vertical-only bound and the tighter one is dead code.
+        //
+        // Exact by construction - max() of two valid lower bounds is a valid
+        // lower bound - so these must render bit-identically and differ only in
+        // how many descriptors reach the exact SDF.
+        // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+        // T174 group-entry ceilings. Both carry FINAL's specialization,
+        // including the now-productionized precompute, so they differ from the
+        // shipped program only in what they do at group level.
+        //
+        // Both are visually invalid by construction and neither is a candidate.
+        // They exist to price the group-entry line before any group metadata is
+        // designed, because there is currently none to reject on.
+        // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+        // T175. Both carry FINAL's specialization, precompute included, so they
+        // differ from the shipped program only in the one thing each names.
+        // Both are visually invalid or unsafe by construction and neither is a
+        // candidate; they exist to decide between empty-space skipping and
+        // occupied-space sampling reduction before either is designed.
+        // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+        // T176 light-march ceilings, all carrying FINAL's specialization
+        // including the productionized precompute, so they differ from the
+        // shipped program only in the lighting lever each names.
+        // ------------------------------------------------------------------
+        [name        : 'cloud_atmosphere_volume_t176_nolight',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: [],
+         overrides   : ['uniform int PaDiagnosticLightingMode;':
+                                'const int PaDiagnosticLightingMode = 1;']],
+        [name        : 'cloud_atmosphere_volume_t176_light3',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_LIGHT_STEPS 3'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t176_light2',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_LIGHT_STEPS 2'],
+         keepUniforms: []],
+
+        [name        : 'cloud_atmosphere_volume_t175_density_every2',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_DENSITY_EVERY_2 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t175_clearance_first_group',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_CLEARANCE_FIRST_GROUP 1'],
+         keepUniforms: []],
+
+        [name        : 'cloud_atmosphere_volume_t174_first_group_only',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_FIRST_GROUP_ONLY 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t174_group2_no_sdf',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_GROUP2_NO_SDF 1'],
+         keepUniforms: []],
+
+        [name        : 'cloud_atmosphere_volume_t173_boxbound',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_BOX_BOUND 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t173_boxbound_pre',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_BOX_BOUND 1',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t173_stack_boxbound_pre',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_BOX_BOUND 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        [name        : 'cloud_atmosphere_volume_t172_pre_edge',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE_EDGE 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t172_pre_owner',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE_OWNER 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t172_pre_both',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: []],
+        // The validated T169 stack with the precompute added, which is the
+        // configuration that would actually ship.
+        [name        : 'cloud_atmosphere_volume_t172_stack_pre',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // T176 Task 8. The stack bakes PA_ARM_LIGHT_STEPS 4, which the
+        // inside-slab cap already forces, so the validated stack carries no
+        // light reduction at all. These price the light march ON the stack,
+        // because the brief forbids inferring stack speedups by multiplying
+        // anchor-relative ratios.
+        [name        : 'cloud_atmosphere_volume_t176_stack_nolight',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize'],
+         overrides   : ['uniform int PaDiagnosticLightingMode;':
+                                'const int PaDiagnosticLightingMode = 1;']],
+        [name        : 'cloud_atmosphere_volume_t176_stack_light3',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // T188 Task 0. The rain-only capture pair. These render the rain
+        // contribution alone - optical mass, onset and termination height, and
+        // the run count that exposes a broken shaft - instead of the composited
+        // frame, because rain and cloud cannot be separated after compositing.
+        //
+        // Diagnostic and temporary: they exist to gate the field on rain
+        // quality and should be removed with the campaign. The mask output is
+        // behind a define rather than a DebugView because every lean program
+        // bakes DebugView to 0, so a runtime view could only ever be rendered
+        // by the monolith - and the arms are exactly what has to be measured.
+        [name        : 'cloud_atmosphere_volume_t188_rain_mask_ref',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t188_rain_mask_field',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                        'PA_ARM_RAIN_OWN_BILINEAR 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+
+        // T194. Pricing only: no field is built and nothing is wired into the
+        // renderer. The combined ceiling measures how much GPU time light and
+        // probe descriptor traversal cost together - which is the whole budget
+        // available to pay for a field - and the slice arms price what
+        // generating a volume of that size would cost.
+        // Light is removed the way T176 removes it - by baking
+        // PaDiagnosticLightingMode to the constant-lighting arm - because there
+        // is no PA_ARM_NO_LIGHT define; the probe is removed by its own define.
+        // Composing the two exactly as their single-consumer arms do is what
+        // makes this ceiling comparable to T193's.
+        [name        : 'cloud_atmosphere_volume_t194_noboth',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_PROBE 1'],
+         keepUniforms: [],
+         overrides   : ['uniform int PaDiagnosticLightingMode;':
+                                'const int PaDiagnosticLightingMode = 1;']],
+        [name        : 'cloud_atmosphere_volume_t194_slices16',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_FIELD_SLICES 16'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+        [name        : 'cloud_atmosphere_volume_t194_slices32',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_FIELD_SLICES 32'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+        [name        : 'cloud_atmosphere_volume_t194_slices64',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_FIELD_SLICES 64'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+
+        // T195. The lookup side of the shared field, priced without building
+        // one. Light and probe descriptor traversal are removed exactly as
+        // t194_noboth removes them, and each consumer then pays one trilinear
+        // fetch from a stand-in 8 MB volume per density it would have
+        // computed - the light fetch feeding the production scatter chain,
+        // the probe fetches on the scan lattice, 13 per scan event, which is
+        // at or above production's measured 11.3-12.5. PaDiagnosticEvalEpsilon
+        // stays a uniform so the probe fetches cannot be folded away: it is
+        // uploaded as exactly zero and multiplies the fetch sink into the
+        // march advance.
+        [name: 'cloud_atmosphere_volume_t195_lookup',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_NO_PROBE 1', 'PA_ARM_FIELD_LOOKUP 13'],
+         keepUniforms: ['PaDiagnosticEvalEpsilon']],
+
+        // T196. The shared 3D storm field, built. PaStormFieldPass stays live
+        // so the renderer can run the build pass and then render with the
+        // same program; which consumers read the field is baked per arm, so
+        // the timed march carries no runtime branch on it. Every arm builds:
+        // generate_only prices the build alone, the other three add one or
+        // both lookups, and both is the production candidate.
+        // T197 kept PaStormFieldXZ live here to sweep 384 and 512; T199
+        // retired the sweep, so the grid is the baked 256 everywhere and the
+        // hybrid arm (bit 4, superseded by T198's bit 8) is gone.
+        [name: 'cloud_atmosphere_volume_t196_generate_only',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 0;']],
+        [name: 'cloud_atmosphere_volume_t196_field_light',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 1;']],
+        [name: 'cloud_atmosphere_volume_t196_field_probe',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 2;']],
+        [name: 'cloud_atmosphere_volume_t196_field_both',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 3;']],
+        // T198. The light-tap audit: t196_field_light's march with the exact
+        // density evaluated beside every field tap and an accumulator of the
+        // difference as the fragment output. One program; the variant and
+        // the output are uniforms selected per capture.
+        [name: 'cloud_atmosphere_volume_t198_light_audit',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_LIGHT_AUDIT 1'],
+         // The consumer bits stay live too, so one audit program measures
+         // both the T196 lookup (1) and the T198 exact-noise lookup (9).
+         keepUniforms: ['PaStormFieldPass', 'PaStormFieldEnabled',
+                        'PaLightAuditVariant', 'PaLightAuditOutput']],
+        // T198 Task 4. The correction: the field carries the descriptor
+        // traversal (threshold and height per node) and the tap evaluates
+        // the base noise, the detail and the erosion itself. Light alone for
+        // the pocket metric, both consumers as the production candidate.
+        [name: 'cloud_atmosphere_volume_t198_field_light_exact',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 9;']],
+        [name: 'cloud_atmosphere_volume_t198_field_both_exact',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 11;']],
+
+        // T199. The pre-field FINAL: the lean specialization with the field's
+        // consumers off and no build pass. Now that FINAL itself carries the
+        // field, this is the reference every FINAL-with-field number is
+        // measured against - the image and pocket anchor and the timing
+        // anchor of the T199 matrix.
+        [name: 'cloud_atmosphere_volume_t199_final_nofield',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: [],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaStormFieldPass;':
+                     'const int PaStormFieldPass = 0;']],
+
+        // T201. Time attribution of the field FINAL at 0.25: each arm is
+        // FINAL's specialization (the field built and read, bits 11) with one
+        // non-rain consumer compiled out, so its delta against the FINAL
+        // anchor is that consumer in milliseconds. t176_nolight,
+        // t181_norefine, t180_noprobe and t175_density_every2 already carry
+        // the same specialization and are reused; these four are the ones no
+        // existing arm removes cleanly (t166_nodetail predates the T174
+        // precompute and is not comparable).
+        [name: 'cloud_atmosphere_volume_t201_nodetail',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_NO_DETAIL 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t201_primary_field',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_PRIMARY_FIELD_DENSITY 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t201_norain_shaft',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_NO_RAIN_SHAFT 1'],
+         keepUniforms: []],
+        // The two expected largest together, measured rather than multiplied.
+        [name: 'cloud_atmosphere_volume_t201_primary_norefine',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_PRIMARY_FIELD_DENSITY 1', 'PA_ARM_NO_REFINE 1'],
+         keepUniforms: []],
+
+        // T202. The body consumers on the field. Each is FINAL's
+        // specialization with the light and probe bits (11) plus 16 (the
+        // primary body density from the field's threshold and height, noise
+        // and detail exact at the sample) and/or 32 (the refinement's
+        // clearance from the node floor in A); the bits are baked explicitly
+        // so the arms keep their meaning whatever production bakes. The
+        // audit program is the primary arm with the exact density evaluated
+        // beside the field's at every primary sample; its output selector
+        // stays live.
+        [name: 'cloud_atmosphere_volume_t202_primary_field',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 27;']],
+        [name: 'cloud_atmosphere_volume_t202_refine_field',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 43;']],
+        [name: 'cloud_atmosphere_volume_t202_both_field',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 59;']],
+        [name: 'cloud_atmosphere_volume_t202_primary_audit',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_PRIMARY_AUDIT 1'],
+         keepUniforms: ['PaStormFieldPass', 'PaLightAuditOutput'],
+         overrides: ['uniform int PaStormFieldEnabled;':
+                     'const int PaStormFieldEnabled = 27;']],
+        // The representation oracle: the primary body from the union
+        // distance, softness, strength and height interpolated over the
+        // eight nodes of the dual cell (eight build-mode walks a sample), on
+        // FINAL's bits - a quality arm, never timed - and its audit.
+        [name: 'cloud_atmosphere_volume_t202_dinterp_oracle',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_PRIMARY_DINTERP 1'],
+         keepUniforms: ['PaStormFieldPass']],
+        [name: 'cloud_atmosphere_volume_t202_dinterp_audit',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_PRIMARY_DINTERP 1', 'PA_PRIMARY_AUDIT 1'],
+         keepUniforms: ['PaStormFieldPass', 'PaLightAuditOutput']],
+
+        // T203. The rain gate field. FINAL's specialization (bits 43
+        // inherited) with the gate baked on: the build pass under
+        // PaRainFieldPass writes per-cell dry proofs and attach bounds, and
+        // the segment test rejects by them or defers to its exact path. The
+        // generate-only arm builds and never reads (2), pricing the build;
+        // the mask arm is the rain-only capture against t188_rain_mask_ref.
+        // The ray programs bake the rain-field pass OFF, so the gate build
+        // branch folds out of them: the first run kept it live and the ray
+        // paid 2.5-4 ms for code it never executed. The build is its own
+        // program below, the pass baked on.
+        [name        : 'cloud_atmosphere_volume_t203_rain_gate',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        // Bakes 2: the gate off in the segment test, so the ray is FINAL's
+        // and the renderer still draws the build - the build's frame cost.
+        [name        : 'cloud_atmosphere_volume_t203_gate_generate_only',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 2;']],
+        [name        : 'cloud_atmosphere_volume_t203_rain_mask_gate',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        // Run 3: the residual above the gate, decomposed. Each is the gate
+        // program with one bound define; all image-invalid.
+        [name        : 'cloud_atmosphere_volume_t203_gate_reject_all',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_GATE_REJECT_ALL 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        [name        : 'cloud_atmosphere_volume_t203_gate_no_fallback',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_GATE_NO_FALLBACK 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        [name        : 'cloud_atmosphere_volume_t203_gate_no_shaft',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_RAIN_SHAFT 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        // T204. The shaft path's attribution. FINAL's specialization with one
+        // shaft chunk removed or gated; the runtime-false arm keeps
+        // PaDiagnosticEvalEpsilon live (uploaded 0) so the compiler cannot
+        // fold the call away. The skeleton arms are the T203 reject-all gate
+        // program with the shaft compiled out or runtime-false.
+        [name        : 'cloud_atmosphere_volume_t204_shaft_runtime_false',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_SHAFT_RUNTIME_FALSE 1'],
+         keepUniforms: ['PaDiagnosticEvalEpsilon']],
+        [name        : 'cloud_atmosphere_volume_t204_shaft_no_walk',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_SHAFT_NO_WALK 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t204_shaft_no_noise',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_SHAFT_NO_NOISE 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t204_shaft_walk_only',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_SHAFT_WALK_ONLY 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t204_skeleton_shaft_out',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_GATE_REJECT_ALL 1', 'PA_ARM_NO_RAIN_SHAFT 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        [name        : 'cloud_atmosphere_volume_t204_skeleton_runtime_false',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_GATE_REJECT_ALL 1', 'PA_ARM_SHAFT_RUNTIME_FALSE 1'],
+         keepUniforms: ['PaStormFieldPass', 'PaDiagnosticEvalEpsilon'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        // T205. Rain as a separate pass. The split cloud program was FINAL's
+        // specialization with the rain family compiled out (T182's define)
+        // and the composite of the rain pass's result; the rain pass program
+        // returns from its own march before the cloud march, with the T203
+        // gate baked on. T206 made that pair the production FINAL and the
+        // rain_pass program above, and retired the campaign copies
+        // (t205_cloud_split, t205_rain_pass) as redundant. What stays is
+        // campaign-scoped: the mask pair renders the T188 rain mask through
+        // the production split, on the mask reference's own defines; the
+        // fine-band pair is the priced bound.
+        [name        : 'cloud_atmosphere_volume_t205_cloud_split_mask',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                        'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_RAIN_SPLIT_COMPOSITE 1'],
+         keepUniforms: ['PaStormFieldPass']],
+        [name        : 'cloud_atmosphere_volume_t205_rain_pass_mask',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                        'PA_RAIN_PASS 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        // The fine-band pair: the split cloud unchanged under a second name
+        // (the renderer pairs cloud and rain programs by name), the rain
+        // pass with the fine stride in the attach band.
+        [name        : 'cloud_atmosphere_volume_t205_cloud_split_fine',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_RAIN_SPLIT_COMPOSITE 1'],
+         keepUniforms: ['PaStormFieldPass']],
+        [name        : 'cloud_atmosphere_volume_t205_cloud_split_fine_mask',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                        'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_RAIN_SPLIT_COMPOSITE 1'],
+         keepUniforms: ['PaStormFieldPass']],
+        [name        : 'cloud_atmosphere_volume_t205_rain_pass_fine',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_RAIN_PASS 1', 'PA_RAIN_PASS_FINE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        [name        : 'cloud_atmosphere_volume_t205_rain_pass_fine_mask',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                        'PA_RAIN_PASS 1', 'PA_RAIN_PASS_FINE 1'],
+         keepUniforms: ['PaStormFieldPass'],
+         overrides   : ['uniform int PaRainGateField;':
+                                'const int PaRainGateField = 1;']],
+        // The gate build program (t203_gate_build) is production since T206:
+        // cloud_atmosphere_volume_rain_gate_build, beside FINAL above.
+
+        // T192. The closed-form ownership bound as classification triage.
+        // Three arms only, and the campaign-scoped loading T191 added means
+        // they cost nothing on an ordinary startup.
+        [name        : 'cloud_atmosphere_volume_t192_field_bound',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled',
+                        'PaRainFieldConservative', 'PaRainFieldClosedForm']],
+        [name        : 'cloud_atmosphere_volume_t192_stack_bound',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize', 'PaRainFieldPass',
+                        'PaRainFieldEnabled', 'PaRainFieldConservative',
+                        'PaRainFieldClosedForm']],
+        [name        : 'cloud_atmosphere_volume_t192_rain_mask_bound',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled',
+                        'PaRainFieldConservative', 'PaRainFieldClosedForm']],
+
+        // T190. The conservative field: the build marks every cell whose
+        // rain-existence decision it cannot prove uniform across the cell, and
+        // those cells are answered by the exact evaluation instead. Three arms
+        // only - the field, its stack, and the rain-only capture - because the
+        // variant count is already near the level that failed a shader load.
+        [name        : 'cloud_atmosphere_volume_t190_field_safe',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled',
+                        'PaRainFieldConservative']],
+        [name        : 'cloud_atmosphere_volume_t190_stack_safe',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize', 'PaRainFieldPass',
+                        'PaRainFieldEnabled', 'PaRainFieldConservative']],
+        [name        : 'cloud_atmosphere_volume_t190_rain_mask_safe',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled',
+                        'PaRainFieldConservative']],
+
+        // T189. Ownership fetched discretely with texelFetch while support and
+        // attach height keep their filtering. This is the candidate; the two
+        // T188 arms above are the same field with the bilinear ownership that
+        // produced 10.6-15.6% false rain, kept so the fix has a baseline.
+        [name        : 'cloud_atmosphere_volume_t189_field_nearest',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+        [name        : 'cloud_atmosphere_volume_t189_stack_nearest',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize', 'PaRainFieldPass',
+                        'PaRainFieldEnabled']],
+        [name        : 'cloud_atmosphere_volume_t189_rain_mask_nearest',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+        // Task 5 diagnostic: the erosion side of the same trade, so dilation
+        // and erosion are priced against each other rather than one being
+        // assumed worse. Never a production candidate - a threshold is a tuning
+        // knob standing in for a type error.
+        [name        : 'cloud_atmosphere_volume_t189_rain_mask_strict',
+         defines     : ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                        'PA_ARM_RAIN_OWN_STRICT 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+
+        // T188. The REAL rain-support field. The generation pass and the
+        // lookup are the same program, so both uniforms stay live; the field
+        // itself is written by the untimed generation draw the renderer issues
+        // before the march, exactly as T153's ground-truth pass does.
+        //
+        // Both are campaign variants, not production programs: FINAL bakes
+        // PaRainFieldPass and PaRainFieldEnabled to 0 and is unchanged.
+        [name        : 'cloud_atmosphere_volume_t188_field_real',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_OWN_BILINEAR 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+        // The exactness arm. It generates the field and still marches the exact
+        // descriptor path, so one frame carries both the ground truth and the
+        // field that has to reproduce it.
+        [name        : 'cloud_atmosphere_volume_t188_field_generate_only',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaRainFieldPass']],
+        [name        : 'cloud_atmosphere_volume_t188_stack_field',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize', 'PaRainFieldPass',
+                        'PaRainFieldEnabled']],
+
+        // T187. The rain-field architectural ceiling: the descriptor traversal
+        // inside localRainSupportAt becomes free, which is the most any
+        // precomputed field could achieve since a real lookup costs more than
+        // nothing. Image-invalid by construction; a bound, not a candidate.
+        [name        : 'cloud_atmosphere_volume_t187_field_oracle',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_FIELD_ORACLE 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t187_stack_field',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_FIELD_ORACLE 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // T186. One rain-support sample per coarse segment instead of two.
+        // The rule is an existence test, so dropping a sample can only turn
+        // true into false - it can miss rain, never invent it. The midpoint is
+        // the least biased single probe; the two Gauss nodes bound the bias
+        // either way.
+        [name        : 'cloud_atmosphere_volume_t186_one_mid',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_ONE_MID 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t186_one_a',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_ONE_A 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t186_one_b',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_ONE_B 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t186_stack_one_mid',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_ONE_MID 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // T185. The rain ownership prune. The shipped envelope stacks three
+        // conservative steps - ellipse to square, squares to AABB, AABB to
+        // circumcircle - and the tight arm removes the last two while keeping
+        // the same guarantee. The exact arm bounds what any geometric prune
+        // could return.
+        [name        : 'cloud_atmosphere_volume_t185_tight_prune',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_TIGHT_PRUNE 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t185_exact_prune',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_EXACT_PRUNE 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t185_stack_tight',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_TIGHT_PRUNE 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // T184. A one-entry cache on localRainSupportAt keyed on exact XZ
+        // equality. Exact by construction: the function is a pure function of
+        // worldXZ within a frame, so an identical XZ must yield an identical
+        // result. Rain rendering is untouched.
+        [name        : 'cloud_atmosphere_volume_t184_reuse_exact',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_RAIN_REUSE_EXACT 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t184_stack_reuse',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_REUSE_EXACT 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // T182. The rain-segment reachability test runs on every coarse step
+        // and, past its MaxPrecipitation gate, performs two full storm
+        // traversals. Removing it uniformly prices the class the T180/T181
+        // residual was hiding in.
+        [name        : 'cloud_atmosphere_volume_t182_norainseg',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_RAIN_SEGMENT 1'],
+         keepUniforms: []],
+        // Task 8: the best measured probe cap, composed with the stack.
+        [name        : 'cloud_atmosphere_volume_t182_stack_probe4',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_CAP 4'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t182_stack_probe4_norainseg',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_CAP 4',
+                        'PA_ARM_NO_RAIN_SEGMENT 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // T181. Uniform compile-time caps on the empty-span scan. The loop
+        // already exits on material or span end, so these only bind on scans
+        // that would have run longer - which is the thing being measured.
+        [name        : 'cloud_atmosphere_volume_t181_probe8',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_PROBE_CAP 8'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t181_probe4',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_PROBE_CAP 4'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t181_probe2',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_PROBE_CAP 2'],
+         keepUniforms: []],
+        // Mandatory: the refinement is 32% of group walks and has never been
+        // priced. Removing it leaves no clearance to advance on.
+        [name        : 'cloud_atmosphere_volume_t181_norefine',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_REFINE 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t181_stack_probe8',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_CAP 8'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // T180. The empty-span probe scan and the bracket bisection are the
+        // two production consumers T175's "48%" was actually made of. Both ask
+        // only whether density exceeds 0.0008, and both are removed here
+        // uniformly at compile time - the shape T179 showed is the only one that
+        // pays - to bound what each class is worth.
+        [name        : 'cloud_atmosphere_volume_t180_noprobe',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_PROBE 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t180_nobracket',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_NO_BRACKET 1'],
+         keepUniforms: []],
+        // The cheaper-query candidate: probes keep running but drop the
+        // subtractive detail erosion, which can only raise the value they test
+        // and so can never let the scan advance over material.
+        [name        : 'cloud_atmosphere_volume_t180_probe_nodetail',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_PROBE_NO_DETAIL 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t180_stack_probe',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_NO_DETAIL 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // T179. Dominance pruning. The rejection threshold drops from the
+        // global blend cap (48 blocks) to the exact blend radius the ordered
+        // union will use for this pair, which is what stormSmoothMinimum's
+        // h == 1 condition actually requires. No new payload, no division, no
+        // ranking - the blend is hoisted from the union below and reused.
+        [name        : 'cloud_atmosphere_volume_t179_dom_exact',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_DOMINANCE_EXACT 1'],
+         keepUniforms: []],
+        // The family ceiling: no blend margin at all. Rejects lobes that do move
+        // the union through the blend band, so it is image-invalid by
+        // construction and bounds the idea rather than implementing it.
+        [name        : 'cloud_atmosphere_volume_t179_dom_aggressive',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_DOMINANCE_AGGRESSIVE 1'],
+         keepUniforms: []],
+        // Task 9's fresh stack: the validated components, no light3.
+        [name        : 'cloud_atmosphere_volume_t179_stack_dom',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_DOMINANCE_EXACT 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // T177. Hard primary-to-light group reuse, alone and on the stack.
+        [name        : 'cloud_atmosphere_volume_t177_reuse_hard',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                        'PA_ARM_LIGHT_REUSE_HARD 1'],
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t177_stack_reuse_hard',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
+                        'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_LIGHT_REUSE_HARD 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name        : 'cloud_atmosphere_volume_t176_stack_light2',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 2',
+                        'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // These must track FINAL's specialization exactly - including the
+        // T174-productionized precompute - or they stop isolating program
+        // identity and start measuring a shader difference instead. The T171
+        // invariant asserts byte-identity and caught this the moment FINAL
+        // changed.
+        //
+        // T206: FINAL is the split cloud program, so the duplicates take
+        // leanFinalDefines and the renderer draws the rain pass for them
+        // (CoreCostDiagnosticProgram.rainSplitCloud).
+        [name        : 'cloud_atmosphere_volume_t171_dup_a',
+         defines     : leanFinalDefines,
+         keepUniforms: []],
+        [name        : 'cloud_atmosphere_volume_t171_dup_b',
+         defines     : leanFinalDefines,
+         keepUniforms: []],
+
+        [name        : 'cloud_atmosphere_volume_t170_stack8',
+         defines     : ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                        'PA_ARM_FOOTPRINT_MAX 8.0', 'PA_ARM_EARLY_TERM 0.045',
+                        'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
+         keepUniforms: ['PaOracleBaseSize']]
 ]
 
 tasks.register('generateLeanFinalShader') {
@@ -443,6 +1610,7 @@ tasks.register('generateLeanFinalShader') {
     inputs.property('leanConstants', leanFinalConstants.toString())
     inputs.property('leanProgramName', leanFinalShaderName)
     inputs.property('leanRemovedSamplers', leanFinalRemovedSamplers.toString())
+    inputs.property('leanStrippedDefines', leanFinalStrippedDefines.toString())
     inputs.property('leanVariants', leanProgramVariants.toString())
     outputs.dir(leanFinalGeneratedResources)
     doLast {
@@ -450,6 +1618,14 @@ tasks.register('generateLeanFinalShader') {
                 leanFinalGeneratedResources.get().asFile,
                 'assets/projectatmosphere/shaders/core')
         shaderDirectory.mkdirs()
+        // T206. A retired variant's stale output would otherwise stay in the
+        // generated tree and ship in the jar; the directory holds nothing
+        // but this task's outputs, so it is emptied before regeneration.
+        shaderDirectory.listFiles().each { File stale ->
+            if (stale.name.startsWith('cloud_atmosphere_volume_')) {
+                stale.delete()
+            }
+        }
 
         String productionSource = leanFinalShaderSource.getText('UTF-8')
         def productionJson = new groovy.json.JsonSlurper().parse(leanFinalShaderJson, 'UTF-8')
@@ -489,6 +1665,25 @@ tasks.register('generateLeanFinalShader') {
                 baked.add(uniformName)
             }
 
+            // T199. Monolith-only defines come out of every lean program; a
+            // host puts its own back through `defines` below. A definition
+            // that has moved or been renamed must fail the build for the
+            // same reason a missed uniform does: the measurement would
+            // silently ship inside FINAL.
+            leanFinalStrippedDefines.each { String defineName ->
+                String definition = '#define ' + defineName + ' 1'
+                if (!variantSource.contains(definition)) {
+                    throw new GradleException(
+                            'Lean specialization could not find ' + definition
+                                    + ' in cloud_atmosphere_volume.fsh. Update'
+                                    + ' leanFinalStrippedDefines in build.gradle and'
+                                    + ' the shader together.')
+                }
+                variantSource = variantSource.replace(definition,
+                        '// ' + defineName + ' is monolith-only; a lean host re-defines'
+                                + ' it in build.gradle')
+            }
+
             if (!variant.defines.isEmpty()) {
                 // The defines must precede every use, and #version must stay
                 // the first line of the program.
@@ -509,8 +1704,8 @@ tasks.register('generateLeanFinalShader') {
                             + '// Dormant diagnostic selectors are constants here, so the driver\n'
                             + '// eliminates those paths before allocating registers.\n'
                             + (variant.defines.isEmpty()
-                                ? ''
-                                : '// Variant defines: ' + variant.defines.join(', ') + '\n')
+                            ? ''
+                            : '// Variant defines: ' + variant.defines.join(', ') + '\n')
                             + variantSource,
                     'UTF-8')
 
@@ -525,6 +1720,59 @@ tasks.register('generateLeanFinalShader') {
                     ? [] : variant.keepSamplers
             variantJson.samplers = variantJson.samplers.findAll {
                 keptSamplers.contains(it.name) || !leanFinalRemovedSamplers.contains(it.name)
+            }
+            // T206. The JSON must match the GLSL it binds. Minecraft resolves
+            // every uniform and sampler the JSON names at link; a name the
+            // generated program no longer declares is a "could not find
+            // uniform" warning under vanilla and a startup crash under
+            // Oculus, and a declared live uniform the JSON does not name is
+            // one safeGetUniform().set() silently drops (the T203 lesson).
+            // Both directions are checked for every generated program, so a
+            // bake or a strip that drifts from the JSON fails the build here
+            // rather than in a player's log.
+            java.util.regex.Matcher declared = java.util.regex.Pattern
+                    .compile(/(?m)^uniform\s+(\w+)\s+(\w+)\s*;/).matcher(variantSource)
+            Map<String, String> glslUniforms = new LinkedHashMap<>()
+            while (declared.find()) {
+                glslUniforms.put(declared.group(2), declared.group(1))
+            }
+            List<String> mismatches = []
+            variantJson.uniforms.each { uniform ->
+                String type = glslUniforms.get(uniform.name)
+                if (type == null) {
+                    mismatches.add('JSON uniform ' + uniform.name + ' is not declared in the GLSL')
+                } else if (type.startsWith('sampler')) {
+                    mismatches.add('JSON uniform ' + uniform.name + ' is a sampler in the GLSL')
+                }
+            }
+            variantJson.samplers.each { sampler ->
+                String type = glslUniforms.get(sampler.name)
+                if (type == null || !type.startsWith('sampler')) {
+                    mismatches.add('JSON sampler ' + sampler.name + ' is not a sampler in the GLSL')
+                }
+            }
+            // Manually bound samplers (units 12+) must not be JSON samplers:
+            // Minecraft tracks twelve and a thirteenth throws in apply().
+            Set<String> jsonSamplerNames = variantJson.samplers.collect { it.name } as Set
+            Set<String> jsonUniformNames = variantJson.uniforms.collect { it.name } as Set
+            glslUniforms.each { String name, String type ->
+                if (type.startsWith('sampler') && jsonSamplerNames.contains(name)
+                        && jsonSamplerNames.size() > 12) {
+                    mismatches.add('JSON names more than twelve samplers (' + name + ')')
+                }
+                if (!type.startsWith('sampler') && !jsonUniformNames.contains(name)
+                        && !name.startsWith('gl_')) {
+                    // A live uniform the JSON does not name cannot be set from
+                    // Java. Only the vanilla-managed pair is exempt: they are
+                    // written by VertexBuffer.drawWithShader, not by name.
+                    if (name != 'ProjMat' && name != 'ModelViewMat') {
+                        mismatches.add('GLSL uniform ' + name + ' is live but not in the JSON')
+                    }
+                }
+            }
+            if (!mismatches.isEmpty()) {
+                throw new GradleException('Shader JSON does not match the generated GLSL for '
+                        + programName + ': ' + mismatches.join('; '))
             }
             new File(shaderDirectory, programName + '.json').setText(
                     groovy.json.JsonOutput.prettyPrint(
@@ -552,6 +1800,16 @@ tasks.named('processResources', ProcessResources).configure {
             mod_description        : mod_description,
             mod_logo_file          : logo_file,
             mod_mixins             : mod_mixins,
+            // T196. Simple Clouds is mandatory for the release (0.9.3.1) but
+            // is compileOnly in the dev runtime unless runSimpleClouds is
+            // used, and FML rejects a mod whose mandatory dependency is
+            // missing before its mixin config can be read. A campaign launch
+            // passes -PsimpleCloudsMandatory=false so the dev client boots as
+            // every campaign since T166 has, without Simple Clouds; the
+            // shipped jar keeps the release value.
+            simpleclouds_mandatory : project.hasProperty('simpleCloudsMandatory')
+                    ? project.property('simpleCloudsMandatory').toString()
+                    : 'true',
     ]
     inputs.properties replaceProps
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
@@ -636,6 +1894,9 @@ tasks.register('stormVolumetricGeometrySandbox', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormVolumetricGeometrySandbox'
     workingDir = project.rootDir
+    // T195. The fourteen T098 report sections assert nothing and cost most of
+    // the sandbox's three minutes; they run only when asked for.
+    systemProperty 'sandbox.t098Reports', project.hasProperty('t098Reports') ? 'true' : 'false'
 }
 
 tasks.register('stormT160UpperEnvelopeSandbox', JavaExec) {
@@ -752,6 +2013,26 @@ tasks.named('check').configure {
     dependsOn 'stormVolumetricGeometrySandbox'
 }
 
+// T195. The gate a diagnostic-campaign commit needs: the code compiles, every
+// generated variant exists, and the storm renderer invariants hold - the
+// campaign wiring, the variant scope, the counter guards, the workload views,
+// and every arm compiling and staying out of FINAL. The morphology and
+// topology sandboxes, the unit tests and the jar/reobf packaging say nothing
+// about a campaign and stay on `check build`, which remains the gate before a
+// merge.
+tasks.register('campaignGate') {
+    group = 'project atmosphere'
+    description = 'Fast gate for diagnostic-campaign changes: compile, generated shader variants, storm renderer invariants.'
+    dependsOn 'compileJava', 'compileTestJava', 'generateLeanFinalShader',
+            'architectureBoundaryCheck', 'stormVolumetricGeometrySandbox'
+}
+
+// Release assembly is intentionally separate from the long-running validation campaign.
+// Invoke `check` explicitly when shader and cloud sandboxes are wanted.
+tasks.named('build').configure {
+    setDependsOn([tasks.named('assemble')])
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.compilerArgs += [
@@ -817,25 +2098,40 @@ if (modrinthToken) {
     tasks.matching { it.name.toLowerCase().contains("modrinth") }.configureEach { enabled = false }
 }
 def curseForgeToken = System.getenv("CURSEFORGE_TOKEN")?.trim()
-if (curseForgeToken) {
-    curseforge {
-        apiKey = curseForgeToken
+def hasCurseForgeToken = curseForgeToken != null && !curseForgeToken.isEmpty()
 
-        project {
-            id = "1258344"
-            changelog = rootProject.file("PAchangelog.md")
-            releaseType = "release" // options: alpha, beta, release
-            addGameVersion "1.20.1"
-            addGameVersion "Forge"
-            mainArtifact(releaseJarFile.get().asFile) {
-                displayName = "Forge-${version}"
-            }
+if (hasCurseForgeToken) {
+    publisher {
+        apiKeys {
+            curseforge curseForgeToken
         }
+
+        setCurseID("1258344")
+        setVersionType("release")
+        setChangelog(rootProject.file("PAchangelog.md"))
+        setDisplayName("Forge-${project.version}")
+        setGameVersions("1.20.1")
+        setLoaders("forge")
+        setCurseEnvironment("both")
+        getJavaVersions().set([JavaVersion.VERSION_17])
+
+        setArtifact(releaseJarFile.get().asFile)
+
+        setDebug(
+                providers.gradleProperty("publisherDebug")
+                        .map { it.toBoolean() }
+                        .orElse(false)
+                        .get()
+        )
     }
 } else {
     logger.lifecycle("CURSEFORGE_TOKEN not set; CurseForge upload tasks will be disabled.")
-    tasks.matching { it.name.toLowerCase().contains("curseforge") }.configureEach { enabled = false }
+
+    tasks.named("publishCurseforge").configure {
+        enabled = false
+    }
 }
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
@@ -863,6 +2159,11 @@ publishing {
 
 if (!hasGithubPackagesCredentials) {
     logger.lifecycle("GitHub package credentials not set; skipping private GitHub Maven repositories.")
+}
+tasks.register('runSimpleClouds') {
+    group = 'project atmosphere'
+    description = 'Runs the Minecraft client with Simple Clouds and its required runtime dependencies.'
+    dependsOn tasks.named('runClient')
 }
 
 

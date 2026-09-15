@@ -1555,6 +1555,2001 @@ implementation, while visual polish remains independently active.
   (`ratio=3.0885 verdict=DRIFTED`). Primary run: 84 cells, **0 rejected**, all three drift
   controls stable, 18 image comparisons. FINAL is textually untouched - the shader diff is 129
   insertions and 0 deletions. Evidence in `validation/performance-pmweather-evaluation.md`.
+- [X] T167 [PERFORMANCE] [US3] Refine the two arms T166 left open and take the cheap win it
+  identified: graded replacements for the over-aggressive distance step, a nearest-K cap on
+  per-sample descriptor owners, and a safer early-termination threshold. Measure all three
+  independently before combining anything, and combine only what passes. Build every arm as a
+  compile-time program carrying `PA_PRECIPITATION_ABSENT`, keep the march conservative under the
+  K cap by having skipped descriptors still feed `groupMinClearance`, and report image quality -
+  not only timing - for every arm, because the descriptor question cannot be decided on speed.
+  Productionize nothing; assert the arms stay out of FINAL in a build gate. Record in
+  `specs/001-native-storm-rendering/validation/performance-descriptor-and-step-refinement.md`
+  (depends on T166, T163, T162, T121) [FR-010-FR-012, FR-027, FR-030; SC-006-SC-007, SC-021]
+  **[BANKED 2026-09-04, branch `experiment/cloud-descriptor-k`, not merged]**
+  **Descriptor nearest-K is REJECTED - CASE D.** No K is faster than evaluating every owner at
+  any pose: K1 1.005x/0.892x/0.940x, K2 0.936/0.870/0.916, K3 0.916/0.844/0.877, K4
+  0.851/0.809/0.818, K6 0.716/0.719/0.762 (FAR/SIDE/PVN). The ordering runs the wrong way -
+  **K6 is the slowest arm in the campaign and also the closest to FULL on every quality metric**,
+  which is the signature of pure overhead. Quality fails independently: the new seam index,
+  added specifically to catch collapse of the ordered smooth union, rises monotonically as owners
+  are dropped and reaches **0.0379 at K1/FAR against 0.0023 for the aggressive step arm**, with
+  cloud SSIM 0.653 and thin retention 0.403 - exactly the failure `directStormGroupField` already
+  documents. **The mechanism corrects a reading of T166**: production already applies the exact
+  lobe SDF to 88.1% of visited lobes at SIDE (T121 rejects only 21.8%), so K1 skipped ~86% of all
+  exact SDF evaluations and was still 8-11% slower. **The ladder's 48.6% "shape/profile/SDF/union"
+  class is per-descriptor traversal - four texel fetches, role decode, ownership ellipse, edge
+  softness, conservative bound - not the SDF equation.** A cap inside the loop cannot reach it.
+  **Do not build nearest-K binning**; the only version still open is one that reduces which
+  descriptors a sample *iterates*, upstream in the candidate map. **Graded curves: PARTIAL
+  SUCCESS.** Curve A (late ramp) recovers thin retention from the aggressive arm's 0.712-0.867 to
+  **0.931-0.969** at silhouette IoU 0.998-0.999 and the lowest seam index measured, for
+  1.055x-1.477x. **Curve D (footprint) is rejected as degenerate**: its unity-pixel constant makes
+  it saturate before the storm begins, so it renders the same picture as the aggressive arm -
+  metrics agree to the third decimal, exactly at PLAY_VIS_NEAR - while costing **+26.9% at FAR**,
+  which measures one extra division in the march loop at up to a quarter of the frame. **The
+  curves are pose-dependent because `t / MaxRenderDistance` couples them to the render distance
+  rather than the material**; a pose-invariant curve needs a footprint variable, which makes
+  fixing curve D's constant the most promising follow-up. **Early termination 0.045 ACCEPTED**:
+  1.081x/1.118x/1.099x at silhouette IoU and thin retention of exactly 1.0000. **Combined SAFE
+  stack (curve A + 0.045): FAR 10.371 ms 1.360x, SIDE 19.692 ms 1.166x, PVN 16.942 ms 1.156x** at
+  thin retention 0.931-0.969; composition returns 85-100% of the product, so speedups still must
+  not be multiplied. **Targets: FAR <=8 ms NOT met (best 8.447 ms, curve B), SIDE <=10 ms NOT met
+  (best 13.466 ms), SIDE <=8 ms NOT met.** Two runs; run 1's FAR was invalidated because the T166
+  arrival guard is armed by `t166PoseTargetValid = t166Run` and wiring T167 through the rest of
+  the machinery did not extend that one assignment - **a guard that exists, works, and is simply
+  not switched on**. The drift control caught it again (`ratio=3.1127 DRIFTED`). Final run: 51
+  cells, **0 rejected**, all three drift controls stable, 42 image comparisons. Evidence in
+  `validation/performance-descriptor-and-step-refinement.md`.
+- [X] T168 [PERFORMANCE] [US3] Build a pose-invariant footprint step LOD from the live
+  projection and audit the descriptor candidate/group walk upstream of the loop prologue.
+  **Task A succeeds.** Deriving the criterion algebraically first shows the growth is
+  **linear in `t`** - `growth(t) = (2P / (P11 * H * fineStep)) * t` - so the whole reciprocal
+  hoists to one per-fragment constant and the inner loop is one multiply plus one clamp,
+  against the per-step division that cost T167 up to 27% of a frame. Best banked arm P=0.75:
+  **1.468x FAR, 1.838x SIDE**, degradation monotone in P at every pose (thin retention
+  0.84-0.96 vs nearest-K's 0.38-0.49). **Task B closes the upstream-binning line (CASE C).**
+  The walk visits **exactly 10.000 lobes per group entered** (8.000 at cap 8) - groups are
+  entered whole, so a candidate structure cannot filter below group granularity - and only
+  38-48% of visited lobes change the union answer, but that majority is *sample-dependent*
+  and no static structure can remove it. Measured ceiling for removing 2 of 10 descriptors
+  upstream: 1.13x FAR / 1.29x SIDE, already rendering a different image; caps 1-6 are
+  degenerate (`cloudDensityCalls=0`, empty sky). Termination 0.045 reconfirmed at ~1.11x with
+  IoU 1.0000 and thin retention 1.0000. **No target met**: best trustworthy FAR 9.4566 ms
+  (goal 8), best SIDE 12.0996 ms (goals 10 and 8). 45 cells, **0 rejected**; FAR and SIDE
+  drift controls stable, **PLAY_VIS_NEAR drifted 1.0923 and is reported but not banked**.
+  Two defects recorded rather than hidden: a static-initializer ordering bug
+  (`T168_ARMS` read `T168_DESCRIPTOR_CAPS` before it was declared) killed two launches at
+  class init - invisible to the build gate, which sees only compile-time invariants - and
+  `descriptorCandidateRanks` reads 0 everywhere because the counter was emitted but never
+  incremented, leaving the "8 candidate ranks" figure a static reading. Evidence in
+  `validation/performance-footprint-lod-and-traversal-audit.md`.
+- [X] T169 [PERFORMANCE] [US3] Reduce lighting and detail cost, and bound what either can
+  return. **The task's premise was wrong.** Conservative tap reduction buys nothing: 6 -> 5 and
+  6 -> 4 return 0.5-0.8% at both poses, and at SIDE they are **bit-identical to the anchor**
+  (`maxAbsRGBA=0.0`, 0 changed pixels) - direct proof that the cone early-out already terminates
+  before tap 5, so capping there is a no-op. Only the early-out floor returns anything (3.3-3.5%).
+  Ceilings: lighting **16.8% FAR / 19.5% SIDE**, detail **17.5% FAR / 15.2% SIDE**. The
+  footprint-gated detail cut captures 84.7% of its ceiling at FAR but 21.2% at SIDE, which is the
+  mechanism working - close range genuinely resolves the detail. Stacks: FAR 5.3371 ms
+  (**<=8 ms met, P50 and P95**), SIDE 10.7305 ms. **SIDE misses both budgets, and the ceilings
+  prove lighting and detail cannot close it**: with both at zero SIDE would still cost ~14.7 ms.
+  36 cells, **0 rejected**, both drift controls stable. Three defects recorded: two driver wiring
+  gaps left the campaign unreachable for three launches (`lightingDetailRunRequested()` missing
+  from `performanceRunRequested()`; `t169Run` missing from `activeEvaluationArms()`), and
+  `T166Arm.label()` omitted the optimization mode, so the five T149 arms collided with the anchor
+  and **were never measured**. Evidence in `validation/performance-lighting-and-detail.md`.
+- [X] T170 [PERFORMANCE] [US3] Build a harness wiring invariant, then attribute the primary march
+  and its per-sample descriptor cost. **Task 0 done and proven**: `StormCampaignRegistry` is the
+  single declaration of all 15 campaigns, `performanceRunRequested()` is now derived from it, and
+  `programArmCampaign()` replaces a four-way chain that had been duplicated at six sites. The
+  sandbox invariant checks marker/predicate/flag/arm-table/pose-guard linkage and **rejects five
+  deliberately mutated copies of the real driver source**, one per historical defect
+  (`T170_WIRING campaigns=15|armMatrices=11|violations=0`,
+  `T170_WIRING_NEGATIVE mutations=5|allDetected=true`). **Task 1 is not answerable and its premise
+  is false**: `fpmax5/6/8` render byte-identical images in both runs, so the clamp stops binding
+  above ~5 and there is no headroom to release; and five SIDE arms rendering the *same image* span
+  **13% in measured time**, while run 1 and run 2 invert the FAR ordering entirely (`fpmax4`
+  2.591x then 1.533x; `fpmax6` 1.537x then 2.884x). No clamp conclusion is banked. **Tasks 2/3/4
+  succeed.** Descriptor texture fetches are **not** the bottleneck - 2148 fetches per pixel at
+  SIDE, and removing essentially all of them returns 1.003x/0.986x. The smooth union returns
+  nothing (1.011x). What dominates is per-sample arithmetic, and a third of it is **provably
+  invariant**: `stormEdgeWidthBlocksFromData` takes no sample position yet is evaluated 259 times
+  per pixel at SIDE (1.655x), as are the ownership ellipse's rotated extents (1.035x); combined
+  hoist ceiling **1.731x SIDE**. **Task 5: C, at two scopes** - SIDE takes only 1.08x the primary
+  steps of FAR but evaluates density on 81% of them against 15%, while the per-call profile is
+  nearly identical (11.85 vs 13.10 descriptor evaluations per density call). Lobes per group
+  entered is 10.000, reconfirming T168. **Task 6: no shippable improvement on T169.** Every
+  shippable stack sits at 12.06-12.64 ms SIDE, inside the noise floor. The ceiling arm
+  `t170_stack_hoist` reaches **SIDE 7.3052 / 7.7558 and FAR 4.0724 / 4.2885 - the first
+  configuration in this line to clear 8 ms at the binding pose** - but it is a ceiling, not a
+  candidate (constant edge width, meanAbs 1.606e-02 vs the stack's 2.210e-03). **CASE C.**
+  Recommended production candidate remains `t169_stack_fast`; recommended next architecture is a
+  per-frame descriptor precompute of edge width and ownership extents, which is image-identical
+  and trades arithmetic for a fetch that this campaign showed is free. 64 cells across two runs,
+  **0 rejected**, all four drift controls stable. Evidence in
+  `validation/performance-primary-march.md`.
+- [X] T171 [PERFORMANCE] [US3] Explain T170's 13% spread across identical-output arms and
+  establish a measurement floor before any architecture change. **The audit found two real
+  sampler defects before a single frame was measured**: `observeFrame()` recorded the async GPU
+  timer once per frame with no freshness test, so a cell could re-record one GPU interval many
+  times, and `VolumetricCloudRenderer.lastGpuTimingSample()` - written for exactly that and
+  documented as such - **was called from nowhere**, a fourth instance of the omission class the
+  T170 registry invariant catches, in a file it does not cover. Both fixed; **neither was the
+  cause** (`duplicatesRejected=0` in all 140 cell records). **The measurement floor**: same GL
+  program back-to-back CV **0.50%**; separately linked byte-identical programs differ by at most
+  **1.07%**, inside the same-program spread, so there is **no program-identity effect**; pooled
+  across 19 identical-output cells CV **0.97% SIDE / 1.23% FAR**. Ordering, warm-up and sample
+  count are all excluded - 60/120/240 frames do not converge, so more frames cannot help.
+  GPU telemetry rules out the leading hardware hypothesis: an RTX 4070 **Laptop** GPU with a
+  210-3105 MHz range held **2340 MHz pinned**, 44-63 C, no throttle, including through the
+  anomalous cell. **What remains is occasional bimodality, not wide distributions**: 2 cells of
+  70 (2.9%) measured an internally tight state disjoint from their own twin - SIDE `fpmax5`
+  12.5880 vs 11.0971 (13.4%, T170's spread reproduced exactly, and it is a *cell* property not an
+  arm property) and FAR `desc_nosdf` 12.7887 vs 8.1859 (56.2%, no frame of one overlapping the
+  other). Cause not identified; eleven hypotheses excluded. **Threshold adopted: minimum
+  measurable speedup 3%, every banked arm measured at least twice, repeats disagreeing by more
+  than 3% rejected rather than averaged, anything else BELOW MEASUREMENT FLOOR.** **Task 7
+  re-measurement**: all six T170 points re-measured with both repeats agreeing within 1.31%.
+  `t169_stack_fast` 1.774x, `desc_nosdf` 1.778x, `desc_constedge` 1.395x, `desc_hoist` **1.421x**
+  - the descriptor findings survive, with the hoist smaller than T170 claimed. **But
+  `t170_stack_hoist` re-measures at 8.7532 ms SIDE against T170's 7.3052 - 19.8% higher and far
+  outside the floor - so SIDE <=10 ms is met and SIDE <=8 ms is NOT, and T170's claim to be the
+  first configuration in the line to clear 8 ms at the binding pose is withdrawn.** 70 cells,
+  **0 rejected**. Descriptor-invariant precompute authorized as the next architecture with its
+  target revised to the 10 ms goal. Evidence in `validation/performance-harness-stability.md`.
+- [X] T172 [PERFORMANCE] [US3] Implement the real descriptor-invariant precompute authorized by
+  T170/T171 and measure what the architecture actually retains. **The implementation succeeds
+  completely and is bit-exact.** Edge width and the ownership radii are computed once when the
+  descriptor is built and carried in texel 3's channels, which the shader already fetched for the
+  role: **16 bytes added per descriptor, zero additional fetches per density call.** All three
+  isolated precompute arms render images **bit-identical** to the anchor at both poses
+  (`maxAbsRGBA=0.0`, 0 changed pixels) - no SSIM or IoU is reported because there is no
+  difference to characterise. Density-call counts are unchanged (primary steps 3,907,150 against
+  T170's 3,907,935), confirming the gain is cost per call. **But it retains only 19.3% of the
+  T170 ceiling (36.8% on the stack), far under the 80% Task 10 threshold, and the cause is a
+  correction to T170 rather than a shortfall here.** T170's `desc_constedge`/`desc_hoist`
+  substituted `STORM_MIN_EDGE_BLOCKS`, the *floor* of the edge-width distribution; a smaller
+  `lobeSoftness` makes the T121 conservative rejection easier to satisfy, so those arms culled far
+  more descriptors before the exact SDF. They measured cheaper arithmetic **plus a much more
+  aggressive cull**, and the cull was ~4x the larger term. The proof is that the real precompute
+  is bit-identical - it provably cannot change the cull - and captures 19%, while the ceiling
+  changes the image an order of magnitude more than the shipped stack's own error and captured
+  the rest. **T170's "1.421x image-identical hoist" is withdrawn**, the second T170 headline to
+  fall to a proper control after T171 withdrew the 7.31 ms figure. **Banked at FAR** (8 of 9
+  pairs accepted, all within 1.45%): anchor 13.0883, edge precompute **1.0496x**, ownership alone
+  1.0291x = **BELOW MEASUREMENT FLOOR**, combined **1.0952x**, and on the shipped stack
+  `t169_stack_fast` 5.0785 -> `t172_stack_pre` 4.7698 = **1.0647x**. **SIDE produced no usable
+  measurement**: 8 of 9 pairs REJECTED with disagreements to 56%, T171's unexplained bimodal mode
+  taking most of a block, with the GPU pinned at 2340 MHz throughout - and the one accepted SIDE
+  pair is still unbankable because its anchor was rejected. **Decision: productionize the combined
+  precompute** (free, bit-exact, 6% on the shipping stack), but not in this commit - the invariant
+  asserts FINAL does not define it, and flipping that belongs with a campaign that covers SIDE.
+  **New lever identified**: the ceilings accidentally showed that loosening the T121 rejection is
+  worth ~4x what removing the arithmetic is, so the recommended next work is a **tighter,
+  still-conservative lower bound** - image-preserving by construction, as T141's box bound already
+  is. Evidence in `validation/performance-descriptor-precompute.md`.
+- [X] T173 [PERFORMANCE] [US3] Explain the SIDE bimodality, then audit and test the T121
+  conservative bound. **SIDE was never unstable - the harness protocol was.** Twenty identical
+  cells with one program and no arm switching agree to **CV 0.57%**, 19/19 consecutive pairs
+  accepted, with the per-cell state byte-constant (`descriptorSignature=08328807b4eb6fed`, camera,
+  targets, scale, governor, history all identical; only `gameTime` advancing) and workload
+  counters varying **<0.02%**. The same descriptor signature appears in T172 and is constant
+  across its transition, so the fixture is deterministic across runs and never evolved. T172's
+  apparent 31% workload drop is explained: its anchor's **timing** moved 6.2% while its reported
+  **counters** moved 31%, which cannot both describe one scene - the counter capture is itself
+  contaminated by arm switching, so neither figure measured what it claimed. GPU state was not
+  re-investigated, deliberately: no GPU execution state can change how many density calls a
+  fragment program makes. **Rule adopted (not a widened floor)**: every arm is bracketed by anchor
+  cells and divided by their mean; an arm whose anchors disagree >3% is `REJECTED_anchor_drift`.
+  Switching still doubles anchor variance (CV 0.57% -> 1.22%) and broke 2 of 10 pairs, so the
+  strict verdict stays `SIDE_NOT_MEASURABLE`, but **both rejections landed on arms whose other
+  repeat was accepted**, so every program carries a trustworthy number and the accepted repeats
+  agree to 0.5-2.6%. **T121 audit**: FINAL bakes `PaDiagnosticOptimizationMode` to 0, so
+  `paT141BoxBound()` is compile-time false and **the shipped renderer has always used the
+  vertical-only bound** - T141's tighter `stormLobeDistanceLowerBound` is dead code in production.
+  Current bound rejects **22.6% of visited lobes** (78.7/pixel) against 302 descriptor
+  evaluations/pixel at SIDE. **The tighter bound is a net loss**: 0.9540 / 0.9287, i.e. **4.6-7.1%
+  slower**, both repeats accepted. Its horizontal term costs a `length()` and a division per
+  descriptor per sample but only binds when a sample lies outside a lobe's horizontal extent, and
+  at SIDE the camera looks through the storm. Correctness holds - **0 changed pixels**,
+  `maxAbsRGBA=1.53e-05`, 32x below the storage epsilon, a float-ordering shift in
+  `groupMinClearance` rather than a false cull (which would give large localised errors, not
+  1.5e-05 everywhere). **First trustworthy SIDE stack numbers**: anchor 23.50, `t169_stack_fast`
+  14.11/14.33, **`t172_stack_pre` 12.59/12.51 (1.878x)**, `t173_stack_boxbound_pre` 13.85/13.70.
+  **The T172 precompute is worth 1.133x at SIDE**, double its 1.065x at FAR, as expected from
+  SIDE's 5.9x density calls. SIDE <=10 ms NOT met (best 12.51, gap 1.25x); FAR <=8 ms met.
+  **Decisions: productionize the T172 precompute (yes, with more confidence than T172 had);
+  productionize the tighter T121 bound (no).** Next lever is groups entered per sample - SIDE
+  visits 348 lobes across 23.8 density calls, 14.6 per call against a group size of 10 - which is
+  a different question from the below-group binning T168 closed. Evidence in
+  `validation/performance-side-stability-and-t121-bound.md`.
+- [X] T174 [PERFORMANCE] [US3] Productionize the T172 precompute, then price the group-entry
+  line. **Productionization banked separately as `4b34b12`**: FINAL and the four T140 oracle
+  variants now define `PA_ARM_DESC_PRECOMPUTE`, and because the precompute and the old derivation
+  are `#if`/`#else` branches the recomputation is **not compiled into FINAL** rather than left
+  live beside it. The T172 gate is inverted rather than deleted - FINAL must now define it, must
+  not define either isolated half, and every oracle variant must carry it. **Proof of consumption
+  is runtime, not a define check**: `t174_no_precompute` is FINAL minus the precompute, renders
+  **bit-identically** (`maxAbsRGBA=0.0`, 0 changed pixels, both poses) and is measurably slower -
+  **1.079-1.104x SIDE, 1.090-1.096x FAR**. Anchors moved SIDE 23.50 -> ~20.6 and FAR 13.09 ->
+  ~12.4. **Group entry passes its gate and still cannot close SIDE.** `first_group_only` -
+  skipping the candidate scan, ten-descriptor walk, bounds, exact SDFs and union for every group
+  beyond the first - is worth **1.136x SIDE / 1.125x FAR**, above the 1.10x gate but below the
+  1.255x the 10 ms target needs. **It is exact**: bit-identical to the anchor, because on this
+  fixture groups beyond the first are entered ~44% of the time and never change the result.
+  **`group2_no_sdf` returns 0.99x** - the exact SDFs inside groups 2+ cost nothing, T121 already
+  culls them, so the 1.136x is pure walk overhead on ~4.4 lobes per density call that contribute
+  nothing. **Task 3 audit: there is no group metadata to reject on** - before the descriptor loop
+  the shader has only a witness index, a group slot and a 2D XZ candidate tile, so every candidate
+  bound would have to be invented and maintained. Counters: SIDE 1.443 groups and 14.43 lobes per
+  density call, **10.000 lobes per group entered** (T168 holds), 18.5% T121-rejected, 25.37 density
+  calls/pixel against FAR's 4.16 on nearly equal step counts (30.83 vs 28.61) - SIDE evaluates
+  density on **82% of primary steps**, FAR on 15%. The 1/2/3+ histogram was **not obtained** and is
+  reported as a gap; the ceiling answers the decision without it. **Stack REJECTED**: repeats
+  disagreed 15.56% SIDE and 51.96% FAR, so no stack number is banked, and r2 was not cherry-picked
+  despite matching T173/T172 to within 0.2%. **Verdict: the group-entry line is real, exact and
+  insufficient** - a perfect filter takes 12.5 -> ~11.0 ms and still misses 10 ms. Closed for the
+  target; recorded as a 1.136x ceiling. **Remaining dominant cost is the number of density calls at
+  SIDE, not per-call cost**, which T170/T172/T173/T174 have now bounded from every side. Next
+  recommended line is empty-space skipping / clearance quality, possibly at group granularity where
+  the missing group metadata would actually pay. Evidence in
+  `validation/performance-group-entry.md`.
+- [X] T175 [PERFORMANCE] [US3] Establish whether the primary march's density calls are necessary.
+  **Both oracles are at the measurement floor, and the framing three campaigns have used was
+  wrong.** `density_every2` halves primary body density calls and returns **1.0146 / 0.9977 SIDE**;
+  `clearance_first_group` frees the safe advance from irrelevant groups and returns **1.0080 /
+  0.9903** - all four results BELOW MEASUREMENT FLOOR across both runs and both poses. The reason
+  is that **the primary march makes 4.99 body density calls per pixel at SIDE, not the 25.37 T174
+  reported**, while the descriptor walk runs **38.25 times per pixel**: the primary body call is
+  **13%** of it, the light march is **39%** (14.98 taps/pixel), and segment tests, clearance probes
+  and quadrature are the remaining 48%. **Histogram** (primary-only by construction, bins anchored
+  on the shader's own 0.0008 threshold): **85.8% of primary calls return material**, 65.7% return
+  high density, only 14.2% exactly zero; mean material run 14.90 samples, mean empty run 9.34. That
+  formally selects CASE B, but CASE B's direction is empty too - the occupied-sampling ceiling is
+  1.006x - so **neither case applies: the primary march's density calls simply are not a
+  significant share of the work.** Perfect empty-skip is DERIVED at <1.02x and did not warrant an
+  arm. **A dead instrumentation gate was found by building on it**: `paWorkloadCaptureActive()`
+  accepted views 22-26 and 28-34, so **T169's light and detail attribution views 35/36 have been
+  emitting zeros since T169** (`lightConeMarches=0 tapsPerConeMarch=n/a` is in T169's own log) -
+  the registry invariant's omission class in a file it does not cover. Fixed, and closed by
+  `validateWorkloadViewsAreEnabled`, which parses the predicate and every `STORM_WORKLOAD_*` id and
+  fails the build on any unenabled view (`declared=16|allEnabled=true`). No banked T169 conclusion
+  depended on those counters. **Every primary-march lever is now measured and at the floor** - group
+  entry 1.136x (T174), tighter per-lobe bound 0.95x (T173), occupied sampling 1.006x, clearance
+  0.999x, empty skip <1.02x - so the 1.25x needed for SIDE <=10 ms cannot come from there. FAR stack
+  ~5.32 ms accepted (2.406x); SIDE stack pair REJECTED on 5.08% repeat disagreement, working figure
+  stays ~12.5 ms. **Recommended T176: attribute and attack the light march**, which is 39% of the
+  descriptor walk, three times the primary march's, and has never been profiled at that level
+  because its counters were dead - specifically whether a light tap can reuse the primary sample's
+  group resolution, and whether the 3.75 cone marches per pixel can be reduced given T169 showed the
+  taps within a march already terminate early. Evidence in
+  `validation/performance-density-necessity.md`.
+- [X] T176 [PERFORMANCE] [US3] Attribute the light march and establish what is recoverable from it.
+  **The light march is 26% of SIDE frame time, and two of the three things T175 recommended
+  attacking turned out not to exist.** With T175's instrumentation gate fixed, the counters finally
+  read: `lightConeEarlyOuts=0`, `tapsPerConeMarch=4.0000` exactly at both poses, and
+  `detailFetchLight=0`. **Four taps is a hard cap reached every single march, not an early-out** -
+  `min(steps, 4)` under `cameraStartsInsideSlab`, with the only in-loop `break` requiring T149's
+  graded mode that FINAL bakes off. **This corrects a banked T175 sentence** ("the taps within a
+  march already terminate early"), which was inferred from T169's bit-identical 6/5/4 arms - arms
+  that were identical because the cap clamped all three to the same program. T169's conclusion
+  survives; its stated mechanism does not. Light taps also already skip every detail octave, so
+  **Task 6's cheaper-shadow-density idea was largely pre-spent**. Attribution at SIDE: **3.6155 cone
+  marches/pixel, 4.0000 taps each, 14.4622 light taps/pixel, 1.0000 density evaluation per tap, 1
+  group and exactly 10.00 lobes per tap** (`lobesVisited/groupFieldCalls = 10.0000`), **39.53% of
+  all descriptor group walks** - reproducing T175's 39% independently; per-tap SDF and fetch counts
+  are DERIVED from that share and labelled, since the shader does not split them by consumer.
+  **Ceilings** (campaign A, anchor-relative, 34 cells, `T176_REJECTED count=0`): `nolight` **1.349x**
+  SIDE / 1.203x FAR, `light3` 1.075x, `light2` 1.139x. **Tap reduction captures only 40% of what
+  lighting costs**; the other 60% is the ten-lobe walk, which tap reduction cannot reach. `light2`
+  is rejected on quality (meanAbs 1.83e-02, 3.5x `light3`, flattened self-shadowing, matching T169's
+  worst arm). **Campaign B measured the light arms ON the stack** - the stack bakes
+  `PA_ARM_LIGHT_STEPS 4`, which the inside-slab cap already forces, so it carried no light reduction
+  and anchor ratios could not be multiplied onto it. **`t176_stack_light3` = 9.62 ms p50 at SIDE
+  (9.6348/9.6000, 0.36%, p95 9.98/10.12), the first sub-10 ms SIDE reading in this series**, worth
+  **1.0701x** over the stack's 10.29 ms and corroborated to within 1% by the independent
+  anchor-relative measurement of the same change. Reported as **met in this run, not yet
+  established**: the same stack measured ~12.5 ms in T173/T175 against a ~6% different anchor, so
+  absolute SIDE ms is not stable across sessions. **A methodological finding: two repeats that agree
+  can both be wrong.** The FAR stack family lands in two modes (~4.3-5.0 and ~8.4-8.6 ms) and
+  `stack_nolight` (8.38/4.26) and `stack_light2` (4.63/8.56) each straddle both, proving the same
+  program reaches both - which makes `stack_light3`'s tight 0.13% pair at 8.54 ms **agreement within
+  a sticky mode, not a measurement**, since it would otherwise mean the stack got 70% slower given
+  strictly less work. No FAR stack figure from run B is banked; FAR rests on accepted
+  `t172_stack_pre` (4.96/5.01, and T175's ~5.32 ms). T171's repeat rule is necessary but not
+  sufficient; a cross-arm mode check is the harness follow-up. **Task 3 (primary-to-light group
+  reuse) is NOT MEASURED** - the oracle was not built, and reuse is only bounded above by `nolight`'s
+  1.349x. Verdict **CASE B, qualified**: `light3` is the only accepted light lever, decisive at the
+  margin but not a large ceiling, and it is a flat 4->3, not the adaptive scheme CASE B describes.
+  **Remaining dominant cost: the ten-lobe group walk** - 36.58 walks/pixel at SIDE, all ten lobes
+  visited every time while only 5.03 contribute. Recommended next: close the reuse oracle, prune the
+  lobe walk, and use the **already-written** T149 graded adaptive-tap path (baked off in FINAL),
+  given 73.6% of light taps land after the primary ray passes 50% alpha. Evidence in
+  `validation/performance-light-march.md`.
+- [X] T177 [PERFORMANCE] [US3] Measure primary-to-light group reuse and re-measure the tap arms
+  under a paired-ratio protocol.
+  **Group reuse is closed, and the reason is that there is nothing to reuse.** The hard ceiling -
+  every light tap forced onto the primary sample's group - measures **0.6873x SIDE / 0.6708x FAR**,
+  i.e. 45% *slower*, both stable (ratio spread 1.24% / 0.85% over three blocks). The load-bearing
+  number is not the regression but **0.00 group walks avoided per pixel**: production already
+  performs **0.9997 group walks per light tap**, which is the floor, so reuse can only remove one
+  `stormCandidatesAt` texelFetch and a four-rank scan - and T170 already priced fetches at ~1.0x.
+  Part of the 45% is an artifact of the arm adding a second inlined `directStormGroupField` call
+  site, so it is reported as such rather than as the cost of reuse. Task 4 (reuse predicate) is moot
+  and was not built. **Reuse validity measured 100.00%** (1,458,641/1,458,641 taps SIDE;
+  215,205/215,205 FAR), zero partial, zero wrong, flat across all four tap ordinals - **but the
+  measurement is not usable**: `lobesVisited/groupFieldCalls = 10.0000` against `StormLobeCount=10`
+  means **this fixture contains exactly one descriptor group**, so every sample resolves the same
+  group and validity is true by construction. The interesting case - a tap crossing into a
+  neighbouring storm - does not occur on this fixture and was not tested. Reported as measured and
+  as unable to carry its conclusion. **Paired-ratio protocol** (three anchor-bracketed blocks per
+  arm; acceptance on local-ratio agreement, not absolute p50): **local anchor variance is small -
+  SIDE CV 0.84% over 36 anchor cells, FAR 2.97% - while the stack arms swing 11-14%, so the sticky
+  mode is program-specific, not machine-wide**, which refines rather than confirms T176's reading.
+  Anchor-relative pairing did not rescue the stack arms, it **rejected all of them**; but comparing
+  an arm against `t172_stack_pre` **within the same block** cancels the drift and yields
+  **light3-on-stack = 1.0634x, spread 0.48%** across three blocks, corroborating T176's 1.0701x.
+  That works at SIDE, where both arms move together (block 2 is slow for both by nearly the same
+  factor), and fails at FAR, where switching is per-cell and the two arms land in opposite modes
+  inside one block. **Within-block pairing cancels slow drift, not per-cell mode switching;
+  bimodality is still not solved.** **light3** is now measured three ways within 1.1% (1.0588
+  anchor-relative, 1.0634 within-block, 1.0701 in T176) with meanAbs 3.19e-03 - but **the quality
+  metrics the brief named (cloud/edge SSIM, silhouette IoU, thin and hole retention, self-shadow
+  contrast, dark-interior retention, shadow pockets, puff separation) do not exist in this harness
+  and were NOT measured**, so performance qualifies and quality is unproven; not productionized.
+  **light2** reproduces at 1.1402x SIDE (0.54%) but costs 3.9x light3's error for 7.7% more speed,
+  and is REJECTED at FAR (14.03%) - not a candidate. **Stack: every anchor-relative stack figure
+  this session is REJECTED on ratio spread**, so T176's 9.62 ms does not survive the stricter
+  protocol; session-local `stack_light3` reads 9.71/10.85/9.68 across blocks, reaching <=10 ms in
+  two of three and missing in the third. **SIDE <=10 ms is not established**, SIDE <=8 ms not met,
+  FAR not measurable this session (stack arms straddle 4.9 and 8.3 ms). The only session-independent
+  claim: light3 adds 1.0634x on the validated stack. **Remaining dominant workload: the ten-lobe
+  group walk** - 32.88 walks/pixel at SIDE, all ten lobes visited, ~5 contributing. Recommended
+  next: since the fixture's storm *is* one group of ten lobes, ask whether the group representation
+  can carry precomputed spatial information in the spare T172 texel channels to skip provably
+  non-contributing lobes without ranking in the hot loop - explicitly not nearest-K, which T168
+  closed. Evidence in `validation/performance-light-reuse.md`.
+- [X] T178 [PERFORMANCE] [US3] Measure light3's visual quality and test a precomputed lobe support
+  bound.
+  **Two decisive negatives.** **light3 must not ship.** With the missing metrics finally in place,
+  flat 4 -> 3 taps returns **cloud SSIM 0.884**, **dark-interior retention 0.0715** and
+  **shadow-pocket retention 0.663** at SIDE, while silhouette IoU, thin retention and hole
+  retention are all a perfect 1.000. **The failure mode is brightening, not the predicted
+  flattening**: interior contrast is preserved (ratio 1.018) and valleys are 21% deeper, yet only
+  7.2% of the darkest interior quartile stays at or below its reference luminance - dropping the
+  fourth tap removes 14 units of optical path from every light march, so extinction falls and the
+  whole interior lifts, keeping relief but losing absolute darkness. Two of Task 7's four criteria
+  fail, and they are the two that describe self-shadowing; the ~1.06x stays unspent.
+  **A correction: five of the twelve requested metrics already existed.** `StormArmQualityMetrics`
+  has provided silhouette IoU, cloud/edge SSIM and thin/hole retention since T167 `a280c10`, and
+  **was printing in the T177 log** (`cloudRegionSSIM=0.9347` for light3) when T176 and T177 both
+  claimed "none of those metrics exist in this harness" - the same read-past that T175 found for
+  T169's dead counters. T178 added the four that genuinely did not exist - self-shadow contrast,
+  dark-interior retention, shadow-pocket retention, valley depth - and those four are exactly what
+  produced the verdict; the five pre-existing ones would have passed light3. Puff separation
+  remains `not_implemented_needs_segmentation` rather than silently proxied.
+  **Lobe support is CLOSED, but not for CASE C's stated reason.** Attribution per group walk at
+  SIDE: **10.0000 visits, 2.0182 cheap pre-SDF rejects, 7.9819 exact SDFs, 4.2033 contributors,
+  3.7784 wasted** - so **47.34% of every exact SDF is discarded by the union**, and most
+  non-contributing lobes are *not* already cheaply rejected (the reverse of CASE C's premise).
+  Per pixel: 341.31 visits, 272.43 exact SDFs, 128.96 wasted. **The light march carries the
+  expensive half**: 46.26% of exact SDFs from 37.66% of visits, because a light tap is cheaply
+  rejected only **1.94%** of the time against **31.20%** for everything else - it marches from
+  inside the cloud where the conservative bound cannot reject. The ceiling is real: `t178_nosdf`
+  measures **1.7428x FAR** (accepted) and 1.5328x SIDE, so exact SDFs are ~34.8% of SIDE frame
+  time and removing just the wasted 47.34% would be worth **~1.197x**, above CASE A's gate. **But
+  the precomputed bound rejected exactly zero lobes** (`lobeSupportRejects=0`, both poses) and
+  measured **0.9410x FAR** (accepted, 2.49% spread) - image-exact (every metric 1.000000, FAR
+  `digestsEqual=true`), so the implementation is right and simply never binding. **That is also the
+  real explanation for T173**: it was slow not because its arithmetic was expensive but because it
+  bought nothing. Payload: texel 5 carries `1/maxRadius, minRadius, shearLength`, +16 bytes and
+  +1 fetch per lobe visit, removing a role-profile branch, two scaled-radius pairs, a `length()`
+  and a division - and it still lost. **The structural reason: the wasted lobes are not far away,
+  they are close but dominated**, so no conservative spatial envelope can identify them, which
+  disqualifies CASE B's remedy too. **I should have caught this before benchmarking** - one counter
+  asking whether T141's horizontal term ever binds would have closed the line without a campaign.
+  Stack: FAR ~5.05 ms accepted (2.5494x) but within-block support gain 1.0033 (rejected); SIDE
+  11.05 rejected. SIDE <=10 ms **no**, <=8 ms **no**, FAR <=8 ms **yes**. **Remaining dominant
+  workload: the exact lobe SDF**, 272.43/pixel at SIDE, 46.3% of it from light taps. Recommended
+  next: a tighter incoming-distance estimate against the running union minimum rather than a
+  spatial envelope; and a bound designed for rays that start *inside* the medium, which no campaign
+  has treated as its own problem. **Texel 5 is dead weight while this line stays closed and should
+  return TEXELS_PER_DESCRIPTOR to 5 before any merge.** Evidence in
+  `validation/performance-lobe-support.md`.
+- [X] T179 [PERFORMANCE] [US3] Test whether a lobe can be proven unable to move the smooth union
+  before its exact SDF is paid.
+  **Closed: the candidate is exact, free, and worth nothing.** From `stormSmoothMinimum` itself,
+  `h = saturate(0.5 + 0.5*(d_new - d_cur)/blend)` reaches 1 exactly when `d_new >= d_cur + blend`,
+  and there the result is `d_cur` with the polynomial term vanishing and `stormBlendFactor`'s mix
+  an identity - so **a lobe at or beyond `d_cur + blend` cannot alter any component of the union**.
+  Production already tests that, against the 48-block global cap while the pair's real blend is
+  `clamp(0.25*smaller radius, 4, 48)`, typically 8-20. `t179_dom_exact` substitutes the exact value,
+  hoisted from the union below and reused there, and is **bit-identical** (0 changed pixels, maxAbs
+  exactly 0.000000, both poses) - **but measures 0.9999x SIDE / 0.9955x FAR.** **My slack hypothesis
+  was wrong**: the tightening rejects only **0.076%** more lobes (25,109 of 32,941,121), because
+  the lobes surviving T121 are far closer than the 8-48 block band - **the bound is the binding
+  constraint, not the threshold.** **Strict ceiling 1.0159x SIDE** (`t179_dom_aggressive`, no blend
+  margin, accepted at 1.34% spread) against Task 8's 1.10x gate; it genuinely discards contributors
+  (424 changed pixels), so the ceiling is real work skipped rather than T178's accidental no-op.
+  **Histogram** (non-first exact SDFs, 28.67M at SIDE): **46.75% change exactly zero**, 1.80% below
+  storage epsilon, 0.39% tiny, 51.05% meaningful - 3.14 zero-change SDFs per group walk. **By
+  consumer, dominance pruning is half as effective on light taps** (25.0% zero-change) as on primary
+  (52.8%), answering T178's question the other way round: a light tap marches from *inside* the
+  cloud, where the vertical lower bound returns ~0 and cannot exceed `groupDistance` under any
+  margin, and where several lobes genuinely are near. **The structural finding: removing 46.75% of
+  exact SDFs is worth 1.6%, while T170's compile-time `desc_nosdf` removing 100% of them uniformly
+  was worth 1.53x.** Those cannot be reconciled by work-removed arithmetic; the consistent
+  explanation is execution shape - the ten-lobe loop is warp-wide, so a lobe skipped by one lane is
+  still evaluated whenever any other lane needs it. Labelled an **inference from two measurements**,
+  not instrumented, but it fits the whole series: T167 nearest-K slower, T174 group entry 1.136x and
+  insufficient, T178 support bound 0.941x. **Every per-lane pruning scheme has underdelivered
+  against its own arithmetic; both shipped wins (T168 footprint LOD, T172 precompute) were uniform
+  compile-time reductions.** Task 6's ordering oracle **NOT MEASURED** - a better order changes how
+  many lobes are rejected, not what a rejection is worth, and the union is order-sensitive so
+  best-first is not image-neutral. Stack: every figure rejected on ratio spread including the
+  control (SIDE 10.90%, FAR 54.48%); nothing to compose at 0.9999x. SIDE <=10 ms **no**, <=8 ms
+  **no**. **Recommended T180: branch B - fresh-profile the segment/probe/quadrature workload**,
+  ~48% of descriptor walks per T175 and never attributed since; representation redesign is not
+  indicated because the flat walk already identifies dominated lobes correctly and finding them is
+  what fails to pay. Weight uniform reductions over selective ones. The T123 invariant caught this
+  campaign's counter below a multi-line guard, the same class it caught in T174 and T175. Evidence
+  in `validation/performance-dominance.md`; texel cleanup banked separately as `42e655d`.
+- [X] T180 [PERFORMANCE] [US3] Decompose the segment/probe/quadrature workload class and price its
+  consumers by uniform removal.
+  **The category T175 named does not exist, and the largest ceiling of the series is here.**
+  `t180_noprobe` - the empty-span probe scan removed uniformly at compile time - measures
+  **1.1972x SIDE (1.15% spread) and 1.2918x FAR (2.29%)**, both accepted, clearing the brief's
+  1.20x major-target bar at FAR. **T179's execution inference is now directly supported**: uniform
+  removal of **18.6%** of exact SDFs returns **1.1972x**, while T179's per-lane removal of
+  **46.75%** returned **1.0159x** - 2.5x less work removed for 12x more speedup, same shader,
+  fixture and protocol. **There is no production quadrature**: all four
+  `lightMarchOpticalDepth*` functions are reachable only under `DebugView == 6..9` and are dead in
+  FINAL, so CASE D is excluded before measurement. **`directStormSegmentMayIntersect` returns a
+  bool and never calls `directStormGroupField`** - segment tests were already cheap and are not
+  part of the class. The real decomposition, tagged at call sites rather than derived by
+  subtraction (buckets sum back: 548,439 + 1,560,504 + 951,957 + 20 vs `cloudDensityCalls`
+  3,060,902): **march union-distance refinement 32.0% of group walks and 26.4% of exact SDFs**
+  (11.11 walks/px, never previously named), **empty-span probes 21.1% / 18.6%** (7.35 calls/px),
+  **bracket bisection 0.0%** - 20 calls in an entire frame, 1.0047x, and **bit-identical at FAR**,
+  so it is not a consumer at all. **Semantics**: primary and light need the full field; probe and
+  bracket need only `density > 0.0008`; refinement needs only the union *distance*. **The cheaper
+  query failed and the reason is structural**: `t180_probe_nodetail` drops subtractive detail
+  erosion, which can only raise the tested value and so can never let the scan advance over
+  material (45 changed pixels), yet measures **0.9707x - slower**, because the probe's value feeds
+  a control decision: overestimating density makes the scan advance less and the march take more
+  fine steps. **Any conservative cheap probe biases the same way**, so the route is uniform count
+  reduction, not query substitution. Stack: `t180_stack_probe` 10.538 ms p50 session-local but its
+  within-block ratio vs the control is 1.0830 (rejected, 18.35%) at SIDE and **0.9933** (accepted)
+  at FAR - not a gain. SIDE <=10 ms **no**, <=8 ms **no**, FAR <=8 ms **yes** (~4.95 ms).
+  **Gaps stated rather than inferred**: Task 7 duplication is **NOT MEASURED**, and **no removal
+  ceiling was built for the refinement** - the larger of the two consumers. Verdict **CASE A**,
+  qualified: one consumer has a >=1.20x uniform ceiling and does not need full density, but its
+  obvious cheaper query is slower. **Recommended T181**: sweep `PA_EMPTY_SPAN_PROBES` (16 -> 8 -> 4
+  -> 2) as uniform compile-time arms with damage at each; then build the refinement removal
+  ceiling; do not target the bracket. Evidence in `validation/performance-consumers.md`.
+- [X] T181 [PERFORMANCE] [US3] Sweep the empty-span probe cap and price the march's union-distance
+  refinement.
+  **T180's refinement attribution was wrong, and this campaign corrects it.** T180 identified the
+  refinement's call site by elimination and assigned it the entire untagged residual - 32.0% of
+  group walks. Direct tagging shows **1.50 events/pixel and ~1.62 group walks/pixel, about 4.7%**.
+  **It is also not removable**: `t181_norefine` measures **0.9454x SIDE** (accepted, 2.36% spread)
+  with 7,607 changed pixels - removing 4.7% of walks costs 5.5% of frame time, because the
+  clearance it computes is what permits the coarse stride at all. Semantically it is a **single**
+  `directStormShape` call per event, not an iterative solve, so **Task 6's iteration sweep has no
+  premise**; it is a clearance correction needing a conservative distance, never a density.
+  **The probe cap does bind, contrary to my stated prediction**: 10.91 probes per scan at SIDE,
+  **53.1% of scans reach the cap without finding material**, and **64.8% land in the 9-16 bucket**
+  (FAR: 12.38, 61.9%, 75.7%). **The sweep is non-monotonic and peaks at 4 at both poses** - 16->8
+  gives 1.0605, **16->4 gives 1.0850 SIDE / 1.1056 FAR**, 16->2 falls back to 1.0704 - because
+  fewer probes is less work but a shorter scan advances the ray less and costs march iterations.
+  **Capping captures at most 43% of T180's 1.1972x no-probe ceiling**; the rest is probes that
+  genuinely earn their advance. **Quality does not collapse**: cap 4 holds cloud SSIM **0.9969**,
+  edge SSIM 0.9843, silhouette IoU 0.9978, hole retention 0.9937, thin 0.9355, 454 changed pixels -
+  against light3's rejected 0.884 cloud SSIM. **Duplication measured** (T180 left it open): the scan
+  samples the same lattice the fine march then re-walks, so probes in scans that find material are
+  duplicated by construction - **20.4% of probe work at SIDE**, which is only ~3.8% of exact SDFs,
+  so **caching is closed**. Stack: `t181_stack_probe8` reads 10.097 ms p50 session-local but its
+  within-block gain of 1.1913x is **rejected on 5.31% spread** with the control itself spreading
+  4.65% SIDE and 60.31% FAR; the stack arm was fixed at cap 8 before the sweep ran, so **the best
+  cap was never composed with the stack**. SIDE <=10 ms **marginal and unsound**, <=8 ms **no**,
+  FAR <=8 ms **yes** (4.982). **Verdict: cap 4 is a minor stackable candidate** (1.03-1.10x band),
+  refinement **closed**. **Remaining dominant workload is unattributed**: after tagging primary,
+  light, probe, bracket and refinement, **27.7% of group walks still carry no tag** and
+  `directStormShapeCalls` exceeds `cloudDensityCalls` by 2.30M. **Recommended T182: close the
+  buckets against `directStormShapeCalls`, tagging every remaining entry including the conditional
+  path inside `cloudDensity` - and do not infer a call site by elimination again.** Evidence in
+  `validation/performance-probe-refine.md`.
+- [X] T182 [PERFORMANCE] [US3] Close the descriptor-walk accounting and name the residual.
+  **The accounting closes - `shapeUntagged = 0` at both poses - and the residual T180 mis-named and
+  T181 could not identify is the rain-segment reachability test**, which is **the largest single
+  consumer of descriptor work in the shader: 36.26% of `directStormShape` calls at SIDE and 56.67%
+  at FAR**, more than the light march. `main` runs `rainSegmentMayContribute` on **every coarse
+  step**; past its gate it evaluates `localRainSupportAt` twice, each walking every descriptor and
+  then performing a full candidate/group union - two complete storm traversals per step. The
+  shader's own header has documented this since T098 and no campaign had measured it. Its gate is
+  `MaxPrecipitation <= 0.02`, a **runtime uniform**, not the compile-time `PA_PRECIPITATION_ABSENT`
+  FINAL bakes, so it runs at full cost for a feature this build cannot render. **Uniform removal
+  measures 1.2139x FAR** (accepted, 2.64% spread) with **105 changed pixels, meanAbs 1.05e-05** -
+  the largest clean ceiling of this phase and nearly free of image cost. SIDE was **not measurable**:
+  the anchor swung 20.34-22.01 and drifted 4.3-7.2% in eleven of twelve blocks, rejecting nearly
+  every arm; `norainseg`'s three SIDE ratios nonetheless agree to 1.9% (1.1848/1.2074/1.1988,
+  centring 1.198) while each was rejected because the *anchor* moved - recorded as corroborating,
+  **not banked**. **Count reconciliation**: `directStormShapeCalls` 5,739,705 exceeds
+  `cloudDensityCalls` 3,370,120 by 2,369,585 because tags 5, 6 and 7 reach `directStormShape`
+  without passing through `cloudDensity`; their sum is 2,368,447. The 0.058% gap between tagged sum
+  and total is **cross-frame capture variance** (each debug view is a separate rendered frame), not
+  an unattributed consumer. **SIDE/FAR contrast**: every rendering consumer shrinks with distance
+  (light 33.8%->16.6%, primary 11.0%->7.1%) while rain reachability **grows to 57%**, because it is
+  paid per coarse step at any distance. **Cap 4 does NOT survive composition: 0.9900x on the stack
+  at FAR** (accepted, 0.46% spread) - a null result, not an inconclusive one - so it fails Task 9's
+  >=3% bar and **must not be productionized**, despite T181's standalone 1.0850x/1.1056x and cloud
+  SSIM 0.9969. **New invariant `validateConsumerTagsAreCounted`** fails the build if a tag is
+  assigned with no counter reading it, if nothing reads tag 0, or if `paShapeUntagged` is removed -
+  the structural answer to two campaigns of attribution by elimination
+  (`assigned=9|counted=9|untaggedCounterPresent=true`). **Recommended T183: gate
+  `rainSegmentMayContribute` on the same compile-time condition that already removes precipitation**
+  - exact for the shipping build, unlike `t182_norainseg` which removes it unconditionally and would
+  break a precipitation build - and check whether the runtime `MaxPrecipitation` gate can be hoisted
+  out of the per-step call for builds that do render rain. Evidence in
+  `validation/performance-accounting.md`.
+- [X] T183 [PERFORMANCE] [US3] Specialize rain reachability for the precipitation-absent program.
+  **Not implemented - the change is a functional regression, and this is established from source and
+  from T182's own counters, not from a timing run. No GPU campaign was spent.** The premise was that
+  because FINAL bakes `PA_PRECIPITATION_ABSENT`, the rain-segment reachability test is dead work.
+  **It is not.** That define removes precipitation from `cloudDensity`'s internal term only; **rain
+  still renders in FINAL** through `rainShaftDensityOverSegment`, which the march calls directly and
+  gates on `localRainSegment` - the flag `rainSegmentMayContribute` computes. Gating the test on the
+  define would pin that flag false, set `rainDensity = 0.0` unconditionally and **delete rain from
+  the shipped program**, which the brief's own Task 3 forbids. **Three proofs**: (a) T163's comment
+  at the define says "Rain itself is unaffected: it renders through `rainShaftDensityOverSegment`,
+  which the march calls directly"; (b) the **generated** FINAL still contains that call, gated only
+  by `localRainSegment`; (c) consumer tag 7 is reachable only inside `rainShaftDensityAt`, whose
+  `cloudDensity` route is compiled out, yet T182 measured `shapeRainShaft=43958` SIDE / 43133 FAR -
+  rain rendering ran tens of thousands of times per frame. **This corrects T182**, which claimed
+  `t182_norainseg`'s 105 changed pixels were a perturbed step pattern and that "the rain it gates
+  cannot render in this build"; those pixels are rain being deleted, and the 1.2139x is the cost of
+  a shipped feature rather than a ceiling on dead work. Three inline corrections added to
+  `performance-accounting.md`. **Task 0 done**: `shapeAccountingClosed` compared against half a call,
+  stricter than cross-frame capture variance (each debug view is a separate rendered frame), so it
+  printed `false` on a correct 0.058% residual; replaced with a documented **0.5% fractional
+  tolerance** plus `shapeAccountingResidual` and `shapeAccountingResidualFraction`, and it now
+  **requires `shapeUntagged == 0` as well** - the strict structural check is unweakened, and the
+  static consumer-tag invariant is untouched. **Tasks 2/3 inverted**:
+  `validateRainRenderSurvivesPrecipitationSpecialization` reads the **generated** FINAL and T140
+  variants and fails the build if `rainShaftDensityOverSegment` or `rainSegmentMayContribute`
+  disappears - an invariant blocking the requested change rather than proving it
+  (`T183_RAIN_RENDER programs=3|rainReachablePostSpecialization=true`). Items 9-20 and 21-33 are
+  **not reported**: they describe a build that should not exist. **Recommended T184: reduce the
+  frequency and cost of the rain reachability query while preserving rain** - it answers a boolean
+  with two full descriptor traversals per coarse step, and the attach height is a property of the
+  *column*, not the segment, so a per-ray or weather-tile-keyed bound would answer it far less often;
+  T145's existing height prune is the model. Evidence in
+  `validation/performance-rain-reachability.md`.
+- [X] T184 [PERFORMANCE] [US3] Measure rain-support recomputation and price exact column reuse.
+  **The hypothesis is exactly right about the function and exactly wrong about the ray.**
+  `localRainSupportAt` is **provably column-invariant within a frame** - every input is
+  `sampleWeather(worldXZ)`, `sampleMorphology(worldXZ)`, `directStormRainSupportAt(worldXZ, ...)`
+  or a frame uniform; **no Y, no segment endpoints, no camera, no jitter** - so reuse keyed on XZ
+  equality is exact, not approximate. The one-entry cache built on that proof is **bit-identical:
+  0 changed pixels, meanAbs 0.000000, at both poses**, which is empirical confirmation of the
+  dependency audit across 2.3M calls. **And it is worth nothing**: exact reuse fires **0.40% SIDE /
+  0.17% FAR**, so the arm measures **0.9973x SIDE / 0.9911x FAR** (both accepted) and the stack
+  composition is **0.9983x FAR** (accepted). Task 3's own gate - close below 1.05x - is met with
+  room to spare. **CLOSED.** **Task 7's premise also fails, determinable from source without a
+  campaign**: both `rainSegmentMayContribute` and `rainShaftDensityOverSegment` sample at the
+  two-point **Gauss-Legendre nodes 0.2113/0.7887** - interior points, not endpoints - so
+  consecutive segments share **no** sample position and the hoped-for `support(B)` carry-forward
+  never occurs; exact shared-endpoint rate is **0%, structurally**. **Reuse distance is the whole
+  answer**: even at an 8-block tile (already an approximation) only 7.16% SIDE / 3.00% FAR repeat;
+  at exact XZ it is four tenths of one percent, because the ray advances a coarse step between
+  calls and the two Gauss points sit 57% of a segment apart. **The observation that matters for
+  next time**: support calls barely change with distance (18.06/px SIDE vs 17.54/px FAR - the test
+  runs once per coarse step regardless) while the **T145 prune rate does: 12.12% SIDE vs 76.74%
+  FAR**. At FAR most columns fall outside the rain ownership circle and are rejected on a weather
+  fetch; at SIDE the camera sits near the storm, almost every column is inside it, and the full
+  descriptor traversal is paid. **T145 is a rejection test, not a reusable representation** - it
+  can prove absence but never produce `attachY`/`localSupport`, so it is not semantically
+  sufficient to share, and that is stated rather than forced. **Recommended T185: widen the prune,
+  do not cache the result** - ask whether one bounding circle over all rain-owning descriptors is
+  too coarse (T172 already precomputed per-descriptor ownership radii into texel 3), and whether
+  the `precipitation <= 0.02` conjunct can be relaxed for columns provably outside every ownership
+  ellipse. Both preserve rain exactly, per T183. Rain-render invariant passes throughout
+  (`T183_RAIN_RENDER programs=3`). SIDE <=10 ms **no** (10.920 session-local, composition
+  rejected), FAR <=8 ms **yes** (4.815). Evidence in `validation/performance-rain-reuse.md`.
+- [X] T185 [PERFORMANCE] [US3] Test whether the rain ownership envelope is too coarse.
+  **The envelope really was too coarse - by a lot - and it does not matter.** At SIDE the shipped
+  circle rejects **14.47%** of rain-support queries, a tightened box **49.36%**, and the exact
+  per-ellipse test **71.50%**. Tripling the rejection rate is worth **1.0135x**; the exact ceiling,
+  rejecting five times as many columns as production, is worth **1.0155x** - so Task 3's own gate
+  (close below 1.05x) is met by the *ceiling*. **CLOSED.** Both prunes are **bit-identical: 0
+  changed pixels, meanAbs 0.000000, both poses**, verifying conservativeness rather than assuming
+  it. **The envelope diagnosis (Task 1) was correct**: `paBuildRainLocality` stacks three
+  conservative steps - each ownership ellipse becomes a **square** of side `2*max(semi-axis)`, the
+  squares become one **AABB**, and the AABB becomes its **circumscribed circle** (root two on the
+  diagonal) - and accumulates over **every role**, so wide ANVIL lobes inflate a bound whose purpose
+  is set by BASE attachment. That is why SIDE, close to the storm, sits inside the inflated disc.
+  **Task 6's proposed safe form is unsound and was not implemented**: `localRainSupportAt` returns
+  `weatherCoverage`-based support for a column outside all descriptor ownership when raster
+  `precipitation > 0.02`, so "outside all rain-owning support => rain impossible regardless of
+  precipitation" is false; the conjunct is load-bearing and was kept. **The conjunct diagnostic
+  decided the campaign**: `rainPrecipLowFraction` is exactly **1.0000** at both poses, so the
+  precipitation half never fails and the geometry is the entire binding constraint - which is what
+  justified testing the tightening instead of assuming it. False positives: 27.08% SIDE / 22.91%
+  FAR of accepted columns carry no support. **Task 7 explains the outcome**: the prune decides per
+  **column**, so rejection is per-lane inside a warp-wide traversal - the shape T179/T180 showed
+  does not pay. **T185 is the strongest per-lane experiment yet run** (largest logical fraction
+  removed, exactly correct, at *negative* arithmetic cost - a box test replacing a `distance()`,
+  using only T172's precomputed radii) and it returns 1.6%, a fourth independent confirmation.
+  Secondary: the prune sits *after* `sampleWeather`/`sampleMorphology`, so rejected columns still
+  pay two fetches. **No usable stack figure** - the control itself spread 15.19% SIDE / 52.82% FAR;
+  the SIDE within-block ratio of 1.2336 missed the 3% rule at 3.50% and is **not banked**. SIDE
+  <=10 ms **no** (10.2315 session-local, rejected), FAR <=8 ms yes. **Recommended T186**: per the
+  brief's own failure branch, `rainSegmentMayContribute` samples **two** points per coarse step - a
+  uniform compile-time reduction to one is the shape that has paid twice in this series, gated on
+  rain-coverage metrics rather than timing alone; **if that fails, stop optimising rain** and pick
+  the next target on measured share. **The transferable lesson**: this prune should have been worth
+  ~20% of the rain-support traversal on arithmetic and returned 1.4% - price per-lane proposals
+  against that, not against the fraction of work removed. The T145 invariant caught a real defect in
+  the first patch (preprocessor branches each opening a brace left the source unbalanced for
+  `functionBlock`). Evidence in `validation/performance-rain-prune.md`.
+- [X] T186 [PERFORMANCE] [US3] Reduce rain reachability from two samples per segment to one, and
+  decide whether the micro-optimization series continues.
+  **Best arm `t186_one_mid`: 1.0668x SIDE** (accepted, 0.88% spread) with **cloud SSIM 0.999983**
+  and **120 changed pixels** - real, trivially implementable, and the largest quality-safe
+  single-arm gain since T180. **It is not enough, and per the brief's own rule the series stops
+  here**: the strong-candidate bar was 1.10x, the strategic requirement is 1.2-1.3x, the stack
+  composition was **rejected** (within-block 0.9833 at 13.27% spread, control itself 15.98%), and
+  the rain-specific quality gate is **unmeasured**. **Premise correction**: the two-sample rule
+  costs **0.59 support evaluations per segment test, not 2**, because the T145 height prune already
+  rejects **70.4%** of sample opportunities (5,478,395 of 7,784,958) before any traversal. "Halves
+  the work" is false per call and true per traversal - sample 1 is 1,151,877 of 2,296,819 support
+  evaluations, so removing it removes **49.2%** of them. **Semantics (Task 1)**: the rule is an
+  **OR with early return** - existence, not max or integrated - so dropping a sample can only turn
+  true into false, making **"falsely added rain" structurally zero** and "missed rain" the only
+  failure mode. The early return is nearly irrelevant: the test returns true on just **0.28%** of
+  calls, so both samples run almost equally often. The second sample is the deciding one for
+  **11.50%** of rain-positive segments. **All three positions accepted within 1.1% of each other**
+  (mid 1.0668, one_b 1.0598, one_a 1.0557 at SIDE); quality is essentially untouched - hole
+  retention exactly 1.0, IoU 0.999 - with **thin retention** the only metric that moves
+  (0.896-0.969), consistent with losing thin rain wisps rather than cloud body. **Not measured and
+  not implied**: missed-rain pixels, rain-region overlap, shaft continuity, onset/termination
+  height - none exist in this harness, and with 11,028 rain-positive segments per frame this
+  fixture is too rain-sparse for them to mean much; that is a fixture problem, not a metrics one.
+  **Verdict: hold `one_mid` as a banked minor candidate** pending a composition re-test on a stable
+  control and a rain-heavy fixture - do not ship it off this run - and **close rain optimization**
+  after five campaigns (T182 attribution, T183 specialization, T184 reuse, T185 prune, T186
+  sampling). **Fresh post-everything SIDE attribution**, `shapeAccountingClosed=true` with residual
+  0.0001 and `shapeUntagged` 0: rain segment **44.12%**, light tap 26.45%, empty-span probe 15.69%,
+  primary body 9.48%, refinement 3.34%, rain shaft 0.93% - 34.88 shape calls, 28.40 group walks,
+  284.0 lobe visits, 220.0 exact SDFs per pixel. **Recommended architecture task: bake the
+  rain-attach field once per frame.** T184 already proved `localRainSupportAt` is *exactly*
+  column-invariant within a frame, and showed per-ray caching fails only because a ray never
+  revisits a column (0.40%) - **a precomputed field does not need revisiting**. It converts 30.03
+  segment tests per pixel from descriptor traversals into texture fetches: uniform work removal, the
+  only shape that has paid here, applied to the largest remaining consumer. Open questions are field
+  resolution against the 184-block attach band, conservative tile quantisation, and per-frame build
+  cost. Evidence in `validation/performance-rain-samples.md`.
+- [X] T187 [PERFORMANCE] [US3] Establish whether a precomputed 2D rain-support field is worth
+  building, before building one.
+  **Feasibility pass, not an implementation - no field was built.** **The ceiling clears the gate:
+  `t187_field_oracle` measures 1.1756x SIDE** (accepted, 2.28% spread) and **1.1129x FAR**
+  (accepted, 2.93%), against the brief's 1.10x stop condition, by making
+  `directStormRainSupportAt` cost nothing while every other part of `localRainSupportAt` computes
+  exactly as production does. That removes **1,994,647 rain-segment traversals per frame** (15.39
+  per pixel, 44.12% of `directStormShape` calls). **The build arithmetic is the enabling number**:
+  ULTRA's existing weather domain is **512x512 = 262,144 cells**, so the field costs **1 evaluation
+  per 7.61 traversals removed** - about 13.1% of the work it eliminates, leaving ~86.9% of the
+  ceiling before lookup cost. **Realistic estimate 1.13-1.15x SIDE, DERIVED and labelled as such**,
+  not measured: a strong candidate, not the 1.2-1.3x structural win the target needs, so it should
+  not be treated as the thing that closes the 10 ms gap by itself. **Semantics (Task 1)**: the field
+  is exactly **three values** - `directSupport`, `stormBaseY`, `ownsDescriptorGroup` - because
+  everything else in `localRainSupportAt` is two texture fetches plus scalar arithmetic that costs
+  less than storing it. **One field serves both Gauss positions with no approximation** (they differ
+  only in XZ, and T184 proved the function is exactly XZ-invariant); **spatial quantisation is the
+  only approximation a field introduces**. **Domain (Task 2)**: reuse `WeatherOrigin`/`WeatherExtent`,
+  already shared by `sampleWeather` and `stormCandidatesAt` - **no scrolling, recentering or edge
+  policy to invent**, all inherited - at **1-2 MB**, which is not a constraint at any useful
+  resolution. **Generation (Task 6): GPU**, because `VolumetricCloudRenderTargets.prepare*Target`
+  already builds weather, morphology and cumulus-stage maps per frame over the *identical* domain,
+  so this is one more target in an existing pass rather than a new architecture; CPU generation is
+  rejected on evidence - the field must reproduce `directStormFinalDensity`'s union bit-exactly, and
+  T172 exists precisely because a CPU precompute had to be proven identical to the shader. **Stack
+  at the ceiling: `t187_stack_field` reads 7.7483 ms / 8.4357 ms session-local at SIDE** with its own
+  ratio accepted at an unusually tight **0.26%** spread - clearing both the 10 ms target and the 8 ms
+  stretch - **but the composition against the control is rejected** (within-block 1.3988 at 15.41%,
+  control itself 15.08%), the same instability that has blocked every stack comparison since T181;
+  and this is a ceiling, so a real field lands above 7.75 ms. **Tasks 3, 4, 8, 9 and 10 are
+  deliberately not done**: the brief gates everything on the ceiling clearing 1.10x, so building a
+  rain-metrics harness and a rain-heavy fixture for an architecture that might be dead on cost would
+  have been wasted - both are now justified work, and the metrics need a **rain-only capture path**
+  (rain and cloud are composited in the reference frames) that cannot be retrofitted after
+  acceptance. **Verdict: proceed - build the GPU rain-support field**, in order: rain-only view plus
+  rain IoU / missed / false / onset / termination / continuity metrics and a rain-heavy fixture
+  first, then the 512x512 field target, then measure against the derived 1.13-1.15x, then sweep
+  resolution downward while the metrics hold; update frequency and scrolling are optimisations of a
+  field that must first be shown to pay. **If it were rejected**, the next targets are light tap
+  (26.45%) and empty-span probe (15.69%), 42% together. **Infrastructure note**: the first campaign
+  launch hard-crashed the client during shader-variant loading (exit -805306369) after six minutes
+  of compilation with **127 declared variants**; a clean relaunch completed all 38 cells, so it was
+  transient - but compiling 127 full-size fragment programs at every startup is close enough to a
+  cliff to prune before it becomes a recurring blocker, and roughly 90 are referenced by invariants,
+  so that prune is its own task. Evidence in `validation/performance-rain-field.md`.
+- [X] T188 [PERFORMANCE] [US3] Build the real GPU rain-support field, price it against the
+  traversal it replaces, and gate it on rain-specific quality.
+  **The field is real, it works, and T187's derivation was right.** Net including the build,
+  measured on two campaigns: **SIDE 1.1158x accepted** (three blocks, 2.24% spread), corroborated
+  by a second run's 1.1307x; FAR 1.1450x accepted in one run and 1.0776x rejected in the other.
+  T187 derived 1.13-1.15x from build arithmetic alone, so this is that prediction **confirmed**,
+  not merely not contradicted, and it lands in the brief's **1.10-1.15 strong-candidate** band. **No
+  stop condition fired.** **The build is nearly free: 0.2266-0.2458 ms** for 262,144 cells,
+  RGBA32F, **4 MB**, stable to within 8% across every arm and both poses - and
+  `t188_field_generate_only`, which pays the whole build and still marches the exact descriptor
+  path, returns **0.9967x and 0.9900x net at FAR (both accepted)**, proving the build costs 0.3-1.0%
+  and that the gain is genuinely the lookup replacing traversal. **Structural proof (Task 3): the
+  rain path does not shrink, it leaves the ray.** Tagged descriptor-shape calls fall
+  **1,358,167 -> 575,422 (-57.6%)** with `shapeAccountingClosed=true` and `shapeUntagged=0` on both
+  sides; **rain segment 750,507 -> 0** and rain shaft 17,314 -> 0; `rainFieldFetches` 2,098,025 with
+  **`rainFieldFallbacks=0`**, so every rain-relevant column is inside the inherited weather domain
+  and the exact-traversal edge path never fires. Build cost per cell measured at 1.000 shape calls,
+  0.180 group walks, 1.800 lobe visits, 0.786 exact SDFs, giving **8.00 ray fetches per cell built**
+  against T187's derived 7.61. **Generated by the production function itself** - an untimed
+  fullscreen pass in the same program calling the same `directStormRainSupportAt` - so there is no
+  second implementation to drift, which is the proof burden T172 had to discharge the hard way.
+  **And the field invents rain.** On the rain-only capture built for this task: **missed rain
+  0.75-1.02%, false rain 10.6-15.6%**, rain IoU 0.858-0.895, thin retention 0.969-0.983, mean onset
+  error 3.06-5.58 blocks, shaft continuity 0.935-0.965 with 11-42 newly broken shafts - the
+  asymmetry holding across four independent measurements. **The mechanism is identified**: ownership
+  is a boolean the bilinear filter returns as a fraction, and thresholding at half a cell still
+  **dilates** the union outward by up to four world blocks, which produces exactly this signature -
+  a ring of new rain around every shaft and no lost interior. **Verdict: accepted on performance,
+  not yet on quality; do not ship.** **Next: stop interpolating ownership** (a `NEAREST` ownership
+  channel, or a conservative threshold that erodes rather than dilates), re-run the rain-mask pair
+  targeting false rain at or below missed rain, and only then sweep resolution - **Task 8 is
+  deliberately withheld** because a coarser field makes half-texel dilation strictly worse, so the
+  sweep would produce a table dominated by an error with a cheaper fix. Tasks 9 and 10 likewise
+  wait: at 0.23 ms, rebuild frequency is not where the cost is. **Post-field attribution (Task 11)**
+  makes T187's shares obsolete as anticipated - **light tap 38.41% and empty-span probe 37.96%, now
+  co-dominant at 76.4% together**, primary body 17.04%, refinement 6.58%, rain **0%**. **Two defects
+  found and fixed, both of which would have silently corrupted the result**: a thirteenth shader-JSON
+  sampler threw `ArrayIndexOutOfBoundsException: Index 12 out of bounds for length 12` inside
+  `ShaderInstance.apply` and disabled the volumetric pass for a whole session (Minecraft tracks
+  twelve texture units; the field is now bound manually on PA-owned unit 15, as the puff candidate
+  map and both noise volumes already are), and the field GPU timer was sticky, reporting
+  `rainFieldP50=0.2109` on a `lean_final` anchor that ran no field pass - which would have charged
+  every control for the candidate's build. Both are now asserted by invariants. **FINAL is unchanged
+  by T188**: it bakes both field uniforms to 0, so neither the generation pass nor the lookup branch
+  is compiled into it. Variants **128 -> 133**, all five campaign-scoped; the T187 report's "127" was
+  one short, and the prune it recommended is still outstanding. Evidence in
+  `validation/performance-rain-field-real.md`.
+- [X] T189 [PERFORMANCE] [US3] Make rain-field ownership sampling discrete, and find out whether
+  interpolation was the quality failure.
+  **It was not, and this entry corrects T188.** T188 concluded that bilinear interpolation of a
+  boolean ownership channel dilated the union and caused its false rain, and stated that mechanism
+  as identified. Three arms - bilinear at 0.5, `texelFetch`, and bilinear at 0.99 - render
+  **byte-identical rain masks, same digest, at both poses** (SIDE `1321e341dd510683`, FAR
+  `9dc3104c50ba6ab7`), with `captureFresh=true` on every row. **Changing how ownership is resolved
+  changes the rendered rain by exactly zero pixels.** **The premise was measured rather than
+  assumed this time**: the texture *is* filtered (`fieldTextureIsFiltered=true`, filtered-minus-
+  texelFetch delta 42-92 on ownership and 249-306 on support), but **fractional ownership occurs on
+  only 0.19-0.32% of columns** - far too few to produce a 12% error. **The field is nearly exact**:
+  ownership disagrees with `directStormRainSupportAt` on **32 of 129,600 columns (0.02%)**, mean
+  support error 0.0014, **mean attach-height error 0.0275 blocks**. **The real mechanism is an OR
+  over ~60 column samples per ray**, and it is verified numerically rather than fitted: rain
+  presence is an existence test, T186/T188 measured ~30 segment tests x 2 Gauss nodes and 15.39
+  surviving support calls per pixel, and `1-(1-0.00224)^60 = 12.6%` against a **measured 12.36%**
+  false rain at SIDE. It also explains the asymmetry T188 misattributed - under an OR a wrongly
+  owned column propagates to the whole ray while a wrongly unowned one is masked by the other 59,
+  so false rain is amplified (12.36%) and missed rain suppressed (0.45%). **Resolution cannot fix
+  it**: 1% ray-level error needs ~13x lower per-column error, so ~169x the cells (44M vs 262,144),
+  which inverts the build ratio from 8.0:1 in the field's favour to about 1:21 against - Task 9's
+  sweep stays withheld, now for a firmer reason than T188 had. **Performance: the fix is free.**
+  `T189_OWNERSHIP_COST` measures nearest against bilinear in the same blocks at **0.9981 and 1.0030
+  (both accepted)** - zero within noise - and net SIDE holds at **1.1228 accepted at 0.15% spread**
+  (1.1368 in run 1), FAR 1.1341 accepted, all above the 1.10 band; field build 0.2350-0.2468 ms
+  unchanged. **Verdict: keep the discrete fetch, do not approve the field.** Ownership is a boolean
+  and asking a filter for it is a type error whatever it currently costs; the fetch is free and
+  removes a class of future error. But 8.5-12.4% false rain stands and the brief's bar excludes it.
+  **Recommended next: conservative ownership (Task 6 option C)** - store per cell whether it is
+  entirely owned, entirely unowned, or mixed, and fall back to the exact traversal on mixed cells
+  only. Mixed cells are the 0.2-0.3% measured here, so false rain goes to zero **by construction
+  rather than by tuning**, the 8:1 build ratio is preserved, no resolution change is needed, and the
+  fallback path already exists and is already exercised. Option B (signed ownership margin) is the
+  approximate alternative; **options A and D are ruled out** by the arithmetic above. **Not
+  measured**: the direction of the 32 disagreements is summed into one figure - splitting it is two
+  lines and belongs with the conservative-ownership work, where it sizes the mixed-cell fallback.
+  **Harness**: capture freshness is now checked against the request that produced it, because three
+  back-to-back mask captures made a stale read indistinguishable from the genuine result;
+  `WorkloadResult` hit the JVM's 255-parameter ceiling so T189's counters travel as a nested
+  `FieldProbe`; the coordinate mapping is asserted rather than assumed, with the build failing if a
+  half-texel term appears on either side of it. Stack **not banked** - SIDE composition rejected in
+  both runs on a control that spread 4.62-12.13%. Variants **133 -> 137**. Evidence in
+  `validation/performance-rain-field-ownership.md`.
+- [X] T190 [PERFORMANCE] [US3] Make the rain field conservative: classify cells at build time and
+  fall back to the exact evaluation where the field cannot be trusted.
+  **The fallback does what it was designed to do, and it costs the gain it was protecting.**
+  **Quality improved on every metric**: false rain **15.22% -> 2.99%** at SIDE and 10.75% -> 2.51%
+  at FAR, rain IoU **0.8632 -> 0.9675** and 0.9029 -> 0.9755, mean onset error **4.12 -> 0.79
+  blocks**, newly broken shafts 39 -> 20, shaft continuity 0.964 -> 0.982. **But net gain fell from
+  1.1575 to 1.0230 at SIDE** (1 block; the better-supported figure is **1.047**, from applying the
+  3-block `T190_CORRECTNESS_COST` of 0.9042 to T189's accepted 1.1575) and 1.1451 -> **1.0360** at
+  FAR (accepted). SIDE is under the brief's `<1.03x architecture no longer worthwhile` line and
+  **false rain did not reach zero**, which was the acceptance target. **Task 1 was measured before
+  the classifier was designed**, because T188 designed against an assumed cause and its fix changed
+  zero pixels: of 129,600 columns, **ownership disagreements are exactly 0** (view 63 confirms
+  independently, against T189's 32), and the entire residual is **support-cutoff crossing (111) and
+  attach-height variation (37)** - 0.114% total, down from T189's 0.224%, which is what turned 15%
+  false rain into 3%. **The classifier eliminated the ownership component completely**; what remains
+  is variation strictly inside a cell that five sample points cannot see. **Rates (Task 5)**: mixed
+  cells **1.42-2.04%**, fallback lookups 113,002 against 2,002,113 safe hits - a **2.91% fallback
+  fraction**, 0.184 per pixel - so 262,144 cells plus 113,002 fallbacks against 2,115,115 lookups
+  still amortizes **5.6:1**, down from 8.0:1 but nowhere near breaking the trade. **The fallback
+  rate is not what killed the gain: classification is.** Field build **0.2437 -> 0.8684 ms, 3.6x**,
+  because proving a cell uniform means five full `directStormRainSupportAt` calls instead of one;
+  the fallbacks add a further ~2.5 ms to the march. **Representation unchanged (Task 9)**: RGBA32F,
+  16 B/texel, 4 MB, one texture - T188 wrote alpha as a constant marker nothing read, so the
+  certainty flag cost **no extra channel, texture or byte**, and the hot lookup stays one
+  `texelFetch`, one comparison, a rare exact fallback. **Stack**: SIDE `t190_stack_safe` vs
+  `t172_stack_pre` **1.0761 accepted at 1.49%** - the first accepted SIDE stack composition since
+  T181, on a control that finally held still at 0.45% - 15.02 ms session-local; FAR rejected at
+  45.96% control spread. **Verdict: do not approve, and do not iterate on this classifier.** Both
+  failures share one cause and it is the instrument, not the architecture: **sampling five points is
+  at once too expensive to be cheap and too weak to be a proof.** **Next: bound ownership instead of
+  sampling it.** The scaling in `paRainColumnOwnedExact` is per-axis, so a cell's axis-aligned box
+  stays axis-aligned in scaled space and the min/max of `dot(scaled, scaled)` over it are
+  closed-form - `max < 1` proves the cell owned, `min > 1` proves it unowned, anything else is
+  genuinely mixed. That is **provably** conservative rather than sampled and costs one cheap loop
+  over ten lobes instead of four union evaluations, which should return most of the 0.62 ms while
+  keeping ownership exact by construction. The 148-column support/attach residual is then a named,
+  measured problem to bound or accept. If that does not restore net SIDE to ~1.12 with false rain
+  near zero, close the field: three campaigns have shown the performance is real and the correctness
+  is expensive. **Task 10 (resolution sweep) stays withheld** - it was gated on 512 being
+  quality-correct and it is not. **Task 12 not re-run**: the field is not accepted, so T188's light
+  38.41% / probe 37.96% stands as the last valid attribution. Variants **137 -> 140**; the prune is
+  overdue. Evidence in `validation/performance-rain-field-conservative.md`.
+- [X] T191 [INFRASTRUCTURE] Stop compiling every historical campaign arm at every startup.
+  **Shader registration fell from 6m 46s to 5s, and from 140 live fragment programs to 2.** The
+  before figure is measured, not estimated: the T190 log registers shaders 20:58:08 -> 21:04:54 and
+  T189 19:01:41 -> 19:08:13, **6m 46s and 6m 32s** - and that window is exactly where the T187
+  launch died, six minutes into shader loading. **Inventory**: all 141 enum programs classify
+  without a remainder - **2 production** and **139 campaign arms** across 26 prefixes (T166 alone
+  has 22, T170 15, T167 14) - with **zero orphans**, which is what makes scoping a complete answer
+  rather than a partial one. None of the 139 is referenced at runtime outside its campaign:
+  `setFinalProgramOverride` is called only by the driver and `CoreCostDiagnosticProgram.parse` has
+  no caller at all. **No invariant needed a live program** - every one validates generated source,
+  define tables, enum declarations or registry entries, and the sandbox has never had a GL context,
+  so **nothing was weakened**; the compile and link work was serving only the possibility that a
+  campaign might later select an arm. **Scoped rather than pruned**: registration filters on the
+  active campaign marker, and `campaignId()` derives from the arm's own `tNNN_` prefix resolved
+  against `StormCampaignRegistry`, so **a new arm inherits its campaign from its own name** - no
+  second table to keep in step and no way for the count to creep back as it did through T186-T190.
+  Nothing was deleted: every variant is still declared, still generated, and every validation
+  document still stands - only the `ShaderInstance` is conditional. **Three launches, both code
+  paths**: ordinary 5s and 4s with `registered=0 skipped=139`, and **T190 armed with
+  `registered=3 skipped=136` in 5s and no failed loads** - that second one is the counter-test that
+  matters, because a cleanup that quietly stopped campaigns working would look identical to a
+  successful one on an ordinary launch. **Peak shader-load memory is not separately instrumented
+  and is not claimed**; what is claimed is 2 programs instead of 140 over 5 seconds instead of 406.
+  **Production equality**: `git diff 1deb75f` over `shaders/` and `build.gradle` is **empty**,
+  `leanFinalConstants` and `leanProgramVariants` byte-identical, so no image or performance campaign
+  was required and none was run. Production programs register unconditionally ahead of the filter,
+  and `T191_VARIANT_SCOPE productionAlwaysLoaded=2|campaignScoped=139|unreachable=0` fails the build
+  if an arm ever becomes unreachable, if a production program acquires a campaign id, if the loop
+  stops filtering, or if a campaign's marker name drifts from the one the driver looks for.
+  Evidence in `validation/startup-variant-scope.md`.
+- [X] T192 [PERFORMANCE] [US3] Final rain-field attempt: the closed-form ownership bound, under a
+  hard stop.
+  **HARD GATE: FAIL. The rain-field line is CLOSED.** Quality passes - false rain 4.32-5.30%, well
+  clear of T188's 10-16% failure class - but **net SIDE is 1.0792 against a required 1.10x**, so by
+  the brief's own rule rain-field optimization closes completely and there is no sixth campaign.
+  **A correction that framed the task**: T190's report was headed "what killed it was the
+  classification", while its own body gave fallbacks at +2.52 ms against classification at +0.62 ms
+  - **the fallback is 4x the classification**, and this brief inherited the error. That set the
+  budget before any code was written: SIDE anchor ~32.7 ms, net 1.10x needs <=29.7 ms, T189's
+  field-only total was 28.25 ms, so classification **plus** fallback had ~1.47 ms to fit into and
+  T190 spent 3.14 - **eliminating classification entirely still leaves 2.52 ms, i.e. ~1.063**. The
+  bound attacks the 0.62 and could never reach 1.10 alone. **The derivation**: ownership is
+  `dot((worldXZ-centre)/radii, itself) <= 1`; the scaling is per-axis and strictly positive, so an
+  axis-aligned cell stays an axis-aligned box after scaling and the minimum of `u2+v2` over it is
+  closed form - zero per axis if the interval spans zero, the nearer endpoint squared otherwise. So
+  `min > 1` for every descriptor **proves** the cell unowned in one squared inequality per lobe: no
+  sampling, no exact SDF, no noise, no sqrt. **Only the dry direction is used** - "inside the
+  ellipse" is a *superset* of owned, since ownership also needs group coverage, so claiming SAFE
+  OWNED would be unsound in precisely the direction that invents rain. **Proven, not inspected**:
+  40,000 random ellipse/cell pairs straddling the boundary against a 25x25 grid - **12,699 proven
+  dry, 27,301 not provable, falseSafe=0**, both directions asserted non-vacuous, obtained *before*
+  any timing. In the campaign the bound proves **82.97-87.58%** of cells dry. **It is genuinely
+  cheaper and not enough**: field build **0.8684 -> 0.6021 ms (-31%)**, `T192_CLASSIFIER_COST`
+  **1.0313 accepted at 2.45%** - the field is 3.1% cheaper overall - but the fallback rate is
+  unchanged (3.67% vs 2.91%), because **the bound changes what classification costs, not what it
+  decides**, which is what it was designed to do and why it cannot reach the gate. The triage clears
+  ~85% of cells yet cuts the build only 31%, because the bound itself costs about one evaluation
+  pass: ten lobes at three texel fetches each over 262,144 cells. **Quality is byte-identical to
+  T190 at both poses** (IoU 0.942487 / 0.955959, same false and missed rain, ownership disagreement
+  0) - a direct confirmation of the design claim. **Stack recorded, not banked**: SIDE 1.1802
+  accepted at 2.50%, the cleanest stack number of the series, but the brief gates the stack on the
+  hard gate. **A T191 defect this campaign found**: two 57-minute runs died as
+  `world_entry_lost_during_T135_SAMPLE` with zero cells, and I first blamed memory. T191 scoped
+  shader registration by each program's *own* name prefix, assuming a campaign only selects its own
+  arms - false when written, since arm matrices reuse earlier campaigns' programs as controls (T190's
+  own matrix used `T172_STACK_PRE`). T192 selects `T190_FIELD_SAFE` and `T172_STACK_PRE`; neither
+  campaign was armed, so neither loaded, `volumeShader` returned null and the renderer
+  session-disabled. T190 ran before scoping existed, so **T192 was the first campaign under it and
+  broke immediately** - loudly and totally rather than as a silent wrong number. Registration now
+  takes the **union** with the active campaign's arm tables, resolved by reflection rather than a
+  hand-maintained map, and the invariant fails the build if it returns to prefix-only
+  (`crossCampaignControls=8`). **Why the line closes**: across five campaigns - T188 1.1158 at
+  12.36% false rain, T189 1.1228 unchanged, T190 1.0437 at 2.99%, T192 1.0792 at 5.30% - the problem
+  is no single classifier. **The field is cheap where it does not matter and expensive where it
+  does**: away from storms it is free and provably exact, but on owned columns its support value is
+  the one quantity with no cheap bound, because the union is eroded by noise - so correctness there
+  costs a fallback and fallbacks there are frequent enough to consume the gain. The closed form
+  removed the last avoidable cost; the remainder is intrinsic. **Variants removed from active
+  campaign use**: the marker is cleared and T191 scoping makes every rain-field arm inert on an
+  ordinary startup (`registered=0 of 142`) without deleting declarations or evidence. **Next task's
+  first action is a fresh production-path SIDE attribution** - every counter capture here ran with
+  the field forced onto the monolith, so all of them are post-field by construction, and spending
+  another 40 minutes on a closing line was the wrong trade. The most recent production-path capture
+  is T190 run C, one task ago on the same fixture: rain segment 55.26%, light tap 17.10%, empty-span
+  probe 15.77%, primary body 7.30%, refinement 3.29%, rain shaft 1.27%. **Rain stays the largest
+  single consumer and is now out of scope** - both the micro-optimization line (T186) and the field
+  line close here - so the next architecture target is the largest non-rain uniform consumer: light
+  tap plus empty-span probe, together about a third of the descriptor work. Evidence in
+  `validation/performance-rain-field-bound.md`.
+- [X] T193 [PERFORMANCE] [US3] Fresh production-path attribution, and pick the next architecture
+  from it rather than from history.
+  **Both remaining non-rain consumers price in the major band, and unlike rain both are
+  structurally suited to precomputation.** **Ceilings**: SIDE light removal **1.2490 accepted**
+  (2.22% spread), SIDE probe removal 1.2424 (4.33%, rejected on spread), FAR light **1.2302
+  accepted**, FAR probe 1.2771 (4.69%, rejected). Every rain-field campaign topped out at 1.12x net,
+  so **each of these on its own is worth more than the entire rain architecture was**. **Fresh
+  attribution** - the capture T192 could not provide, since no rain-field campaign is armed and the
+  monolith is therefore not forced to build a field: SIDE with `shapeUntagged=0` and residual
+  fraction 0.0001, rain segment **41.49%** (3.09/px), **light tap 21.96%** (1.64/px), **empty-span
+  probe 21.17%** (1.58/px), primary body 9.78%, refinement 3.89%, rain shaft 1.71%, total 7.46 shape
+  calls/px. The named consumers sum to `shapeTagged` exactly - **nothing attributed by subtraction,
+  no residual bucket**. `exactSdfPerGroupWalk` is 7.04 throughout, so ranking by group walks is also
+  ranking by exact-SDF work; two captures agree to 0.03%. **Rain remains the largest single consumer
+  at 41.49% and stays out of scope** - both its lines closed on measurement. **The ceilings are
+  ceilings**: `t176_nolight` leaves silhouette IoU at exactly 1.0000 while dark-interior retention
+  falls to **0.0032** (shape untouched, shading gone), `t180_noprobe` keeps dark-interior at 0.9996
+  and moves the silhouette instead (sample placement, not lighting) - two clean, diagnostic damage
+  signatures. **The semantics decide the architecture**: the probe is a *threshold* test
+  (`paProbeDensity > 0.0008`) whose only output is how far the ray may advance, and **its error is
+  one-sided and benign** - "material may be present" costs march time, never correctness; the light
+  tap is *integrated* over four taps into extinction, so errors **average** rather than compound.
+  **Neither has rain's structure**, and that is the whole argument: rain reachability is an
+  existence test ORed ~60 times per ray, which turned a 0.22% per-column error into 12% false rain
+  (`1-(1-0.00224)^60 = 12.6%`, measured). **The failure that closed the rain field does not
+  transfer**; what transfers is the part that worked - moving descriptor traversal out of the ray
+  gave a real 1.15x class gain on a 0.23 ms build. **Selected: a shared coarse 3D
+  storm-occupancy/density field serving both probe and light tap** - they are within 0.8 points of
+  each other in share and 0.007 in ceiling, so choosing one would be arbitrary, and they consume the
+  same quantity at different precisions, amortising one build across **43.13%** of shape calls
+  instead of 21%. **This is not the per-lane pruning that failed**: T179 removed 46.75% of exact SDFs
+  per lane for 1.0159x and T185 removed 71.50% for 1.0155x, because both changed what a thread
+  decided without changing what the shader executed; this removes the traversal from the ray for
+  whole coherent workloads, the shape that produced T180's 1.1972x and T188's 1.1158x. **Expected
+  gain deliberately not guessed**: the combined ceiling is **not measured** and neither is the 3D
+  build cost. **The open risk is dimensionality** - the rain field was 2D and cheap only because
+  T184 proved rain support XZ-invariant; storm density is not, so 262,144 cells at 0.23 ms becomes
+  1.05M-4.2M voxels, and whether the build leaves any of the 1.24x standing is exactly what T187
+  asked before T188 built anything. **Next task is semantics and pricing, not implementation**:
+  measure the combined ceiling in one arm, re-measure the probe ceiling to protocol (both its arms
+  were rejected on spread), establish what resolution each consumer needs, then price the 3D build
+  against the 43% it would remove. **Both lines stay open**; if the shared field does not survive
+  pricing they separate cleanly and light is the better-established of the two. **No new shader
+  variants** - both ceilings already existed, and T193 owning no programs of its own makes it the
+  clean test of T192's cross-campaign registration fix (`registered=2 crossCampaignControls=3`).
+  Evidence in `validation/performance-production-attribution.md`.
+- [X] T194 [PERFORMANCE] [US3] Price the shared 3D storm field before building it: combined
+  light+probe ceiling, semantics audit, build oracle.
+  **Pricing only - no field was built and nothing was wired into the renderer.** **Combined
+  ceiling measured, not inferred**: FAR `t194_noboth` **1.7450 accepted** (2.92% spread,
+  removable 8.73 ms of 20.45); SIDE 1.9981 on one block (1.9351 / 1.9518 on the two others,
+  rejected on anchor drift of 3.01% and 3.21% against a 3.00% tolerance - so
+  `REJECTED_insufficient_blocks`, not established to protocol). T193's two single-consumer
+  ratios multiply to 1.551; the measured combined ratio is 1.745-1.998, so the consumers are
+  **superadditive** and inferring would have understated the budget by 13-29%. **Build oracle**:
+  each fragment of the 512x512 weather-domain pass sweeps N slab heights through production
+  `cloudDensity` (no detail, no precipitation) on the field clock - 16/32/64 slices measured
+  **1.6835 / 3.2683 / 6.4679 ms** at SIDE, 0.4014-0.3855 ns/voxel, linear over a 4x range, march
+  ratio 1.01 throughout so the build lands entirely in its own column. **Semantics**: light taps
+  accumulate `density * stepLength * tapWeight` over four taps with detail on the first two only
+  and mip bias `i*0.6` - they need an unbiased estimate; the probe is `density > 0.0008` with
+  one-sided error - it needs a conservative upper bound. One field, two channels: R mean, G max,
+  RG16F, 4 bytes/voxel. **Domain**: `WeatherExtent` 4096 blocks, slab ~866 blocks for the fixture;
+  candidates 256x256x32 (2.1M voxels, 8.4 MB, 0.84 ms derived) to 512x512x64 (16.8M, 67 MB, 6.72
+  ms). Break-even before lookup **1.904x SIDE / 1.645x FAR** at 256x256x32. Left open: lookup cost
+  (estimated, not measured), update frequency (not audited), the SIDE ceiling to protocol, and
+  whether the max channel can be a true bound at one evaluation per voxel. Four variants added,
+  all campaign-scoped (`declared=146 registered=4 skipped=142`). Evidence in
+  `validation/performance-shared-field-pricing.md`.
+- [X] T195 [PERFORMANCE] [US3] Finish the shared-field price: SIDE ceiling to protocol, lookup
+  measured, update frequency audited, gate decided.
+  **Recovery, not restart**: T194's variants, matrix, registry row and evidence were intact at
+  `47fd756`; its `tasks.md` entry, gate log and evidence directory were missing, its marker was
+  still armed, and its report had left the SIDE ceiling on one block, the lookup estimated, and
+  the rebuild cadence unaudited. Branch merged with `origin/Forge-1.20.1` (`8e22da4`, PR #101/#102)
+  as `21758ee` first. **Combined ceiling established**: SIDE `t194_noboth` **1.8595 accepted**
+  (four blocks, 1.02% spread, removable **14.04 ms** of 30.36); FAR 1.6353 rejected on 7.00%
+  spread (arm cells wandered, anchors held), so T194's accepted FAR 1.7450 stands. **Lookup
+  measured**: `t195_lookup` pays one trilinear fetch per light tap into the production scatter
+  chain and 13 fetches per scan event from a stand-in 8 MB volume (the 128^3 base noise addressed
+  over the weather domain and slab) - **1.8178 accepted** at SIDE (1.94%), so reading the field
+  back costs **0.41 ms** at SIDE and 0.27 ms at FAR, 2.9% of what it removes, and that includes
+  the scatter chain the no-light ceiling had been generous by. **Update frequency audited in
+  code**: `WorldTime` reaches only the funnel swirl and the rain shaft; the body noise is a static
+  function of `p - MaterialOffset`, so the field needs no clock, only dirty state - which, because
+  the weather bake, descriptor upload and material advection all refresh every frame while a storm
+  moves, is every frame in practice, and is what the break-even already charges. **Semantics
+  re-verified** and one gap closed: a single evaluation per voxel is a point sample, not a bound,
+  so the probe's max channel needs a closed-form bound or a directional super-sample, and the
+  probe must read it `NEAREST`. **Break-even on measured values**: net SIDE = 30.43 / (16.74 +
+  build): **1.731x at 256x256x32** (0.84 ms, 8.4 MB), 1.513x at 512x512x32, 1.296x at 512x512x64;
+  a full 2x2x2 max super-sample at 256x256x32 (16.8M evaluations, the 512x512x64 arm's count,
+  6.47 ms measured) still gives 1.296x SIDE but **1.081x FAR** - the only term that can still
+  close the architecture, and the first decision of the implementation. Break-even voxel count
+  27.2M SIDE / 15.9M FAR. **GATE: PASS.** No real field exists; the next task is the max-channel
+  bound, then the quality harness, then a 256x256x32 `(mean, max)` RG16F field. One variant
+  added (147 -> 148), campaign-scoped (`registered=2 skipped=145 crossCampaignControls=3`).
+  **Campaign infrastructure**: the T194 client idled 30 of its 45 minutes after
+  `T132_AUTORUN_FINISHED`, the unused T098 capture set took 3.5 minutes, and the 44-stage
+  production-context counter capture took 7-9 s of every 11 s cell while being identical for every
+  cell of a pose; the driver now stops the client on `run/t132-autorun-exit.txt`, finishes
+  program-arm campaigns after their report, and captures counters once per pose. Evidence in
+  `validation/performance-shared-field-lookup.md`.
+- [X] T196 [PERFORMANCE] [US3] Build the shared 3D storm field for light taps and empty-span
+  probes, prove the probe floor sound, and measure it net of its build.
+  **Built, sound, and 2.06x net at SIDE.** One 256x256x32 field over `WeatherExtent` and the slab,
+  an 8x4 atlas in a single 2048x1024 **RG16F** target (8.4 MB), one fullscreen draw before the
+  timed march on the field clock: R the detail-free production density (the light cone reads it
+  bilinearly across two slices, four taps unchanged), G the **probe floor** - a lower bound on the
+  storm body's noise threshold over the node's dual cell, from `L >= 1 - 1.65 E` (the
+  strength-fill product is bounded) and `E` at the node's union distance dilated by the largest
+  drop the distance can take across the cell: horizontal half-diagonal times the lobes' ellipse
+  aspect plus vertical half-extent times the profile's **cell-local** height slope, both published
+  by the walk `cloudDensity` already does, so **one walk per node** serves both channels against
+  the rejected 2x2x2's eight. The probe fetches the nearest node and tests the exact base noise at
+  its point: one texel and one noise fetch. **Soundness oracle** (pass 2, 2,097,152 nodes x 43
+  production-exact reference samples, CPU readback): six launches took the floor from 11,667
+  underestimates (isotropic dilation) to **0 at both poses** - the lobe pseudo-distance's vertical
+  Lipschitz constant is `|dR/dy|` and reaches **8.6** on the anvil flare, the T121 vertical
+  rejection needs the cell's half-extent as margin, and the last "misses" were the oracle
+  sampling the tile boundary that belongs to the neighbouring node. Useful empty retained
+  **98.5% / 99.0%**. On the ray: `stormFieldProbeFalseEmpty=0` at both poses, false-occupied
+  69,245 against 11,498 true (the bound's price, paid in fine steps). **Build 1.77 ms SIDE /
+  1.65 FAR** (twice T195's projection: no reach early-out, vertical margin, nine weather texels
+  per node). **Net, three accepted blocks each**: SIDE `field_both` **2.0570x** (0.11% spread,
+  29.42 -> 12.69 + 1.61 ms), FAR **1.5489x** (1.22%); light alone 1.14x / 1.05x, probe alone
+  1.10x / 1.06x; the pair beats T195's 1.8595x removal ceiling because the field probe keeps the
+  scan's empty-span skipping that the ceiling arm lost, and fewer primary steps mean fewer light
+  cones. **Workload**: `shapeLight` 1,181,752 -> 0, `shapeProbe` 745,951 -> 0, exact SDFs
+  **-45.2%**, shape calls -26.6%, `shapeUntagged=0`, residual 274 of 3.4M; the new largest
+  consumer is the rain segment at 67.7%, then the primary march at 22.6% (grown by the probe's
+  conservativeness). **Quality**: the light channel keeps what rejected light3 - dark-interior
+  retention **0.956** (light3 0.072), self-shadow contrast 0.938, silhouette IoU 1.000 - and loses
+  a third of the shadow pockets (**0.704**) and a tenth of valley depth, which is what a 16-block
+  node does to an envelope edge; the probe channel is near-lossless (SSIM 0.966, IoU 0.992, 0.6%
+  changed pixels). A hybrid arm (first two taps exact) costs half the gain (1.32x) and does not
+  restore the pockets (0.723) - closed. **Verdict: performance and soundness pass; light quality
+  is a conditional pass on the pocket metric, and the resolution question is now about quality,
+  not economics** - 512x512x32 would still net about 1.48x. Next: XZ resolution for the pockets, a
+  tighter floor (86% of "possible" verdicts are false), dirty-state reuse measured on a moving
+  fixture (the frozen fixture would have hidden the build), then production wiring. Five variants
+  (147 -> 152), three workload views (47), a T196 sandbox invariant that compiles every field
+  program and proves FINAL bakes the field out; `mods.toml` expands `simpleclouds_mandatory` so
+  the dev client boots without Simple Clouds after Forge-1.20.1 made it mandatory. Each launch
+  six minutes, self-exiting. Evidence in `validation/performance-shared-field.md`.
+- [X] T197 [PERFORMANCE] [US3] Measure the shared field at 384 and 512 XZ nodes against 256 for
+  shadow-pocket recovery, probe soundness and net cost, and select a resolution.
+  **XZ resolution does not recover the pockets; 256 stays and the resolution line is stopped.**
+  `PA_STORM_FIELD_XZ` became a live uniform in the five T196 programs (baked 256 elsewhere; no
+  program added, `registered=2`), with `StormFieldGeometry` as the one derivation of spacing,
+  half-cell, atlas and bytes; the extent is identical at every grid. Only 256 and 512 nest in the
+  16-block candidate tiles that T196's single-tile soundness argument reads; 384 straddles them
+  and was measured by the oracle instead. One launch, 19 arms x 2 poses, 2 min 19 s. **Probe**:
+  0 underestimates at every grid and pose (2.1M / 4.7M / 8.4M nodes x 43 samples), false-empty 0
+  on the ray; useful-empty 98.55 -> 98.63%, false-occupied 76,522 -> 73,188 - the envelope barely
+  tightens because the dilation's vertical term dominates. **Light, SIDE light-only**: pockets
+  **0.705 / 0.684 / 0.698**, dark-interior 0.974-0.976, SSIM 0.951-0.957; FAR 0.710 / 0.744 /
+  0.768 on 207 pocket pixels. **Pocket diagnostic** (new, per capture with mask and difference
+  PNGs): the arm is darker around every pocket by -0.0065 (11% of pocket depth), the wells are
+  12-14% shallower and the walls sit +0.95 px outward - the same at 16, 10.7 and 8 blocks a node;
+  512 recovers 55 of 256's 245 lost pockets and newly loses 61, scattered at random rather than
+  at the envelope edge. The pockets are flattened by uniform over-darkening, not smeared shut:
+  **the 16-block-smearing hypothesis is falsified**, and the remaining suspect is the detail-free
+  R channel overstating extinction along the cone (then Y). **Build** 1.61 / 3.76 / 6.28 ms
+  SIDE, linear in nodes, identical per-node walk cost; the march is flat (13.45 / 13.17 /
+  13.15 ms) and fetches per pixel constant, so a 4x field costs nothing on the ray. **Net**
+  SIDE **2.151x** / 1.923x / 1.666x, FAR 1.581x / 1.357x / 1.155x, `T197_REJECTED count=0`.
+  Winner 256 (8 MiB); production-quality light FAIL on the pocket metric at every resolution.
+  **Post-field attribution** (256 SIDE): rain segment 62.0%, primary 26.8% (+53.5%, 80% of the
+  probe's possible verdicts are false), refine 7.7%, shaft 3.5%, light and probe 0, untagged 0,
+  residual 175 closed. Next: tighter floor, vertical term first (largest non-rain consumer), and
+  separately a detail-aware R channel measured with the pocket diagnostic. Gate 28 s, check
+  build 57 s. Evidence in `validation/performance-shared-field-resolution.md` and
+  `validation/t197-campaign/`.
+- [X] T198 [PERFORMANCE] [US3] Find and remove the light field's extinction bias so the shared
+  field's light channel is production-quality: shadow-pocket retention from ~0.705 to >=0.90
+  (>=0.85 with visual support) at 256x256x32, dark-interior retention kept, probe soundness
+  unchanged, net SIDE >=1.20x (bands: >=1.50x excellent, 1.30-1.50x major, 1.20-1.30x strong).
+  **Done: PASS, the field is ready to productionize.** A light-tap audit program
+  (`t198_light_audit`, `PA_LIGHT_AUDIT`; exact production density evaluated beside every field
+  tap, eight accumulators x eight decomposition variants captured per pose through the
+  reference-image path and joined with the anchor's pixel classes by `StormLightTapErrorReport`)
+  measured the T196 field at SIDE pockets: taps 0-1 **+0.25 density a tap, 95% over**; taps
+  2-3 -0.04 / -0.07 mean with **0.21 / 0.25 RMS**; cone optical depth +4.2 of 68 (+6.2%), and
+  per pixel that cone error drives the pocket luminance error (r = -0.63 SIDE, -0.67 FAR).
+  Decomposition: **erosion stage +9.18** (the near taps' missing bite), detail noise 0.37 of
+  that, mip bias **0.000** (the sampler carries no mip), weather 0, morphology 0, build-mode
+  walk 0, **interpolation -4.99** - and the interpolation term is aliasing: the base noise's
+  texel is 3.1 blocks against 16-block nodes, which is why T197 found the loss invariant in
+  XZ. The T196 hybrid removed the erosion term on taps 0-1 and left the aliasing on taps 2-3.
+  **Correction**: R becomes the storm body's exact threshold L at the node and B its height01
+  (from the same walk), and the tap interpolates those two envelope quantities and evaluates
+  the base noise, the detail and the erosion at its own point - the probe's architecture
+  applied to the light; RGBA16F (A keeps the T196 density), 16 MiB, consumer bit 8, two arms
+  (`t198_field_light_exact` 9, `t198_field_both_exact` 11). **Quality** (light alone): pockets
+  **0.644 -> 0.880 SIDE, 0.739 -> 0.923 FAR** (regions 0.90 / 0.96), both consumers 0.625 ->
+  0.861 / 0.705 -> 0.874; wall displacement 1.01 -> 0.13 px, walls beyond reach 701 -> 14, 211
+  of 279 lost pockets recovered; SSIM 0.925 -> 0.941, changed pixels halved, dark interior
+  0.974 / 0.913, contrast 1.26 (the residual is now a slight under-extinction). After
+  correction taps 0-1 RMS 0.30 -> 0.07; taps 2-3 keep a one-sided -0.04 / -0.06 at the
+  storm's top rim - the vertical envelope, the named remaining error. **Performance**: net
+  SIDE **2.151x** (control 2.204x, spread-rejected), FAR 1.580x (1.579x); march +0.27 ms,
+  build +0.004 ms, +13 noise + 6.9 detail fetches / px. **Probe unchanged**: oracle 0
+  underestimates on the corrected build, false-empty 0, attribution identical (rain 62.3%,
+  primary 26.5%). Three programs added (155 declared, 5 registered), gate 41 s, check build
+  86 s, two launches of ~7 min. Next: productionize the field into FINAL (bits 11), then a
+  fresh FINAL baseline with the audit on the far taps. Evidence in
+  `validation/performance-shared-field-light-bias.md` and `validation/t198-campaign/`.
+  Sub-tasks T198a-T198h below, in order; the campaign is one launch after T198f. Evidence goes to
+  `specs/001-native-storm-rendering/validation/performance-shared-field-light-bias.md` and
+  `specs/001-native-storm-rendering/validation/t198-campaign/`. Constraints from the brief: no
+  resolution change (256 only; no 384/512/Y/extent), no probe change (defer the tighter floor),
+  no second field campaign on a hunch after a FAIL, no merge. [SC-005, SC-021]
+- [X] T198a [US3] Task 0 recovery: inspect and record, in the report's section 1, the exact
+  light path the field replaces - the four-tap loop in
+  `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh`
+  (production tap `cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false)`: per-tap
+  mip bias 0.6 i, detail on taps 0-1 only, T149 detail grading `paLightingDetailWeight`, the
+  early-out and weights), the node build `paStormFieldNodeAt` (`cloudDensity(node, 0.0, false,
+  false, false)`: mip 0, no detail, build-mode walk with the reach early-out lifted and the
+  vertical reject margin), `paStormFieldDensityAt` (bilinear in tile, linear across two slices),
+  and inside `cloudDensity` the order of weather modulation, morphology, descriptor union,
+  erosion and detail. Record what the T196 hybrid (`PaStormFieldEnabled` bit 4) actually did:
+  taps 0-1 on the exact walk with detail and their mip bias, taps 2-3 on the field - so it
+  restored the near taps entirely and left the far taps' bias untouched. Verify the baseline:
+  `StormFieldGeometry.DEFAULT_XZ == 256`, `VolumetricCloudDebugConfig.stormFieldXZ()` reset to
+  it at campaign start, no `run/t197-*` marker present. No code change in this sub-task.
+- [X] T198b [US3] Tap-level error capture (Task 1): add a light-tap audit to
+  `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` behind
+  a new uniform `PaLightAudit` (baked 0 in every program by the `build.gradle` override map,
+  live only in the monolith). When non-zero and the field's light bit is on, every light tap
+  evaluates both `paStormFieldDensityAt(pos + offset)` and the exact production
+  `cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false)` (the field value still
+  drives the render), and accumulates per pixel per tap i: sum(field - exact), sum|.|, sum(.)^2,
+  count, over/under counts. Expose them as three workload debug views (next free ids after 69;
+  register in `VolumetricCloudRaymarchDebugView.java`, `StormWorkloadRuntimeCapture.java` and the
+  T175 view list): per-tap mean signed error (RGBA = taps 0-3), per-tap mean |error|, per-tap
+  count with over/under packed. Add `StormLightTapErrorReport.java` (package
+  `net.Gabou.projectatmosphere.clouds.client.render.volumetric`) that joins the three captures
+  with the anchor frame's pixel classes from `StormImageQualityMetrics` (reference shadow
+  pockets via `pocketDiagnostics().refPocket()`, dark interior = darkest quartile of interior,
+  normal interior, edge band) and prints `T198_TAP_ERROR pose=.. tap=.. region=..` lines with
+  mean, median, RMS, p95 |error|, sign bias, over/under-estimate fractions and sample counts.
+- [X] T198c [US3] Decomposition (Task 2): extend the audit with `PaLightAuditVariant` (uniform,
+  baked 0 elsewhere) selecting what the "exact" side evaluates at the same tap point: 0
+  production; 1 detail off; 2 erosion off; 3 mip bias 0; 4 weather modulation off; 5 morphology
+  off; 6 the field's own node equation evaluated directly at the tap (build-mode
+  `paStormFieldBuildNode`, mip 0, no detail) - so 6 minus production is the representation error
+  and the texture value minus 6 is the interpolation/discretization error. Each toggle is a
+  branch inside `cloudDensity` (or its callees) guarded by `PaLightAuditVariant` and must be
+  compiled out of FINAL (sandbox check). In `StormT132AutoDriver.java` sequence one audit
+  capture per variant per pose on the monolith with the field forced on
+  (`setStormFieldForcedOnMonolith(1)`), and have `StormLightTapErrorReport` print, per tap and
+  region, the contribution of each term as the difference between variant errors. Report which
+  pair carries the ~-0.0065 pocket bias.
+- [X] T198d [US3] Hypothesis verification (Task 3): in `StormLightTapErrorReport.java` compute,
+  over light samples inside reference pocket regions and separately outside, the Pearson
+  correlation and regression slope between the missing term identified in T198c (e.g. exact
+  with detail minus exact without detail, per tap) and the field error (field minus exact), and
+  print `T198_BIAS_CAUSALITY region=.. r=.. slope=.. explainedFraction=..`. State in the report
+  whether omitting that term explains the pocket bias (explained fraction and sign), or does
+  not; if the direct-equation variant (6) already carries the bias, say the representation is
+  incomplete; if only the texture does, say discretization/interpolation is responsible.
+- [X] T198e [US3] Minimum correction oracle (Task 4), chosen only from T198c/T198d: implement
+  the cheapest form that restores the identified term as `PaStormFieldEnabled` bits 8 and, if
+  two candidates survive, 16, in the shader and as at most two campaign-scoped variants in
+  `build.gradle` (`cloud_atmosphere_volume_t198_<name>`, `PA_PRECIPITATION_ABSENT 1`,
+  `PA_ARM_DESC_PRECOMPUTE 1`, keepUniforms `PaStormFieldPass`, `PaStormFieldXZ`) plus enum
+  constants and `stormFieldEnabledBits()` in `CoreCostDiagnosticProgram.java`. Candidates: (A)
+  field for the walk on all four taps plus the cheap missing term evaluated at each tap (detail
+  fetch / erosion / mip-matched base noise), (B) the term baked into R in `paStormFieldNodeAt`
+  during the build, (C) a correction scalar in a third channel (RGB16F target in
+  `VolumetricCloudRenderTargets.java`; report the memory), (D) an analytic bias term only if
+  T198d shows a stable one. Write in the report why the candidate differs from the T196 hybrid
+  before measuring: it keeps the field's walk on every tap and adds only the missing term on
+  every tap, including the far taps the hybrid left biased.
+- [X] T198f [US3] Campaign T198: add `new Campaign("T198", "t198-light-field-bias.txt",
+  "lightFieldBiasRunRequested", "t198Run", "T198_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP)`
+  to `StormCampaignRegistry.java`; in `StormT132AutoDriver.java` the marker, predicate, flag,
+  `T198_POSES = {SIDE, FAR}`, `T198_ARMS` (LEAN_FINAL anchors; `T196_FIELD_BOTH` at 256 as the
+  control; each T198 correction arm; three repeats, 60 samples), `T198_OPTIMIZATION_ARMS`,
+  `T198_IMAGE_ARMS` (light-only and both for the control and each correction, with
+  `t197ReportPockets`-style pocket diagnostics against the control), counter phases (production,
+  field control, each correction with `requestStormFieldSoundness()` so `T196_SOUNDNESS`
+  proves the probe unchanged), the T198c audit captures, and `buildT198Report()` via
+  `buildBracketedPricingReport("T198", "T198_LIGHT_BIAS_DECISION", ...)` with the control's
+  arm key as block lead. Wire every `t197Run` dispatch site for `t198Run`.
+- [X] T198g [US3] Invariants in
+  `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`:
+  FINAL bakes `PaLightAudit`, `PaLightAuditVariant` and the correction bits to 0 and carries no
+  audit view code; every T198 program compiles in the GL context with its bits baked; the new
+  workload views are enabled (T175 count updated); the campaign wiring check passes for the
+  registry's newest row. Run `./gradlew.bat campaignGate` (tens of seconds; inspect elapsedMs
+  first if slow).
+- [X] T198h [US3] Run the campaign once (`run/t198-light-field-bias.txt`, keep
+  `run/t132-autorun.txt` and `run/t132-autorun-exit.txt`, `./gradlew.bat runClient --offline
+  -PsimpleCloudsMandatory=false`, one GPU campaign at a time), retire the marker, extract the
+  `T198_*`, `T196_SOUNDNESS`, `T136_COUNTERS`, `T166_IMAGE_AB` and `T197_POCKETS` lines to
+  `validation/t198-campaign/t198-run.log` with the pocket mask/diff PNGs, run `./gradlew.bat
+  check build` once, and write `validation/performance-shared-field-light-bias.md` with the
+  55-item final report: tap error per tap and region, decomposition contributions (envelope,
+  weather, morphology, erosion, detail, mip bias, interpolation), root cause, the T196 hybrid
+  contrast, the correction's added fetches / build cost / memory, quality before/after (pockets,
+  pocket error, wall displacement, dark interior, contrast, valley, SSIMs, IoU, RMS), field /
+  ray / combined p50-p95, SIDE and FAR net with spreads, PASS/FAIL against Task 9, and the exact
+  next task (PASS: productionize the field into FINAL; FAIL: the remaining tap-level error).
+  Add the `[X]` summary to this file, commit with the session attribution, do not merge.
+- [X] T199 [PERFORMANCE] [US3] Productionize the accepted T198 shared light/probe field into the
+  ordinary FINAL renderer path. **Done: PASS, the shared field is FINAL.** FINAL builds the
+  256x256x32 RGBA16F field before every timed draw and reads it on both consumers (bits 11 baked
+  through `leanFinalConstants`, `PaStormFieldPass` live, XZ a constant, the audit out, the T196
+  hybrid and the T197 sweep retired); the monolith defaults to the same bits so debug views
+  render FINAL's image. **FINAL is byte-identical to the T198-accepted program and prices at
+  1.00x of it** (13.03 vs 13.10 ms SIDE, 10.73 vs 10.77 FAR); **fresh baseline net 2.088x SIDE /
+  1.545x FAR** against the pre-field FINAL (`t199_final_nofield`, 30.6 / 19.0 ms), build 1.65 /
+  1.55 ms, empty-sky build 0.53 ms (named as the first follow-up). Probe sound: false-empty 0,
+  oracle underestimates 1 of 2.1M (worst 0.0012, boundary 0). Pockets on run 2's fixture:
+  light-only 0.851 / 0.904, FINAL 0.771 / 0.871 - FAR reproduces T198 like for like, SIDE is the
+  fixture (619 pockets vs T198's 784; the metric is never compared across sessions again).
+  Attribution under the field: rain segment 65.9% / 66.8%, light and probe 0, recorded not acted
+  on. Far-tap residual re-measured on the FINAL baseline (taps 2-3 at the pockets -0.047 /
+  -0.096, cone -8.7%), located in the pixels beneath the anvil top rather than the silhouette
+  rows, not worked. Lifecycle proven in the log (alloc once, kept across cloud-target
+  recreation, released on disable / reload / resize / exit). Every-frame rebuild kept; reuse
+  counters in place. **Two lessons banked**: compiling the dead oracle out of FINAL cost 30% at
+  SIDE (run 1) - the strip was reverted and FINAL ships the measured program; and campaign
+  evidence must always be read within one session. Decision A: tighter floor deferred (bound
+  4.7% / 4.4% < 10%). Decision B: structurally ready for temporal work, not budget-ready; the
+  next task is a two-scale FINAL baseline to re-derive the pixel-scaling exponent. Two client
+  runs of ~5 min, gate 25-45 s, check build PASS. Evidence in
+  `validation/performance-shared-field-final.md` and `validation/t199-campaign/`. Not merged.
+  Basis, fixed by T198 and not re-decided here: 256x256x32
+  (`StormFieldGeometry.DEFAULT_XZ`, Y 32, RGBA16F, 16 MiB); R/B = the storm body's exact
+  threshold L and height01 at the node from the build-mode walk, G = the conservative probe floor,
+  A = the T196 density; every one of the four light taps interpolates the envelope and evaluates
+  the base noise, the detail (taps 0-1) and the erosion at its own point (consumer bits 8 + 1),
+  the probe reads G `NEAREST` (bit 2) - production bits **11**; probe false-empty 0 and oracle
+  underestimates 0; pockets 0.880 SIDE / 0.923 FAR; net SIDE 2.151x, FAR 1.580x; march +0.27 ms,
+  build +0.004 ms over T196's ~0.84 ms. **Acceptance**: FINAL binds one program that builds the
+  field before its timed draw and reads it on both consumers; FINAL carries no audit, no oracle
+  pass, no hybrid branch and no live resolution; the field's atlas is allocated once, survives
+  cloud-target recreation, and is released on pass disable, shader reload and shutdown; the
+  field rebuilds every frame; FINAL-path pockets >= 0.85 SIDE / >= 0.90 FAR against the
+  pre-field FINAL image, dark interior within 0.02 of T198, `T196_SOUNDNESS` underestimates 0 on
+  the production node equation, `stormFieldProbeFalseEmpty=0` under production bits; a fresh
+  paired FINAL baseline at SIDE and FAR within the T198 band (>= 1.20x, expected ~2.15x / ~1.58x)
+  with the field build p50-p95 on its own clock; fresh attribution under the productionized
+  field; the tap 2-3 top-rim residual (-0.04 / -0.06) re-measured by the retained audit and
+  recorded, not touched. **Constraints**: do not optimize the far-tap residual; do not change the
+  field resolution (256 stays; XZ becomes a constant, which is not a change); do not reopen rain
+  optimization (T184-T192 evidence stands, rain segment share is recorded, not acted on); do not
+  merge; keep every T19x report, campaign log and PNG under `validation/`. Evidence goes to
+  `specs/001-native-storm-rendering/validation/performance-shared-field-final.md` and
+  `specs/001-native-storm-rendering/validation/t199-campaign/`. Sub-tasks T199a-T199k below, in
+  order; the campaign is one launch after T199h. [SC-005, SC-021]
+- [X] T199a [US3] Campaign-only audit (item 1). **Done: ledger written as section 1 of
+  `validation/performance-shared-field-final.md`** (nine tables, 60 controls, every one anchored
+  to a file:line at `6046ea0`). Decision recorded: FINAL bakes bits **11**, bit 4 is dead in FINAL,
+  `PaStormFieldPass` stays live (0/1), `PaStormFieldXZ` bakes 256, audit selectors bake 0.
+  Findings for the later sub-tasks: the pass-2 oracle (`.fsh:7574-7633`, sole callers of
+  `paStormFieldReferenceFloorAt`) would compile into FINAL once the pass is live, so T199c's
+  `PA_STORM_FIELD_ORACLE` define is required, not optional; `stormFieldForcedOnMonolith == 0`
+  today means "no field", so the monolith's default must become 11 or every debug view diverges
+  from FINAL; `LEAN_FINAL_SPECIALIZATIONS` in the sandbox lacks every T188+ row; and
+  `validateT197FieldResolution` (`:765`) asserts `PaStormFieldXZ` is live on every field arm -
+  the T197 clause must be inverted with the T196 one when T199h bakes XZ. Baseline confirmed:
+  `DEFAULT_XZ == 256`, no `run/t19*-*.txt` marker, `run/t132-autorun*.txt` present. No code
+  change. Original brief: inspect and record, as section 1 of the report, a
+  three-column ledger (promote to FINAL / campaign-only, keep / campaign-only, retire) of every
+  field-related control, with the file and line it lives in. Cover at least: the `PaStormFieldPass`
+  values 0/1/2 (render, build, T196 soundness oracle) in
+  `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh`; the
+  `PaStormFieldEnabled` bits 1 (light), 2 (probe), 4 (T196 hybrid: taps 0-1 exact), 8 (T198
+  exact-noise tap) and the tap selector at `(PaStormFieldEnabled & 1) != 0 && !((... & 4) != 0
+  && i < 2)`; `PaStormFieldXZ`; `PA_LIGHT_AUDIT`, `PaLightAuditVariant`, `PaLightAuditOutput` and
+  the audit accumulators; in `VolumetricCloudDebugConfig.java` `stormFieldForcedOnMonolith`,
+  `stormFieldXZ`/`setStormFieldXZ`, `lightAuditVariant`/`lightAuditOutput`,
+  `lightAuditFieldBits`, `stormFieldSoundnessRequested`; in `VolumetricCloudRenderer.java`
+  `stormFieldProgram()`, the build block before the timed draw, the `RAIN_FIELD_TIMER` serving as
+  the field clock, `runStormFieldSoundnessOracle`, the manual `StormFieldSampler` bind on unit 15
+  in `bindManualTextures`, and `stormFieldTextureId` reset every frame; in
+  `VolumetricCloudRenderTargets.java` `prepareStormFieldTarget`, `stormFieldTargetXZ`,
+  `prepareStormFieldOracleTarget`/`releaseStormFieldOracleTarget` and the release in
+  `shutdown()`; in `CoreCostDiagnosticProgram.java` `stormFieldGeneration()`,
+  `stormFieldEnabledBits()`, `lightAuditCapture()` and the T196/T198 constants; in `build.gradle`
+  the `leanFinalConstants` rows for `PaStormFieldPass/Enabled/XZ/PaLightAuditVariant/Output`,
+  the T196 `keepUniforms` pattern and the `t196_*`/`t198_*` variant rows; in
+  `StormT132AutoDriver.java` the `t196Run`/`t197Run`/`t198Run` phases. State the decision that
+  FINAL's baked bits are 11 and that bit 4 is dead in FINAL, and confirm the baseline
+  (`DEFAULT_XZ == 256`, no `run/t19*-*.txt` marker, `run/t132-autorun.txt` present). No code
+  change in this sub-task.
+- [X] T199b [US3] Promote the field into FINAL (item 2). **Done: seven edits, no shader change,
+  `compileJava` clean, generated FINAL verified** (`PaStormFieldPass` live and kept in the JSON,
+  `PaStormFieldEnabled = 11`, `PaStormFieldXZ = 256`, audit selectors 0, `t171_dup_a` byte-identical
+  to FINAL). Two departures from the brief, both recorded in report section 2.1: the constant is
+  `StormFieldGeometry.PRODUCTION_CONSUMER_BITS` (the class the other field constants live in,
+  headless for the sandbox), and `stormFieldGeneration()` is derived from the baked bits
+  (`T196_GENERATE_ONLY || (!monolith && bits != 0)`) rather than a hand-list, because the field
+  enters through the shared `leanFinalConstants` map - the only way `t171_dup_a/b` stay
+  byte-identical to FINAL - so every lean variant inherits bits 11 unless it overrides the row
+  and must therefore build before it reads. `resetStormFieldMonolithBits()` added and used by the
+  three end-of-campaign resets; campaign-start and mid-campaign 0s untouched so T196-T198's
+  production phases keep their pre-field meaning. `campaignGate` (`gate-t199b.log`, 25 s): T161
+  PASSED, halts at the T196 "FINAL does not bake the storm field out" clause (`:835`) - T199c's
+  inversion. Original brief: `build.gradle`: in `leanFinalConstants`
+  set `'uniform int PaStormFieldEnabled;' : 'const int PaStormFieldEnabled = 11;'`, keep
+  `PaStormFieldXZ = 256`, and remove `PaStormFieldPass` from the map so `cloud_atmosphere_volume_final`
+  declares it live and the generated JSON keeps it (it is derived from the map by
+  `leanFinalRemovedUniforms`); update the comment block above the map (T196/T197/T198 rows) to say
+  the field is now production. `CoreCostDiagnosticProgram.java`: `stormFieldGeneration()` returns
+  true for `LEAN_FINAL` and `stormFieldEnabledBits()` returns 11 for it. `VolumetricCloudRenderer.java`:
+  the build block runs for `LEAN_FINAL` through `stormFieldProgram()` with `PaStormFieldPass` 1
+  then 0 around the build draw exactly as the arms do, the manual sampler bind is unconditional
+  on FINAL frames, `lastRainFieldGpuMilliseconds` reports the field build on FINAL, and the
+  render status string (`VolumetricCloudRenderHook.java` status builder) gains
+  `field=<build ms>`; make the monolith default to the production bits (11) so every debug view
+  renders the image FINAL renders - `stormFieldForcedOnMonolith` becomes an override that
+  campaigns set explicitly, `setStormFieldForcedOnMonolith(0)` restoring the production default
+  rather than "no field" (rename it or add `PRODUCTION_FIELD_BITS = 11` in
+  `VolumetricCloudDebugConfig.java` and reference it from both classes). `leanFinalEligible()`:
+  add `VolumetricCloudDebugConfig.stormFieldXZ() == StormFieldGeometry.DEFAULT_XZ` and the
+  audit selectors at 0, since FINAL now bakes those; the lean list and the predicate change
+  together (the header comment says so). If `prepareStormFieldTarget` returns null on a FINAL
+  frame, raise `LeanFinalProgramUnavailableException("storm field atlas unavailable")` rather than
+  rendering bits 11 against no field - the established loud fallback.
+- [X] T199c [US3] Compile campaign and audit controls out of FINAL (item 3). **Done; campaignGate
+  PASS** (`gate-t199c-campaign.log`, 0 FAILED, `T199_FINAL_FIELD bits=11 xz=256 passLive=1
+  audit=0 oracle=0 hosts=2`; T161/T171/T191/T196/T197/T198/T199 PASSED). One departure from the
+  brief, recorded in report section 2.2: the oracle gate's polarity is inverted, because the
+  monolith - the raw source, loaded with no defines - is the program every T196-T198 soundness
+  phase runs on, so a hosts-only `#ifdef` would have stripped the oracle from it. The raw source
+  now defines `PA_STORM_FIELD_ORACLE` at its top, `generateLeanFinalShader` strips it from every
+  lean variant through a new `leanFinalStrippedDefines` list (missing definition fails the build),
+  and `t196_field_both` / `t198_field_both_exact` re-define it. Gated: `paStormFieldReferenceFloorAt`
+  and the pass-2 branch. Sandbox: four rows added to `LEAN_FINAL_SPECIALIZATIONS`, the T196 FINAL
+  clause inverted (label now "FINAL keeps the build pass live"), `validateT199FinalField` added
+  (source, JSON, hosts, non-hosts, enum agreement, monolith default, GL compile). Original brief: In
+  `cloud_atmosphere_volume.fsh` put the `PaStormFieldPass == 2` soundness-oracle branch behind
+  `#ifdef PA_STORM_FIELD_ORACLE`, and in `build.gradle` add `'PA_STORM_FIELD_ORACLE 1'` to the
+  defines of `t196_field_both` and `t198_field_both_exact` only (the oracle hosts); leave
+  `PA_LIGHT_AUDIT` on `t198_light_audit` only. Verify by reading the generated
+  `build/generated/leanFinalResources/.../cloud_atmosphere_volume_final.fsh` that it contains
+  `const int PaStormFieldEnabled = 11;`, `const int PaStormFieldXZ = 256;`, `uniform int
+  PaStormFieldPass;`, `const int PaLightAuditVariant = 0;`, `const int PaLightAuditOutput = 0;`,
+  no `PA_LIGHT_AUDIT`, no `PA_STORM_FIELD_ORACLE` and that the bit-4 hybrid test is statically
+  false. Sandbox (`src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`):
+  add `PaStormFieldEnabled`, `PaStormFieldXZ`, `PaLightAuditVariant`, `PaLightAuditOutput` rows
+  to `LEAN_FINAL_SPECIALIZATIONS`, add a `T199 FINAL builds and reads the shared field and carries
+  no field diagnostics` invariant that asserts the list above and compiles the generated FINAL
+  in GL, invert the T196 invariant's "FINAL carries no field" clause, keep the T198 clause that
+  FINAL defines no audit, and print `T199_FINAL_FIELD bits=11 xz=256 passLive=1 audit=0 oracle=0`.
+- [X] T199d [US3] Field allocation, lifecycle, reload and shutdown (item 4). **Done in code and
+  by trace; the pasted session lines land at T199j.** Every release path converges on
+  `VolumetricCloudRenderTargets.destroyAll(reason)` (disable, resource reload, logout/level change,
+  resize, client stop) and cloud-target recreation calls only `destroyCloudTargets()`, so no
+  lifecycle code was needed - the events were made log-visible instead: `T199_FIELD_ALLOC`
+  (renamed from `T197_FIELD_ALLOC`), `T199_FIELD_RELEASE reason=<shutdown|resize|levelChanged>`,
+  `T199_FIELD_KEPT` on every cloud-target recreation that left the atlas alone. (c) and (d) are
+  automated by a new frame-stepped `StormT132AutoDriver.T199LifecycleProbe` (disable, enable,
+  `reloadResourcePacks()`, wait) printing `T199_LIFECYCLE step=..`; T199f sequences it before any
+  timed arm; (b) and (e) fall out of the campaign's own scale changes and join/exit; (f) is not
+  triggerable (`TextureTarget` throws rather than returns null) and is verified by reading the
+  guard. Sandbox `validateT199FieldAllocation` pins RGBA16F / 8 B a node / 2048x1024 / 2,097,152
+  nodes / 16 MiB / nests / supported (`gate-t199d-campaign.log`, PASS). The six-row trace table
+  with the expected log line for each event is report section 3. Original brief: Confirm in code and
+  on the dev client, and record as report section 3 with the log lines: (a) first FINAL frame
+  allocates one RGBA16F 2048x1024 atlas via `VolumetricCloudRenderTargets.prepareStormFieldTarget(256)`
+  and logs `T197_FIELD_ALLOC` once (rename the tag `T199_FIELD_ALLOC`, keep the fields);
+  (b) cloud-target recreation on a resolution-scale transition (`VolumetricCloudRenderer`
+  history invalidation / `destroyCloudTargets`) leaves the atlas allocated; (c)
+  `VolumetricCloudRenderHook.setRuntimeEnabled(false)` -> `VolumetricCloudRenderTargets.shutdown()`
+  destroys it and the next enable re-allocates; (d) a shader reload (F3+T, or the
+  `RegisterShadersEvent` path in `src/main/java/net/Gabou/projectatmosphere/client/render/shader/VolumetricCloudShaders.java`)
+  rebinds `StormFieldSampler` on unit 15 on the next frame because `stormFieldTextureId` is reset
+  per frame; (e) leaving and re-entering a world; (f) the `LeanFinalProgramUnavailableException`
+  path from T199b disables the pass with the cause in the status string. Add a sandbox unit
+  check that `StormFieldGeometry.bytes(256) == 16 MiB`, `atlasWidth/Height(256) == 2048/1024`
+  and `nestsInCandidateTiles(256)`; nothing else is unit-testable without GL, so (b)-(f) are a
+  checklist run once on the dev client with the log lines pasted into the report.
+- [X] T199e [US3] Every-frame rebuild (item 5). **Done: policy recorded (every frame, no skip,
+  no dirty signature) in report section 4; the counters a future reuse task would start from are
+  in place.** `VolumetricCloudRenderer.countStormFieldBuild` composes a count-only signature of
+  the field's inputs (descriptor + candidate signatures, weather bake generation via new
+  `CloudWeatherMapRenderer.cacheMisses()`, origin, slab, `MaterialOffset`) and counts `builds` /
+  `unchangedInputs` / `unchangedDescriptors`; `stormFieldRebuildStatus()` and
+  `resetStormFieldRebuildCounters()` expose them. The build cost comes from the campaign's field
+  column on the FINAL arm at SIDE and FAR, and on a `lean_final@d0` repeat (the descriptor
+  upload capped at zero: the build against an empty sky, at the same poses - T199f chose this over
+  a CLEAR pose because CLEAR has no storm and would stall the fixture qualification) and prints
+  `T199_FIELD_REBUILD` per pose; numbers land at T199j. `compileJava` clean. Original brief: T196 Task 11's dirty-reuse measurement on a
+  moving fixture was deferred and never taken, and T195's audit found the weather bake,
+  descriptor upload and material advection all refresh every frame while a storm moves; exact
+  reuse is therefore **not proven** and FINAL rebuilds the field every frame, unconditionally,
+  before its timed draw. Do not add a skip or a dirty signature in T199. Record in report
+  section 4: the build cost per frame from `lastRainFieldGpuMilliseconds` at SIDE, FAR and an
+  empty-sky pose (the price of building against zero descriptors), and the frame counts from
+  `StormLobeSpatialIndex`'s existing dirty-signature hit/miss over the campaign's moving frames as
+  the evidence a future reuse task would start from.
+- [X] T199f [US3] Campaign T199 wiring (items 6-9, one launch). **Done; campaignGate PASS**
+  (`gate-t199f-campaign.log`, `T170_WIRING campaigns=42 violations=0`, T191 reachability PASS
+  with the new control, `t199_final_nofield` compiled and asserted in the T199 invariant).
+  Registry row added; `t199_final_nofield` (lean specialization, pass and bits both baked 0) in
+  `build.gradle` + `T199_FINAL_NOFIELD` enum (bits 0, no build); driver: marker, predicate, flags,
+  `T199_POSES = {SIDE, FAR}`, `T199_ARMS` (nofield anchors; per repeat `lean_final`,
+  `t198_field_both_exact@x256`, `lean_final@d0` - the empty-sky build - three repeats, 60
+  samples), `T199_OPTIMIZATION_ARMS`, `T199_IMAGE_ARMS` (`t198_field_light_exact` light-only,
+  `lean_final` both, then the audit variant 0 x 8 outputs at bits 11), counter phases
+  `{0 |nofield, 11 |final}` with `requestStormFieldSoundness()` on the second (the oracle runs on
+  the monolith, which carries it), `T199_ATTRIBUTION` echoed from the `|final` counters' share
+  fields, the lifecycle probe ticked ahead of the pose guards, `T199_FIELD_REBUILD` per pose,
+  `buildT199FinalFieldReport()` -> `T199_FINAL_FIELD_DECISION` with `lean_final` as block lead;
+  every `t198Run` dispatch site wired for `t199Run`. Three design points recorded: the image
+  anchor and `t194IsAnchor` are the nofield control under T199 (FINAL is the arm under test);
+  `T166Arm.armKey()` now carries `@d<cap>` so the empty-sky repeat is its own row; pockets are
+  classed against the nofield anchor with the light-only frame as the baseline and FINAL's frame
+  reported `versusLightOnly`, so the probe consumer's share of any pocket loss is visible - note
+  T198 measured both-consumer pockets at 0.861 / 0.874, below the parent's 0.90 FAR figure,
+  which was the light-only number; T199k judges FINAL on the both-consumer frame and says so.
+  Original brief: Add
+  `new Campaign("T199", "t199-shared-field-final.txt", "sharedFieldFinalRunRequested", "t199Run",
+  "T199_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP)` to `StormCampaignRegistry.java`; in
+  `build.gradle` one campaign-scoped control `cloud_atmosphere_volume_t199_final_nofield`
+  (the lean specialization with `PaStormFieldEnabled = 0`, `PaStormFieldPass = 0`, defines
+  `PA_PRECIPITATION_ABSENT 1`, `PA_ARM_DESC_PRECOMPUTE 1`, keepUniforms `[]`) as the pre-field
+  FINAL reference for both image and timing, plus its enum constant in
+  `CoreCostDiagnosticProgram.java`; in `StormT132AutoDriver.java` the marker, predicate, flag,
+  `T199_POSES = {SIDE, FAR}`, `T199_ARMS` (the nofield control as anchor; `LEAN_FINAL` as the
+  candidate; `t198_field_both_exact` as the T198 control so the FINAL number is comparable to
+  T198's 2.151x; three repeats, 60 samples), `T199_OPTIMIZATION_ARMS`, `T199_IMAGE_ARMS`
+  (`LEAN_FINAL` against the nofield control at both poses with `t197ReportPockets`-style pocket
+  diagnostics and `T166_IMAGE_AB`), counter phases on the monolith at production bits 11
+  (`T136_COUNTERS` for `stormFieldProbeFalseEmpty`, probe fetches per px) and one
+  `T193_PRODUCTION_ATTRIBUTION`-style attribution phase printed as `T199_ATTRIBUTION` (rain
+  segment, primary, refine, shaft, light, probe, untagged, residual), one
+  `requestStormFieldSoundness()` on `t198_field_both_exact` at 256 (the oracle host that shares
+  FINAL's node equation; T199c's sandbox proves the two are generated from the same source with
+  the same bits), the T199d `T199LifecycleProbe` ticked to completion as the campaign's first
+  phase (before any timed arm - it disables the pass and reloads resources), the T199e rebuild
+  counters (`resetStormFieldRebuildCounters()` at start, `T199_FIELD_REBUILD pose=..` +
+  `stormFieldRebuildStatus()` after each pose's timing block) with `CLEAR` added as a third
+  timing pose for the FINAL arm's field column only (no image, pocket or counter phase there -
+  it has no storm), the T199g audit captures, and `buildT199Report()` via
+  `buildBracketedPricingReport("T199", "T199_FINAL_FIELD_DECISION", ...)` with the nofield
+  control's arm key as block lead. Wire every `t198Run` dispatch site for `t199Run`.
+- [X] T199g [US3] Retained far-tap audit (item 10). **Done; campaignGate PASS**
+  (`gate-t199g-campaign.log`, `T199_TOP_RIM rows=6 flagged=66`). The capture wiring landed in
+  T199f (bits 11, variant 0, eight outputs, once per pose, before any timed arm). New in T199g:
+  `StormLightTapErrorReport.flagTopRim` / `topRimRows` make the top rim a measured region -
+  per column, the cloud's first pixel from the top of the frame and the cloud pixels in the
+  ~2% of rows below it (six at 270, floor three), flagged above the class values so the
+  class-keyed regions are unchanged and `region=topRim` overlaps them - so the FINAL baseline
+  carries `T198_TAP_ERROR .. tap=2|3 region=topRim|pocket` lines rather than a difference-image
+  observation. Headless `validateT199TopRimRegion` added. Report section 8.1 records the expected
+  residual from T198 (taps 2-3 mean -0.037 / -0.064, one-sided, cone -5.9% SIDE) and names the
+  remaining error as the far taps' vertical envelope, not worked in T199. Original brief: Keep `t198_light_audit`,
+  `StormLightTapErrorReport.java` and the `PaLightAudit*` selectors as a permanent diagnostic. In
+  the T199 campaign take one audit capture per pose with `setLightAuditFieldBits(11)` and variant
+  0, and have `StormLightTapErrorReport` print `T198_TAP_ERROR` for taps 2-3 in the reference
+  pocket and top-rim (edge band, upper half) regions. Record the residual as the FINAL baseline
+  in report section 8 (expected about -0.04 / -0.06 one-sided, RMS ~0.21 / 0.25); state the
+  named remaining error is the vertical envelope on the far taps and that it is **not** worked
+  in T199.
+- [X] T199h [US3] Clean temporary campaign plumbing (item 11). **Done; campaignGate PASS after it
+  (`gate-t199i-campaign-1.log`, `T170_WIRING campaigns=41 violations=0`).** Retired: bit 4 (the
+  hybrid tap selector and the uniform's doc), `t196_field_hybrid` (variant, enum, `case 7`, the
+  T196 timing and image tables, the sandbox row); the whole T197 campaign (marker, poses,
+  `T197_XZ`, flags, arms, image arms, `T197ImageArm`, predicate, report, every dispatch site, the
+  registry row); the runtime resolution state (`stormFieldXZ`/`setStormFieldXZ` and every upload -
+  the renderer uploads `DEFAULT_XZ` to the monolith, every lean program bakes it, and
+  `leanFinalEligible` drops its XZ clause); `PaStormFieldXZ` from every field arm's
+  `keepUniforms`. Sandbox: `validateT197FieldResolution` now asserts the grid baked on all eight
+  field programs (was: live on five), the T196 and T198 invariants no longer require it live.
+  Kept, with reasons, in report section 9: the T196 single-consumer arms and `t196_field_both`,
+  the audit and `t198_field_light_exact` (T199's light-only image arm), `t198_field_both_exact`,
+  `t199_final_nofield`, the `T166Arm.stormFieldXZ` label, `t197ReportPockets` and the pocket
+  baseline, `StormFieldGeometry`, every cited log tag, everything under `validation/`. Variants
+  156 declared (155 + nofield - hybrid). Original brief: Retire, in this order, each with the
+  sandbox and gate still green: the bit-4 hybrid branch in `cloud_atmosphere_volume.fsh` and
+  `cloud_atmosphere_volume_t196_field_hybrid` (`build.gradle`, `T196_FIELD_HYBRID` in
+  `CoreCostDiagnosticProgram.java`, `stormFieldEnabledBits()` case 7); the
+  ~~`cloud_atmosphere_volume_t198_field_light_exact` arm~~ (T199f keeps it: it is T199's
+  light-only image arm, the pocket number comparable to T198's 0.880 / 0.923, and the audit's
+  luminance link); the T197 XZ sweep (`t197Run` sweep loop in
+  `StormT132AutoDriver.java`, `setStormFieldXZ` callers) with `PaStormFieldXZ` baked to 256 in the
+  remaining field arms by dropping it from their `keepUniforms` - `StormFieldGeometry` and its
+  `supported()` stay, and the sandbox's `validateT197FieldResolution` clause that every field arm
+  keeps `PaStormFieldXZ` live (`:765`) and the T196 invariant's matching `bakes PaStormFieldXZ`
+  check (`:862`) are inverted with it, keeping the `T197_FIELD_GEOMETRY` facts; the
+  `t196_field_light` / `t196_field_probe` single-consumer arms unless
+  T199f still uses them. Keep `t196_field_both` (the T196 control and an oracle host),
+  `t198_field_both_exact`, `t198_light_audit`, `t199_final_nofield`, every workload view, every
+  `T19x_*` log tag the reports cite, the registry rows (the wiring check reads the newest row), and
+  everything under `validation/`. Record the variant count before and after (155 declared, T198
+  registered 5) and the ledger in report section 9.
+- [X] T199i [US3] Gate during development (item 12). **Done: the gate ran after every code
+  sub-task** - `gate-t199b.log` (the expected T196 halt), `gate-t199c-campaign.log`,
+  `gate-t199d-campaign.log`, `gate-t199f-campaign.log`, `gate-t199g-campaign.log`,
+  `gate-t199i-campaign-1.log` (after T199h) - all PASS from T199c on, 25-45 s each, main-level
+  5-7 s; T161, T170 wiring (42 -> 41 campaigns), T171, T175 (47), T191, T196, T197, T198 and the
+  three T199 invariants green on the last. Original brief: run `./gradlew.bat campaignGate` after T199c,
+  after T199f and after T199h (tens of seconds; inspect `elapsedMs` first if slow) and keep the
+  three `gate-t199-campaign-*.log` files; the T199 invariant, `T161`, `T175` (count unchanged at
+  47), `T196`, `T198` and the campaign wiring check for the registry's newest row must all pass.
+- [X] T199j [US3] Run the campaign once. **Done - run twice, and the first run is why.** Run 1
+  (23:18-23:24, `t199-campaign/t199-run1-oracle-stripped.log`) priced the T199c FINAL - the
+  oracle compiled out - at **18.55 ms SIDE against 14.12 ms** for `t198_field_both_exact`
+  (+31%; FAR +12%), whose generated source differed by the one `#define PA_STORM_FIELD_ORACLE 1`
+  line (`diff`-verified; T171 excludes program identity; the nofield anchors reproduced T198's
+  pre-field FINAL to the tenth). FINAL failed its own 1.00x comparator check, so the strip was
+  reverted: the raw source no longer defines or gates the oracle, `leanFinalStrippedDefines` is
+  empty with the lesson attached, the hosts drop the redundant define, FINAL carries the pass-2
+  branch dead behind the live uniform, and `validateT199FinalField` asserts the branch present
+  and `t198_field_both_exact` byte-identical to FINAL (`gate-t199i-campaign-2.log`). The
+  lifecycle probe was also resequenced (run 1 ticked it with the nofield anchor pinned, so the
+  atlas was not resident). Run 2 (23:30-23:35, `t199-campaign/t199-run.log`, 4 mask/diff PNGs):
+  **FINAL 13.03 / 10.73 ms = 1.00x of the comparator (0.5% / 0.4%), net 2.088x SIDE / 1.545x
+  FAR**, build 1.65 / 1.55 ms, empty-sky build 0.53 ms; pockets light-only 0.851 / 0.904, FINAL
+  0.771 / 0.871 (a 619-pocket fixture; FAR reproduces T198 like for like, SIDE is the fixture);
+  soundness underestimates 1 (worst 0.0012, boundary 0), false-empty 0, probe 3.51 / 0.92
+  fetches per px; attribution rain segment 65.9% / 66.8%, primary 24.2 / 22.0, light and probe
+  0; far taps 2-3 at the pockets -0.047 / -0.096 (cone -8.7%), and the screen-space top rim
+  carries almost none of it (-0.002 / -0.011) - the residual sits in the pixels beneath the
+  anvil top; `T199_FIELD_REBUILD` 1121/1119 - the frozen fixture, not a play number; lifecycle
+  ALLOC / KEPT / RELEASE(resize) / RELEASE(shutdown) on disable / reload ok / ALLOC / RELEASE at
+  exit all present. Marker retired; `./gradlew.bat check build` PASS once after (`gate-t199.log`,
+  47 invariants, jar built). A first launch was killed by the tool's memory guard during world
+  entry and relaunched detached. Original brief: Run the campaign once (`run/t199-shared-field-final.txt`, keep
+  `run/t132-autorun.txt` and `run/t132-autorun-exit.txt`, `./gradlew.bat runClient --offline
+  -PsimpleCloudsMandatory=false`, one GPU campaign at a time), retire the marker, extract the
+  `T199_*`, `T196_SOUNDNESS`, `T136_COUNTERS`, `T166_IMAGE_AB`, `T197_POCKETS` and `T198_TAP_ERROR`
+  lines to `validation/t199-campaign/t199-run.log` with the pocket mask/diff PNGs, then run
+  `./gradlew.bat check build` once (item 13) and keep `gate-t199.log`.
+- [X] T199k [US3] Report, decisions and bank (items 14-15). **Done:
+  `validation/performance-shared-field-final.md`, 12 sections + status, no pending items.**
+  Decision A (tighter probe floor): upper bound = false-occupied fraction x (primary + refine
+  share) = 0.157 x 30.2% = **4.7% SIDE**, 0.160 x 27.6% = **4.4% FAR** - below the 10% rule at
+  both poses, **deferred** with the number; the floor is still loose where it matters (84% of
+  occupied verdicts are false) but what it costs is bounded. Decision B (temporal
+  reconstruction): **structurally ready, not budget-ready, and the deciding number is not in
+  T199's data** - FINAL is 4-8x over the 8.0 ms Ultra budget at the severe poses at the shipped
+  scale by T146/T147's exponent, and T151's reopen condition for reconstruction is new evidence
+  on the pixel-scaling exponent, which T196-T199 may have moved by removing the per-sample light
+  and probe walks (44.5% of the pre-field frame, now 0). Exact next task: a two-scale FINAL
+  baseline (0.25 / 0.75, SIDE + PLAY_NEAR) to re-derive the exponent; before it, the empty-sky
+  build early-out (0.53 ms a clear frame, exact by construction). Committed, not merged.
+  Original brief: Write
+  `validation/performance-shared-field-final.md`: 1 campaign-only ledger, 2 FINAL wiring and the
+  generated-source proof, 3 lifecycle checklist with log lines, 4 rebuild policy and cost, 5
+  quality (pockets, dark interior, contrast, SSIMs, IoU, changed pixels) FINAL vs nofield and vs
+  T198, 6 soundness (underestimates, binary misses, useful-empty, false-empty), 7 baseline (field
+  / ray / combined p50-p95, SIDE and FAR net with spreads, against nofield and against
+  `t198_field_both_exact`), 8 attribution and the far-tap residual, 9 cleanup ledger and variant
+  counts, 10 gate/build, 11 **decision A - tighter probe floor**: from section 8 compute the
+  upper bound the floor could still save as (false-occupied probe verdicts / probe verdicts) x
+  (primary + refine segment share) of the FINAL frame at SIDE and FAR; justified only if that
+  bound is >= 10% of frame time at either pose, otherwise record it as deferred with the number;
+  12 **decision B - temporal reconstruction readiness**: ready only if FINAL SIDE and FAR GPU
+  ms are inside the T135 Ultra budget, the history path (`HistorySampler`, reprojection
+  confidence, invalidation on resolution transitions) is intact under the field, the lifecycle
+  checklist passed, no correctness residual is open other than the named far-tap rim, and the
+  rain share is recorded without action; state yes/no with the numbers and the exact next task.
+  Add the `[X]` summary to this file, commit with the session attribution, do not merge.
+- [X] T200 [PERFORMANCE] [US3] FINAL pixel-scaling baseline for temporal readiness.
+  **Done: TEMPORAL READY = NO.** Five scales x three repeats at SIDE, PLAY_VIS_NEAR (the brief's
+  PLAY_NEAR at 4x the radius sits beyond the 2000-block cloud render distance and the T150 guard
+  rejected it as empty sky; 1.6x is the representative pose the T135 budget is quoted at) and
+  FAR, one deterministic fixture a pose, no shader variant. MEASURED: SIDE ray 13.17 / 26.99 /
+  40.82 / 80.36 / 131.73 ms at 0.25 / 0.375 / 0.5 / 0.75 / 1.0 (480x270 ... 1920x1080), field
+  build 2.1-2.2 ms fixed (no trend with scale), composite 0.09 ms; 0.75 / 0.25 ray ratio **6.10x**
+  SIDE, **5.55x** PLAY_VIS_NEAR, 3.57x FAR for 9x pixels. DERIVED: alpha (log-log, r2 >= 0.999)
+  **0.823 SIDE, 0.779 PLAY_VIS_NEAR**, 0.650 FAR (two-point agrees to 0.001); T138's pre-field
+  0.760 / 0.761 / 0.711 - removing the per-sample walks made the ray *more* linear in pixels, and
+  T151's 0.49-0.75 band is superseded. Budget: at raw 0.25 the cloud cost alone is **15.35 ms SIDE
+  / 14.43 PLAY_VIS_NEAR** (ray + field), -4.4 to -5.4 ms against 10 ms and -6.4 to -7.3 against
+  8 ms before any reconstruction; a 6 ms raw cost needs ~0.12 scale (~225x125). Criterion 1
+  (meaningful ray reduction) passes, 2 and 3 fail: the deficit is per-pixel cost (~100 ns a
+  pixel at 480x270), not pixel count. Next: **T201, a time attribution of the field FINAL** with
+  the T166/T193-style ceiling arms at 0.25 (SIDE + PLAY_VIS_NEAR) to rank non-rain consumers by
+  ms (the T199 call shares cannot); temporal is revisited when raw 0.25 is under ~6 ms. Two
+  launches (~5 min each), campaignGate x2 and check build PASS. Evidence in
+  `validation/performance-pixel-scaling.md` and `validation/t200-campaign/`. Original brief:
+  Measurement only: no probe-floor, rain, field-resolution, far-tap, temporal or reconstruction change. T151
+  closed interleaved reconstruction on cost ~ pixels^0.49-0.75, measured before T196-T199 moved the
+  light and probe walks out of the per-pixel ray; T200 re-measures the current FINAL (field built
+  every frame, bits 11) at raw scales 0.25 / 0.375 / 0.50 / 0.75 / 1.00 of the 1920x1080 window
+  (480x270 ... 1920x1080), three repeats a scale, 60 samples, at SIDE (severe), PLAY_NEAR
+  (representative) and FAR, on one deterministic fixture per pose. Campaign `T200`
+  (`run/t200-pixel-scaling.txt`, `pixelScalingRunRequested`, `t200Run`, `T200_ARMS` of
+  `LEAN_FINAL` at each scale via `T166Arm.resolutionScale` - a runtime setting, no shader variant
+  - `T200_OPTIMIZATION_ARMS`, no image arms) in `StormCampaignRegistry.java` and
+  `StormT132AutoDriver.java`; `buildT200Report()` prints per pose and scale the MEASURED ray
+  p50/p95, field build p50/p95, composite p50/p95, combined and frame p50 with target dimensions,
+  pixel counts and repeat spread; the field build as the fixed term with its spread across scales;
+  the 0.75 / 0.25 pixel, ray and combined ratios; DERIVED alpha two ways (two-point 0.25-0.75,
+  and a log-log fit over every scale with r-squared) for the ray alone and for the whole renderer;
+  the model `time = fixed + k * pixels^alpha` with predictions per scale; and the temporal budget
+  left at raw 0.25 / 0.375 / 0.50 against 10 ms and 8 ms. Decision: TEMPORAL READY only if
+  reducing raw scale materially cuts the ray cost, the budget left covers reconstruction and
+  history validation, and the total can plausibly approach 8-10 ms; otherwise the next task is a
+  fresh profile of the largest non-rain structural consumer. Evidence in
+  `validation/performance-pixel-scaling.md` and `validation/t200-campaign/`. [SC-005, SC-021]
+- [X] T201 [PERFORMANCE] [US3] FINAL time attribution at 0.25 and next-target selection.
+  **Done: the non-rain structural budget is 3.8 / 4.0 ms in total, the 6-8 ms class is not
+  reachable inside scope, and temporal stays paused.** Local controls (46 anchors a pose): SIDE
+  ray 12.98 / field 1.84 / combined 14.82 ms; PLAY_VIS_NEAR 12.35 / 1.96 / 14.31. Ceilings (delta
+  ms, paired, all blocks accepted): primary body density **1.85 / 1.94** (`t201_primary_field`,
+  the field's A channel in place of the exact evaluation), refinement 0.86 / 0.98, detail 0.80 /
+  0.75, light cone 0.27 / 0.31 (the field made it 2% of the ray), probe scan **-0.63 / -1.38** (a
+  saving; stays), every-2nd-step hold -3.9 (not a ceiling); primary + refinement together **2.62
+  / 2.70** (measured, sub-additive); the rain shaft, measured because asked, **2.49 / 2.46** - the
+  largest single consumer priced, and rain-family. Field build 1.84 / 1.96 ms of which the
+  empty-sky atlas is 0.54 and node work 1.3-1.4. Primary audit (T199 bits-11 counters + the T166
+  ladder): 32.8 steps, 6.5 density calls (50.6% zero), 27 shape calls, 202 lobe visits, 164 SDF
+  evaluations a pixel; a production call costs 2.2 ns against 0.27 ns for one coherent
+  evaluation - **the dominant primary cost is the per-call descriptor traversal**, not the noise.
+  Probe consequence bound 0.94-1.19 ms -> **tighter floor closed for this pass**. Ranking: #1
+  primary traversal (<= 1.9 ms, secondary band), #2 refinement (<= 1.0), pair 2.6-2.7 (strong
+  only together). Decision: T202 = primary per-call traversal (with refinement), realistic 1.0-1.5
+  ms, raw 0.25 after it ~13.5 ms; temporal reopen after it **NO** - every non-rain consumer at
+  zero still leaves 11.0 / 10.4 ms, and the 6.7 ms residual is the rain segment test, march
+  control and composition. The rain constraint is now the binding one; the cheapest next fact is
+  one `t182_norainseg` arm timed the same way (a measurement). Four campaign-scoped variants and
+  two `#ifdef`-only hooks added; campaignGate and check build PASS. Evidence in
+  `validation/performance-time-attribution.md` and `validation/t201-campaign/`. Original brief:
+  Measurement only - no temporal, rain, field-resolution, light-quality, probe-floor or
+  architecture change. T200 showed the per-pixel cost, not the pixel count, is the blocker, and
+  T199's call shares cannot rank consumers by milliseconds. Campaign `T201`
+  (`run/t201-time-attribution.txt`, `timeAttributionRunRequested`, `t201Run`, `T201_ARMS`,
+  `T201_OPTIMIZATION_ARMS`, no image arms) at SIDE and PLAY_VIS_NEAR, 0.25 only: FINAL anchors
+  bracket, three repeats, one arm per non-rain consumer compiled out of FINAL's own
+  specialization - reused where an existing arm removes exactly one consumer on the current
+  specialization (`t176_nolight`, `t181_norefine`, `t180_noprobe`, `t175_density_every2`; the
+  T166 no-detail/no-light arms predate the T174 precompute and are not comparable) and new
+  where none does (`t201_primary_field`: the primary body density read from the field's A
+  channel, `PA_ARM_PRIMARY_FIELD_DENSITY`; `t201_nodetail`; `t201_norain_shaft`,
+  `PA_ARM_NO_RAIN_SHAFT`; `t201_primary_norefine`, the two expected largest together, measured
+  not multiplied), plus the `lean_final@d0` empty-sky build and the T166 fixed-work ladder for
+  the per-class cost of one evaluation. `buildT201Report()` prints per consumer control ray ms,
+  removed ray ms, delta ms (the ranking metric), paired ratio and spread, the field build, and
+  the ladder's per-rung deltas. The report also audits the primary march from the counters
+  (steps, density calls, group walks, exact SDFs, detail per pixel), bounds the false-occupied
+  probe consequence in ms (primaryDensityZero / primaryDensityCalls x the primary delta), and
+  selects the next architecture by removable ms (>= 4 major, 2-4 strong, 1-2 secondary, < 1 no
+  campaign). Evidence in `validation/performance-time-attribution.md` and
+  `validation/t201-campaign/`. [SC-005, SC-021]
+- [X] T202 [PERFORMANCE] [US3] The primary body density and the refinement on the shared field.
+  Architecture campaign against T201's #1 target, the per-call descriptor traversal behind the
+  primary body density and the union-distance refinement (pair ceiling 2.62-2.70 ms). Two
+  consumer bits on the accepted field: 16, the primary body from the field's threshold and
+  height (R, B) with the base noise, detail octaves and erosion evaluated at the sample
+  (`paStormFieldPrimaryDensityAt`, the T198 light lookup at mip 0 with the primary's detail
+  stages; uncovered nodes fall back to the exact walk); 32, the refinement's clearance floor
+  read from A (`paStormFieldClearanceAt`, one texel fetch; the build writes the walk's
+  minimum descriptor clearance dilated over the dual cell - the probe floor's own Lipschitz
+  dilation - on covered nodes, uncovered nodes keep the light's fallback density; the
+  renderer uploads the consumer bits to the build draw so the monolith's atlas matches
+  FINAL's). Campaign `T202` (`run/t202-primary-traversal.txt`, `primaryTraversalRunRequested`,
+  `t202Run`, `T202_ARMS`, `T202_OPTIMIZATION_ARMS`, `T202_IMAGE_ARMS`) at SIDE and
+  PLAY_VIS_NEAR, 0.25: counters on the monolith at bits 11 and 59, frames of each consumer
+  and both against the FINAL anchor with the T178 quality harness and the T197 pocket
+  diagnostic, a primary-sample audit (`t202_primary_audit`, `PA_PRIMARY_AUDIT`: the exact
+  density beside the field's at every primary sample, joined per pixel class by
+  `StormPrimaryFieldAuditReport`), then anchor-bracketed timing of `t202_primary_field` (27),
+  `t202_refine_field` (43), `t202_both_field` (59) and T201's three ceilings re-timed in the
+  same session; a second run added the representation oracle `t202_dinterp_oracle` /
+  `t202_dinterp_audit` (`PA_PRIMARY_DINTERP`: the union distance, softness, strength and
+  height interpolated over the dual cell's eight nodes, eight walks a sample, quality only).
+  RESULT: refinement PASS - image exact-class (cloud SSIM 0.995, IoU 0.998, thin 0.98-1.00,
+  hole 0.98-1.00), 0.54 / 0.86 ms (0.63 / 0.67 on the repeat), minor band, **banked: FINAL
+  bakes bits 43** (`StormFieldGeometry.PRODUCTION_CONSUMER_BITS`, `leanFinalConstants`; FINAL
+  is byte-identical to `t202_refine_field`, sandbox-asserted). Primary FAIL on quality despite
+  1.6-2.1 ms (80% of its ceiling): thin retention 0.70-0.84, edge SSIM 0.68-0.89, IoU
+  0.96-0.97, 4.5-4.7% of primary samples disagreeing on zero/nonzero, -3/-4% body mass; the
+  distance oracle recovers the interior (hole 0.86 -> 0.98) but not the boundary (edge SSIM
+  0.71 / 0.90, thin 0.91 / 0.70, 3.4% disagreement) - the descriptor geometry's curvature
+  across a 16 x ~20-block cell, so no 256 x 32 field carries the body at body accuracy.
+  Workload (SIDE): shape calls tagged primary 945k -> 0, refinement 268k -> 25k (out-of-slab
+  fallbacks), exact SDFs 17.6M -> 8.2M, lobe visits 27.1M -> 15.7M, noise unchanged; the
+  residual walk is the rain segment test. Campaign `T202B` (`run/t202b-post-baseline.txt`,
+  `postBaselineRunRequested`, `t202bRun`, `T202B_ARMS`, no image arms) then measured the
+  post-T202 FINAL baseline and the rain segment test's ceiling on it (`t182_norainseg`,
+  measurement only): FINAL ray 12.7 / 12.6 ms, and the segment test **7.7 / 8.2 ms**
+  (ratio 2.5-3.0x) - the binding constraint, now priced. Temporal stays closed (raw 0.25
+  combined 15-17 ms). Three launches (~6, 6 and 4 min), campaignGate x3 and check build
+  PASS. New counters on view 70 (`STORM_WORKLOAD_STORM_FIELD_D`, stage 47); the T123
+  instrumentation invariant masks `PA_PRIMARY_AUDIT`; new T202 invariant (six programs
+  compile, bake their bits, FINAL carries no audit). Evidence in
+  `validation/performance-primary-traversal.md` and `validation/t202-campaign/`. [SC-005, SC-021]
+- [X] T203 [PERFORMANCE] [US3] The rain segment test's architecture: the rain gate field.
+  Reopened on T202's measurement of the rain family at 7.7-9.2 ms (60-67% of the ray). A
+  per-column field (512^2 RGBA32F, T188's target and unit) of *dry proofs and attach bounds*,
+  never a rain answer: R flag bits (provably free of descriptor rain; raster precipitation
+  possible), G/B sound bounds on the attach height (minus the 184-block window), A the proof
+  census. Three proofs per cell in the build (`paRainGateBuildCell`): T192's closed-form
+  ownership bound, no-BASE-support by the lobe distance's Lipschitz dilation (aspect plus the
+  domain warp's slope `PA_RAIN_GATE_WARP_SLOPE`, headroom 1.2), and the T196 floor test at the
+  support height; the attach bounds by convexity over the candidate lobes, padded by 0.002 for
+  float rounding. `rainSegmentMayContribute` fetches one texel (`paRainGateCellAt`,
+  `texelFetch`, never filtered) and rejects only by proof - dry, or the sample outside
+  [Amin-184, Amax) - and defers everything else to production's own exact test; the shaft
+  stays exact. The build is its own program (`t203_gate_build`, pass and gate baked on,
+  `copyFrameUniforms`/`setFrameSamplers` from the ray program, `RAIN_GATE_TIMER`): run 1 carried
+  it in the ray program and the ray paid 2.5-4 ms of codegen for code it never executed. The
+  storm field moved to its own unit (`STORM_FIELD_UNIT` 16). Campaign `T203`
+  (`run/t203-rain-gate.txt`, `rainGateRunRequested`, `t203Run`, `T203_ARMS`,
+  `T203_OPTIMIZATION_ARMS`, `T203_IMAGE_ARMS`, `T203_SUPPORT_PROGRAMS` - a table the registry
+  now resolves) at SIDE and PLAY_VIS_NEAR, 0.25: counters with the gate off (the T203 walk
+  classes, views 71-72) and forced on (census 73-74, soundness oracle 75 - 17 exact samples a
+  cell, census 76, build cost 77; `PaRainGateField` declared in the shader JSON), the rain
+  mask through the gate against `t188_rain_mask_ref` and the frame against FINAL, then
+  anchor-bracketed timing of `t203_rain_gate` x3, `t203_gate_generate_only`, `t182_norainseg`
+  and three residual bounds (`t203_gate_reject_all`, `t203_gate_no_fallback`,
+  `t203_gate_no_shaft`). RESULT: **quality exact** - rain IoU 1.000, 0 false / 0 missed rain,
+  frames byte-identical to FINAL at both poses, false-safe 0 (2 x 118.8k dry cells), attach
+  bounds 0 misses after a warp-slope term and a 0.002-block rounding pad (run 5); **traversal gone** - segment-test walks 2.30M -> 196k (-91.5%) SIDE,
+  3.47M -> 97k (-97%) PLAY_VIS_NEAR, exact SDFs 15.5M -> 7.8M, 2.3% / 1.8% of samples fall
+  back; build 0.12 ms, 4 MB; **but net 1.2-2.2 / 1.1-2.4 ms, mean 1.6** (ratios 1.13-1.23 / 1.13-1.31,
+  runs 2-5) of a 7.1-8.3 ms ceiling: FAIL against >= 4 and CLOSE by the brief's scale
+  (2-3 borderline, < 2 close). The bound arms decompose the residual: the walks the gate removed were worth
+  2.0-2.4 ms, the walks it left 0.2, the field read 0.5, the test's skeleton 1.3-1.5, and the
+  **shaft path 2.5-3.2 ms for 132k walks** - code presence and divergence, not traversal. The
+  rain-traversal question is answered and closed; the family's remaining cost is structural.
+  Not baked into FINAL (the user's call: an exact minor-band gain at 0.12 ms and 4 MB; the
+  T202 recipe bakes it). Temporal stays closed (12-13 ms raw combined with the gate). Five
+  launches (~2-5 min each), campaignGate x6, check build PASS. Task 1 breakdown: the "ring"
+  (owned, supported, union empty) is an empty class - support at the BASE height and coverage
+  there are one condition - so the provable classes are unowned (57-79% of walks) and
+  no-BASE-support (12-23%); eroded 6-15%; 74-84% of supported samples sit above the local
+  attach height. Harness lessons: a runtime-set uniform must be in the shader JSON or
+  `safeGetUniform().set()` is a silent no-op; a build pass belongs in its own program.
+  Evidence in `validation/performance-rain-gate.md` and `validation/t203-campaign/`.
+  [SC-005, SC-021]
+- [X] T204 [PERFORMANCE] [US3] Rain shaft codegen / divergence attribution. Why the shaft path
+  costs 2.5-3.2 ms for 132k walks. Campaign `T204` (`run/t204-shaft-attribution.txt`,
+  `shaftAttributionRunRequested`, `t204Run`, `T204_ARMS`, `T204_OPTIMIZATION_ARMS`, no image
+  arms) at SIDE and PLAY_VIS_NEAR, 0.25, 15 anchors a pose: the shaft compiled out
+  (`t201_norain_shaft`) x3, compiled in but gated off by a live uniform uploaded 0
+  (`t204_shaft_runtime_false`, `PA_ARM_SHAFT_RUNTIME_FALSE` on `PaDiagnosticEvalEpsilon`) x3,
+  three chunk arms (`t204_shaft_no_walk`, `_no_noise`, `_walk_only`), the family reference
+  (`t182_norainseg`), and the T203 skeleton with the shaft out / runtime-false
+  (`t204_skeleton_*`) beside `t203_gate_reject_all` / `_no_fallback`; a per-pixel shaft view
+  (78, `STORM_WORKLOAD_RAIN_SHAFT_LANES`) the capture censuses in 8x4 / 4x8 / 16x16 tiles on the
+  CPU (`ShaftLanes`) for the any-lane estimate no `#version 150` program can take with subgroup
+  ops; program binary sizes logged at link (`T204_PROGRAM_BINARY`, `GL_PROGRAM_BINARY_LENGTH`).
+  RESULT: shaft ceiling **2.72 / 2.85 ms** (ratios 1.28 / 1.30); runtime-false **1.65 / 1.84**
+  -> **code presence 1.0 ms, execution 1.7-1.8 ms**; the no-walk arm recovers 2.64 / 2.57 -
+  **the shaft is its four inlined column walks** (42 of its 57 KB; FINAL 302.6 KB, shaft out
+  245.6, family out 225.9 - the rain family is 25% of the program), the noise fetch, setup math
+  and composition measure zero. Divergence is not the mechanism: positive pixels 1.75% / 0.64%,
+  8x4 tiles with any positive lane 3.0% / 1.8% at 58% / 36% lane occupancy - clustered - but
+  each active lane runs 67-105 full storm walks. Skeleton: the repeated call/loop alone ~1.0 ms
+  (one block), shaft presence +0.5, gate fetch +0.46. DECISION: dominant mechanism = the shaft's
+  walks (execution + inlined presence); removable ~2.6 ms; next architecture = a separate rain
+  pass fed by the cloud pass's rain intervals and the segment test's column values (the shaft's
+  first sample is the test's own Gauss point), compositing against the cloud's exported
+  transmittance is the quality risk; expected 2.0-2.6 ms, 3.5-5.0 with the whole family moved;
+  temporal after it: NO on the shaft alone (~11.8 raw), borderline-NO with the family moved
+  (~9). One launch (5 min), campaignGate x3, check build PASS. Evidence in
+  `validation/performance-shaft-attribution.md` and `validation/t204-campaign/`. [SC-005, SC-021]
+- [X] T205 [PERFORMANCE] [US3] Rain as a separate pass. The rain family moved out of the cloud
+  program: `t205_cloud_split` (FINAL's specialization with `PA_ARM_NO_RAIN_SEGMENT` and
+  `PA_RAIN_SPLIT_COMPOSITE`: one texel fetch of the rain pass's output, composited at the
+  first march step past the rain's mass-weighted depth - `accumulated += R * T`,
+  `T *= T_r` - with an after-loop catch-up) and `t205_rain_pass` (`PA_RAIN_PASS`: main returns
+  from a rain-only march on the cloud march's own setup - slab, scene clip, coverage pretest,
+  strides, jitter - at the coarse stride, the segment test with T203's gate baked on, the
+  production shaft, `sampleLighting` for the radiance, integrated against the rain's own
+  transmittance; exports rgb + one float packing `T_r` and `t_R` as two 12-bit values into an
+  RGBA32F cloud-sized target, unit 17 `RAIN_PASS_UNIT`). The renderer draws the rain pass with
+  the cloud program's uniforms and samplers (`copyFrameUniforms`) on `RAIN_PASS_TIMER` before
+  the split cloud; the profile carries `rainPassP50/P95`. Mask pair `_mask` renders the T188
+  rain mask through the split (the rain pass's mask with the depth folded into the run
+  channel, the split weighting mass by its transmittance at the rain, under the reference's
+  own 0.015 termination rule); a `_fine` pair prices a fine stride in the attach band.
+  Campaign `T205` (`run/t205-rain-pass.txt`, `rainPassRunRequested`, `t205Run`, `T205_ARMS`,
+  `T205_OPTIMIZATION_ARMS`, `T205_IMAGE_ARMS`, `T205_SUPPORT_PROGRAMS`), SIDE and
+  PLAY_VIS_NEAR, 0.25, three launches. RESULT: **PASS (major)** - split cloud draw 5.0-5.3 /
+  3.6-4.4 ms (the family-out class: binary 228.5 KB vs FINAL 302.6, T182 225.9), rain pass
+  1.0-1.1 / 1.5-1.6 ms fullscreen, field 1.06, **total 7.1-7.5 / 6.2-7.2 ms vs FINAL
+  13.9-15.0 / 13.8-14.2: net 6.8-7.6 ms saved (ratios 1.96-2.02 / 1.95-2.21)**, the
+  temporal reopen gate (<= 8 ms) met. Frame exact-class: cloud SSIM 0.99998, edge 0.99998,
+  0.1-0.4% pixels changed at 3e-4 RMS, thin 0.98-1.0, hole 1.0. Rain mask below its class
+  (IoU 0.60-0.75, 22-39% of the reference's sub-ulp thin pixels missed, false rain 1-6%,
+  continuity 0.79-0.99): the coarse pass loses the thin rain the reference samples finely
+  under the base; the fine-band variant recovers IoU +0.05 at 4.9 / 8.1 ms (a bound). Not
+  baked: T206 = productionize (FINAL = split cloud + rain pass + gate, invariants flipped,
+  fresh baseline), then T207 = temporal on the ~7 ms frame. campaignGate x3, check build
+  PASS; eight campaign-scoped programs, FINAL defines no split (asserted). Evidence in
+  `validation/performance-rain-pass.md` and `validation/t205-campaign/`. [SC-005, SC-021]
+- [X] T206 [PERFORMANCE] [US3] Productionize the split rain renderer. FINAL is the T205 split:
+  `leanFinalDefines` (build.gradle) adds `PA_ARM_NO_RAIN_SEGMENT` and
+  `PA_RAIN_SPLIT_COMPOSITE` to FINAL's specialization, and two production programs are
+  registered beside it unconditionally - `rain_pass` (`PA_RAIN_PASS`, the gate baked 1, the
+  coarse stride, no fine band, no mask output) and `rain_gate_build` (T203's build program
+  promoted, gate 2 + field pass 1) - as `CoreCostDiagnosticProgram.finalSupportProgram()`
+  inside FINAL's fail-fast block in `VolumetricCloudShaders` (a link failure of either nulls
+  FINAL and session-disables; the renderer throws `LeanFinalProgramUnavailableException`
+  rather than draw FINAL without its gate or rain pass; the monolith is never the fallback).
+  Production render order every FINAL frame: storm field build -> gate build -> rain pass
+  (RGBA32F cloud-sized target, unit 17) -> split cloud (composites at the first step past
+  `t_R`, T205's semantics untouched) -> composite/output. `isProductionProgram()` is four
+  (monolith, FINAL, rain pass, gate build); `LEAN_FINAL.rainSplitCloud()`,
+  `rainGateGeneration()`, `rainPassProgram() == RAIN_PASS`. Lifecycle: the rain-pass target
+  is released in `destroyAll` (T205's campaign target never was - a leak on resize / reload
+  / shutdown, closed) with `T206_RAIN_PASS_ALLOC/RELEASE` lines on the T199 pattern; the
+  gate and rain-pass clocks close on `shutdown()`. JSON validation: `generateLeanFinalShader`
+  asserts every generated program's JSON matches its GLSL both ways (uniforms, samplers,
+  the twelve-sampler cap); the sandbox T206 invariant repeats it for the production three
+  and asserts every renderer `safeGetUniform` name is in the monolith's JSON - which found
+  `PaDiagnosticStepBudget` declared and set but never in the JSON (a silent no-op on the
+  monolith; added). The generator now empties its output directory, so retired variants
+  cannot ship. Retired: `t205_cloud_split` / `t205_rain_pass` (byte-identical to production;
+  the T205 campaign keeps the mask and fine-band pairs and prices them against FINAL). Added
+  `t206_monolithic_ref` (the pre-split FINAL: the quality anchor, and what the T202
+  comparator is byte-identical to); the T171 identity controls take FINAL's list and draw the
+  rain pass; the T140 oracle family keeps the pre-split specialization. Invariants flipped:
+  T191 (four production programs), T205 (split in FINAL, pair retired), T203 (build program
+  under its production name), T199/T202 (comparator vs the monolithic reference), T183 (the
+  shipped rain path checked as FINAL + rain pass). Campaign `T206`
+  (`run/t206-production-baseline.txt`, `productionBaselineRunRequested`, `t206Run`,
+  `T206_ARMS` - FINAL bracketed by the monolithic reference at 0.25 and 0.75 -
+  `T206_OPTIMIZATION_ARMS`, `T206_IMAGE_ARMS`, `T206_SUPPORT_PROGRAMS`, the T199 lifecycle
+  probe reused; `buildT206Report()` prints per pose and scale field / gate / rain pass /
+  cloud / composite / total against the reference and the budget to 10 and 8 ms), two
+  launches on 13Sep2026. RESULT: **PASS** - production FINAL binary 228,477 B (T205's split
+  size to the byte; rain pass 249,822, gate build 141,959, reference 302,615); 0.25 totals
+  **SIDE 7.24 / 7.26 ms (field 1.07-1.29, gate 0.12, rain 1.03-1.05, cloud 4.85-5.04,
+  composite 0.08-0.09), PLAY_VIS_NEAR 6.20 / 7.05 ms** against the reference's 14.0-15.5 /
+  12.2-14.6 (net 6.8-8.2 / 6.0-7.5, paired cloud-draw ratio 2.4-2.6 / 2.8-3.1); 0.75 totals
+  31.5-38.6 / 21.1-29.2 against 68.5-77.4 / 51.0-71.6. Frame exact-class: cloud SSIM
+  0.99997-1.0, edge SSIM 0.9995-0.99995, 0.07-0.54% pixels changed at 1.5e-4 to 1.5e-3 RMS,
+  hole retention >= 0.986. Thin-rain caveat documented: mask IoU 0.57-0.72 (the reference's
+  sub-ulp thin rain, sampled finely under the base, the fine-band / tile-mask follow-up).
+  Temporal budget at 0.25: 2.7-3.8 ms to 10, 0.7-1.8 ms to 8; **T207 ready: YES.**
+  campaignGate x2, check build PASS. Evidence in `validation/performance-production-split.md`
+  and `validation/t206-campaign/`. [SC-005, SC-021]
+- [X] T207 [PERFORMANCE] [US3] Temporal reconstruction + history validity. The four-phase
+  lattice of T165 (`experiment/cloud-temporal-reconstruction`) productionized on the T206
+  split renderer with the correspondence model T165's report asked for. Each frame marches
+  one raw phase into its own target (`CloudTemporalPhaseState`, quarter-pixel screen-space
+  offsets of the ray via `PaSampleJitter` on `paViewTexCoord`; RGBA16F body + depth + an
+  RGBA16F aux MRT `fragTemporalAux` carrying the body's accumulation and transmittance at the
+  rain's depth, `PaTemporalPhase` deferring the split rain composite); the four phases are
+  resolved once per frame into a target of twice the phase resolution
+  (`cloud_temporal_resolve.fsh`, `CloudTemporalResolveRenderer`, 960x540 at 0.25) that the
+  existing composite upsamples. The current phase is fetched exactly; each history phase is
+  reprojected ONCE from its own recorded camera and validated against the CURRENT phase's
+  3x3 neighbourhood - coverage and linear-distance intervals carried through the warp, new
+  sky / new cloud, a parallax guard (camera moved > 10% of the sampled distance), the age
+  rule (three rendered frames), offscreen - judged only once the reprojection moved the
+  sample past half a texel (sub-texel disagreement is lattice structure: the 191-233 thin
+  wisps T165's kind of test rejected at PLAY_VIS_NEAR). Rejected sites fall back to the
+  current phase's jitter-corrected bilinear; rain is the CURRENT frame's, composited in the
+  resolve with the in-march equation from the aux (exact, never reconstructed; the rain
+  pass runs unjittered on a temporal frame - a jittered one was a four-frame rain flicker).
+  No recursion: the resolved target is never a phase input or recorded (sandbox
+  `validateT207TemporalReconstruction`); the shipped ping-pong blend is never applied to a
+  phase. Lifecycle: phases and the resolved target in `destroyAll`, every history
+  invalidation drops the phase set (`T207_PHASES_*`/`T207_RESOLVED_*`, the T199 probe).
+  Campaigns `T207` (`run/t207-temporal.txt`, `temporalRunRequested`, `t207Run`,
+  `T207_ARMS` with `T166Arm.temporal`, `T207_IMAGE_ARMS`, the validity class map ->
+  `T207_VALIDITY`, `buildT207Report()`) and `T207M` (`run/t207-temporal-motion.txt`, the
+  T152 route under `StormT152MovingCameraFixture.ArmSet.TEMPORAL`: production 0.50 against
+  the temporal 0.25 lattice frame by frame); the profile carries `temporalResolveP50/P95`.
+  Four static and two motion launches on 13Sep2026. RESULT: **PASS** - resolve **0.10 ms**
+  (reconstruction 0.03 + validation 0.07), totals **SIDE 7.4-8.0 / PLAY_VIS_NEAR 6.8-7.7 ms**
+  (anchors 7.4-7.7 / 6.8-7.5), the phase march at 0.98-1.02x the production march. Static
+  vs production 0.50: **PLAY_VIS_NEAR SSIM 0.9952 / edge 0.9931** (single frame 0.813 /
+  0.693; trust-all ceiling 0.9954), holes 0.60 -> 0.98, pockets 0.35 -> 0.71; SIDE 0.9514
+  (single frame 0.9545 - not resolution-limited, rain at phase resolution), edge 0.895 ->
+  0.931, holes 0.71 -> 0.85, pockets 0.34 -> 0.59. Validity 99.994-99.999% accepted
+  statically (the validated lattice = trust-all to four digits). Motion (T152 route):
+  ghost mean 0.0007 vs 0.50 production, p95 0.0014, bias <= +0.0005, flicker 0.00214 vs
+  0.00199, 11 of 2200 frames above 0.02 mean alpha error (in-cloud openings; nothing older
+  than the cycle). `PRODUCTION_TEMPORAL_MODE = 1`: the lattice is the production path.
+  campaignGate x5, check build PASS. Evidence in
+  `validation/performance-temporal-reconstruction.md` and `validation/t207-campaign/`.
+  Next: rain at lattice resolution / the in-cloud fallback, then the reopened pixel-scaling
+  question (a 0.125 phase reconstructing the 0.25 image). [SC-005, SC-006, SC-021]
+- [X] T208 [PERFORMANCE] [US3] Temporal quality cleanup + the 0.50 production baseline. On the
+  T207 lattice (0.25 raw phases -> four-phase temporal -> 960x540; no 0.125 phase, no output
+  below 0.50, no upscaler): (1) SIDE's ceiling attributed with new image arms - the rain pass
+  skipped for arm and reference (`VolumetricCloudDebugConfig.rainDisabled`, the target cleared
+  to "no rain"), the body alone (`deferredSplitForced` on the 0.50 reference, resolve
+  `DebugOutput = 2` on the lattice), the single phase, trust-all, a no-guard control, class maps
+  under both modes; (2) a near-field guard in `cloud_temporal_resolve.fsh` (`CLASS_NEARFIELD`:
+  history within 96 blocks, moved >= 1 phase texel by the reprojection, judged by an ambiguous
+  3x3 interval - coverage span > 0.5 or distance span > 0.33 x far - is refused; resolve mode 5
+  = mode 1 without it, the control), judged on the T152 route with `ArmSet` generalised to a
+  reference plus N candidates (production 0.50 -> mode 1 -> mode 5 through ONE fixture) and
+  shipped in mode 1; (3) T207's bracketed timing (`buildTemporalReport`, shared) re-run; (4)
+  the driver verifies the 1920x1080 window before each pose (`contractWindowReady`,
+  `T135_WINDOW`: a client launched from Bash ignored the T135_PREPARE resize and ran a whole
+  campaign at 854x480). Campaigns `T208` (`run/t208-temporal-cleanup.txt`,
+  `temporalCleanupRunRequested`, `t208Run`, `T208_ARMS`, `T208_IMAGE_ARMS` -> `T208_IMAGE_AB`)
+  and `T208M` (`run/t208-temporal-motion.txt`, `temporalMotionGuardRunRequested`, `t208mRun`).
+  Three static launches (run 2 GPU-contended) and two routes on 13Sep2026. RESULT: **PASS.** SIDE limiter = representation, not validity (trust-all =
+  validated to four digits): where the frame carries rain, the current-frame rain pass at phase
+  resolution (rain-heavy SIDE storm: full 0.796 SSIM / edge 0.38, rain-disabled and body-only
+  **0.976 / 0.99**, silhouette IoU 0.9993); in a rain-light SIDE storm the body lattice's own
+  ~0.93-0.95 ceiling (full 0.9505, single 0.920, trust-all 0.936). PLAY_VIS_NEAR 0.9959 /
+  0.9953 / 0.9940 (three storms), body-only within 0.0005 of it. Guard: route frames > 0.02 mean alpha error **14 -> 5**, interior ghost mean
+  0.00152 -> 0.00111, bias +0.00055 -> +0.00013, route ghost 0.00081 -> 0.00069, flicker
+  0.00212 -> 0.00215 (ref 0.00196), far segments untouched, static acceptance unchanged
+  (100.00 / 99.99%, `nearField = 0`); the in-cloud opening that T207's validity held shut for
+  12 frames at +0.02 alpha (history rays 1.7-5 blocks behind the camera integrating the medium
+  between the cameras) is tracked to 3e-5. On the shipped binary through a second storm the guard is neutral-to-positive
+  (route ghost 0.00084 -> 0.00080, interior p95 0.0066 -> 0.0056, flicker identical) and the 30
+  outlier frames are identical under both modes - an on-axis in-cloud opening (sub-texel
+  reprojection motion, the medium between the two cameras: the along-ray residual named for the
+  follow-up) and a representation episode. Performance (clean sessions): resolve
+  **0.11 ms** (0.04 + 0.07), totals SIDE 8.63 / 8.22 and PLAY_VIS_NEAR 8.56 / 7.85 (two clean sessions) against
+  same-session one-frame anchors 8.28 / 7.81 and 9.21 / 7.78 - the fixture's raw march, the temporal
+  overhead within noise. T209 contract: 960x540 premultiplied RGBA16F + NDC depth, rain
+  composited, scene depth available, no edge metadata, native 1920x1080, insertion at
+  `CloudFieldCompositeRenderer.composite`; budget 1.4-2.2 ms to the 10 ms line (0-0.15 to 8 at these
+  fixtures; 0.05-1.2 in T207's). Harness: run 2's GPU was contended (field build 1.3-19 ms,
+  0.50 reference 80 ms, repeats no longer identical) - quoted as corroboration only.
+  campaignGate x3, check build PASS. Evidence in `validation/performance-temporal-cleanup.md`
+  and `validation/t208-campaign/`. Next: T209 spatial upscale evaluation (control = today's
+  bilinear composite, FSR1/EASU, one depth-guided 2x alternative; body-only beside full-frame at
+  SIDE; the T152 route against native). [SC-005, SC-006, SC-021]
+- [X] T209 [PERFORMANCE] [US3] Spatial upscale evaluation: the 960x540 temporal lattice to the
+  1920x1080 display against the NATIVE production render (FINAL at 1.0). New pass
+  `cloud_spatial_upscale.fsh` / `CloudSpatialUpscaleRenderer` between the resolve and the
+  composite (`VolumetricCloudDebugConfig.spatialUpscaleMethod`, `PRODUCTION_SPATIAL_UPSCALE`; its
+  own clock `spatialUpscaleP50/P95`; layer `spatialUpscaleTarget` RGBA16F premultiplied + depth,
+  released with the rest), three methods on the premultiplied field with ONE kernel for all four
+  channels - 0 the fused composite's PA bilinear (the control), 1 FSR1 EASU (luma + coverage edge
+  feature, Reinhard-max + sqrt colour domain, 2x2 clamp on every channel), 2 a depth-guided
+  Catmull-Rom (taps on another surface or scene-occluded dropped, weights renormalised) - the PA
+  depth selection for all, depth through GL_ALWAYS, and a TWO-SIDED premultiplied guard (straight
+  colour clamped to the valid centre taps' range: the first launch's one-sided guard let the
+  kernels' negative lobes drive premultiplied rgb to zero under positive alpha - a dark halo on
+  every silhouette, caught by the new edge-luma diagnostic `edgeLumaP001 = 0`). The composite
+  fetches a display-size source one-to-one (`OneToOne`, never filtered twice). Harness:
+  `T166Arm.upscale`, `T209_IMAGE_ARMS` (native / native without rain / native body; the lattice
+  against native downsampled 2x; the layers full-frame and body-only), `T209_RAIN` (rain-mask
+  metrics), `T209_CAPTURE` edge-luma tail, `buildT209Report`, `ArmSet.UPSCALE` on the T152 route.
+  Campaigns `T209` (`run/t209-spatial-upscale.txt`, `spatialUpscaleRunRequested`, `t209Run`) and
+  `T209M` (`run/t209-spatial-motion.txt`, `spatialMotionRunRequested`, `t209mRun`). Two static
+  launches and one route on 13Sep2026. RESULT: **CASE C - the depth-aware bilinear stays
+  production; no candidate clearly improves on it.** Static vs native (run 2): SIDE bilinear
+  **0.9387 / edge 0.833**, EASU 0.9210 / 0.774, bicubic 0.9074 / 0.721 (run 1 agreed); PVN
+  bilinear 0.9370 / 0.788, EASU 0.9423 / 0.790 (+0.005 SSIM, thin retention 0.944 -> 0.856),
+  bicubic 0.9373; body-only ranks the same. Rain (rain-light fixtures, 0.14-0.37%): the bilinear
+  thickens least (+0.019 vs +0.034 / +0.051) and loses the least thin rain (9% vs 11-14%). Motion
+  vs native: bilinear flicker 0.00209 (native 0.00198), ghost 0.00064, 6 frames > 0.02; EASU /
+  bicubic 0.00215 / 0.00217, 0.00069, **19 / 18** frames, interior ghost 0.0013 vs 0.0009. Cost:
+  0.10 / 0.14 / 0.14 ms per pass (all excellent), totals 7.4-7.8 ms, budget to 10 ms 2.4-3.0.
+  `PRODUCTION_SPATIAL_UPSCALE = -1` (the sandbox pins it); the pass stays as a diagnostic. RCAS
+  not tested (EASU did not pass). campaignGate x2, check build PASS. Evidence in
+  `validation/performance-spatial-upscale.md` and `validation/t209-campaign/`. Next: the
+  representation residuals T208 named - the rain pass at phase resolution, then the on-axis
+  in-cloud parallax term. [SC-005, SC-006, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

@@ -2,6 +2,8 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeRenderer;
+import net.Gabou.projectatmosphere.clouds.client.render.field.CloudSpatialUpscaleRenderer;
+import net.Gabou.projectatmosphere.clouds.client.render.field.CloudTemporalResolveRenderer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 import java.util.ArrayList;
@@ -33,9 +35,9 @@ public final class StormT135PerformanceProfile {
     /** Frames discarded after a mode or pose change before sampling begins. */
     private static final int SETTLE_FRAMES = 45;
     /** Frames kept per (pose, mode) cell. */
-    private static final int SAMPLE_FRAMES = 120;
+    private static final int SAMPLE_FRAMES = 240;
     /** Hard ceiling so a stalled cell cannot hang a run. */
-    private static final int CELL_TIMEOUT_FRAMES = 600;
+    private static final int CELL_TIMEOUT_FRAMES = 1500;
 
     /**
      * Active per-cell budgets. The T136 five-mode sweep keeps the full 45/120
@@ -55,6 +57,18 @@ public final class StormT135PerformanceProfile {
      * and never falls below the 16-sample floor {@code finish} already requires
      * before a cell may be recorded.
      */
+    /**
+     * T171 control. Disabling the gate restores the pre-T171 behaviour so the
+     * defect's contribution can be measured rather than asserted.
+     */
+    public static synchronized void setFreshSampleGating(boolean enabled) {
+        freshSampleGating = enabled;
+    }
+
+    public static synchronized boolean freshSampleGating() {
+        return freshSampleGating;
+    }
+
     public static synchronized void setCellBudget(int settleFrames, int sampleFrames) {
         settleTarget = Math.max(0, Math.min(SETTLE_FRAMES, settleFrames));
         sampleTarget = Math.max(16, Math.min(SAMPLE_FRAMES, sampleFrames));
@@ -78,6 +92,25 @@ public final class StormT135PerformanceProfile {
     private static int requiredDescriptors;
     private static boolean contaminated;
     private static String armLabel = "production";
+    /**
+     * T171. The GPU timer resolves asynchronously, so {@code lastGpuMilliseconds()}
+     * holds whatever timestamp pair most recently completed - which is frequently
+     * the same value it held on the previous frame.
+     *
+     * <p>Until T171 this class recorded that value once per sampled frame without
+     * checking whether it was new, so a cell's sample array mixed distinct GPU
+     * measurements with re-recorded duplicates. The duplicate rate depends on the
+     * phase between the frame loop and query resolution, which is exactly the kind
+     * of thing that shifts between arms and between runs, and it is the leading
+     * suspect for T170's 13% spread across arms that render identical images.
+     *
+     * <p>{@code VolumetricCloudRenderer.lastGpuTimingSample()} was written for this
+     * and documented as "identifies a fresh completed GPU timestamp result without
+     * using a frame-time proxy" - and was never called. It is called now.
+     */
+    private static boolean freshSampleGating = true;
+    private static long lastRecordedTimingSerial = -1L;
+    private static int duplicateSamplesRejected;
     private static final float[] cloudMilliseconds = new float[SAMPLE_FRAMES];
     private static final float[] frameMilliseconds = new float[SAMPLE_FRAMES];
     /**
@@ -87,6 +120,14 @@ public final class StormT135PerformanceProfile {
      * measured separately instead of folded into the cloud time.
      */
     private static final float[] compositeMilliseconds = new float[SAMPLE_FRAMES];
+    /** T188. The rain-support field build, sampled alongside the march. */
+    private static final float[] rainFieldMilliseconds = new float[SAMPLE_FRAMES];
+    private static final float[] rainGateMilliseconds = new float[SAMPLE_FRAMES];
+    private static final float[] rainPassMilliseconds = new float[SAMPLE_FRAMES];
+    /** T207. The temporal resolve's own clock; zero on a non-temporal frame. */
+    private static final float[] temporalResolveMilliseconds = new float[SAMPLE_FRAMES];
+    /** T209. The spatial upscale's own clock; zero when the frame ran none. */
+    private static final float[] spatialUpscaleMilliseconds = new float[SAMPLE_FRAMES];
     private static float effectiveResolutionScale = Float.NaN;
     private static final List<Cell> results = new ArrayList<>();
 
@@ -106,22 +147,59 @@ public final class StormT135PerformanceProfile {
             int cloudWidth,
             int cloudHeight,
             int samples,
+            int duplicateSamplesRejected,
             double cloudP50,
             double cloudP95,
             double cloudMean,
+            double cloudSd,
+            double cloudCv,
+            double cloudMin,
+            double cloudMax,
             double frameP50,
             double frameP95,
             double frameMean,
             double remainderP50,
             double compositeP50,
             double compositeP95,
-            float effectiveResolutionScale
+            float effectiveResolutionScale,
+            // T188. The rain-support field's own GPU pass, timed separately
+            // from the march. The architecture is only worth having if build
+            // plus lookup beats the traversal it replaced, and a cloud-ray
+            // number alone reports exactly one half of that trade.
+            double rainFieldP50,
+            double rainFieldP95,
+            // T203. The rain gate field's own build, already inside the
+            // field column above; recorded beside it so the gate's cost
+            // reads directly rather than as a difference of two builds.
+            double rainGateP50,
+            double rainGateP95,
+            // T205. The rain pass's own clock, outside the field column.
+            double rainPassP50,
+            double rainPassP95,
+            // T207. The temporal resolve (lattice + rain composite), its own
+            // clock; zero when the frame resolved nothing.
+            double temporalResolveP50,
+            double temporalResolveP95,
+            // T209. The spatial upscale (lattice -> display), its own clock;
+            // zero when the frame ran none.
+            double spatialUpscaleP50,
+            double spatialUpscaleP95
     ) {
+        /**
+         * T188. What the renderer actually spends on clouds: the march plus the
+         * field pass that fed it. Zero for every program that builds no field,
+         * so this is the march time unchanged wherever T188 is not in play.
+         */
+        public double cloudPlusFieldP50() {
+            return cloudP50 + Math.max(0.0D, rainFieldP50);
+        }
     }
 
     /** Begins sampling one (pose, mode) cell. Returns false when already busy. */
     public static synchronized boolean begin(
             String pose, AtmoCommonConfig.CloudRaymarchQuality quality, String arm) {
+        lastRecordedTimingSerial = -1L;
+        duplicateSamplesRejected = 0;
         if (active) {
             return false;
         }
@@ -251,15 +329,42 @@ public final class StormT135PerformanceProfile {
             // The asynchronous timer has no result yet; do not fabricate one.
             return;
         }
+        // A frame that produced no new timestamp pair carries the previous
+        // frame's measurement. Recording it again would count one GPU interval
+        // twice and shrink the apparent spread of whatever the cell is really
+        // doing, so the frame is skipped rather than resampled.
+        long timingSerial = VolumetricCloudRenderer.lastGpuTimingSample();
+        if (freshSampleGating) {
+            if (timingSerial == lastRecordedTimingSerial) {
+                duplicateSamplesRejected++;
+                return;
+            }
+            lastRecordedTimingSerial = timingSerial;
+        }
         // The scale actually in force this frame, read from the renderer rather
         // than from the mode table: a diagnostic override turns the mode's
         // configured scale into a label instead of a measurement.
         effectiveResolutionScale = VolumetricCloudRenderer.lastResolutionScale();
         float frameMs = (now - previous) / 1_000_000.0F;
         float compositeMs = CloudFieldCompositeRenderer.lastGpuMilliseconds();
+        float rainFieldMs = VolumetricCloudRenderer.lastRainFieldGpuMilliseconds();
+        float rainGateMs = VolumetricCloudRenderer.lastRainGateGpuMilliseconds();
+        float rainPassMs = VolumetricCloudRenderer.lastRainPassGpuMilliseconds();
+        float temporalResolveMs = CloudTemporalResolveRenderer.lastFrameResolved()
+                ? CloudTemporalResolveRenderer.lastGpuMilliseconds() : 0.0F;
+        float spatialUpscaleMs = CloudSpatialUpscaleRenderer.lastFrameUpscaled()
+                ? CloudSpatialUpscaleRenderer.lastGpuMilliseconds() : 0.0F;
         if (sampled < sampleTarget) {
             cloudMilliseconds[sampled] = cloudMs;
             frameMilliseconds[sampled] = frameMs;
+            // A program that builds no field leaves the timer at -1. Recording
+            // zero there keeps the combined figure equal to the march time
+            // instead of poisoning it with a sentinel.
+            rainFieldMilliseconds[sampled] = Math.max(0.0F, rainFieldMs);
+            rainGateMilliseconds[sampled] = Math.max(0.0F, rainGateMs);
+            rainPassMilliseconds[sampled] = Math.max(0.0F, rainPassMs);
+            temporalResolveMilliseconds[sampled] = Math.max(0.0F, temporalResolveMs);
+            spatialUpscaleMilliseconds[sampled] = Math.max(0.0F, spatialUpscaleMs);
             // A pending composite query records as zero rather than as a
             // fabricated cost. The percentile then understates it, which is the
             // safe direction for a term used to argue a cost floor.
@@ -276,9 +381,19 @@ public final class StormT135PerformanceProfile {
             float[] cloud = Arrays.copyOf(cloudMilliseconds, sampled);
             float[] frame = Arrays.copyOf(frameMilliseconds, sampled);
             float[] composite = Arrays.copyOf(compositeMilliseconds, sampled);
+            float[] rainField = Arrays.copyOf(rainFieldMilliseconds, sampled);
+            float[] rainGate = Arrays.copyOf(rainGateMilliseconds, sampled);
+            Arrays.sort(rainGate);
+            float[] rainPass = Arrays.copyOf(rainPassMilliseconds, sampled);
+            Arrays.sort(rainPass);
+            float[] temporalResolve = Arrays.copyOf(temporalResolveMilliseconds, sampled);
+            Arrays.sort(temporalResolve);
+            float[] spatialUpscale = Arrays.copyOf(spatialUpscaleMilliseconds, sampled);
+            Arrays.sort(spatialUpscale);
             Arrays.sort(cloud);
             Arrays.sort(frame);
             Arrays.sort(composite);
+            Arrays.sort(rainField);
             results.add(new Cell(
                     poseName,
                     armLabel,
@@ -291,36 +406,68 @@ public final class StormT135PerformanceProfile {
                     cloudTargetWidth,
                     cloudTargetHeight,
                     sampled,
+                    duplicateSamplesRejected,
                     percentile(cloud, 0.50D),
                     percentile(cloud, 0.95D),
                     mean(cloud),
+                    standardDeviation(cloud),
+                    coefficientOfVariation(cloud),
+                    cloud.length == 0 ? Double.NaN : cloud[0],
+                    cloud.length == 0 ? Double.NaN : cloud[cloud.length - 1],
                     percentile(frame, 0.50D),
                     percentile(frame, 0.95D),
                     mean(frame),
                     percentile(frame, 0.50D) - percentile(cloud, 0.50D),
                     percentile(composite, 0.50D),
                     percentile(composite, 0.95D),
-                    effectiveResolutionScale
+                    effectiveResolutionScale,
+                    percentile(rainField, 0.50D),
+                    percentile(rainField, 0.95D),
+                    percentile(rainGate, 0.50D),
+                    percentile(rainGate, 0.95D),
+                    percentile(rainPass, 0.50D),
+                    percentile(rainPass, 0.95D),
+                    percentile(temporalResolve, 0.50D),
+                    percentile(temporalResolve, 0.95D),
+                    percentile(spatialUpscale, 0.50D),
+                    percentile(spatialUpscale, 0.95D)
             ));
             Cell recorded = results.get(results.size() - 1);
             ProjectAtmosphere.LOGGER.info(
                     "T135_PROFILE pose={} arm={} descriptors={} mode={} steps={}"
                             + " resolutionScale={} framebuffer={}x{}"
-                            + " cloudTarget={}x{} samples={}"
-                            + " cloudP50={} cloudP95={} cloudMean={}"
+                            + " cloudTarget={}x{} samples={} duplicatesRejected={}"
+                            + " gating={}"
+                            + " cloudP50={} cloudP95={} cloudMean={} cloudSd={}"
+                            + " cloudCv={} cloudMin={} cloudMax={}"
                             + " frameP50={} frameP95={} frameMean={} remainderP50={}"
                             + " effectiveResolutionScale={}"
-                            + " compositeP50={} compositeP95={}",
+                            + " compositeP50={} compositeP95={}"
+                            + " rainFieldP50={} rainFieldP95={}"
+                            + " rainGateP50={} rainGateP95={}"
+                            + " rainPassP50={} rainPassP95={}"
+                            + " temporalResolveP50={} temporalResolveP95={}"
+                            + " spatialUpscaleP50={} spatialUpscaleP95={}"
+                            + " cloudPlusFieldP50={}",
                     recorded.pose(), recorded.arm(), recorded.descriptors(),
                     recorded.mode(), recorded.raymarchSteps(),
                     fmt(recorded.resolutionScale()), recorded.frameWidth(),
                     recorded.frameHeight(), recorded.cloudWidth(), recorded.cloudHeight(),
-                    recorded.samples(),
+                    recorded.samples(), recorded.duplicateSamplesRejected(),
+                    freshSampleGating,
                     fmt(recorded.cloudP50()), fmt(recorded.cloudP95()), fmt(recorded.cloudMean()),
+                    fmt(recorded.cloudSd()), fmt(recorded.cloudCv()),
+                    fmt(recorded.cloudMin()), fmt(recorded.cloudMax()),
                     fmt(recorded.frameP50()), fmt(recorded.frameP95()), fmt(recorded.frameMean()),
                     fmt(recorded.remainderP50()),
                     fmt(recorded.effectiveResolutionScale()),
-                    fmt(recorded.compositeP50()), fmt(recorded.compositeP95()));
+                    fmt(recorded.compositeP50()), fmt(recorded.compositeP95()),
+                    fmt(recorded.rainFieldP50()), fmt(recorded.rainFieldP95()),
+                    fmt(recorded.rainGateP50()), fmt(recorded.rainGateP95()),
+                    fmt(recorded.rainPassP50()), fmt(recorded.rainPassP95()),
+                    fmt(recorded.temporalResolveP50()), fmt(recorded.temporalResolveP95()),
+                    fmt(recorded.spatialUpscaleP50()), fmt(recorded.spatialUpscaleP95()),
+                    fmt(recorded.cloudPlusFieldP50()));
         } else {
             ProjectAtmosphere.LOGGER.warn(
                     "T135_PROFILE pose={} mode={} produced only {} samples; discarded",
@@ -335,6 +482,30 @@ public final class StormT135PerformanceProfile {
         }
         int index = (int) Math.round(q * (sorted.length - 1));
         return sorted[Math.max(0, Math.min(sorted.length - 1, index))];
+    }
+
+    private static double standardDeviation(float[] values) {
+        if (values.length < 2) {
+            return Double.NaN;
+        }
+        double average = mean(values);
+        double sum = 0.0D;
+        for (float v : values) {
+            double d = v - average;
+            sum += d * d;
+        }
+        // Sample standard deviation: these are a sample of the cell's frames,
+        // not the whole population of frames the arm could ever render.
+        return Math.sqrt(sum / (values.length - 1));
+    }
+
+    /** Dispersion as a fraction of the mean, which is what compares across arms. */
+    private static double coefficientOfVariation(float[] values) {
+        double average = mean(values);
+        if (!(average > 0.0D)) {
+            return Double.NaN;
+        }
+        return standardDeviation(values) / average;
     }
 
     private static double mean(float[] values) {

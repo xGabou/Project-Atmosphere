@@ -1,0 +1,25 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "one",
+    "dstrgb": "zero",
+    "srcalpha": "one",
+    "dstalpha": "zero"
+  },
+  "vertex": "projectatmosphere:cloud_volume",
+  "fragment": "projectatmosphere:cloud_spatial_upscale",
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "samplers": [
+    { "name": "CloudColorSampler" },
+    { "name": "CloudDepthSampler" },
+    { "name": "SceneDepthSampler" }
+  ],
+  "uniforms": [
+    { "name": "SceneDepthValid", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "CoverageAlphaReconstruction", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "UpscaleMethod", "type": "int", "count": 1, "values": [ 0 ] }
+  ]
+}

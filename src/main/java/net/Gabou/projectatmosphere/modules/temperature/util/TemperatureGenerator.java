@@ -52,7 +52,12 @@ public class TemperatureGenerator {
             SeasonStage stage = SeasonTimeHelper.stage(level);
             Season currentSeason = mapSeasonStage(stage);
 
-            float baseTemp = level.getBiome(chunkPos).value().getBaseTemperature();
+            // The forecast already knows the sampled biome id. Looking the biome up in
+            // the registry is equivalent for its static base climate and avoids a
+            // position-based biome query, which can invoke worldgen density sampling
+            // under C2ME.
+            Biome biome = level.registryAccess().registryOrThrow(Registries.BIOME).get(biomeId);
+            float baseTemp = biome != null ? biome.getBaseTemperature() : 0.8F;
             BiomeTempConfig.DailyRange clamp = BiomeTempConfig.getClamp(biomeId, currentSeason);
 
             return new ForecastBaseData(cycleTicks, seasonDuration, dayDuration, currentSeason, baseTemp, clamp);
@@ -65,6 +70,8 @@ public class TemperatureGenerator {
 
         float seaLevelC = toCelsiusSeaLevel(biomeId, base.baseTemp, base.currentSeason);
         float altitudeBase = seaLevelC + (chunkPos.getY() - SEA_LEVEL) * LAPSE_RATE;
+        altitudeBase = (float) net.Gabou.projectatmosphere.api.climate.RuntimeClimateBridge.initialTemperature(
+                level, chunkPos.getX(), chunkPos.getZ(), altitudeBase);
 
         float randomAmp = isTropicalBiome(biomeId, level, 4f, 8f);
         float fluctuationAmp = isTropicalBiome(biomeId, level, 2f, 4f);

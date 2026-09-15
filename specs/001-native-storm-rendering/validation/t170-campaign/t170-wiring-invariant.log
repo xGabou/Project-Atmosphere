@@ -1,0 +1,5 @@
+T170_WIRING campaigns=15|armMatrices=11|violations=0
+T170_WIRING_NEGATIVE mutations=5|allDetected=true
+PHASE4R_RESULT|T170 primary march arms compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T170 every registered campaign is wired into every dispatch site|PASSED|invariant satisfied
+PHASE4R_RESULT|T170 the campaign wiring invariant detects an omitted wire|PASSED|invariant satisfied

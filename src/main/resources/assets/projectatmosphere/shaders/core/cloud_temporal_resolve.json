@@ -1,0 +1,51 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "one",
+    "dstrgb": "zero",
+    "srcalpha": "one",
+    "dstalpha": "zero"
+  },
+  "vertex": "projectatmosphere:cloud_volume",
+  "fragment": "projectatmosphere:cloud_temporal_resolve",
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "samplers": [
+    { "name": "Phase0Color" },
+    { "name": "Phase1Color" },
+    { "name": "Phase2Color" },
+    { "name": "Phase3Color" },
+    { "name": "Phase0Depth" },
+    { "name": "Phase1Depth" },
+    { "name": "Phase2Depth" },
+    { "name": "Phase3Depth" },
+    { "name": "RainPassSampler" }
+  ],
+  "uniforms": [
+    { "name": "InvProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "InvViewRotMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "CloudViewProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "PhaseViewProj0", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "PhaseViewProj1", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "PhaseViewProj2", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "PhaseViewProj3", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "PhaseCamDelta0", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+    { "name": "PhaseCamDelta1", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+    { "name": "PhaseCamDelta2", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+    { "name": "PhaseCamDelta3", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+    { "name": "PhaseValid0", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PhaseValid1", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PhaseValid2", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PhaseValid3", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PhaseJitter0", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
+    { "name": "PhaseJitter1", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
+    { "name": "PhaseJitter2", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
+    { "name": "PhaseJitter3", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
+    { "name": "CurrentPhase", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "MaxRenderDistance", "type": "float", "count": 1, "values": [ 2000.0 ] },
+    { "name": "ResolveMode", "type": "int", "count": 1, "values": [ 1 ] },
+    { "name": "DebugOutput", "type": "int", "count": 1, "values": [ 0 ] }
+  ]
+}

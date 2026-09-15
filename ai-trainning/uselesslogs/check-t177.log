@@ -1,0 +1,40 @@
+PHASE4R_RESULT|T079 cluster-only signatures|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 candidate group witness coverage|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 candidate non-authority|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 bounded per-group intersection|PASSED|invariant satisfied
+PHASE4R_RESULT|T111 production storm shader compiles|PASSED|invariant satisfied
+PHASE4R_RESULT|T161 lean FINAL shader specializes and compiles|PASSED|invariant satisfied
+PHASE4R_RESULT|T140 oracle variants compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T162 attribution arms compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T166 attribution arms compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T167 refinement arms compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T168 footprint arms compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T169 lighting and detail arms compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T170 primary march arms compile and stay out of FINAL|PASSED|invariant satisfied
+T170_WIRING campaigns=22|armMatrices=18|violations=0
+PHASE4R_RESULT|T170 every registered campaign is wired into every dispatch site|PASSED|invariant satisfied
+T170_WIRING_NEGATIVE mutations=5|allDetected=true
+PHASE4R_RESULT|T170 the campaign wiring invariant detects an omitted wire|PASSED|invariant satisfied
+T171_CONTROLS duplicates=2|byteIdenticalToFinal=true
+PHASE4R_RESULT|T171 program identity controls are byte-identical to FINAL|PASSED|invariant satisfied
+T171_SAMPLING freshnessGate=wired|duplicateCounter=wired|dispersion=wired
+PHASE4R_RESULT|T171 the GPU sampler records only fresh timer results|PASSED|invariant satisfied
+PHASE4R_RESULT|T172 precompute arms compile and stay out of FINAL|PASSED|invariant satisfied
+T172_PRECOMPUTE texels=5|minEdge=11.363636|edgeBound=0.75|channelsPinned=true
+PHASE4R_RESULT|T172 the CPU precompute still matches the shader formula|PASSED|invariant satisfied
+T175_WORKLOAD_VIEWS declared=19|allEnabled=true
+PHASE4R_RESULT|T175 every workload debug view is actually enabled|PASSED|invariant satisfied
+PHASE4R_RESULT|T163 FINAL is specialized against the dead precipitation path|PASSED|invariant satisfied
+
+> Task :test
+
+> Task :volumetricStabilityDiagnosticsSandbox
+PHASE4R_RESULT|T078 rain and rendered-body agreement|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 independent lifecycle generations|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 same-frame history invalidation|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 shaftDensity maxPrecipitation argument|PASSED|invariant satisfied
+
+> Task :check
+
+BUILD SUCCESSFUL in 14m 23s
+18 actionable tasks: 13 executed, 5 up-to-date

@@ -4,6 +4,7 @@ import java.util.Random;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.region.RegionBiomeSample;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.biome.Biome;
 
@@ -18,7 +19,13 @@ public class HumidityGenerator {
 
     public static float[][] generateWeekForecast(ServerLevel level, RegionBiomeSample sample, float[][] tempWeek, long day) {
         float baseRh = AsyncAtmosphereService.callOnMainThread(() -> {
-            Biome biome = level.getBiome(sample.pos()).get();
+            // RegionBiomeSample already carries the selected biome id. Humidity uses
+            // only static climate data, so a registry lookup avoids a redundant
+            // position-based biome query (and C2ME's density-function work).
+            Biome biome = level.registryAccess().registryOrThrow(Registries.BIOME).get(sample.biomeId());
+            if (biome == null) {
+                return MIN_HUMIDITY_DESERT_BIOME;
+            }
             float rh = biome.getModifiedClimateSettings().downfall() * MAX_HUMIDITY;
             if (!biome.getModifiedClimateSettings().hasPrecipitation()) {
                 rh = MIN_HUMIDITY_DESERT_BIOME;

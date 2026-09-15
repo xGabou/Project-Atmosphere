@@ -23,6 +23,19 @@ uniform sampler2D SceneDepthSampler;
 uniform sampler2D HistorySampler;
 uniform sampler2D HistoryDepthSampler;
 uniform sampler2D OracleIntervalSampler;
+/**
+ * T188. The precomputed rain-support field, RGBA32F on the existing weather
+ * domain: R = descriptor body support, G = attach height in world blocks,
+ * B = descriptor ownership as 0/1, A = 1 where a cell was written.
+ */
+uniform sampler2D RainFieldSampler;
+/**
+ * T205. The rain pass's output, read by the split cloud program at its own
+ * pixel: rgb the rain radiance integrated against the rain's own
+ * transmittance, a the rain's total transmittance and its mass-weighted
+ * depth packed as two 12-bit values. Bound manually on its own unit.
+ */
+uniform sampler2D RainPassSampler;
 uniform sampler3D BaseNoiseSampler;   // bound manually (3D)
 uniform sampler3D DetailNoiseSampler; // bound manually (3D)
 
@@ -230,6 +243,185 @@ uniform int PaDiagnosticOptimizationMode;
 uniform int PaOraclePass;
 uniform vec2 PaOracleBaseSize;
 /**
+ * T188. 1 while this draw is generating the rain-support field rather than
+ * marching the view ray. The generation pass runs the SAME
+ * directStormRainSupportAt the ray used to call per sample, so the field is
+ * bit-exact by construction rather than by a separate proof - which is the
+ * whole reason generation lives in this program instead of a second one that
+ * would have to duplicate the descriptor union.
+ */
+uniform int PaRainFieldPass;
+/**
+ * T188. 1 when localRainSupportAt reads the field instead of walking the
+ * descriptors. Separate from the generation flag so a campaign can generate
+ * the field and still march the exact path, which is how the exactness arm
+ * measures quantisation error against ground truth in one frame.
+ */
+uniform int PaRainFieldEnabled;
+/**
+ * T190. 1 when the field carries a per-cell certainty flag and the lookup
+ * honours it: a cell whose rain-existence decision is not uniform across its
+ * own area falls back to the exact descriptor evaluation.
+ *
+ * <p>A uniform rather than a define because the classification lives in the
+ * generation pass, which is not hot, and because the diagnostic monolith is the
+ * only program that can read workload counters - a define would leave it
+ * unclassified and every mixed-cell counter reading zero.
+ */
+uniform int PaRainFieldConservative;
+/**
+ * T192. 1 when cell classification triages with the closed-form ownership
+ * bound before falling back to corner sampling. Separate from
+ * PaRainFieldConservative so the two classifiers can be measured in the same
+ * session against the same anchors.
+ */
+uniform int PaRainFieldClosedForm;
+/**
+ * T203. The rain gate field. T188-T192 stored the column's rain triple and
+ * asked the ray to trust it, and a 0.1-0.2% per-column error became 3-12%
+ * false rain through an OR over sixty samples. This field never answers
+ * "rain": it answers "provably no descriptor rain anywhere in this cell"
+ * and "attach height provably inside [Amin, Amax] here", and the segment
+ * test keeps production's exact evaluation for every sample the field
+ * cannot reject. 0 off; 1 the build pass (under PaRainFieldPass) writes the
+ * gate field and rainSegmentMayContribute reads it; 2 builds without
+ * reading, the build-cost arm. Baked 0 everywhere but the T203 programs and
+ * the monolith, which uploads it when a campaign forces the gate on.
+ */
+uniform int PaRainGateField;
+/**
+ * T196. The shared 3D storm field. 0 renders; 1 is the node build pass, one
+ * fragment per node of the PaStormFieldXZ-square x 32 atlas; 2 is the soundness oracle, which
+ * writes the node floor beside a dense reference floor instead of a field.
+ * Baked to 0 in every program that neither builds nor reads the field, so
+ * neither pass is compiled into them.
+ */
+uniform int PaStormFieldPass;
+/**
+ * T196. Which consumers read the field: bit 1 the light cone, bit 2 the
+ * empty-span probe. Baked per program.
+ * T198. Bit 8: the light cone reads the field's threshold and height (R, B)
+ * and evaluates the base noise, the detail and the erosion at the tap itself,
+ * instead of the node density in A.
+ * T199. Production is 11 (1 | 2 | 8), baked into FINAL. Bit 4 - the T196
+ * hybrid that kept taps 0-1 on the exact walk - was retired: with bit 8 every
+ * tap evaluates the noise itself, so there was nothing left for it to
+ * restore, and T198 showed it left the far taps biased.
+ * T202. Bit 16: the primary body density reads the field's threshold and
+ * height (R, B) and evaluates the base noise, the detail octaves and the
+ * erosion at the sample itself - the bit-8 lookup at mip 0 with the primary's
+ * detail flags - instead of walking the descriptors; an uncovered node hands
+ * the sample back to the exact evaluation. Bit 32: the union-distance
+ * refinement reads the node's clearance floor from A (the build writes the
+ * walk's minimum descriptor clearance, dilated over the dual cell, into A on
+ * covered nodes when this bit is on; uncovered nodes keep the node density
+ * the light's fallback reads) instead of walking the descriptors for it.
+ */
+uniform int PaStormFieldEnabled;
+/**
+ * T196. Headroom on the dual-cell half-diagonal the probe floor dilates by.
+ * The union distance is not proved 1-Lipschitz, so the dilation carries a
+ * multiplier the soundness oracle calibrates; 1.0 would be exact Lipschitz.
+ */
+const float PA_STORM_FIELD_DILATION = 1.25;
+/**
+ * T196. The lobe pseudo-distance is not isotropically Lipschitz: horizontally
+ * it is a first-order ellipse distance (about 1), but vertically the role
+ * profile radius changes with height, so |d(d)/dy| is |dR/dy| and reaches
+ * several blocks per block where a tower flares into its anvil. The first
+ * oracle run measured 11,667 underestimates with an isotropic dilation; the
+ * dilation is therefore split by axis, each with its own measured constant.
+ */
+// Per node rather than global: the walk publishes, for the lobes it visited,
+// the largest vertical slope (the role profile's maximum height derivative -
+// 2.0 base, 1.9 core, 2.3 tower, 3.5 anvil, measured on the profiles - times
+// the lobe's radius over its height) and the largest ellipse aspect, which
+// bounds the horizontal constant of the gradient-normalised distance. The
+// second oracle run measured 2.09 horizontally and 8.30 vertically on this
+// fixture, the latter on the anvil flare alone; a global constant at those
+// values would dilate every node by 140 blocks. Both carry this headroom.
+const float PA_STORM_FIELD_LIPSCHITZ_HEADROOM = 1.2;
+// T196. Bound manually on the rain-field unit - the two fields are never
+// resident in the same program - for the reason RainFieldSampler is.
+uniform sampler2D StormFieldSampler;
+// T196. The field grid: PaStormFieldXZ nodes square over WeatherExtent, 32
+// over the slab, stored as an 8x4 atlas of PaStormFieldXZ-square tiles.
+// T197. The horizontal resolution is a uniform the field programs keep live
+// (256, 384 or 512 in the campaign; FINAL bakes 256) so one program serves
+// every resolution: the node spacing, the texel centres, the atlas
+// coordinates and the dual-cell half-extent the probe floor dilates by all
+// derive from it below. WeatherExtent is covered at every value - resolution
+// changes the spacing, never the coverage. Y stays 32, so the atlas keeps its
+// 8x4 tiles and the vertical margin is unchanged between resolutions.
+uniform int PaStormFieldXZ;
+const int PA_STORM_FIELD_Y = 32;
+/**
+ * T198 Task 1. The light-tap audit, compiled only into the t198_light_audit
+ * program (PA_LIGHT_AUDIT). At every light tap the program evaluates the
+ * field's density and the exact production density at the same point and
+ * accumulates their difference per tap; the fragment output is one of the
+ * accumulators (PaLightAuditOutput) rather than a frame. PaLightAuditVariant
+ * selects what the exact side evaluates so the error can be decomposed term
+ * by term: 0 production; 1 detail noise at its mean (erosion keeps its mean
+ * bite); 2 erosion stage off; 3 mip bias 0; 4 weather neutral; 5 morphology
+ * neutral; 6 the field's own node equation at the tap (build-mode walk, mip
+ * 0, no detail) - so 6 minus 0 is the representation error and the texture
+ * minus 6 the interpolation error; 7 erosion off and mip 0 on the ordinary
+ * walk, so 6 minus 7 is the build-mode walk alone. Baked 0 everywhere else.
+ */
+uniform int PaLightAuditVariant;
+uniform int PaLightAuditOutput;
+const int PA_STORM_FIELD_TILES_X = 8;
+const int PA_STORM_FIELD_TILES_Y = 4;
+const float PA_STORM_FIELD_BODY_GAIN = 1.65;
+const float PA_STORM_FIELD_UNCOVERED = -10.0;
+/**
+ * T190. The support level below which localRainSupportAt returns no rain, so
+ * the side of it a column falls on is a decision rather than a magnitude.
+ * Matches the cutoff that function applies to localSupport.
+ */
+const float PA_FIELD_SUPPORT_CUTOFF = 0.01;
+/**
+ * T190. How far the attach height may vary across a cell before the cell is
+ * called mixed, in world blocks. One block is well inside the T145 height
+ * gate's own resolution, so a cell that passes cannot move a segment across it.
+ */
+const float PA_FIELD_ATTACH_TOLERANCE = 1.0;
+/**
+ * T203. The gate field's flag bits, stored exactly in R: 1 the cell is
+ * provably free of descriptor rain, 2 the raster precipitation map may be
+ * above its 0.02 cutoff somewhere in the cell (any of the 3x3 morphology
+ * texels the bilinear filter can reach from a point of the cell), in which
+ * case the raster branch of localRainSupportAt is live and the gate defers
+ * to the exact evaluation.
+ */
+const int PA_RAIN_GATE_DRY = 1;
+const int PA_RAIN_GATE_PRECIP = 2;
+/**
+ * T203. The segment test's own window below the attach height; the gate's
+ * lower bound is stored as Amin minus this so the ray compares once.
+ */
+const float PA_RAIN_GATE_WINDOW = 184.0;
+/**
+ * T203. Headroom on the Lipschitz dilations the gate's dry proofs use - the
+ * per-lobe support distance across the cell and the union distance across
+ * the cell and the support height span - the same margin the storm field's
+ * floor carries, calibrated by that field's oracle and checked again here
+ * by the gate's own (view 75).
+ */
+const float PA_RAIN_GATE_HEADROOM = PA_STORM_FIELD_LIPSCHITZ_HEADROOM;
+/**
+ * T203. The lobe pseudo-distance's domain warp adds to its horizontal slope
+ * 0.08 * 2.3 * 0.00197 (the weighted horizontal wave numbers of
+ * lowFrequencyDomainWarp) * (2 - 1/radial) <= 0.00073 blocks per block per
+ * block of the lobe's radius, rounded up; see paRainGateBuildCell.
+ */
+const float PA_RAIN_GATE_WARP_SLOPE = 0.0008;
+/** T203. The attach bounds' rounding pad, in blocks; see paRainGateBuildCell. */
+const float PA_RAIN_GATE_BOUND_PAD = 0.002;
+/** T205. The attach band the fine-stride rain pass samples at the cloud march's fine step. */
+const float PA_RAIN_PASS_FINE_BAND = 48.0;
+/**
  * Uploaded as exactly zero. The amplification arm perturbs its extra
  * evaluation by this, so the compiler cannot prove the second call redundant
  * and fold it away, while the result stays bit-identical to the first.
@@ -253,7 +445,19 @@ bool paT141EvalAmplify() {
 
 /** True when the conservative bound is the full box rather than vertical only. */
 bool paT141BoxBound() {
+#ifdef PA_ARM_BOX_BOUND
+    // T173. The tighter bound, reachable at compile time.
+    //
+    // FINAL bakes PaDiagnosticOptimizationMode to 0, so the shipped renderer
+    // has always used the vertical-only bound and stormLobeDistanceLowerBound
+    // has been unreachable in production. It is a valid lower bound by the same
+    // argument the function documents - max() of two valid lower bounds is a
+    // valid lower bound - so switching to it cannot change the image, only how
+    // many descriptors reach the exact SDF.
+    return true;
+#else
     return (PaDiagnosticOptimizationMode & PA_OPT_T141_BOX_BOUND) != 0;
+#endif
 }
 
 /** True when the hoisted ray-invariant storm reachability bound is active. */
@@ -328,6 +532,21 @@ float paLightingDetailWeight = 1.0;
 bool paArmLightingSample = false;
 #endif
 
+#ifdef PA_ARM_DETAIL_FOOTPRINT
+/**
+ * T169 Task 4A. Squared distances past which a detail octave projects to less
+ * than PA_ARM_DETAIL_FOOTPRINT target pixels.
+ *
+ * <p>Squared deliberately. The existing T149 path calls
+ * `paProjectedFeaturePixels`, which costs a `length()`, a `textureSize()` and a
+ * division at every detail evaluation - the per-step division T167 already
+ * showed is unaffordable. Comparing squared distances against a per-fragment
+ * constant is a dot product and a compare, and answers the same question.
+ */
+float paDetailCutoffDistSq = 3.0e38;
+float paDetailFineCutoffDistSq = 3.0e38;
+#endif
+
 /** True when the march's far endpoint is halved, bounding distance culling. */
 bool paT147HalfDistance() {
     return (PaDiagnosticOptimizationMode & PA_OPT_T147_HALF_DISTANCE) != 0;
@@ -365,6 +584,164 @@ bool paT145RainLocality() {
 float paRainAttachTop = -1.0e9;
 vec2 paRainOwnCentre = vec2(0.0);
 float paRainOwnRadius = -1.0;
+/**
+ * T185. The same union, kept as an axis-aligned box instead of collapsed to a
+ * circumscribed circle, and accumulated from each ellipse's true per-axis
+ * extent instead of a square built from its larger semi-axis.
+ *
+ * <p>The existing bound stacks three conservative steps: each ownership ellipse
+ * becomes a square of side 2*max(semi-axis), the squares become one AABB, and
+ * the AABB becomes its circumcircle - which alone costs a factor of root two on
+ * the diagonal. This keeps the same guarantee with none of the last two.
+ */
+vec2 paRainOwnMin = vec2(0.0);
+vec2 paRainOwnMax = vec2(0.0);
+
+/**
+ * T185. Which half of the T145 conjunct actually rejects a column.
+ *
+ * <p>The prune requires BOTH "raster precipitation is negligible" AND "outside
+ * the ownership envelope". If the first fails at SIDE, tightening the geometry
+ * cannot help, and no arm should be built. These count each half separately,
+ * plus what a tighter box and an exact per-ellipse test would reject.
+ */
+int paRainPrecipLow = 0;
+int paRainOutsideCircle = 0;
+int paRainOutsideAabb = 0;
+int paRainOutsideExact = 0;
+int paRainAcceptedZeroSupport = 0;
+// T188 structural proof: field fetches that replaced a descriptor traversal,
+// and the columns outside the field domain that still have to traverse.
+int paRainFieldFetches = 0;
+int paRainFieldFallbacks = 0;
+// T190. Lookups the field answered outright, and those that landed in a cell
+// the build could not prove uniform and so paid the exact traversal for.
+int paRainFieldSafeHits = 0;
+int paRainFieldMixedFallbacks = 0;
+/**
+ * T203 Task 1. Where the rain-support walks that actually run end up, so
+ * the segment test's cost is decomposed before the gate is trusted: the
+ * walk found the column unowned; owned but no BASE lobe supports it; owned
+ * with support but the union carries no coverage at the support height (the
+ * ownership ring, provable by geometry); owned with coverage but the noise
+ * eroded the support below the cutoff (not provable by geometry); owned and
+ * supported above the cutoff. Counted only where the walk ran.
+ */
+int paRainWalkUnowned = 0;
+int paRainWalkOwnedNoBase = 0;
+int paRainWalkOwnedEnvelopeZero = 0;
+int paRainWalkOwnedEroded = 0;
+int paRainWalkOwnedSupported = 0;
+/** T203 Task 1. Of the supported samples, how the height window decides. */
+int paRainSegSupported = 0;
+int paRainSegAboveAttach = 0;
+int paRainSegBelowWindow = 0;
+/**
+ * T203 Task 8. The gate's census on the ray: cells fetched, samples the
+ * dry flag rejected, samples the attach window rejected, samples handed to
+ * the exact test (the fallback), columns outside the field's domain, samples
+ * deferred because the raster precipitation is live in the cell; and of
+ * the fallbacks, how many reached a walk and how many of those found
+ * support - the gate's precision.
+ */
+int paRainGateFetches = 0;
+int paRainGateDryRejects = 0;
+int paRainGateWindowRejects = 0;
+int paRainGateFallbacks = 0;
+int paRainGateOutOfDomain = 0;
+int paRainGatePrecipFallbacks = 0;
+int paRainGateFallbackWalks = 0;
+int paRainGateFallbackSupported = 0;
+/**
+ * T203. Published by directStormRainSupportAt under capture: whether a BASE
+ * lobe supported the column, and the union coverage at its support height,
+ * so the walk's outcome can be classed without a second walk.
+ */
+bool paLastRainHasLocalBase = false;
+float paLastRainCoverage = 0.0;
+/**
+ * T204. The shaft path per pixel: samples rainShaftDensityAt evaluated, and
+ * the segments whose shaft returned a positive density. View 78 emits them
+ * per pixel and the capture measures their spatial clustering in
+ * warp-shaped tiles on the CPU - the any-lane estimate a #version 150
+ * program cannot take with subgroup operations.
+ */
+int paRainShaftSamples = 0;
+int paRainShaftPositiveSegments = 0;
+#ifdef PA_LIGHT_AUDIT
+// T198 Task 1. Per-tap accumulators over every light tap this pixel's march
+// evaluates: signed error (field - exact), its magnitude and square, the
+// sample count, the over- and under-estimate counts, and both sides' sums.
+// Guarded by a define for T188's reason: the arm under audit is a lean
+// program, and only a program can carry an output the monolith does not.
+float paLaSumErr[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaSumAbs[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaSumSq[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaCount[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaOver[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaUnder[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaExactSum[4] = float[4](0.0, 0.0, 0.0, 0.0);
+float paLaFieldSum[4] = float[4](0.0, 0.0, 0.0, 0.0);
+// The variant the exact side is being evaluated under, set around that one
+// call only, so the primary march and the field build are untouched.
+int paLightAuditExactVariant = 0;
+#endif
+#ifdef PA_PRIMARY_AUDIT
+// T202 Task 3. Accumulators over every primary body sample of this pixel's
+// march: the field density against the exact one - signed error, magnitude,
+// square, extremum, the over/under counts, the zero/nonzero and the material
+// (> 0.0008) disagreements split by direction, the uncovered fallbacks, both
+// sides' sums, and the count and error of the samples the exact side places
+// at a body edge (0 < exact <= 0.05). Guarded by a define for T198's reason.
+float paPaCount = 0.0;
+float paPaSumErr = 0.0;
+float paPaSumAbs = 0.0;
+float paPaSumSq = 0.0;
+float paPaMaxAbs = 0.0;
+float paPaOver = 0.0;
+float paPaUnder = 0.0;
+float paPaZeroDisagree = 0.0;
+float paPaExactZeroFieldNot = 0.0;
+float paPaFieldZeroExactNot = 0.0;
+float paPaMaterialDisagree = 0.0;
+float paPaFallback = 0.0;
+float paPaExactSum = 0.0;
+float paPaFieldSum = 0.0;
+float paPaEdgeCount = 0.0;
+float paPaEdgeSumAbs = 0.0;
+#endif
+#ifdef PA_RAIN_MASK_OUTPUT
+// T188 Task 0. The rain-only capture. Rain and cloud are composited in the
+// rendered frame, so no mask can be recovered from it after the fact; these
+// accumulate the rain contribution alone, along the same ray, in the same
+// march, with the same steps.
+//
+// Guarded by a define rather than a DebugView, because every lean program
+// bakes DebugView to 0 - a runtime view could only ever be rendered by the
+// monolith, and the arms are exactly what has to be measured.
+float paRainMassAccum = 0.0;
+float paRainOnsetY = -1.0;
+float paRainTerminationY = -1.0;
+float paRainRuns = 0.0;
+bool paRainPrevActive = false;
+#endif
+
+/**
+ * T186. What the two-sample rule actually costs.
+ *
+ * <p>rainSegmentMayContribute is an OR over two Gauss nodes with an early
+ * return, and each sample can also be skipped by the T145 height prune. So the
+ * second sample is already conditional, and "one sample halves the work" is an
+ * assumption rather than a fact. These measure the real split before any arm is
+ * trusted: how often the second sample runs at all, and how often it is the one
+ * that finds the rain.
+ */
+int paRainSegCalls = 0;
+int paRainSegSupport0 = 0;
+int paRainSegSupport1 = 0;
+int paRainSegTrueAt0 = 0;
+int paRainSegTrueAt1 = 0;
+int paRainSegHeightSkip = 0;
 
 /**
  * Ray-invariant horizontal bound on every resident descriptor's reach, in
@@ -401,6 +778,251 @@ int paGroupFieldCalls = 0;
 int paLobesVisited = 0;
 int paCloudDensityCalls = 0;
 int paDensityZeroCalls = 0;
+/**
+ * T175. The PRIMARY body density histogram.
+ *
+ * <p>T174 reported 25.37 density calls per pixel at SIDE, but cloudDensityCalls
+ * counts light-march taps too - 1,826,472 of 3,287,861 at SIDE. The primary
+ * march actually makes 11.28 per pixel, on 36.6% of its steps rather than 82%.
+ * These count only the one body call in the march loop, so they cannot be
+ * conflated with lighting again.
+ *
+ * <p>Bins are anchored on the shader's own material threshold, 0.0008 - the
+ * value PA_MR_DENSITY_ABOVE_THRESHOLD and the oracle interval close already use
+ * - rather than on invented cut points.
+ */
+int paPrimaryDensityCalls = 0;
+int paPrimaryDensityZero = 0;
+int paPrimaryDensityNegligible = 0;
+int paPrimaryDensityLow = 0;
+int paPrimaryDensityMedium = 0;
+int paPrimaryDensityHigh = 0;
+/** Transitions along a ray, so run lengths can be derived rather than assumed. */
+int paPrimaryMaterialRuns = 0;
+int paPrimaryZeroRuns = 0;
+
+/**
+ * T177. Primary-to-light group reuse validity.
+ *
+ * <p>The question is whether a light tap, which samples along LightDir from a
+ * point whose descriptor group was just resolved, needs its own group
+ * resolution at all. These record, per light tap, the groups the tap actually
+ * needed against the groups the originating primary sample had already
+ * resolved.
+ *
+ * <p>Diagnostic only: every write is behind paWorkloadCaptureActive() and the
+ * classification runs after the walk, so it cannot change what the walk does.
+ */
+int paPrimaryGroupMask = 0;
+int paPrimaryWitnessIndex = -1;
+bool paCapturePrimaryGroups = false;
+/** 0 when not inside a light tap, otherwise the 1-based tap ordinal. */
+int paLightTapOrdinal = 0;
+int paReuseTapsClassified = 0;
+int paReuseTapsEmpty = 0;
+int paReuseSufficient = 0;
+int paReusePartial = 0;
+int paReuseWrong = 0;
+int paReuseSuffOrd1 = 0;
+int paReuseSuffOrd2 = 0;
+int paReuseSuffOrd3 = 0;
+int paReuseSuffOrd4 = 0;
+/** Groups entered while inside a light tap - the size of the reuse prize. */
+int paReuseGroupsEnteredInTaps = 0;
+
+/**
+ * T178 Task 1. Separating a LOBE VISIT from an EXPENSIVE LOBE EVALUATION.
+ *
+ * <p>Ten lobes are visited per group walk and about five change the union. The
+ * question a support test lives or dies on is where the other five are
+ * rejected: a lobe the T121 bound already skips before the exact SDF is not
+ * opportunity, while one that is fully evaluated and then found not to move the
+ * union is.
+ */
+int paLobeExactSdf = 0;
+int paLobeExactSdfNoChange = 0;
+int paLobeVisitsLight = 0;
+int paLobeExactSdfLight = 0;
+int paLobeCheapRejectLight = 0;
+/**
+ * T179 replaces T178's support rejects with dominance rejects: lobes proven
+ * unable to move the smooth union before their exact SDF is paid.
+ */
+int paLobeDominanceRejects = 0;
+
+/**
+ * T179 Task 2. The post-hoc dominance histogram.
+ *
+ * <p>Binned on what the lobe actually did to the accumulated union distance,
+ * measured after the fact, so the bins describe the population a pre-SDF test
+ * would have to identify rather than the population any particular test finds.
+ * "Exactly zero" is the strict ceiling: those lobes provably could have been
+ * skipped with no image consequence whatsoever.
+ */
+int paDomChangeZero = 0;
+int paDomChangeBelowEpsilon = 0;
+int paDomChangeTiny = 0;
+int paDomChangeMeaningful = 0;
+int paDomZeroLight = 0;
+int paDomZeroPrimary = 0;
+/** Slack the production threshold carries over the exact dominance threshold. */
+int paDomWouldRejectWithExactBlend = 0;
+
+/**
+ * T180. Which consumer is currently inside cloudDensity().
+ *
+ * <p>T175 attributed 48% of descriptor walks to "segment tests, clearance
+ * probes and quadrature" by subtraction, and no campaign has decomposed it
+ * since. This tag replaces the subtraction with a direct attribution: it is set
+ * around the real production call sites and read where the group walk and the
+ * exact SDF are counted, so every walk lands in exactly one bucket.
+ *
+ * <p>0 other, 1 primary body, 2 light tap, 3 empty-span probe,
+ * 4 bracket bisection.
+ */
+int paDensityConsumer = 0;
+int paProbeCalls = 0;
+int paProbeGroupWalks = 0;
+int paProbeExactSdf = 0;
+int paBracketCalls = 0;
+int paBracketGroupWalks = 0;
+int paBracketExactSdf = 0;
+int paOtherCalls = 0;
+int paOtherGroupWalks = 0;
+int paOtherExactSdf = 0;
+
+/**
+ * T181. The empty-span scan's probe cap is 16, but the loop breaks as soon as a
+ * probe finds material or the offset leaves the span, so 16 is a CAP and not a
+ * count. Whether it ever binds decides whether lowering it can do anything at
+ * all, so the distribution is measured rather than assumed.
+ *
+ * <p>The refinement is one directStormShape call per event, not an iterative
+ * solve - there is no iteration count to sweep, which is why T181 prices its
+ * removal instead.
+ */
+int paRefineEvents = 0;
+int paScanEvents = 0;
+int paScanFoundMaterialCount = 0;
+int paScanCapReached = 0;
+int paScanProbes1To2 = 0;
+int paScanProbes3To4 = 0;
+int paScanProbes5To8 = 0;
+int paScanProbes9To16 = 0;
+/**
+ * T181 Task 8. Probes spent inside a scan that then found material. The scan
+ * samples "exactly the lattice the fine march would have sampled", so when it
+ * hits material the march enters fine mode and re-evaluates that same lattice.
+ * These probes are duplicated work by construction, not by coincidence.
+ */
+int paScanWastedProbes = 0;
+
+/**
+ * T182. Complete attribution of directStormShape by consumer.
+ *
+ * <p>T180 assigned an untagged residual to a call site by elimination and was
+ * wrong; T181 found the residual was still 27.7% after correcting it. These
+ * counters exist so the question is closed by arithmetic instead: every
+ * production-reachable entry sets a tag, and paShapeUntagged must read exactly
+ * zero. The tagged counters must sum to paDirectStormShapeCalls.
+ *
+ * <p>Tags: 1 primary body, 2 light tap, 3 empty-span probe, 4 bracket
+ * bisection, 5 march refinement, 6 rain segment reachability, 7 rain shaft
+ * density, 8 camera-inside test, 9 light cheap forward probe.
+ */
+int paShapePrimary = 0;
+int paShapeLight = 0;
+int paShapeProbe = 0;
+int paShapeBracket = 0;
+int paShapeRefine = 0;
+int paShapeRainSegment = 0;
+int paShapeRainShaft = 0;
+int paShapeCamera = 0;
+int paShapeLightForward = 0;
+int paShapeUntagged = 0;
+
+// T196. The shared storm field's counters. Fetches served per consumer, the
+// probe's two field verdicts, and - on the monolith only, where production is
+// also evaluated beside the field - the probe decision audit.
+int paStormFieldLightFetches = 0;
+int paStormFieldProbeFetches = 0;
+int paStormFieldProbeProvablyEmpty = 0;
+int paStormFieldProbeFallback = 0;
+int paStormFieldFalseEmpty = 0;
+int paStormFieldFalseOccupied = 0;
+int paStormFieldAgreeEmpty = 0;
+int paStormFieldAgreeOccupied = 0;
+// T202. The two body consumers on the field: fetches served to the primary
+// body density and to the union-distance refinement, and the calls each
+// handed back to the exact walk because the node was uncovered or outside
+// the slab.
+int paStormFieldPrimaryFetches = 0;
+int paStormFieldPrimaryFallback = 0;
+int paStormFieldRefineFetches = 0;
+int paStormFieldRefineFallback = 0;
+// T196. Published by directStormShape for the node build: the softness range
+// of the groups that entered the union, which the dilated envelope needs and
+// the coverage value alone does not carry.
+float paLastStormMinSoftness = 1.0e9;
+float paLastStormMaxSoftness = 0.0;
+float paLastStormUnionDistance = 1.0e9;
+// T202. The walk's minimum descriptor clearance at the node - the value the
+// refinement reads at a ray point - published so the build can floor it over
+// the dual cell. 1e9 when the node's tile carries no candidate.
+float paLastStormMinClearance = 1.0e9;
+// T202 oracle. The union's blended softness, beside its distance, so a
+// representation that interpolates the distance can form the envelope itself.
+float paLastStormUnionSoftness = 0.0;
+float paLastStormMaxVerticalSlope = 1.0;
+float paLastStormMaxAspect = 1.0;
+// T198. Published by cloudDensity in build mode: the exact storm-body
+// threshold at the node (stormCoverageLowerBound of the walk's coverage,
+// strength and overlap class; 1 where nothing is owned) and the walk's
+// height01, which the material terms read. Both are envelope quantities the
+// light tap interpolates instead of the node's aliased noise sample.
+float paLastStormLowerBound = 1.0;
+float paLastStormHeight01 = 0.0;
+// T196 oracle: how far outside the dilated envelope the last node floor
+// believed itself to be, in blocks; 1e9 when no group entered.
+float paLastStormFieldSlack = 1.0e9;
+// T196. True while a field node is being built, which lifts the T143 reach
+// early-out: a node just outside the reach circle still has to walk, because
+// the dual cell it bounds may reach inside it.
+bool paStormFieldBuildNode = false;
+// T196. In build mode, T121's vertical rejection judges a lobe against the
+// whole dual cell rather than the node: a lobe that is provably clear of the
+// node by less than the cell's vertical half-extent may still reach a point
+// of the cell. Zero outside the build, so production rejects exactly as before.
+float paStormFieldRejectMargin = 0.0;
+
+/**
+ * T184. Rain-support recomputation.
+ *
+ * <p>localRainSupportAt is exactly column-invariant within a frame - every
+ * input is a function of worldXZ plus frame uniforms, with no Y, no segment
+ * endpoint and no jitter - so any two queries at the same XZ in one frame must
+ * return the same answer. These counters measure how often that actually
+ * happens, at three granularities, before any cache is built.
+ *
+ * <p>The reuse distances are measured against the immediately preceding query,
+ * because a single carried value is the only cache shape worth having here: a
+ * general table would cost more than the walk it avoids.
+ */
+int paRainSupportCalls = 0;
+int paRainSupportPruned = 0;
+int paRainSameExactXZ = 0;
+int paRainSameBlock = 0;
+int paRainSameTile8 = 0;
+vec2 paRainPrevXZ = vec2(1.0e30);
+/** Per-fragment march state for the histogram's run-length transitions. */
+bool paPrimaryPrevMaterial = false;
+#ifdef PA_ARM_DENSITY_EVERY_2
+// Arm-local control state, not T123 counters: deliberately outside the pa*
+// namespace and behind the arm's own define, so production carries neither the
+// variables nor a per-step increment for them.
+int primaryStepParity = 0;
+float primaryHeldDensity = 0.0;
+#endif
 int paSegmentTestCalls = 0;
 int paSegmentTestPositive = 0;
 int paBoxBoundRejects = 0;
@@ -408,6 +1030,60 @@ int paBoxBoundRejects = 0;
 // texture lookup. Rain noise is intentionally excluded: it is functional
 // precipitation work, not the cloud-surface/detail lever T149 is measuring.
 int paDetailOctaveEvaluations = 0;
+/**
+ * T169 lighting and detail attribution counters.
+ *
+ * <p>T168 left the pose gap unexplained: SIDE spends 14.83 light evaluations
+ * and 35.99 detail-octave evaluations per pixel against FAR's 1.74 and 4.57.
+ * `paLightMarchDensityEvaluations` counts taps, which cannot separate "more
+ * material sampled" from "more lighting per sample" - the two readings imply
+ * completely different optimizations, so they are counted apart here.
+ *
+ * <p>`paLightConeMarches` counts entries into the cone loop, so
+ * taps/march is the average admitted tap count after T149 grading and the
+ * in-slab cap. `paLightCheapProbes` counts the in-cloud single-probe path,
+ * which is one evaluation and would otherwise be indistinguishable from a
+ * one-tap cone.
+ */
+int paLightConeMarches = 0;
+int paLightConeTaps = 0;
+int paLightConeEarlyOuts = 0;
+int paLightCheapProbes = 0;
+/**
+ * Detail fetches split by the path that asked for them. Each fetch is three
+ * packed octaves, matching `paDetailOctaveEvaluations`' step of 3, so
+ * (primary + light) * 3 reconciles against it exactly.
+ */
+int paDetailFetchPrimary = 0;
+int paDetailFetchLight = 0;
+int paDetailFetchSecondOctave = 0;
+/** Cone marches begun while the ray was already effectively opaque. */
+int paLightMarchBelowFloor = 0;
+/**
+ * T168 descriptor-traversal counters. They ride the three unused channels of
+ * the existing workload view 26, so no new readback stage is introduced.
+ *
+ * <p>They exist to answer one question T167 left open: a descriptor's cost is
+ * paid in the loop prologue, before the exact SDF is even considered, so the
+ * useful number is not how many descriptors are evaluated but how many enter
+ * the loop at all, and of those how many change the answer.
+ */
+int paDescriptorCandidateRanks = 0;
+int paDescriptorGroupsEntered = 0;
+#ifdef PA_ARM_GROUP2_NO_SDF
+/**
+ * T174 ceiling B only. Which entered group the walk is currently inside, 1 for
+ * the first.
+ *
+ * <p>Deliberately not named with the pa* counter prefix and deliberately behind
+ * the arm's own define: this is control state for one diagnostic ceiling, not a
+ * T123 workload counter, and production must not carry a per-sample increment
+ * for it. The group loop dedupes by slot bitmask and has no notion of ordinal
+ * otherwise, so the ceiling that asks "what do groups 2+ cost" has to add one.
+ */
+int groupEntryOrdinal = 0;
+#endif
+int paDescriptorUnionContributors = 0;
 // T153-only attribution. Distances are world blocks; the remaining values are
 // exact executed-work counts from the timed replay.
 float paOracleSkippedDistance = 0.0;
@@ -425,9 +1101,36 @@ ivec4 paOracleLightAfterAlpha = ivec4(0);
 ivec4 paOracleDetailAfterAlpha = ivec4(0);
 
 bool paWorkloadCaptureActive() {
+    // T175: this list had fallen behind the views that depend on it. Views 35
+    // and 36 - T169's light and detail attribution - have been emitted since
+    // T169 while this predicate returned false for them, so every counter they
+    // carry read zero and the campaign recorded "lightConeMarches=0
+    // tapsPerConeMarch=n/a" without anyone noticing. The same would have
+    // happened to T175's histogram.
+    //
+    // Now a contiguous range with an explicit upper bound, and the sandbox
+    // asserts every STORM_WORKLOAD_* view id falls inside it, so adding a view
+    // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 34);
+        || (DebugView >= 28 && DebugView <= 78);
+}
+
+/**
+ * T205. Two 12-bit values in one float, exact in a 24-bit mantissa: the
+ * rain's mass-weighted depth as a fraction of the render distance and its
+ * total transmittance (or, in mask mode, the run count).
+ */
+float paRainPassPack(float a01, float b01) {
+    float aQ = floor(clamp(a01, 0.0, 1.0) * 4095.0 + 0.5);
+    float bQ = floor(clamp(b01, 0.0, 1.0) * 4095.0 + 0.5);
+    return aQ * 4096.0 + bQ;
+}
+
+vec2 paRainPassUnpack(float packedValue) {
+    float aQ = floor(packedValue / 4096.0);
+    float bQ = packedValue - aQ * 4096.0;
+    return vec2(aQ, bQ) / 4095.0;
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -560,25 +1263,25 @@ void paOracleRecordAfterAlpha(
     if (!paWorkloadCaptureActive()) {
         return;
     }
-    ivec4 active = ivec4(
+    ivec4 bandActive = ivec4(
         alphaBefore >= 0.50 ? 1 : 0,
         alphaBefore >= 0.90 ? 1 : 0,
         alphaBefore >= 0.95 ? 1 : 0,
         alphaBefore >= 0.98 ? 1 : 0
     );
     if (paWorkloadCaptureActive())
-        paOracleStepsAfterAlpha += active;
+        paOracleStepsAfterAlpha += bandActive;
     if (paWorkloadCaptureActive())
-        paOracleDescriptorAfterAlpha += active
+        paOracleDescriptorAfterAlpha += bandActive
             * (paDescriptorEvaluations - descriptorBefore);
     if (paWorkloadCaptureActive())
-        paOracleDensityAfterAlpha += active
+        paOracleDensityAfterAlpha += bandActive
             * (paCloudDensityCalls - densityBefore);
     if (paWorkloadCaptureActive())
-        paOracleLightAfterAlpha += active
+        paOracleLightAfterAlpha += bandActive
             * (paLightMarchDensityEvaluations - lightBefore);
     if (paWorkloadCaptureActive())
-        paOracleDetailAfterAlpha += active
+        paOracleDetailAfterAlpha += bandActive
             * (paDetailOctaveEvaluations - detailBefore);
 }
 // T128 on-demand centre-line trace uniforms. They are inert unless DebugView
@@ -625,6 +1328,19 @@ uniform int PaDiagnosticLightingMode;
 uniform int PaRayTraceMode;
 uniform vec2 PaRayTraceNdc;
 uniform vec2 PaRayTraceFragCoord;
+// T207. The temporal phase's subpixel ray offset, in texture-coordinate
+// units (the phase jitter in cloud-target pixels divided by the target size
+// on the CPU). It moves the RAY, not the sub-step phase along it: consecutive
+// frames trace different lines through the medium and sample structure the
+// previous frame had no information about (T165). Zero on every frame that
+// is not a temporal phase, which keeps the non-temporal march byte-identical.
+uniform vec2 PaSampleJitter;
+// T207. 1 while the march writes a raw temporal phase: the split rain
+// composite is deferred to the resolve pass, and the body's accumulation and
+// transmittance at the rain's depth are exported on the aux attachment so the
+// resolve can composite the CURRENT frame's rain onto a history phase's body
+// exactly (rain is never reconstructed from history). 0 composites in-march.
+uniform int PaTemporalPhase;
 
 bool paRayTraceActive() {
     return PaRayTraceMode != 0;
@@ -777,6 +1493,12 @@ uniform vec4 Funnel1B;
 
 in vec2 texCoord;
 out vec4 fragColor;
+// T207. The temporal phase's aux attachment: rgb the body's accumulation
+// before the rain's depth, a its transmittance there (the whole body when
+// the ray carries no rain). Location 1 has no draw buffer on an ordinary
+// cloud target, so the write is discarded there and only a phase target
+// keeps it.
+out vec4 fragTemporalAux;
 
 const int MAX_STEPS = 128;
 // Ceiling for the T098 diagnostic budget arm. Only PaDiagnosticStepBudget can
@@ -1432,6 +2154,38 @@ float directStormLobeDistanceFromData(
     if (role == 3) {
         radii.y *= 1.56;
     }
+    if (paStormFieldBuildNode) {
+        // T196. The field build's Lipschitz bounds for this lobe: the wall
+        // distance is about |o| - R(h), so its vertical drop per block is
+        // |dR/dy| = profile slope * base radius / height, and its horizontal
+        // constant is bounded by the ellipse aspect.
+        vec2 paBaseRadii = max(radiusRotation.xy, vec2(1.0));
+        if (role == 3) {
+            paBaseRadii.y *= 1.56;
+        }
+        // The profile's slope over this cell's own height band rather than
+        // its global maximum: the anvil flares at 3.5 for a third of its
+        // height and is nearly flat above, and a global 3.5 dilated every
+        // anvil node by 130 blocks. The band is the cell's vertical
+        // half-extent in profile units; the finite difference over it is
+        // widened by half again for curvature inside the band, and a band
+        // that reaches a cap sees the cap's steep rise from the clamp.
+        float paBand = max(paStormFieldRejectMargin / height, 0.002);
+        float paRadiusBelow;
+        float paRadiusAbove;
+        float paShapeUnused;
+        float paShearUnused;
+        stormRoleProfile(clamp(height01 - paBand, 0.0, 1.0), role,
+            paRadiusBelow, paShapeUnused, paShearUnused);
+        stormRoleProfile(clamp(height01 + paBand, 0.0, 1.0), role,
+            paRadiusAbove, paShapeUnused, paShearUnused);
+        float paLocalSlope = max(abs(paRadiusAbove - profileRadius),
+            abs(profileRadius - paRadiusBelow)) / paBand * 1.5;
+        paLastStormMaxVerticalSlope = max(paLastStormMaxVerticalSlope,
+            max(paLocalSlope, 0.25) * max(paBaseRadii.x, paBaseRadii.y) / height);
+        paLastStormMaxAspect = max(paLastStormMaxAspect,
+            max(paBaseRadii.x, paBaseRadii.y) / min(paBaseRadii.x, paBaseRadii.y));
+    }
     float radial = length(oriented / radii);
     float groupOffset = float(max(groupSlot, 0)) * 997.0;
     vec3 morphologyWarp = lowFrequencyDomainWarp(
@@ -1589,6 +2343,9 @@ void paBuildRainLocality() {
     }
     vec2 minimum = vec2(1.0e18);
     vec2 maximum = vec2(-1.0e18);
+    // T185: the same union without the per-descriptor squaring.
+    vec2 paRainTightMin = vec2(1.0e18);
+    vec2 paRainTightMax = vec2(-1.0e18);
     bool any = false;
     for (int descriptorIndex = 0; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
         if (descriptorIndex >= StormLobeCount) {
@@ -1620,6 +2377,10 @@ void paBuildRainLocality() {
         vec2 centre = positionHeight.xy + shearMedia.xy * 0.5;
         minimum = min(minimum, centre - vec2(ownershipReach));
         maximum = max(maximum, centre + vec2(ownershipReach));
+        // T185: per-axis, so a lobe twice as long as it is wide no longer
+        // inflates its short axis to match its long one.
+        paRainTightMin = min(paRainTightMin, centre - ownershipRadii);
+        paRainTightMax = max(paRainTightMax, centre + ownershipRadii);
         any = true;
     }
     if (!any) {
@@ -1627,6 +2388,8 @@ void paBuildRainLocality() {
     }
     paRainOwnCentre = (minimum + maximum) * 0.5;
     paRainOwnRadius = length(maximum - paRainOwnCentre);
+    paRainOwnMin = paRainTightMin;
+    paRainOwnMax = paRainTightMax;
 }
 
 void paBuildStormReachability() {
@@ -2023,6 +2786,59 @@ void directStormGroupField(
     }
     int firstIndex = stormGroupFirstIndex(witnessIndex, groupSlot);
     int endIndex = stormGroupEndIndex(witnessIndex, groupSlot);
+#ifdef PA_ARM_DESC_CONST_FETCH
+    // T170 Task 3, oracle A. One descriptor payload read, hoisted out of the
+    // walk and reused by every iteration. The loop still runs the same number
+    // of times and every downstream term is still computed, so the only thing
+    // removed is per-descriptor texture traffic.
+    //
+    // Deliberately not a valid image. This arm exists to bound fetch cost and
+    // is never a production candidate.
+    int paDescCacheIndex = clamp(firstIndex, 0, MAX_STORM_LOBES - 1);
+    vec4 paDescCached0 = stormDescriptorTexel(paDescCacheIndex, 0);
+    vec4 paDescCached1 = stormDescriptorTexel(paDescCacheIndex, 1);
+    vec4 paDescCached2 = stormDescriptorTexel(paDescCacheIndex, 2);
+    vec4 paDescCached3 = stormDescriptorTexel(paDescCacheIndex, 3);
+#endif
+#ifdef PA_ARM_DESCRIPTOR_K
+    // Rank the group's descriptors by the cheapest bound already trusted
+    // elsewhere in this file - the role-aware vertical lower bound, which needs
+    // only texel 0 and the role from texel 3 - and keep the K smallest.
+    //
+    // A lower bound is the right ordering here precisely because it is
+    // conservative: a descriptor whose bound is large provably cannot be close,
+    // so ranking by it can only mis-order descriptors that are all plausibly
+    // near, never promote a distant one over a near one.
+    float paKBest[PA_ARM_DESCRIPTOR_K];
+    for (int paSlot = 0; paSlot < PA_ARM_DESCRIPTOR_K; paSlot++) {
+        paKBest[paSlot] = 1.0e9;
+    }
+    for (int paRankIndex = firstIndex; paRankIndex < MAX_STORM_LOBES; paRankIndex++) {
+        if (paRankIndex >= endIndex) {
+            break;
+        }
+        vec4 paRankPosition = stormDescriptorTexel(paRankIndex, 0);
+        vec4 paRankLifecycle = stormDescriptorTexel(paRankIndex, 3);
+        if (paRankLifecycle.w < -0.5) {
+            continue;
+        }
+        int paRankPacked = int(floor(paRankLifecycle.w + 0.5));
+        int paRankRole = paRankPacked - (paRankPacked / 8) * 8;
+        float paRankBound = stormVerticalDistanceLowerBound(
+            p, paRankPosition, paRankRole);
+        for (int paSlot = 0; paSlot < PA_ARM_DESCRIPTOR_K; paSlot++) {
+            if (paRankBound < paKBest[paSlot]) {
+                float paSwap = paKBest[paSlot];
+                paKBest[paSlot] = paRankBound;
+                paRankBound = paSwap;
+            }
+        }
+    }
+    // Ties admit together, so the arm can evaluate more than K when several
+    // descriptors share a bound. The reported descriptors-per-density-call
+    // counter is what the campaign uses, never the nominal K.
+    float paKThreshold = paKBest[PA_ARM_DESCRIPTOR_K - 1];
+#endif
     for (int descriptorIndex = firstIndex; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
         if (descriptorIndex >= endIndex) {
             break;
@@ -2030,16 +2846,45 @@ void directStormGroupField(
         if (paWorkloadCaptureActive()) {
             paLobesVisited++;
         }
+        if (paWorkloadCaptureActive()) {
+            paLobeVisitsLight += paLightTapOrdinal > 0 ? 1 : 0;
+        }
+#ifdef PA_ARM_DESC_CONST_FETCH
+        vec4 positionHeight = paDescCached0;
+        vec4 radiusRotation = paDescCached1;
+        vec4 shearMedia = paDescCached2;
+        vec4 lifecycleRole = paDescCached3;
+#else
         vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
         vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
         vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
         vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+#endif
         if (lifecycleRole.w < -0.5) {
             continue;
         }
         int packedTopology = int(floor(lifecycleRole.w + 0.5));
         int lobeRole = packedTopology - (packedTopology / 8) * 8;
         vec2 ownershipCenter = positionHeight.xy + shearMedia.xy * 0.5;
+#if defined(PA_ARM_DESC_PRECOMPUTE_OWNER) || defined(PA_ARM_DESC_PRECOMPUTE)
+        // T172. The real hoist, not the T170 ceiling that approximated it.
+        // StormLobeDescriptor.writePrecomputedInvariants applied the rotated
+        // extents, the 1.85 widening and the unit floor on the CPU when the
+        // descriptor was built, so this is the same number the walk used to
+        // derive - not a cheaper substitute for it.
+        //
+        // texel 3 is already in registers; it was fetched for the role. The
+        // hoist therefore costs no additional fetch and removes two length()
+        // calls per descriptor per density sample.
+        vec2 ownershipRadii = lifecycleRole.yz;
+#elif defined(PA_ARM_DESC_CHEAP_OWNERSHIP) || defined(PA_ARM_DESC_HOIST)
+        // T170 Task 2/4. The rotated extents are a pure function of the
+        // descriptor's radii and rotation - no sample position enters them -
+        // yet both length() terms are evaluated at every density sample. This
+        // substitutes the unrotated radii to bound what hoisting them to once
+        // per descriptor per frame could return.
+        vec2 ownershipRadii = max(radiusRotation.xy * 1.85, vec2(1.0));
+#else
         float extentX = length(vec2(
             radiusRotation.x * radiusRotation.w,
             radiusRotation.y * radiusRotation.z
@@ -2049,6 +2894,7 @@ void directStormGroupField(
             radiusRotation.y * radiusRotation.w
         ));
         vec2 ownershipRadii = max(vec2(extentX, extentZ) * 1.85, vec2(1.0));
+#endif
         ownsGroup = ownsGroup || length((p.xz - ownershipCenter) / ownershipRadii) <= 1.0;
 
         float lobeRadius = min(radiusRotation.x, radiusRotation.y);
@@ -2057,10 +2903,27 @@ void directStormGroupField(
         // values.  Same texture, same descriptor index, same texel indices, so
         // the refetched values are bit-identical to the ones in registers -
         // this is the real pre-reuse work, not a copy of the ON result.
+#if defined(PA_ARM_DESC_PRECOMPUTE_EDGE) || defined(PA_ARM_DESC_PRECOMPUTE)
+        // T172. The real hoist. stormEdgeWidthBlocksFromData is a pure function
+        // of the descriptor payload and the role, so its result was computed
+        // once when the descriptor was built and stored in texel 3. This is the
+        // identical value, not the constant the T170 ceiling substituted, so
+        // unlike that arm this one is image-equivalent.
+        float lobeSoftness = lifecycleRole.x;
+#elif defined(PA_ARM_DESC_CONST_EDGE) || defined(PA_ARM_DESC_HOIST)
+        // T170 Task 2/4. stormEdgeWidthBlocksFromData takes no sample position:
+        // it is a pure function of the descriptor payload and the role, so its
+        // value is fixed for the life of a frame's descriptor set. It is
+        // nevertheless evaluated once per descriptor per density sample, which
+        // at SIDE is the single most-repeated invariant in the walk. Replacing
+        // it with a constant bounds the hoist.
+        float lobeSoftness = STORM_MIN_EDGE_BLOCKS;
+#else
         float lobeSoftness = paT122Off()
             ? stormEdgeWidthBlocks(descriptorIndex, lobeRole)
             : stormEdgeWidthBlocksFromData(
                 positionHeight, radiusRotation, shearMedia, lobeRole);
+#endif
         // T122: the FromData softness form consumes the two descriptor texels
         // already fetched above.  Count those two precise wrapper fetches that
         // are avoided; this is a diagnostic-only counter, not an estimate
@@ -2070,13 +2933,41 @@ void directStormGroupField(
         }
         groupMinimumRadius = min(groupMinimumRadius, lobeRadius);
 
+        // T179. The blend radius the ordered union will use for THIS pair,
+        // hoisted above the rejection test so the test can use the exact value
+        // instead of the global cap, and so the union below can reuse it rather
+        // than recompute it.
+        //
+        // The dominance condition is exact, from stormSmoothMinimum itself:
+        //
+        //     h      = saturate(0.5 + 0.5 * (d_new - d_cur) / blend)
+        //     result = mix(d_new, d_cur, h) - blend * h * (1 - h)
+        //
+        // h reaches 1 exactly when d_new >= d_cur + blend, and at h == 1 the
+        // result is d_cur and the polynomial term vanishes. stormBlendFactor is
+        // the same saturate, so groupStrength and groupSoftness are likewise
+        // unchanged. A lobe at or beyond d_cur + blend therefore cannot alter
+        // the union at all.
+        //
+        // Production tests against groupDistance + STORM_MAX_BLEND_BLOCKS, and
+        // that constant is 48 while this pair's blend is
+        // clamp(0.25 * smaller radius, 4, 48) - typically 8 to 20. The test was
+        // carrying up to 40 blocks of slack it did not need, which is why 3.78
+        // lobes per group walk survived it and then failed to move the union.
+        float paLobeBlend = stormLobeBlendRadius(
+            previousRadius, lobeRadius, previousRole, lobeRole);
+
         // T141 arm: the same comparison against a strictly tighter lower
         // bound. max() of two valid lower bounds is a valid lower bound, so
         // the arm can only reject more, never differently.
-        float verticalLowerBound = paT141BoxBound()
+        // T196: in build mode the bound is judged against the whole dual
+        // cell, so the cell's vertical half-extent comes off it here; the
+        // margin is zero everywhere else.
+        float verticalLowerBound = (paT141BoxBound()
             ? stormLobeDistanceLowerBound(
                 p, positionHeight, radiusRotation, shearMedia, lobeRole)
-            : stormVerticalDistanceLowerBound(p, positionHeight, lobeRole);
+            : stormVerticalDistanceLowerBound(p, positionHeight, lobeRole))
+            - paStormFieldRejectMargin;
         // A smooth minimum is exactly unchanged once the incoming distance is
         // more than its blend radius beyond the current union.  The global
         // maximum is used here instead of a guessed local value.  Requiring
@@ -2088,14 +2979,71 @@ void directStormGroupField(
         // rejected, through the identical exact SDF and the identical ordered
         // smooth union.  Nothing else about the loop changes, so any image
         // difference between the arms is attributable to the rejection alone.
+#ifdef PA_ARM_DESCRIPTOR_K
+        // Not among the K most relevant owners of this sample. Skipped exactly
+        // the way T121 skips a provably irrelevant lobe: the exact SDF and the
+        // union are avoided, but the clearance still receives this lobe's lower
+        // bound, so paSafeAdvance in the march cannot grow and the ray cannot
+        // step over material this descriptor owns.
+        //
+        // This is a deliberately conservative form of the experiment. A real
+        // ownership structure would also avoid the four texel fetches above and
+        // the ranking pass; this arm pays both, so whatever it measures is a
+        // LOWER bound on what such a structure could return.
+        if (verticalLowerBound > paKThreshold) {
+            groupMinClearance = min(
+                groupMinClearance, verticalLowerBound - lobeSoftness);
+            previousRadius = lobeRadius;
+            previousRole = lobeRole;
+            continue;
+        }
+#endif
+#ifdef PA_ARM_DOMINANCE_AGGRESSIVE
+        // T179 Task 3 ceiling. Drops the blend margin entirely, so it rejects
+        // every lobe the union's own minimum already dominates without allowing
+        // for the smooth blend that actually happens. NOT conservative: lobes
+        // inside the blend band do move the union. Bounds the family; never a
+        // candidate.
+        float paDominanceThreshold = groupDistance;
+#elif defined(PA_ARM_DOMINANCE_EXACT)
+        // T179 Task 5 candidate. The exact threshold proved above. Strictly
+        // smaller than the production constant, so it rejects a superset, and
+        // every additional rejection is a lobe that provably could not have
+        // changed the union.
+        float paDominanceThreshold = groupDistance + paLobeBlend;
+#else
+        float paDominanceThreshold = groupDistance + STORM_MAX_BLEND_BLOCKS;
+#endif
+        // Diagnostic only: how many lobes the exact threshold would reject that
+        // the production constant lets through. Measured on the production
+        // path, so it prices the candidate before the candidate is built.
+        bool paDomSlack = false;
+        if (paWorkloadCaptureActive()) {
+            paDomSlack = started && !paT121Off()
+                && verticalLowerBound > max(
+                    lobeSoftness + STORM_T121_SOFTNESS_MARGIN_BLOCKS,
+                    groupDistance + paLobeBlend)
+                && verticalLowerBound <= max(
+                    lobeSoftness + STORM_T121_SOFTNESS_MARGIN_BLOCKS,
+                    groupDistance + STORM_MAX_BLEND_BLOCKS);
+        }
+        if (paWorkloadCaptureActive()) {
+            paDomWouldRejectWithExactBlend += paDomSlack ? 1 : 0;
+        }
         if (started && !paT121Off() && verticalLowerBound > max(
                 lobeSoftness + STORM_T121_SOFTNESS_MARGIN_BLOCKS,
-                groupDistance + STORM_MAX_BLEND_BLOCKS)) {
+                paDominanceThreshold)) {
             // T121: this is the sole conservative vertical-cap branch.  It
             // skips the exact descriptor SDF only after its lower bound proves
             // that the lobe cannot contribute to the ordered smooth union.
             if (paWorkloadCaptureActive()) {
                 paConservativeDescriptorRejects++;
+            }
+            if (paWorkloadCaptureActive()) {
+                paLobeCheapRejectLight += paLightTapOrdinal > 0 ? 1 : 0;
+            }
+            if (paWorkloadCaptureActive()) {
+                paLobeDominanceRejects++;
             }
             // Rejected by the horizontal term alone: the vertical-only bound
             // that ships today would have evaluated this lobe exactly. Counting
@@ -2123,9 +3071,52 @@ void directStormGroupField(
         if (paWorkloadCaptureActive() && !paT122Off()) {
             paAvoidedDescriptorTextureFetches += 4;
         }
+        // T178. Reaching here is the expensive path: every lobe counted below
+        // pays a full exact SDF, whatever the union later does with it.
+        if (paWorkloadCaptureActive()) {
+            paLobeExactSdf++;
+        }
+        if (paWorkloadCaptureActive()) {
+            paLobeExactSdfLight += paLightTapOrdinal > 0 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paProbeExactSdf += paDensityConsumer == 3 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paBracketExactSdf += paDensityConsumer == 4 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paOtherExactSdf += paDensityConsumer == 0 ? 1 : 0;
+        }
         // T122 OFF refetches the three texels the exact SDF consumes and
         // passes the refetched values into the same equation, in the same
         // order, with the same groupSlot and role already decoded above.
+#ifdef PA_ARM_DESC_NO_EXACT_SDF
+        // T170 Task 2. The exact descriptor SDF replaced by the conservative
+        // lower bound the T121 test already computed, so the walk still visits
+        // every descriptor and still runs the union, but pays no exact
+        // evaluation. Bounds the exact-SDF share of a primary density sample.
+        float lobeDistance = verticalLowerBound;
+#elif defined(PA_ARM_GROUP2_NO_SDF)
+        // T174 ceiling B. Groups 2+ still get fetched, decoded, bounded and
+        // unioned; only their exact SDF is replaced by the bound. The gap
+        // between this and ceiling A is what group entry itself costs, as
+        // opposed to what the exact SDFs inside those groups cost.
+        //
+        // Also visually invalid, and also not a candidate.
+        float lobeDistance = groupEntryOrdinal >= 2
+            ? verticalLowerBound
+            : (paT122Off()
+                ? directStormLobeDistanceFromData(
+                    p,
+                    stormDescriptorTexel(descriptorIndex, 0),
+                    stormDescriptorTexel(descriptorIndex, 1),
+                    stormDescriptorTexel(descriptorIndex, 2),
+                    groupSlot,
+                    lobeRole)
+                : directStormLobeDistanceFromData(
+                    p, positionHeight, radiusRotation, shearMedia, groupSlot, lobeRole));
+#else
         float lobeDistance = paT122Off()
             ? directStormLobeDistanceFromData(
                 p,
@@ -2137,6 +3128,7 @@ void directStormGroupField(
             : directStormLobeDistanceFromData(
                 p, positionHeight, radiusRotation, shearMedia, groupSlot, lobeRole
             );
+#endif
         if (paT141EvalAmplify()) {
             // A second exact evaluation of the same lobe, on the texels already
             // in registers. PaDiagnosticEvalEpsilon is uploaded as exactly
@@ -2162,17 +3154,77 @@ void directStormGroupField(
             0.0,
             1.0
         );
+        int paRoleMaskBefore = groupActiveRoleMask;
+        float paGroupDistanceBefore = groupDistance;
         if (!started) {
             groupDistance = lobeDistance;
             groupStrength = lobeStrength;
             groupSoftness = lobeSoftness;
             started = true;
+            // The first admitted lobe defines the union, so it always counts.
+            if (paWorkloadCaptureActive()) {
+                paDescriptorUnionContributors++;
+            }
         } else {
-            float blend = stormLobeBlendRadius(previousRadius, lobeRadius, previousRole, lobeRole);
+#ifdef PA_ARM_DESC_HARD_UNION
+            // T170 Task 2. Every distance is still evaluated; only the blend
+            // radius, blend factor and smooth-minimum chain are removed.
+            float mixFactor = lobeDistance < groupDistance ? 0.0 : 1.0;
+            groupDistance = min(groupDistance, lobeDistance);
+            groupStrength = mix(lobeStrength, groupStrength, mixFactor);
+            groupSoftness = mix(lobeSoftness, groupSoftness, mixFactor);
+#else
+            // T179: the same value hoisted above the rejection test.
+            float blend = paLobeBlend;
             float mixFactor = stormBlendFactor(groupDistance, lobeDistance, blend);
             groupDistance = stormSmoothMinimum(groupDistance, lobeDistance, blend);
             groupStrength = mix(lobeStrength, groupStrength, mixFactor);
             groupSoftness = mix(lobeSoftness, groupSoftness, mixFactor);
+#endif
+            // "Contributes" has to mean changed the answer, not merely was
+            // evaluated. A lobe counts if it moved the union distance by more
+            // than a hundredth of a block, or if it turned on a role bit that
+            // downstream density behaviour reads. Anything else was evaluated
+            // for nothing, and is exactly what an upstream filter could remove.
+            if (paWorkloadCaptureActive()
+                    && (abs(groupDistance - paGroupDistanceBefore) > 0.01
+                        || groupActiveRoleMask != paRoleMaskBefore)) {
+                paDescriptorUnionContributors++;
+            }
+            // T178. The complement: fully evaluated, then found not to move the
+            // union. This is the only population a support test can remove.
+            if (paWorkloadCaptureActive()
+                    && abs(groupDistance - paGroupDistanceBefore) <= 0.01
+                    && groupActiveRoleMask == paRoleMaskBefore) {
+                paLobeExactSdfNoChange++;
+            }
+            // T179 Task 2. Bins on the magnitude of the change this lobe made.
+            // Each bin is guarded on its own so every increment is provably
+            // unreachable in a production frame.
+            float paDomDelta = abs(groupDistance - paGroupDistanceBefore);
+            bool paDomRoleSame = groupActiveRoleMask == paRoleMaskBefore;
+            if (paWorkloadCaptureActive()) {
+                paDomChangeZero += (paDomDelta == 0.0 && paDomRoleSame) ? 1 : 0;
+            }
+            if (paWorkloadCaptureActive()) {
+                paDomChangeBelowEpsilon += (paDomDelta > 0.0 && paDomDelta <= 0.0009765625
+                    && paDomRoleSame) ? 1 : 0;
+            }
+            if (paWorkloadCaptureActive()) {
+                paDomChangeTiny += (paDomDelta > 0.0009765625 && paDomDelta <= 0.01
+                    && paDomRoleSame) ? 1 : 0;
+            }
+            if (paWorkloadCaptureActive()) {
+                paDomChangeMeaningful += (paDomDelta > 0.01 || !paDomRoleSame) ? 1 : 0;
+            }
+            if (paWorkloadCaptureActive()) {
+                paDomZeroLight += (paDomDelta == 0.0 && paDomRoleSame
+                    && paLightTapOrdinal > 0) ? 1 : 0;
+            }
+            if (paWorkloadCaptureActive()) {
+                paDomZeroPrimary += (paDomDelta == 0.0 && paDomRoleSame
+                    && paLightTapOrdinal == 0) ? 1 : 0;
+            }
         }
         previousRadius = lobeRadius;
         previousRole = lobeRole;
@@ -2229,14 +3281,96 @@ float directStormShape(
     // genuine lower bound on the distance to any lobe surface - so the march's
     // safe advance stays conservative and cannot step over material. Returning
     // the 1.0e9 sentinel here instead would have been unsafe.
+#ifdef PA_ARM_GROUP2_NO_SDF
+    groupEntryOrdinal = 0;
+#endif
+#ifdef PA_ARM_CLEARANCE_FIRST_GROUP
+    int groupEntryOrdinalClearance = 0;
+#endif
     float paOutsideReach = paStormColumnOutside(p.xz);
-    if (paOutsideReach > 0.0) {
+    if (paOutsideReach > 0.0 && !paStormFieldBuildNode) {
         minDescriptorClearance = paOutsideReach;
         return 0.0;
     }
+    paLastStormMinSoftness = 1.0e9;
+    paLastStormMaxSoftness = 0.0;
+    paLastStormUnionDistance = 1.0e9;
+    paLastStormMinClearance = 1.0e9;
+    paLastStormUnionSoftness = 0.0;
+    paLastStormMaxVerticalSlope = 1.0;
+    paLastStormMaxAspect = 1.0;
     if (paWorkloadCaptureActive()) {
         paDirectStormShapeCalls++;
     }
+    if (paWorkloadCaptureActive()) {
+        paShapePrimary += paDensityConsumer == 1 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeLight += paDensityConsumer == 2 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeProbe += paDensityConsumer == 3 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeBracket += paDensityConsumer == 4 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeRefine += paDensityConsumer == 5 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeRainSegment += paDensityConsumer == 6 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeRainShaft += paDensityConsumer == 7 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeCamera += paDensityConsumer == 8 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeLightForward += paDensityConsumer == 9 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeUntagged += paDensityConsumer == 0 ? 1 : 0;
+    }
+    int paT177GroupContributed = 0;
+    int paT177FirstWitness = -1;
+#ifdef PA_ARM_LIGHT_REUSE_HARD
+    // T177 Task 3, hard ceiling. A light tap skips its own candidate
+    // resolution entirely and walks only the group the originating primary
+    // sample resolved. Visually invalid by construction whenever the tap has
+    // moved into a different group - which is exactly what Task 1 measures -
+    // so this is a bound, never a candidate.
+    if (paLightTapOrdinal > 0 && paPrimaryWitnessIndex >= 0) {
+        float rgDistance;
+        float rgMinimumRadius;
+        float rgStrength;
+        float rgSoftness;
+        float rgHeight01;
+        int rgActiveRoleMask;
+        bool rgOwns;
+        float rgMinClearance;
+        directStormGroupField(
+            p, paPrimaryWitnessIndex,
+            stormDescriptorGroupSlot(paPrimaryWitnessIndex),
+            rgDistance, rgMinimumRadius, rgStrength, rgSoftness,
+            rgHeight01, rgActiveRoleMask, rgOwns, rgMinClearance
+        );
+        minDescriptorClearance = min(minDescriptorClearance, rgMinClearance);
+        activeRoleMask |= rgActiveRoleMask;
+        ownsDescriptorGroup = ownsDescriptorGroup || rgOwns;
+        if (rgDistance > 1.0e8) {
+            return 0.0;
+        }
+        envelopeStrength = rgStrength;
+        return stormEnvelopeFromDistance(rgDistance, rgSoftness, rgStrength);
+    }
+#endif
+    // T196. A field node's dual cell is exactly its candidate tile: both
+    // grids share WeatherOrigin and 16-block spacing, and the node sits at
+    // the tile's centre. A probe anywhere in the cell walks this tile, so the
+    // node's floor needs no other. (The oracle's third run traced its last
+    // misses to lattice samples placed exactly on the tile boundary, which
+    // belong to the neighbouring node; it now samples strictly inside.)
     vec4 candidates = stormCandidatesAt(p.xz);
     for (int rank = 0; rank < STORM_CANDIDATES_PER_TILE; rank++) {
         int witnessIndex = decodeStormCandidate(candidates, rank);
@@ -2249,6 +3383,26 @@ float directStormShape(
             continue;
         }
         groupVisited |= groupBit;
+        paT177FirstWitness = paT177FirstWitness < 0 ? witnessIndex
+                                                    : paT177FirstWitness;
+#ifdef PA_ARM_GROUP2_NO_SDF
+        groupEntryOrdinal++;
+#endif
+        if (paWorkloadCaptureActive()) {
+            paDescriptorGroupsEntered++;
+        }
+        if (paWorkloadCaptureActive()) {
+            paReuseGroupsEnteredInTaps += paLightTapOrdinal > 0 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paProbeGroupWalks += paDensityConsumer == 3 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paBracketGroupWalks += paDensityConsumer == 4 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paOtherGroupWalks += paDensityConsumer == 0 ? 1 : 0;
+        }
         float groupDistance;
         float groupMinimumRadius;
         float groupStrength;
@@ -2262,16 +3416,39 @@ float directStormShape(
             groupDistance, groupMinimumRadius, groupStrength, groupSoftness,
             groupHeight01, groupActiveRoleMask, ownsGroup, groupMinClearance
         );
+#ifdef PA_ARM_CLEARANCE_FIRST_GROUP
+        // T175 Task 4 oracle. Only the first entered group is allowed to
+        // constrain the safe advance; every group's density contribution is
+        // still evaluated and unioned exactly as production does.
+        //
+        // T174 showed groups 2+ never change the density result on this
+        // fixture. They may still shorten the march's safe advance, which would
+        // cost steps rather than correctness - this measures whether they do.
+        // Unsafe by construction: a real ray could step over material a
+        // suppressed group owns. Oracle only.
+        if (groupEntryOrdinalClearance == 0) {
+            minDescriptorClearance = min(minDescriptorClearance, groupMinClearance);
+        }
+        groupEntryOrdinalClearance++;
+#else
         minDescriptorClearance = min(minDescriptorClearance, groupMinClearance);
+#endif
         activeRoleMask |= groupActiveRoleMask;
         ownsDescriptorGroup = ownsDescriptorGroup || ownsGroup;
         if (groupDistance > 1.0e8) {
             continue;
         }
+        // T177. Groups that reach here are the ones that actually enter the
+        // union, which is the set a reusing light tap would have to reproduce.
+        if (paWorkloadCaptureActive()) {
+            paT177GroupContributed |= groupBit;
+        }
         if (groupDistance < nearestGroupDistance) {
             nearestGroupDistance = groupDistance;
             dominantHeight01 = groupHeight01;
         }
+        paLastStormMinSoftness = min(paLastStormMinSoftness, groupSoftness);
+        paLastStormMaxSoftness = max(paLastStormMaxSoftness, groupSoftness);
         if (!started) {
             stormDistance = groupDistance;
             stormStrength = groupStrength;
@@ -2285,12 +3462,67 @@ float directStormShape(
             stormSoftness = mix(groupSoftness, stormSoftness, mixFactor);
         }
         previousGroupRadius = groupMinimumRadius;
+#ifdef PA_ARM_FIRST_GROUP_ONLY
+        // T174 ceiling A. Process only the first entered group, so every cost
+        // of groups 2+ disappears: the candidate scan, the ten-descriptor walk,
+        // the bounds, the exact SDFs and the group-level smooth union.
+        //
+        // Visually invalid by construction - a sample genuinely owned by two
+        // groups loses one of them. This bounds the entire group-entry prize
+        // and is never a production candidate.
+        break;
+#endif
     }
+    // T177 Task 1. Classify this walk against the originating primary
+    // sample's resolution. Runs after the walk and writes only counters, so
+    // the walk itself is untouched.
+    if (paCapturePrimaryGroups) {
+        paPrimaryGroupMask = paT177GroupContributed;
+        paPrimaryWitnessIndex = paT177FirstWitness;
+    }
+    bool paT177Tap = paLightTapOrdinal > 0;
+    bool paT177Suff = paT177GroupContributed != 0
+        && (paT177GroupContributed & ~paPrimaryGroupMask) == 0;
+    bool paT177Over = (paT177GroupContributed & paPrimaryGroupMask) != 0;
+    if (paWorkloadCaptureActive()) {
+        paReuseTapsEmpty += (paT177Tap && paT177GroupContributed == 0) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseTapsClassified += (paT177Tap && paT177GroupContributed != 0) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseSufficient += (paT177Tap && paT177Suff) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReusePartial += (paT177Tap && !paT177Suff && paT177Over) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseWrong += (paT177Tap && paT177GroupContributed != 0 && !paT177Over)
+            ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseSuffOrd1 += (paT177Suff && paLightTapOrdinal == 1) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseSuffOrd2 += (paT177Suff && paLightTapOrdinal == 2) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseSuffOrd3 += (paT177Suff && paLightTapOrdinal == 3) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseSuffOrd4 += (paT177Suff && paLightTapOrdinal == 4) ? 1 : 0;
+    }
+    // T202. The clearance is published before the started check: a walk
+    // whose groups were all rejected still bounds the safe advance, and the
+    // node build needs that bound as much as the ray does.
+    paLastStormMinClearance = minDescriptorClearance;
     if (!started) {
         return 0.0;
     }
     envelopeStrength = stormStrength;
     unionDistanceBlocks = stormDistance;
+    paLastStormUnionDistance = stormDistance;
+    paLastStormUnionSoftness = stormSoftness;
     return stormEnvelopeFromDistance(stormDistance, stormSoftness, stormStrength);
 }
 
@@ -2326,6 +3558,11 @@ float directStormFinalDensity(
     float coverage = directStormShape(
         p, ownsDescriptorGroup, dominantHeight01, envelopeStrength, activeRoleMask,
         paUnionDistanceUnusedA, paClearanceUnusedA);
+    // T203. The rain-support classification reads the coverage the walk
+    // found at the support height; guarded so FINAL carries no extra write.
+    if (paWorkloadCaptureActive()) {
+        paLastRainCoverage = coverage;
+    }
     if (coverage <= 0.0) {
         return 0.0;
     }
@@ -2377,8 +3614,8 @@ bool directStormSegmentMayIntersect(vec3 segmentStart, vec3 segmentEnd) {
         paSegmentTestCalls++;
     }
     int groupVisited = 0;
-    for (int sample = 0; sample < 3; sample++) {
-        float fraction = sample == 0 ? 0.0 : (sample == 1 ? 0.5 : 1.0);
+    for (int sampleIndex = 0; sampleIndex < 3; sampleIndex++) {
+        float fraction = sampleIndex == 0 ? 0.0 : (sampleIndex == 1 ? 0.5 : 1.0);
         vec4 candidates = stormCandidatesAt(mix(segmentStart.xz, segmentEnd.xz, fraction));
         for (int rank = 0; rank < STORM_CANDIDATES_PER_TILE; rank++) {
             int witnessIndex = decodeStormCandidate(candidates, rank);
@@ -3600,6 +4837,9 @@ float directStormRainSupportAt(
         out bool ownsDescriptorGroup) {
     float supportY;
     bool hasLocalBase = directStormLocalBaseAt(worldXZ, attachY, supportY);
+    if (paWorkloadCaptureActive()) {
+        paLastRainHasLocalBase = hasLocalBase;
+    }
     float ignoredHeight01;
     // The coverage envelope is not a visible body. Rain must attach to the
     // density the noise stages actually produced, or it can hang under a
@@ -3613,6 +4853,427 @@ float directStormRainSupportAt(
     return hasLocalBase ? bodySupport : 0.0;
 }
 
+/**
+ * T185. The exact question the envelope approximates: is this column inside any
+ * descriptor's ownership ellipse? This is the same test directStormGroupField
+ * applies, on the radii T172 precomputed into texel 3, so it is exact rather
+ * than a bound - which makes it the ceiling for any geometric prune.
+ */
+bool paRainColumnOwnedExact(vec2 worldXZ) {
+    for (int descriptorIndex = 0; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
+        if (descriptorIndex >= StormLobeCount) {
+            break;
+        }
+        vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+        if (lifecycleRole.w < -0.5) {
+            continue;
+        }
+        vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
+        vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
+        vec2 centre = positionHeight.xy + shearMedia.xy * 0.5;
+        vec2 scaled = (worldXZ - centre) / max(lifecycleRole.yz, vec2(1.0e-6));
+        if (dot(scaled, scaled) <= 1.0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * T188. One texture fetch in place of directStormRainSupportAt's descriptor
+ * walk plus the full candidate/group union.
+ *
+ * <p>The domain is the one sampleWeather and stormCandidatesAt already share,
+ * so there is no second coordinate system and no scrolling rule to invent. A
+ * column outside it falls back to the exact traversal rather than to a
+ * fabricated value: the field is an acceleration structure, never a change of
+ * answer, and the edge is where that distinction has to hold.
+ */
+float paRainFieldSupportAt(
+        vec2 worldXZ,
+        out float attachY,
+        out bool ownsDescriptorGroup) {
+    vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        if (paWorkloadCaptureActive()) {
+            paRainFieldFallbacks++;
+        }
+        return directStormRainSupportAt(worldXZ, attachY, ownsDescriptorGroup);
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainFieldFetches++;
+    }
+    if (PaRainFieldConservative == 1) {
+        // T190. The field is an acceleration structure, and an acceleration
+        // structure is only allowed to be fast, never to be wrong. The build
+        // marks every cell whose rain-existence decision it could not prove
+        // uniform across the cell's own area; those cells are answered by the
+        // exact evaluation instead.
+        //
+        // This is the whole architecture: the field's per-column error was only
+        // 0.22%, but rain reachability is an existence test asked ~60 times per
+        // ray, which amplified it to 12% false rain. Removing the error at
+        // source is the only fix that survives that amplification - a smaller
+        // error still gets multiplied by sixty.
+        ivec2 paSafeSize = textureSize(RainFieldSampler, 0);
+        ivec2 paSafeTexel = clamp(
+            ivec2(floor(uv * vec2(paSafeSize))),
+            ivec2(0),
+            paSafeSize - ivec2(1)
+        );
+        vec4 paSafeCell = texelFetch(RainFieldSampler, paSafeTexel, 0);
+        if (paSafeCell.a >= 0.5) {
+            if (paWorkloadCaptureActive()) {
+                paRainFieldMixedFallbacks++;
+            }
+            return directStormRainSupportAt(
+                worldXZ, attachY, ownsDescriptorGroup);
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainFieldSafeHits++;
+        }
+        vec4 paSafeFiltered = texture(RainFieldSampler, uv);
+        attachY = paSafeFiltered.g;
+        // Ownership from the same exact texel the certainty flag came from, so
+        // the flag and the value it vouches for cannot disagree.
+        ownsDescriptorGroup = paSafeCell.b >= 0.5;
+        return paSafeFiltered.r;
+    }
+    // Support and attach height are continuous, so they keep the filtering
+    // the neighbouring weather maps use: without it every rain edge shows the
+    // eight-block staircase of the underlying grid.
+    vec4 cell = texture(RainFieldSampler, uv);
+    attachY = cell.g;
+#if defined(PA_ARM_RAIN_OWN_BILINEAR)
+    // T188's behaviour, kept only so the defect stays measurable. Ownership is
+    // a boolean, and asking a bilinear filter for it returns a fraction across
+    // every cell boundary; thresholding that fraction at half a cell dilates
+    // the union outward by up to half a texel in every direction, which is
+    // four world blocks at 512 - measured as 10.6-15.6% false rain against
+    // 0.75-1.02% missed.
+    ownsDescriptorGroup = cell.b >= 0.5;
+#elif defined(PA_ARM_RAIN_OWN_STRICT)
+    // T189 Task 5 diagnostic, and the other side of the same trade: a strict
+    // threshold on the interpolated value erodes the union instead of dilating
+    // it. Included to price dilation against erosion, never as the answer -
+    // a threshold is a tuning knob standing in for a type error.
+    ownsDescriptorGroup = cell.b >= 0.99;
+#else
+    // T189. Ownership is discrete, so it is fetched discretely.
+    //
+    // The generation pass wrote cell (i,j) from the fragment whose texCoord was
+    // (i+0.5)/N, so cell (i,j) owns world XZ over [i/N, (i+1)/N) of the domain
+    // and floor(uv * N) is exactly the cell that contains this column - which
+    // is also the cell whose centre is nearest it. That identity is why no
+    // half-texel correction belongs here: adding one would move the lookup to
+    // a neighbouring cell rather than fixing an offset.
+    //
+    // texelFetch takes integer texel coordinates and ignores the sampler's
+    // filter and wrap state entirely, so this is exact regardless of how the
+    // texture is configured for the two continuous channels above. The stored
+    // value is exactly 0.0 or 1.0, so the comparison is not a threshold.
+    ivec2 paFieldSize = textureSize(RainFieldSampler, 0);
+    ivec2 paOwnTexel = clamp(
+        ivec2(floor(uv * vec2(paFieldSize))),
+        ivec2(0),
+        paFieldSize - ivec2(1)
+    );
+    ownsDescriptorGroup =
+        texelFetch(RainFieldSampler, paOwnTexel, 0).b >= 0.5;
+#endif
+    return cell.r;
+}
+
+/**
+ * T192. Is this whole cell provably outside every descriptor's ownership
+ * ellipse?
+ *
+ * <p>Derived from paRainColumnOwnedExact, which owns a column when
+ * dot((worldXZ - centre) / radii, itself) <= 1 for any descriptor. The scaling
+ * is per-axis and strictly positive, so an axis-aligned cell stays an
+ * axis-aligned box after scaling - and the minimum of u*u + v*v over such a box
+ * is closed form: per axis, zero if the interval spans zero, and the nearer
+ * endpoint squared otherwise.
+ *
+ * <p>So min > 1 for every descriptor proves the entire cell unowned. One
+ * squared inequality per lobe: no sampling, no exact SDF, no noise, no square
+ * roots, no per-cell division that could not be hoisted.
+ *
+ * <p>Only the DRY direction is used, and that is deliberate. The converse - a
+ * cell entirely inside an ellipse - would prove the cell owned only if the
+ * ellipse test were equivalent to ownsDescriptorGroup, and it is not:
+ * ownership also requires the group union to carry coverage there, so "inside
+ * the ellipse" is a superset of "owned". Treating it as SAFE OWNED would be
+ * unsound in exactly the direction that invents rain. The complement is a
+ * proof; the implication is not.
+ *
+ * <p>A provably dry cell needs nothing else checked, because its stored triple
+ * is exactly right everywhere in it: ownership is false throughout, the union
+ * carries no coverage so directSupport is zero throughout, and
+ * localRainSupportAt discards stormBaseY entirely for an unowned column,
+ * taking weatherBaseY - which never came from the field.
+ */
+bool paCellProvablyUnowned(vec2 cellMin, vec2 cellMax) {
+    for (int descriptorIndex = 0; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
+        if (descriptorIndex >= StormLobeCount) {
+            break;
+        }
+        vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+        if (lifecycleRole.w < -0.5) {
+            continue;
+        }
+        vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
+        vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
+        vec2 centre = positionHeight.xy + shearMedia.xy * 0.5;
+        vec2 radii = max(lifecycleRole.yz, vec2(1.0e-6));
+        vec2 lowScaled = (cellMin - centre) / radii;
+        vec2 highScaled = (cellMax - centre) / radii;
+        vec2 spansOrigin = step(lowScaled, vec2(0.0)) * step(vec2(0.0), highScaled);
+        vec2 nearest = mix(
+            min(abs(lowScaled), abs(highScaled)), vec2(0.0), spansOrigin);
+        if (dot(nearest, nearest) <= 1.0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * T190's classifier, extracted so T192 can reach it after its own triage.
+ *
+ * <p>Samples the four cell corners and reports whether the three quantities the
+ * ray decides on stay uniform: ownership, the side of the support cutoff, and
+ * attach height. Sampling is not a proof - T190 measured 0.114% of columns
+ * still disagreeing - but support crossing its cutoff inside a cell has no
+ * cheap closed form, because the union is eroded by noise.
+ */
+float paClassifyCellByCorners(
+        vec2 cellCentreXZ,
+        vec2 cellHalf,
+        float centreSupport,
+        float centreAttachY,
+        bool centreOwns) {
+    bool mixedOwn = false;
+    bool mixedSupport = false;
+    bool centreSupported = centreSupport > PA_FIELD_SUPPORT_CUTOFF;
+    float minAttach = centreAttachY;
+    float maxAttach = centreAttachY;
+    for (int cornerIndex = 0; cornerIndex < 4; cornerIndex++) {
+        vec2 cornerOffset = vec2(
+            (cornerIndex == 0 || cornerIndex == 3) ? -cellHalf.x : cellHalf.x,
+            cornerIndex < 2 ? -cellHalf.y : cellHalf.y
+        );
+        float cornerAttachY;
+        bool cornerOwns;
+        float cornerSupport = directStormRainSupportAt(
+            cellCentreXZ + cornerOffset, cornerAttachY, cornerOwns);
+        mixedOwn = mixedOwn || (cornerOwns != centreOwns);
+        mixedSupport = mixedSupport
+            || ((cornerSupport > PA_FIELD_SUPPORT_CUTOFF) != centreSupported);
+        minAttach = min(minAttach, cornerAttachY);
+        maxAttach = max(maxAttach, cornerAttachY);
+    }
+    return (mixedOwn || mixedSupport
+        || (maxAttach - minAttach) > PA_FIELD_ATTACH_TOLERANCE) ? 1.0 : 0.0;
+}
+
+/**
+ * T203. The gate field's cell for a column: an exact texel fetch, never a
+ * filter - every channel is a per-cell bound and a blend of two bounds is
+ * neither. Cell (i, j) owns world XZ over [i/N, (i+1)/N) of the weather
+ * domain (T189), so floor(uv * N) is the cell whose proof covers this
+ * column. False outside the domain, where the gate says nothing and the
+ * segment test keeps its exact path.
+ */
+bool paRainGateCellAt(vec2 worldXZ, out vec4 cell) {
+    vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        cell = vec4(0.0);
+        return false;
+    }
+    ivec2 size = textureSize(RainFieldSampler, 0);
+    ivec2 texel = clamp(
+        ivec2(floor(uv * vec2(size))),
+        ivec2(0),
+        size - ivec2(1)
+    );
+    cell = texelFetch(RainFieldSampler, texel, 0);
+    return true;
+}
+
+/**
+ * T203. One cell of the rain gate field, built once per frame per column
+ * cell of the weather domain.
+ *
+ * <p>Stored: R the flag bits (PA_RAIN_GATE_DRY, PA_RAIN_GATE_PRECIP), G a
+ * lower bound on the descriptor attach height over the cell less the
+ * segment test's window, B an upper bound on that attach height, A the
+ * reason the cell was proved dry (0 not proved, 1 provably unowned, 2 no
+ * BASE lobe can support it, 3 the union provably carries no coverage at any
+ * support height in it) - a census channel, never read by the ray.
+ *
+ * <p>Why each proof is sound. Descriptor rain at a column needs (T145,
+ * localRainSupportAt) the column owned by a descriptor group AND
+ * directStormRainSupportAt above the cutoff there, and directStormRainSupportAt
+ * is zero unless some BASE lobe supports the column AND the storm union
+ * carries coverage at the column's support height. So the cell is free of
+ * descriptor rain if any one of these holds everywhere in it:
+ *
+ *  1. no ownership ellipse meets the cell - T192's closed form, one squared
+ *     inequality per lobe, proven non-vacuous on 40,000 trials;
+ *  2. no BASE lobe supports any column of the cell. A lobe supports a column
+ *     iff its pseudo-distance at (column, its own support height) is under
+ *     its softness, and that distance is evaluated at one fixed height, so
+ *     across the cell it can fall by at most the half-diagonal times the
+ *     lobe's horizontal Lipschitz constant - the ellipse aspect (T196) -
+ *     under the same headroom the storm field's floor carries;
+ *  3. the union's coverage is zero at every (column, support height) of the
+ *     cell. The support height is a convex combination of the supporting
+ *     lobes' own support heights, so it lies in [Ymin, Ymax] over the lobes
+ *     of proof 2's complement; one build-mode walk at the cell's centre and
+ *     its own support height publishes the union distance and the walk's
+ *     Lipschitz constants, and the storm field's dilation over an XZ move of
+ *     the half-diagonal and a Y move of the span proves the envelope zero
+ *     when the dilated distance clears the union's largest softness.
+ *
+ * <p>The attach bounds follow from the same convexity: the attach height is
+ * the support-weighted mean of the supporting BASE lobes' base heights, and
+ * the supporting set at any column of the cell is a subset of proof 2's
+ * candidate set, so [min, max] of that set's base heights bounds it.
+ *
+ * <p>The raster branch is not proved, it is deferred: any of the 3x3
+ * morphology texels a point of the cell can filter from carrying
+ * precipitation above 0.02 sets PA_RAIN_GATE_PRECIP, and the ray hands such
+ * cells to the exact evaluation whatever the descriptor proofs say.
+ *
+ * <p>The candidate tile is 16 blocks on the weather origin and the cell grid
+ * is the weather map's, so at 256 cells or more each cell lies inside one
+ * tile and the walk at its centre sees exactly the groups any column of the
+ * cell would - the same alignment the storm field's node build relies on.
+ */
+vec4 paRainGateBuildCell(vec2 cellCentreXZ, vec2 cellHalf) {
+    float halfDiagonal = length(cellHalf);
+    int flags = 0;
+    ivec2 morphologySize = textureSize(MorphologyMapSampler, 0);
+    ivec2 morphologyCentre = ivec2(floor(
+        (cellCentreXZ - WeatherOrigin) / WeatherExtent * vec2(morphologySize)));
+    for (int dz = -1; dz <= 1; dz++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            ivec2 texel = clamp(morphologyCentre + ivec2(dx, dz), ivec2(0),
+                morphologySize - ivec2(1));
+            if (saturate(texelFetch(MorphologyMapSampler, texel, 0).a) > 0.02) {
+                flags |= PA_RAIN_GATE_PRECIP;
+            }
+        }
+    }
+    if (StormLobeCount <= 0) {
+        return vec4(float(flags | PA_RAIN_GATE_DRY), 0.0, 0.0, 1.0);
+    }
+    if (paCellProvablyUnowned(cellCentreXZ - cellHalf, cellCentreXZ + cellHalf)) {
+        return vec4(float(flags | PA_RAIN_GATE_DRY), 0.0, 0.0, 1.0);
+    }
+    // Proof 2, and the candidate set for the attach and support-height bounds.
+    float attachMin = 1.0e9;
+    float attachMax = -1.0e9;
+    float supportYMin = 1.0e9;
+    float supportYMax = -1.0e9;
+    bool anySupport = false;
+    for (int descriptorIndex = 0; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
+        if (descriptorIndex >= StormLobeCount) {
+            break;
+        }
+        vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+        if (lifecycleRole.w < -0.5) {
+            continue;
+        }
+        int packedTopology = int(floor(lifecycleRole.w + 0.5));
+        int role = packedTopology - (packedTopology / 8) * 8;
+        if (role != 0) {
+            continue;
+        }
+        vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
+        if (saturate(shearMedia.z) <= 0.0) {
+            // directStormLocalBaseAt scales the lobe's support by this; zero
+            // means the lobe never supports, whatever its distance.
+            continue;
+        }
+        vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
+        vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
+        float lobeSupportY = mix(positionHeight.z, positionHeight.w, 0.22);
+        int supportGroupSlot;
+        int supportRole;
+        float centreDistance = directStormLobeDistance(
+            vec3(cellCentreXZ.x, lobeSupportY, cellCentreXZ.y),
+            descriptorIndex,
+            supportGroupSlot,
+            supportRole
+        );
+        float softness = stormEdgeWidthBlocksFromData(
+            positionHeight, radiusRotation, shearMedia, role);
+        vec2 baseRadii = max(radiusRotation.xy, vec2(1.0));
+        float aspect = max(baseRadii.x, baseRadii.y) / min(baseRadii.x, baseRadii.y);
+        // The lobe distance's horizontal slope outside the surface is at
+        // most the ellipse aspect (1.03 at aspect 2 on a numeric sweep of
+        // the gradient-normalised form) plus the domain warp's: the warp
+        // moves the normalised radius by 0.08 times a sum of three sines
+        // whose horizontal wave numbers weigh to 0.00197 per block at the
+        // 2.3 domain scale, and a unit of normalised radius is up to
+        // 2 - 1/radial effective radii of blocks - so the warp's slope is
+        // bounded by PA_RAIN_GATE_WARP_SLOPE times the lobe's larger radius.
+        // The first oracle run found 81-126 attach-bound misses a pose with
+        // the aspect alone: the fixture's lobes are several hundred blocks.
+        float lipschitz = aspect + PA_RAIN_GATE_WARP_SLOPE * max(baseRadii.x, baseRadii.y);
+        if (centreDistance - halfDiagonal * lipschitz * PA_RAIN_GATE_HEADROOM >= softness) {
+            continue;
+        }
+        anySupport = true;
+        attachMin = min(attachMin, positionHeight.z);
+        attachMax = max(attachMax, positionHeight.z);
+        supportYMin = min(supportYMin, lobeSupportY);
+        supportYMax = max(supportYMax, lobeSupportY);
+    }
+    if (!anySupport) {
+        return vec4(float(flags | PA_RAIN_GATE_DRY), 0.0, 0.0, 2.0);
+    }
+    // Proof 3. The centre's own support height when it has one; the span's
+    // midpoint otherwise, so the vertical dilation covers the whole span.
+    float centreAttachY;
+    float centreSupportY;
+    bool centreHasBase = directStormLocalBaseAt(cellCentreXZ, centreAttachY, centreSupportY);
+    float evalY = centreHasBase
+        ? clamp(centreSupportY, supportYMin, supportYMax)
+        : 0.5 * (supportYMin + supportYMax);
+    float yHalf = max(supportYMax - evalY, evalY - supportYMin);
+    paStormFieldBuildNode = true;
+    paStormFieldRejectMargin = yHalf;
+    bool centreOwns;
+    float centreHeight01;
+    directStormFinalDensity(
+        vec3(cellCentreXZ.x, evalY, cellCentreXZ.y), 0.0, centreOwns, centreHeight01);
+    paStormFieldBuildNode = false;
+    paStormFieldRejectMargin = 0.0;
+    bool envelopeEmpty;
+    if (paLastStormUnionDistance > 1.0e8) {
+        envelopeEmpty = true;
+    } else {
+        float dilation = (halfDiagonal * paLastStormMaxAspect
+            + yHalf * paLastStormMaxVerticalSlope) * PA_RAIN_GATE_HEADROOM;
+        float unionSoftness = max(paLastStormMaxSoftness, STORM_MIN_EDGE_BLOCKS);
+        envelopeEmpty = paLastStormUnionDistance - dilation >= unionSoftness;
+    }
+    // The attach height is the support-weighted mean of the candidates'
+    // base heights, and a weighted mean of equal values lands an ulp past
+    // them in float: run 4's oracle found 231-239 misses a pose whose
+    // excess summed under half a block. The bounds carry a pad far below
+    // anything visible and far above the rounding.
+    float pad = PA_RAIN_GATE_BOUND_PAD;
+    return vec4(
+        float(envelopeEmpty ? (flags | PA_RAIN_GATE_DRY) : flags),
+        attachMin - pad - PA_RAIN_GATE_WINDOW,
+        attachMax + pad,
+        envelopeEmpty ? 3.0 : 0.0);
+}
+
 float localRainSupportAt(
         vec2 worldXZ,
         out float attachY,
@@ -3620,6 +5281,22 @@ float localRainSupportAt(
         out float familyStrength,
         out vec4 weather,
         out vec4 morphology) {
+    if (paWorkloadCaptureActive()) {
+        paRainSupportCalls++;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainSameExactXZ += worldXZ == paRainPrevXZ ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainSameBlock += floor(worldXZ) == floor(paRainPrevXZ) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainSameTile8 += floor(worldXZ * 0.125) == floor(paRainPrevXZ * 0.125)
+            ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainPrevXZ = worldXZ;
+    }
     weather = sampleWeather(worldXZ);
     morphology = sampleMorphology(worldXZ);
     precipitation = saturate(morphology.a);
@@ -3638,15 +5315,91 @@ float localRainSupportAt(
     // precipitation below. A column outside every ownership ellipse cannot be
     // owned, so when the raster precipitation is also absent the function's own
     // early-out below is already decided and the traversal is pure waste.
-    if (paT145RainLocality()
-            && precipitation <= 0.02
-            && paRainOwnRadius >= 0.0
-            && distance(worldXZ, paRainOwnCentre) > paRainOwnRadius) {
+    // T185 diagnostics. Each half of the conjunct, and what a tighter box or
+    // an exact per-ellipse test would reject, all measured on the production
+    // path so the arms below are priced before they are trusted.
+    bool paRainLow = precipitation <= 0.02;
+    bool paRainOutCircle = paRainOwnRadius >= 0.0
+        && distance(worldXZ, paRainOwnCentre) > paRainOwnRadius;
+    bool paRainOutBox = paRainOwnRadius >= 0.0
+        && (any(lessThan(worldXZ, paRainOwnMin))
+            || any(greaterThan(worldXZ, paRainOwnMax)));
+    if (paWorkloadCaptureActive()) {
+        paRainPrecipLow += paRainLow ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainOutsideCircle += paRainOutCircle ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainOutsideAabb += paRainOutBox ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainOutsideExact += paRainColumnOwnedExact(worldXZ) ? 0 : 1;
+    }
+    // The arm selects only the predicate, never the block, so the source text
+    // stays brace-balanced for the parsers that read this function.
+#ifdef PA_ARM_RAIN_TIGHT_PRUNE
+    // T185 Task 5. Same guarantee, two inflations removed: per-axis extents and
+    // a box test instead of the circumcircle. Strictly a superset of the
+    // ownership union, so it can only reject columns the circle also could
+    // have, plus more - and the test is cheaper than the distance it replaces.
+    bool paRainPrune = paT145RainLocality() && paRainLow && paRainOutBox;
+#elif defined(PA_ARM_RAIN_EXACT_PRUNE)
+    // T185 Task 3 ceiling. The exact per-ellipse ownership test as the prune.
+    // Correct, but it walks every descriptor, so it is a bound on what any
+    // geometric prune could return rather than a candidate.
+    bool paRainPrune = paT145RainLocality() && paRainLow
+        && !paRainColumnOwnedExact(worldXZ);
+#else
+    bool paRainPrune = paT145RainLocality() && paRainLow && paRainOutCircle;
+#endif
+    if (paRainPrune) {
+        if (paWorkloadCaptureActive()) {
+            paRainSupportPruned++;
+        }
         return 0.0;
     }
-    float directSupport = directStormRainSupportAt(
-        worldXZ, stormBaseY, directStormOwned
-    );
+#ifdef PA_ARM_RAIN_FIELD_ORACLE
+    // T187 Task 7 ceiling. A precomputed rain field would replace exactly this
+    // call - directStormLocalBaseAt's descriptor walk plus
+    // directStormFinalDensity's full candidate/group union - with one texture
+    // fetch. Everything else in this function is already two cheap samples and
+    // scalar arithmetic, so making this free is an UPPER bound on what any
+    // field can return: a real lookup costs more than nothing.
+    //
+    // Image-invalid by construction: descriptor-owned rain loses its support
+    // and its base height. This is a bound, never a candidate.
+    float directSupport = 0.0;
+    directStormOwned = false;
+#else
+    // T188. The field replaces exactly the descriptor-derived column values
+    // and nothing else: weather coverage, morphology, precipitation, the
+    // family term and the shaft rendering below all still run as production
+    // computes them.
+    float directSupport = PaRainFieldEnabled == 1
+        ? paRainFieldSupportAt(worldXZ, stormBaseY, directStormOwned)
+        : directStormRainSupportAt(worldXZ, stormBaseY, directStormOwned);
+    // T203 Task 1. Class the walk's outcome. The eroded class is a column
+    // the union covers at its support height whose noise-eroded density
+    // still fell under the cutoff: the one class no geometric proof reaches.
+    if (paWorkloadCaptureActive() && PaRainFieldEnabled != 1) {
+        paRainWalkUnowned += directStormOwned ? 0 : 1;
+    }
+    if (paWorkloadCaptureActive() && PaRainFieldEnabled != 1) {
+        paRainWalkOwnedNoBase += (directStormOwned && !paLastRainHasLocalBase) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive() && PaRainFieldEnabled != 1) {
+        paRainWalkOwnedEnvelopeZero += (directStormOwned && paLastRainHasLocalBase
+            && paLastRainCoverage <= 0.0) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive() && PaRainFieldEnabled != 1) {
+        paRainWalkOwnedEroded += (directStormOwned && paLastRainHasLocalBase
+            && paLastRainCoverage > 0.0 && directSupport <= 0.01) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive() && PaRainFieldEnabled != 1) {
+        paRainWalkOwnedSupported += (directStormOwned && directSupport > 0.01) ? 1 : 0;
+    }
+#endif
     // Descriptor-owned storm splats are intentionally absent from the raster
     // map. Their separate precipitation intensity therefore comes from the
     // frame maximum while the exact body union alone defines shaft support.
@@ -3660,10 +5413,65 @@ float localRainSupportAt(
     attachY = directStormOwned ? stormBaseY : weatherBaseY;
     if ((!hasMorphologyCategory(morphology.r) && directSupport <= 0.01)
             || localSupport <= 0.01) {
+        // T185. Accepted by the prune, then found to carry no support anyway -
+        // the false-positive rate the tighter geometry would have to beat.
+        if (paWorkloadCaptureActive()) {
+            paRainAcceptedZeroSupport++;
+        }
         return 0.0;
     }
     return localSupport * smoothstep(0.02, 0.12, precipitation);
 }
+
+#ifdef PA_ARM_RAIN_REUSE_EXACT
+/**
+ * T184 Task 3 oracle, and a real candidate if it pays: a one-entry cache keyed
+ * on exact XZ equality.
+ *
+ * <p>Exact by construction. localRainSupportAt is a pure function of worldXZ
+ * within a frame, so returning a stored result for an identical XZ returns the
+ * value the function would have computed. Image equality is therefore the
+ * test of that claim, not of an approximation.
+ */
+vec2 paRainReuseXZ = vec2(1.0e30);
+float paRainReuseSupport = 0.0;
+float paRainReuseAttachY = 0.0;
+float paRainReusePrecip = 0.0;
+float paRainReuseFamily = 0.0;
+vec4 paRainReuseWeather = vec4(0.0);
+vec4 paRainReuseMorphology = vec4(0.0);
+int paRainReuseHits = 0;
+
+float localRainSupportCached(
+        vec2 worldXZ,
+        out float attachY,
+        out float precipitation,
+        out float familyStrength,
+        out vec4 weather,
+        out vec4 morphology) {
+    if (worldXZ == paRainReuseXZ) {
+        attachY = paRainReuseAttachY;
+        precipitation = paRainReusePrecip;
+        familyStrength = paRainReuseFamily;
+        weather = paRainReuseWeather;
+        morphology = paRainReuseMorphology;
+        if (paWorkloadCaptureActive()) {
+            paRainReuseHits++;
+        }
+        return paRainReuseSupport;
+    }
+    float support = localRainSupportAt(
+        worldXZ, attachY, precipitation, familyStrength, weather, morphology);
+    paRainReuseXZ = worldXZ;
+    paRainReuseSupport = support;
+    paRainReuseAttachY = attachY;
+    paRainReusePrecip = precipitation;
+    paRainReuseFamily = familyStrength;
+    paRainReuseWeather = weather;
+    paRainReuseMorphology = morphology;
+    return support;
+}
+#endif
 
 bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
     if (MaxPrecipitation <= 0.02) {
@@ -3671,9 +5479,86 @@ bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
     }
     const float FIRST_SAMPLE = 0.2113248654;
     const float SECOND_SAMPLE = 0.7886751346;
-    for (int sampleIndex = 0; sampleIndex < 2; sampleIndex++) {
+    if (paWorkloadCaptureActive()) {
+        paRainSegCalls++;
+    }
+    // T186. The arms change only the trip count and the position - both
+    // expressions, never a brace - so the source stays balanced for the
+    // parsers that read this function. T185 learned that the hard way.
+#if defined(PA_ARM_RAIN_ONE_MID) || defined(PA_ARM_RAIN_ONE_A) \
+        || defined(PA_ARM_RAIN_ONE_B)
+    const int paRainSampleCount = 1;
+#else
+    const int paRainSampleCount = 2;
+#endif
+    for (int sampleIndex = 0; sampleIndex < paRainSampleCount; sampleIndex++) {
+#if defined(PA_ARM_RAIN_ONE_MID)
+        // The segment midpoint minimises the greatest distance to any point in
+        // the segment, so for a property that varies continuously along it this
+        // is the least biased single probe.
+        float along = 0.5;
+#elif defined(PA_ARM_RAIN_ONE_A)
+        float along = FIRST_SAMPLE;
+#elif defined(PA_ARM_RAIN_ONE_B)
+        float along = SECOND_SAMPLE;
+#else
         float along = sampleIndex == 0 ? FIRST_SAMPLE : SECOND_SAMPLE;
+#endif
         vec3 p = mix(segmentStart, segmentEnd, along);
+        // T203. The gate field. One exact texel fetch decides whether this
+        // sample can be rejected by proof - the cell is free of descriptor
+        // rain, or the sample lies outside every attach height the cell can
+        // have - and every other sample takes the exact path below, which is
+        // production's own test. The gate has no approximate branch: it
+        // rejects by proof or it defers.
+        bool paGateFell = false;
+        if (PaRainGateField == 1) {
+#ifdef PA_ARM_RAIN_GATE_REJECT_ALL
+            // T203 run 3 decomposition. Every sample rejected before the
+            // fetch: what the segment test's own structure costs with no
+            // field read and no walk. Image-invalid (no rain); a bound.
+            continue;
+#endif
+            vec4 paGateCell;
+            if (paRainGateCellAt(p.xz, paGateCell)) {
+                if (paWorkloadCaptureActive()) {
+                    paRainGateFetches++;
+                }
+                int paGateFlags = int(paGateCell.r + 0.5);
+                if ((paGateFlags & PA_RAIN_GATE_PRECIP) == 0) {
+                    if ((paGateFlags & PA_RAIN_GATE_DRY) != 0) {
+                        if (paWorkloadCaptureActive()) {
+                            paRainGateDryRejects++;
+                        }
+                        continue;
+                    }
+                    if (p.y >= paGateCell.b || p.y <= paGateCell.g) {
+                        if (paWorkloadCaptureActive()) {
+                            paRainGateWindowRejects++;
+                        }
+                        continue;
+                    }
+                    paGateFell = true;
+                    if (paWorkloadCaptureActive()) {
+                        paRainGateFallbacks++;
+                    }
+#ifdef PA_ARM_RAIN_GATE_NO_FALLBACK
+                    // T203 run 3 decomposition. The fetch and the gate's
+                    // decisions paid, the exact fallback skipped: the
+                    // residual above the reject-all arm is the field read.
+                    // Image-invalid (no rain); a bound.
+                    continue;
+#endif
+                } else {
+                    paGateFell = true;
+                    if (paWorkloadCaptureActive()) {
+                        paRainGatePrecipFallbacks++;
+                    }
+                }
+            } else if (paWorkloadCaptureActive()) {
+                paRainGateOutOfDomain++;
+            }
+        }
         // T145. Rain contributes only strictly below the attachment height, and
         // that height is either the raster cloud base for this column or, when
         // the column is descriptor-owned, a convex combination of the BASE
@@ -3685,6 +5570,9 @@ bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
             float paSlabSpan = max(SlabTopY - SlabBaseY, 1.0);
             float paWeatherBaseY = SlabBaseY + sampleWeather(p.xz).g * paSlabSpan;
             if (p.y >= max(paWeatherBaseY, paRainAttachTop)) {
+                if (paWorkloadCaptureActive()) {
+                    paRainSegHeightSkip++;
+                }
                 continue;
             }
         }
@@ -3693,10 +5581,49 @@ bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
         float familyStrength;
         vec4 weather;
         vec4 morphology;
+        if (paWorkloadCaptureActive()) {
+            paRainSegSupport0 += sampleIndex == 0 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainSegSupport1 += sampleIndex == 1 ? 1 : 0;
+        }
+        paDensityConsumer = 6;
+#ifdef PA_ARM_RAIN_REUSE_EXACT
+        float support = localRainSupportCached(
+            p.xz, attachY, precipitation, familyStrength, weather, morphology
+        );
+#else
         float support = localRainSupportAt(
             p.xz, attachY, precipitation, familyStrength, weather, morphology
         );
-        if (support > 0.01 && p.y < attachY && p.y > attachY - 184.0) {
+#endif
+        paDensityConsumer = 0;
+        bool paRainHit = support > 0.01 && p.y < attachY
+            && p.y > attachY - 184.0;
+        // T203 Task 1 and Task 8: the window's decision on supported samples,
+        // and the gate's precision on the samples it handed to this path.
+        if (paWorkloadCaptureActive()) {
+            paRainSegSupported += support > 0.01 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainSegAboveAttach += (support > 0.01 && p.y >= attachY) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainSegBelowWindow += (support > 0.01 && p.y <= attachY - 184.0) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainGateFallbackWalks += paGateFell ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainGateFallbackSupported += (paGateFell && support > 0.01) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainSegTrueAt0 += (paRainHit && sampleIndex == 0) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainSegTrueAt1 += (paRainHit && sampleIndex == 1) ? 1 : 0;
+        }
+        if (paRainHit) {
             return true;
         }
     }
@@ -3708,11 +5635,26 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
         return 0.0;
     }
 
+    if (paWorkloadCaptureActive()) {
+        paRainShaftSamples++;
+    }
     float localBaseY;
     float localPrecipitation;
     float localFamilyStrength;
     vec4 localWeather;
     vec4 localMorphology;
+    paDensityConsumer = 7;
+#ifdef PA_ARM_SHAFT_NO_WALK
+    // T204 chunk D. The shaft's two column walks replaced by constants the
+    // rest of the path can run on: what the descriptor walks cost inside
+    // the shaft. Image-invalid; a bound.
+    float preliminarySupport = 0.5;
+    localBaseY = p.y + 40.0;
+    localPrecipitation = MaxPrecipitation;
+    localFamilyStrength = 1.0;
+    localWeather = vec4(0.3);
+    localMorphology = vec4(0.3);
+#else
     float preliminarySupport = localRainSupportAt(
         p.xz,
         localBaseY,
@@ -3721,7 +5663,9 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
         localWeather,
         localMorphology
     );
+#endif
     if (preliminarySupport <= 0.01 || p.y >= localBaseY) {
+        paDensityConsumer = 0;
         return 0.0;
     }
 
@@ -3733,12 +5677,27 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
     float familyStrength;
     vec4 weather;
     vec4 morphology;
+#ifdef PA_ARM_SHAFT_NO_WALK
+    float localSupport = 0.5;
+    baseY = localBaseY;
+    precipitation = MaxPrecipitation;
+    familyStrength = 1.0;
+    weather = vec4(0.3);
+    morphology = vec4(0.3);
+#else
     float localSupport = localRainSupportAt(
         sourceXZ, baseY, precipitation, familyStrength, weather, morphology
     );
+#endif
+    paDensityConsumer = 0;
     if (localSupport <= 0.01 || precipitation <= 0.02 || p.y >= baseY) {
         return 0.0;
     }
+#ifdef PA_ARM_SHAFT_WALK_ONLY
+    // T204 chunks B+C-D: the walks kept, the setup math, the noise fetch
+    // and the composition dropped. Image-invalid; a bound.
+    return localSupport * 0.05;
+#endif
 
     float condensate = saturate(
         localSupport * 0.36 + weather.a * 0.28 + precipitation * 0.24 + morphology.b * 0.12
@@ -3760,7 +5719,13 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
         p.y * 0.0014 - WorldTime * 0.0015,
         dot(sourceXZ, windDir) * 0.0035
     );
+#ifdef PA_ARM_SHAFT_NO_NOISE
+    // T204: the shaft's 3D noise fetch replaced by a constant that keeps
+    // the streak arithmetic live. Image-invalid; a bound.
+    vec4 rainNoise = vec4(0.6, 0.5, 0.5, 0.5) + vec4(rainDomain.x, rainDomain.y, rainDomain.z, 0.0) * 1.0e-6;
+#else
     vec4 rainNoise = texture(DetailNoiseSampler, rainDomain, mipBias + 0.75);
+#endif
     // R is the coherent low-frequency Worley channel; G/B only roughen real
     // columns.  The previous weighted average plus a 2% floor gave every
     // precipitating texel non-zero density, producing a horizon-wide curtain.
@@ -3776,6 +5741,12 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
 }
 
 float rainShaftDensityOverSegment(vec3 segmentStart, vec3 segmentEnd, float mipBias) {
+#ifdef PA_ARM_NO_RAIN_SHAFT
+    // T201 ceiling. The shaft's two Gauss samples a segment are the one
+    // rain-family cost the attribution prices on its own; the segment test
+    // that gates them stays. Visually invalid, never a candidate.
+    return 0.0;
+#endif
     // Fixed Gauss points integrate the broad shaft on coarse body steps. They
     // are world/ray anchored and never depend on FrameIndex or blue-noise
     // jitter, eliminating dotted screen-space curtains and shimmer.
@@ -3783,6 +5754,9 @@ float rainShaftDensityOverSegment(vec3 segmentStart, vec3 segmentEnd, float mipB
     const float SECOND_SAMPLE = 0.7886751346;
     float first = rainShaftDensityAt(mix(segmentStart, segmentEnd, FIRST_SAMPLE), mipBias);
     float second = rainShaftDensityAt(mix(segmentStart, segmentEnd, SECOND_SAMPLE), mipBias);
+    if (paWorkloadCaptureActive()) {
+        paRainShaftPositiveSegments += (first + second) > 0.0 ? 1 : 0;
+    }
     return (first + second) * 0.5;
 }
 
@@ -3791,6 +5765,117 @@ float rainShaftDensityOverSegment(vec3 segmentStart, vec3 segmentEnd, float mipB
  * This uses only continuous render inputs and remains stable while descriptor
  * or role boundaries cross the ray.
  */
+#ifdef PA_ARM_DETAIL_FOOTPRINT
+/**
+ * T169 footprint-gated detail (Task 4A).
+ *
+ * <p>Same relation T168 validated for the march step, applied to the detail
+ * lookup instead: the packed detail wavelength projects to
+ * `wavelength * P11 * H / (2t)` pixels, so it falls below one target pixel
+ * beyond a fixed distance. Past that the fetch is resolving structure finer
+ * than the target can show, and its only visible effect is aliasing.
+ *
+ * <p>The coefficient is the T168 form with the detail wavelength substituted
+ * for the step, so it is hoisted per fragment exactly the same way and the
+ * inner test stays a multiply and a compare - no per-sample division.
+ */
+float paDetailFootprintCoefficient(float wavelengthBlocks) {
+    float projectionScale = max(abs(CloudProjMat[1][1]), 0.001);
+    float targetHeight = max(PaOracleBaseSize.y, 1.0);
+    return (projectionScale * targetHeight * wavelengthBlocks) * 0.5;
+}
+#endif
+
+#ifdef PA_ARM_FOOTPRINT
+/**
+ * T168 footprint step LOD - the per-fragment half of it.
+ *
+ * <p>A world-space span s at ray distance t projects to a height, in cloud
+ * target pixels, of
+ *
+ *     pixels(s, t) = s * P11 * H / (2 t)
+ *
+ * where P11 is the vertical projection scale CloudProjMat[1][1] = 1/tan(fovY/2)
+ * and H is the cloud target height in pixels - the 270 of a 480x270 target, so
+ * the resolution scale is already inside it and must not be applied again.
+ *
+ * <p>Solving pixels(s, t) = P for the span that covers exactly P pixels gives
+ * s = 2 P t / (P11 H), and the growth over the shipped constant exterior fine
+ * step is therefore
+ *
+ *     growth(t) = s / fineStep = ( 2 P / (P11 H fineStep) ) * t
+ *
+ * <p>**That is linear in t.** The whole reciprocal collapses into one constant
+ * that depends only on the projection, the target and the quality ladder - none
+ * of which vary along a ray. T167 computed `1.0 / max(footprintPixels, eps)`
+ * per march step and paid up to 27% of the frame for the division; the same
+ * criterion costs one multiply and one clamp once the algebra is done first.
+ *
+ * @return the coefficient C such that growth = clamp(C * t, 1, cap)
+ */
+float paFootprintGrowthCoefficient(float fineStep) {
+    float projectionScale = max(abs(CloudProjMat[1][1]), 0.001);
+    float targetHeight = max(PaOracleBaseSize.y, 1.0);
+    return (2.0 * PA_ARM_FOOTPRINT)
+        / max(projectionScale * targetHeight * fineStep, 0.0001);
+}
+#endif
+
+#ifdef PA_ARM_STEP_CURVE
+/**
+ * T167 graded exterior fine-step growth.
+ *
+ * <p>Production holds the exterior fine step at a constant world size; the T166
+ * arm gave it the coarse tier's full growth and lost 13-20% of thin material.
+ * Each curve here trades a share of that growth for the material back.
+ *
+ * @param normalizedDistance t / MaxRenderDistance, in [0,1]
+ * @param fullGrowth         the aggressive arm's multiplier at this distance
+ * @param footprintPixels    the fine step's projected height in target pixels
+ */
+float paGradedStepGrowth(
+        float normalizedDistance, float fullGrowth, float footprintPixels) {
+#if PA_ARM_STEP_CURVE == 1
+    // A - LATE RAMP. Untouched near and mid, where thin material is resolvable
+    // and cheap to keep; the full curve only arrives in the far field.
+    return 1.0 + (fullGrowth - 1.0) * smoothstep(0.45, 1.0, normalizedDistance);
+#elif PA_ARM_STEP_CURVE == 2
+    // B - SMOOTH RAMP. The same endpoint, reached quadratically, so the near
+    // half of the ray keeps most of its sampling density.
+    return 1.0 + (fullGrowth - 1.0) * normalizedDistance * normalizedDistance;
+#elif PA_ARM_STEP_CURVE == 3
+    // C - CAPPED RAMP. Production's growth shape, clamped well below the
+    // aggressive arm so no sample is ever more than 1.9x coarser.
+    return min(fullGrowth, 1.9);
+#else
+    // D - FOOTPRINT-AWARE. Lengthen the step only by the factor that brings its
+    // projected size back to about one target pixel, and never past the
+    // aggressive arm. Where a fine step already covers a pixel or more this is
+    // exactly 1.0, so near and mid-field material is sampled as production
+    // samples it; the growth appears only where the lattice is provably
+    // finer than the display can resolve.
+    return clamp(1.0 / max(footprintPixels, 0.0001), 1.0, fullGrowth);
+#endif
+}
+#endif
+
+#ifdef PA_ARM_STEP_CURVE
+/**
+ * Projected height, in cloud-target pixels, of a world-space span at distance t.
+ *
+ * <p>Deliberately not routed through paProjectedFeaturePixels: that reads
+ * textureSize(HistorySampler), and history is disabled for every campaign
+ * matrix, so the sampler is unbound and the size is undefined. PaOracleBaseSize
+ * carries the live cloud-target size on every frame and is kept as a uniform in
+ * the curve variants for exactly this reason.
+ */
+float paStepFootprintPixels(float t, float worldSize) {
+    float projectionScale = max(abs(CloudProjMat[1][1]), 0.001);
+    float targetHeight = max(PaOracleBaseSize.y, 1.0);
+    return worldSize * projectionScale * targetHeight / (2.0 * max(t, 1.0));
+}
+#endif
+
 float paProjectedFeaturePixels(vec3 p, float worldSize) {
     float distanceToSample = max(length(p - CameraPos), 1.0);
     float projectionScale = max(abs(CloudProjMat[1][1]), 0.001);
@@ -3806,6 +5891,15 @@ float cloudDensity(
         bool includePrecipitation) {
     if (paWorkloadCaptureActive()) {
         paCloudDensityCalls++;
+    }
+    if (paWorkloadCaptureActive()) {
+        paProbeCalls += paDensityConsumer == 3 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paBracketCalls += paDensityConsumer == 4 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paOtherCalls += paDensityConsumer == 0 ? 1 : 0;
     }
 #ifdef PA_ARM_NO_DETAIL
     // T166 attribution arm. The detail-octave lookups and the erosion they
@@ -3827,6 +5921,33 @@ float cloudDensity(
     if (paArmLightingSample) {
         useDetail = false;
         mipBias += 2.0;
+    }
+#endif
+#ifdef PA_LIGHT_AUDIT
+    // T198 Task 2. The exact side under decomposition: 2 and 7 skip the
+    // erosion stage (detail fetch and bite), 3 and 7 read the base noise at
+    // mip 0 as the field build does.
+    if (paLightAuditExactVariant == 2 || paLightAuditExactVariant == 7) {
+        useDetail = false;
+    }
+    if (paLightAuditExactVariant == 3 || paLightAuditExactVariant == 7) {
+        mipBias = 0.0;
+    }
+#endif
+#ifdef PA_ARM_DETAIL_FOOTPRINT
+    // T169 Task 4A. Once the packed detail wavelength projects below the
+    // configured pixel count the fetch resolves structure the target cannot
+    // show, and its only remaining effect is aliasing.
+    {
+        vec3 toSample = p - CameraPos;
+        float distSq = dot(toSample, toSample);
+        if (distSq > paDetailCutoffDistSq) {
+            useDetail = false;
+        } else if (distSq > paDetailFineCutoffDistSq) {
+            // The second lookup goes first: it is the finer wavelength, so it
+            // becomes subpixel nearer the camera than the base octave does.
+            nearCamera = false;
+        }
     }
 #endif
     if (PuffDensityStage == 1) {
@@ -3895,6 +6016,17 @@ float cloudDensity(
     }
     vec4 weather = sampleWeather(p.xz);
     vec4 morphology = sampleMorphology(p.xz);
+#ifdef PA_LIGHT_AUDIT
+    // T198 Task 2. Variants 4 and 5 remove the raster inputs from the exact
+    // side; a descriptor-owned storm is expected to read neither, and the
+    // audit measures that rather than assuming it.
+    if (paLightAuditExactVariant == 4) {
+        weather = vec4(0.0);
+    }
+    if (paLightAuditExactVariant == 5) {
+        morphology = vec4(0.0);
+    }
+#endif
     // Weather-map coverage already includes the cloudlet density. Its normal
     // spawned-field range is roughly 0.08..0.35; treating 0.92 as the full
     // point erased those clouds before the raymarch ever saw them.
@@ -3964,6 +6096,15 @@ float cloudDensity(
     // tile is never authority for unrelated or incomplete groups.
     bool directStormAvailable = directStormOwned;
     stormProfile = stormProfile || directStormAvailable;
+    if (paStormFieldBuildNode) {
+        // T198. The threshold the body is formed against at STAGE 5, from the
+        // same walk: what the exact-noise light lookup needs from the node.
+        paLastStormLowerBound = directStormAvailable && directStormCoverage > 0.001
+            ? stormCoverageLowerBound(directStormCoverage, directStormStrength,
+                (directStormActiveRoleMask & 7) == 7)
+            : 1.0;
+        paLastStormHeight01 = directStormHeight01;
+    }
 
     if (paTraceCapture) {
         paCdFlags = PA_CD_ENTERED
@@ -4231,8 +6372,11 @@ float cloudDensity(
             float detailFbm = 0.5;
             if (detailWeight > 0.0001) {
                 vec4 detail = texture(DetailNoiseSampler, detailPos, mipBias);
+                // Which path paid for it decides which LOD could remove it.
                 if (paWorkloadCaptureActive()) {
                     paDetailOctaveEvaluations += 3;
+                    paDetailFetchLight += paLightingDensityTap ? 1 : 0;
+                    paDetailFetchPrimary += paLightingDensityTap ? 0 : 1;
                 }
                 float sampledDetail = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
                 detailFbm = mix(0.5, sampledDetail, detailWeight);
@@ -4252,6 +6396,11 @@ float cloudDensity(
                     );
                     if (paWorkloadCaptureActive()) {
                         paDetailOctaveEvaluations += 3;
+                        paDetailFetchSecondOctave++;
+                    }
+                    if (paWorkloadCaptureActive()) {
+                        paDetailFetchLight += paLightingDensityTap ? 1 : 0;
+                        paDetailFetchPrimary += paLightingDensityTap ? 0 : 1;
                     }
                     float fineDetail = fine.r * 0.625 + fine.g * 0.25 + fine.b * 0.125;
                     detailFbm = mix(
@@ -4261,6 +6410,13 @@ float cloudDensity(
                     );
                 }
             }
+#ifdef PA_LIGHT_AUDIT
+            // T198 Task 2. Variant 1: the detail noise at its mean, so the
+            // erosion stage keeps its mean bite and only the noise is removed.
+            if (paLightAuditExactVariant == 1) {
+                detailFbm = 0.5;
+            }
+#endif
             float erosion = profileId == 3 ? 0.14 : 0.26;
             if (profileId == 1 || profileId == 5) {
                 erosion = 0.10;
@@ -4408,6 +6564,535 @@ float cloudDensity(
 }
 
 // ---------------------------------------------------------------------------
+// T196. The shared 3D storm field.
+//
+// One coarse volume over the weather domain and the slab, PaStormFieldXZ
+// nodes square by 32 (256x256x32 in T196; T197 measures 384 and 512), built
+// once per frame by a fullscreen pass over an 8x4 atlas of one tile per
+// slice and read by the two consumers T193 attributed
+// 43% of descriptor traversal to:
+//
+//   A  detail-free production density at the node  - the T196 light cone
+//      reads it trilinearly, four taps as before, one fetch pair per tap
+//      instead of a descriptor walk. T198 measured it: the node's base-noise
+//      sample aliases a noise whose texel is 3 blocks, so the interpolated
+//      density is 25-35% RMS off the exact one at every tap, and the near
+//      taps miss the erosion stage (+0.26 a tap). Kept for that arm.
+//   R  the storm body's exact threshold at the node (T198), 1 where nothing
+//      is owned, -10 where the field does not cover; and B the walk's
+//      height01. The T198 light lookup interpolates these two envelope
+//      quantities and evaluates the base noise, the detail and the erosion
+//      at the tap point itself - the probe's own architecture applied to the
+//      light: the field carries the descriptor traversal, never the noise.
+//   G  the probe floor: a lower bound on the storm body's noise threshold
+//      over every point nearer to this node than to any other (its dual
+//      cell). The probe fetches the nearest node, evaluates the base noise at
+//      its own point exactly - one 3D fetch - and answers "material possible"
+//      iff baseField(p) > floor. 1.0 means provably empty; -10 means the
+//      field does not cover this region (a weather-map family or a funnel)
+//      and the probe must assume material.
+//
+// Why the floor is sound. For a descriptor storm,
+//   density > 0  <=>  stormBody > 0  <=>  baseField(p) > L(p),
+//   L = 1 - coverage * (1 + fill),  coverage = E * strength,
+//   E = 1 - smoothstep(-soft, soft, d),  d = the smooth-union distance.
+// strength * (1 + fill(strength)) is at most 1.45 without convective overlap
+// and at most 1.65 with it (fill grows as strength falls, and the product is
+// bounded), so L(p) >= 1 - 1.65 * E(p) everywhere. E falls with d, and d at
+// any point of the dual cell is at least d(node) - rho with rho the cell's
+// half-diagonal, up to the Lipschitz headroom PA_STORM_FIELD_DILATION
+// carries. So floor = 1 - 1.65 * E(d(node) - rho * headroom) <= L(p) for every
+// p in the cell, with the softness that maximises E over the cell. Erosion is
+// subtractive and the material terms are positive scalings, so neither can
+// make production positive where stormBody is zero. The soundness oracle
+// (pass 2) checks the inequality against a dense reference on every node.
+// ---------------------------------------------------------------------------
+
+
+float paStormFieldVoxelXZ() {
+    return WeatherExtent / float(PaStormFieldXZ);
+}
+
+float paStormFieldVoxelY() {
+    return max(SlabTopY - SlabBaseY, 1.0) / float(PA_STORM_FIELD_Y);
+}
+
+// Continuous node coordinates: node (i, k, j) sits at (i + 0.5, k + 0.5, j + 0.5).
+vec3 paStormFieldCoord(vec3 p) {
+    return vec3(
+        (p.x - WeatherOrigin.x) / paStormFieldVoxelXZ(),
+        (p.y - SlabBaseY) / paStormFieldVoxelY(),
+        (p.z - WeatherOrigin.y) / paStormFieldVoxelXZ()
+    );
+}
+
+// Atlas uv of in-tile texel coordinates (x, z) on slice k, clamped half a
+// texel inside the tile so bilinear filtering never reads a neighbouring slice.
+vec2 paStormFieldAtlasUv(float x, float z, int k) {
+    float edge = float(PaStormFieldXZ);
+    x = clamp(x, 0.5, edge - 0.5);
+    z = clamp(z, 0.5, edge - 0.5);
+    float tx = float(k - (k / PA_STORM_FIELD_TILES_X) * PA_STORM_FIELD_TILES_X);
+    float ty = float(k / PA_STORM_FIELD_TILES_X);
+    return vec2(
+        (tx * edge + x) / (edge * float(PA_STORM_FIELD_TILES_X)),
+        (ty * edge + z) / (edge * float(PA_STORM_FIELD_TILES_Y))
+    );
+}
+
+// Light: manual trilinear over the R channel - bilinear on the two slices
+// that bracket p, blended in Y. Zero outside the slab, which bounds every
+// cloud the frame can contain.
+float paStormFieldDensityAt(vec3 p) {
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y > float(PA_STORM_FIELD_Y)) {
+        return 0.0;
+    }
+    float ky = clamp(c.y - 0.5, 0.0, float(PA_STORM_FIELD_Y - 1));
+    int k0 = int(floor(ky));
+    int k1 = min(k0 + 1, PA_STORM_FIELD_Y - 1);
+    float t = ky - float(k0);
+    if (paWorkloadCaptureActive()) {
+        paStormFieldLightFetches++;
+    }
+    float d0 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k0)).a;
+    float d1 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k1)).a;
+    return mix(d0, d1, t);
+}
+
+// T198. Light: the field's threshold and height at p, then the exact base
+// noise at p - one 3D fetch - forms the body exactly as cloudDensity's STAGE
+// 5 does; a detail tap adds the detail fetch and the erosion bite; the
+// material terms follow with the descriptor constants cloudDensity uses.
+// A node the field does not cover (R at the sentinel) falls back to the
+// node density in A.
+float paStormFieldLightDensityAt(vec3 p, bool detailTap) {
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y > float(PA_STORM_FIELD_Y)) {
+        return 0.0;
+    }
+    float ky = clamp(c.y - 0.5, 0.0, float(PA_STORM_FIELD_Y - 1));
+    int k0 = int(floor(ky));
+    int k1 = min(k0 + 1, PA_STORM_FIELD_Y - 1);
+    float t = ky - float(k0);
+    if (paWorkloadCaptureActive()) {
+        paStormFieldLightFetches++;
+    }
+    vec4 f0 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k0));
+    vec4 f1 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k1));
+    if (min(f0.r, f1.r) <= PA_STORM_FIELD_UNCOVERED * 0.5) {
+        return mix(f0.a, f1.a, t);
+    }
+    float lowerBound = mix(f0.r, f1.r, t);
+    if (lowerBound >= 0.999) {
+        return 0.0;
+    }
+    vec3 samplePos = p;
+    samplePos.xz -= MaterialOffset;
+    vec4 baseNoise = texture(
+        BaseNoiseSampler, baseNoiseDomain(samplePos, STORM_BASE_NOISE_SCALE), 0.0);
+    float lowFbm = baseNoise.g * 0.625 + baseNoise.b * 0.25 + baseNoise.a * 0.125;
+    float baseCarrier = saturate(remap(baseNoise.r, -(1.0 - lowFbm), 1.0, 0.0, 1.0));
+    float cloud = saturate((stormBaseField(baseCarrier) - lowerBound)
+        / max(1.0 - lowerBound, 0.0001));
+    if (detailTap && cloud > 0.003) {
+        vec3 detailPos = detailNoiseDomain(samplePos) + (baseNoise.gbr - 0.5) * 0.18;
+        vec4 detail = texture(DetailNoiseSampler, detailPos, 0.0);
+        if (paWorkloadCaptureActive()) {
+            paDetailOctaveEvaluations += 3;
+            paDetailFetchLight++;
+        }
+        float detailFbm = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
+        cloud = max(cloud - (1.0 - detailFbm) * STORM_EROSION, 0.0);
+    }
+    float height01 = saturate(mix(f0.b, f1.b, t));
+    cloud *= mix(1.0, 1.18, 0.72 * (1.0 - height01) * 0.6);
+    cloud *= mix(0.90, 1.10, 0.78);
+    cloud *= 1.0 + 0.68 * (1.0 - height01) * 0.32;
+    return max(cloud, 0.0) * 0.73 * DensityMul;
+}
+
+// The storm body's noise input at p, exactly as cloudDensity forms it for a
+// descriptor-owned storm at mip 0: one base-noise fetch.
+float paStormBaseFieldAt(vec3 p) {
+    vec3 samplePos = p;
+    samplePos.xz -= MaterialOffset;
+    vec4 baseNoise = texture(
+        BaseNoiseSampler, baseNoiseDomain(samplePos, STORM_BASE_NOISE_SCALE), 0.0);
+    float lowFbm = baseNoise.g * 0.625 + baseNoise.b * 0.25 + baseNoise.a * 0.125;
+    float baseCarrier = saturate(remap(baseNoise.r, -(1.0 - lowFbm), 1.0, 0.0, 1.0));
+    return stormBaseField(baseCarrier);
+}
+
+// Probe: nearest node's floor, then the exact noise at p.
+bool paStormFieldMaterialPossible(vec3 p) {
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y >= float(PA_STORM_FIELD_Y)) {
+        // Outside the slab the field says nothing; the march rarely asks.
+        if (paWorkloadCaptureActive()) {
+            paStormFieldProbeFallback++;
+        }
+        return true;
+    }
+    int k = int(c.y);
+    ivec2 tile = ivec2(
+        k - (k / PA_STORM_FIELD_TILES_X) * PA_STORM_FIELD_TILES_X,
+        k / PA_STORM_FIELD_TILES_X) * PaStormFieldXZ;
+    ivec2 xz = clamp(ivec2(floor(c.xz)), ivec2(0), ivec2(PaStormFieldXZ - 1));
+    if (paWorkloadCaptureActive()) {
+        paStormFieldProbeFetches++;
+    }
+    float floorL = texelFetch(StormFieldSampler, tile + xz, 0).g;
+    if (floorL >= 1.0) {
+        if (paWorkloadCaptureActive()) {
+            paStormFieldProbeProvablyEmpty++;
+        }
+        return false;
+    }
+    if (floorL <= PA_STORM_FIELD_UNCOVERED * 0.5) {
+        if (paWorkloadCaptureActive()) {
+            paStormFieldProbeFallback++;
+        }
+        return true;
+    }
+    return paStormBaseFieldAt(p) > floorL;
+}
+
+// A weather-map family could carry material anywhere its raster is painted;
+// the field does not model those families, so any coverage or morphology in
+// the 3x3 weather texels around the node (8-block texels; the dual cell is
+// +-8 blocks at 256 nodes and smaller at every higher resolution, so the
+// window stays a superset) marks the node uncovered. Descriptor-owned storms suppress their
+// member rasters, so this does not fire inside them.
+bool paStormFieldNonStormPossible(vec2 nodeXZ) {
+    ivec2 size = textureSize(WeatherMapSampler, 0);
+    ivec2 centre = ivec2(floor((nodeXZ - WeatherOrigin) / WeatherExtent * vec2(size)));
+    for (int dz = -1; dz <= 1; dz++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            ivec2 texel = clamp(centre + ivec2(dx, dz), ivec2(0), size - ivec2(1));
+            if (texelFetch(WeatherMapSampler, texel, 0).r * CoverageMul > 0.002) {
+                return true;
+            }
+            if (hasMorphologyCategory(texelFetch(MorphologyMapSampler, texel, 0).r)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// The node's floor, from one exact walk at the node and the dilated envelope.
+// The dilation is the largest drop the union distance can take between the
+// node and any point of its dual cell: the horizontal half-diagonal at the
+// horizontal constant plus the vertical half-extent at the vertical one, by
+// the triangle inequality over an XZ move followed by a Y move.
+float paStormFieldDilationBlocks() {
+    float halfXZ = 0.5 * paStormFieldVoxelXZ();
+    float halfY = 0.5 * paStormFieldVoxelY();
+    return (length(vec2(halfXZ, halfXZ)) * paLastStormMaxAspect
+        + halfY * paLastStormMaxVerticalSlope) * PA_STORM_FIELD_LIPSCHITZ_HEADROOM;
+}
+
+// The node's floor from the walk cloudDensity has just done at the node -
+// the build pays one walk per node for both channels. 1.0 when no group
+// entered the union.
+float paStormFieldFloorFromWalk() {
+    paLastStormFieldSlack = 1.0e9;
+    if (paLastStormUnionDistance > 1.0e8) {
+        return 1.0;
+    }
+    float dilated = paLastStormUnionDistance - paStormFieldDilationBlocks();
+    // E grows with softness outside the surface and shrinks with it inside,
+    // so the softness that maximises E over the cell is the max there and
+    // the min here.
+    float softness = max(dilated >= 0.0 ? paLastStormMaxSoftness : paLastStormMinSoftness,
+        STORM_MIN_EDGE_BLOCKS);
+    paLastStormFieldSlack = dilated - softness;
+    float envelope = 1.0 - smoothstep(-softness, softness, dilated);
+    return 1.0 - PA_STORM_FIELD_BODY_GAIN * envelope;
+}
+
+// Both channels of one node: the detail-free production density, and the
+// floor from the same walk. Uncovered where a weather-map family or a funnel
+// could carry material the field does not model.
+// T198: (threshold, floor, height01, density) - the threshold and height
+// come from the same walk, published by cloudDensity in build mode.
+vec4 paStormFieldNodeAt(vec3 node, out float unionDistanceOut) {
+    paLastStormUnionDistance = 1.0e9;
+    paLastStormLowerBound = 1.0;
+    paLastStormHeight01 = 0.0;
+    paStormFieldBuildNode = true;
+    paStormFieldRejectMargin = 0.5 * paStormFieldVoxelY();
+    float density = cloudDensity(node, 0.0, false, false, false);
+    paStormFieldBuildNode = false;
+    paStormFieldRejectMargin = 0.0;
+    unionDistanceOut = paLastStormUnionDistance;
+    float floorL;
+    float threshold = paLastStormLowerBound;
+    if (FunnelCount > 0 || paStormFieldNonStormPossible(node.xz)) {
+        floorL = PA_STORM_FIELD_UNCOVERED;
+        threshold = PA_STORM_FIELD_UNCOVERED;
+    } else if (StormLobeCount <= 0) {
+        floorL = 1.0;
+        threshold = 1.0;
+    } else {
+        floorL = paStormFieldFloorFromWalk();
+    }
+    if ((PaStormFieldEnabled & 32) != 0 && floorL > PA_STORM_FIELD_UNCOVERED * 0.5) {
+        // T202. A carries the refinement's clearance floor on a covered node:
+        // the walk's minimum descriptor clearance at the node less the
+        // largest drop it can take to any point of the dual cell - the same
+        // axis-split Lipschitz dilation the probe floor uses, on the same
+        // published constants - so clearance(p) >= A for every p in the cell.
+        // A tile with no candidate leaves the clearance at its sentinel, and
+        // production's walk at any point of that tile does the same, so the
+        // cap below is the coarse step's own cap and nothing is lost. Half
+        // float: the cap keeps it exact to an eighth of a block.
+        float clearanceFloor = paLastStormMinClearance > 1.0e8
+            ? 4096.0
+            : paLastStormMinClearance - paStormFieldDilationBlocks();
+        density = clamp(clearanceFloor, -4096.0, 4096.0);
+    }
+    return vec4(threshold, floorL, paLastStormHeight01, density);
+}
+
+// T202. The primary body density from the field: the bit-8 light lookup's
+// form - the field's threshold and height at p, the exact base noise at p at
+// mip 0 - with the primary call's own detail stages: the detail octave, the
+// near-camera second octave when DetailQuality allows it, and the erosion
+// bite, exactly as cloudDensity's STAGE 5-6 apply them to a descriptor-owned
+// storm. The material terms follow with the descriptor constants cloudDensity
+// uses. Zero outside the slab, which bounds every cloud the frame can
+// contain. covered is false where the node is uncovered - a weather-map
+// family or a funnel could carry material the field does not model - and the
+// caller evaluates the exact density instead.
+float paStormFieldBodyFromThreshold(vec3 p, float lowerBound, float height01,
+        bool useDetail, bool nearCamera);
+
+float paStormFieldPrimaryDensityAt(vec3 p, bool useDetail, bool nearCamera, out bool covered) {
+    covered = true;
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y > float(PA_STORM_FIELD_Y)) {
+        return 0.0;
+    }
+    float ky = clamp(c.y - 0.5, 0.0, float(PA_STORM_FIELD_Y - 1));
+    int k0 = int(floor(ky));
+    int k1 = min(k0 + 1, PA_STORM_FIELD_Y - 1);
+    float t = ky - float(k0);
+    if (paWorkloadCaptureActive()) {
+        paStormFieldPrimaryFetches++;
+    }
+    vec4 f0 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k0));
+    vec4 f1 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k1));
+    if (min(f0.r, f1.r) <= PA_STORM_FIELD_UNCOVERED * 0.5) {
+        covered = false;
+        if (paWorkloadCaptureActive()) {
+            paStormFieldPrimaryFallback++;
+        }
+        return 0.0;
+    }
+    float lowerBound = mix(f0.r, f1.r, t);
+    if (lowerBound >= 0.999) {
+        return 0.0;
+    }
+    return paStormFieldBodyFromThreshold(
+        p, lowerBound, saturate(mix(f0.b, f1.b, t)), useDetail, nearCamera);
+}
+
+// T202. The body from a threshold and a height at p: the exact base noise at
+// p at mip 0, the primary call's detail stages, the erosion bite and the
+// descriptor material terms - what cloudDensity's STAGE 5-6 and the material
+// block apply to a descriptor-owned storm once the walk has produced the
+// threshold. Shared by the field lookup above and the representation oracle
+// below, so the two differ only in where the threshold comes from.
+float paStormFieldBodyFromThreshold(vec3 p, float lowerBound, float height01,
+        bool useDetail, bool nearCamera) {
+    vec3 samplePos = p;
+    samplePos.xz -= MaterialOffset;
+    vec4 baseNoise = texture(
+        BaseNoiseSampler, baseNoiseDomain(samplePos, STORM_BASE_NOISE_SCALE), 0.0);
+    float lowFbm = baseNoise.g * 0.625 + baseNoise.b * 0.25 + baseNoise.a * 0.125;
+    float baseCarrier = saturate(remap(baseNoise.r, -(1.0 - lowFbm), 1.0, 0.0, 1.0));
+    float cloud = saturate((stormBaseField(baseCarrier) - lowerBound)
+        / max(1.0 - lowerBound, 0.0001));
+    if (cloud > 0.003 && useDetail) {
+        vec3 detailPos = detailNoiseDomain(samplePos) + (baseNoise.gbr - 0.5) * 0.18;
+        vec4 detail = texture(DetailNoiseSampler, detailPos, 0.0);
+        if (paWorkloadCaptureActive()) {
+            paDetailOctaveEvaluations += 3;
+            paDetailFetchPrimary++;
+        }
+        float detailFbm = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
+        if (nearCamera && DetailQuality >= 2) {
+            float fineWeight = paT149DetailGraded()
+                ? smoothstep(0.65, 1.65, paProjectedFeaturePixels(p, 8.4))
+                : 1.0;
+            if (fineWeight > 0.0001) {
+                vec4 fine = texture(
+                    DetailNoiseSampler,
+                    detailPos * 2.71 + vec3(0.173, -0.291, 0.417),
+                    0.0);
+                if (paWorkloadCaptureActive()) {
+                    paDetailOctaveEvaluations += 3;
+                    paDetailFetchSecondOctave++;
+                    paDetailFetchPrimary++;
+                }
+                float fineDetail = fine.r * 0.625 + fine.g * 0.25 + fine.b * 0.125;
+                detailFbm = mix(detailFbm, detailFbm * 0.72 + fineDetail * 0.28, fineWeight);
+            }
+        }
+        cloud = max(cloud - (1.0 - detailFbm) * STORM_EROSION, 0.0);
+    }
+    cloud *= mix(1.0, 1.18, 0.72 * (1.0 - height01) * 0.6);
+    cloud *= mix(0.90, 1.10, 0.78);
+    cloud *= 1.0 + 0.68 * (1.0 - height01) * 0.32;
+    return max(cloud, 0.0) * 0.73 * DensityMul;
+}
+
+#ifdef PA_PRIMARY_DINTERP
+// T202 representation oracle. The first run interpolated the node THRESHOLD
+// (R) and lost 16-26% of the thin material with a 0.69-0.88 edge SSIM: the
+// threshold is a smoothstep of the union distance, and across a slab cell
+// the distance moves by up to eight blocks a block vertically, so the
+// chord of the smoothstep is not the smoothstep. This oracle interpolates
+// what a second atlas would store instead - the union distance (clamped so
+// a far node reads as far, never as the sentinel), the union's softness,
+// its strength, and the height - over the eight nodes of the dual cell, and
+// forms the envelope, the threshold and the body at the sample. Each node
+// is one build-mode walk, so it is eight walks a sample: quality only,
+// never timed, never a candidate as written. The overlap class comes from
+// the nearest node. Where no node of the cell enters the union the sample
+// is empty, exactly as production's early-coverage reject.
+const float PA_DINTERP_FAR = 1024.0;
+
+void paDInterpNode(vec3 node, out float distance, out float softness, out float strength,
+        out int roleMask, out float height01) {
+    bool owns;
+    float unionDistance;
+    float clearance;
+    paStormFieldBuildNode = true;
+    paStormFieldRejectMargin = 0.5 * paStormFieldVoxelY();
+    directStormShape(node, owns, height01, strength, roleMask, unionDistance, clearance);
+    paStormFieldBuildNode = false;
+    paStormFieldRejectMargin = 0.0;
+    distance = min(unionDistance, PA_DINTERP_FAR);
+    softness = max(paLastStormUnionSoftness, STORM_MIN_EDGE_BLOCKS);
+}
+
+float paStormDInterpOracleDensityAt(vec3 p, bool useDetail, bool nearCamera) {
+    if (StormLobeCount <= 0) {
+        return 0.0;
+    }
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y > float(PA_STORM_FIELD_Y)) {
+        return 0.0;
+    }
+    float vx = paStormFieldVoxelXZ();
+    float vy = paStormFieldVoxelY();
+    vec3 g = vec3(c.x - 0.5, clamp(c.y - 0.5, 0.0, float(PA_STORM_FIELD_Y - 1)), c.z - 0.5);
+    vec3 g0 = floor(g);
+    vec3 f = g - g0;
+    float distance = 0.0;
+    float softness = 0.0;
+    float strength = 0.0;
+    float height01 = 0.0;
+    int nearestMask = 0;
+    float nearestWeight = -1.0;
+    for (int corner = 0; corner < 8; corner++) {
+        vec3 o = vec3(float(corner & 1), float((corner >> 1) & 1), float((corner >> 2) & 1));
+        vec3 gi = g0 + o;
+        gi.y = clamp(gi.y, 0.0, float(PA_STORM_FIELD_Y - 1));
+        vec3 node = vec3(
+            WeatherOrigin.x + (gi.x + 0.5) * vx,
+            SlabBaseY + (gi.y + 0.5) * vy,
+            WeatherOrigin.y + (gi.z + 0.5) * vx);
+        float w = (o.x > 0.5 ? f.x : 1.0 - f.x) * (o.y > 0.5 ? f.y : 1.0 - f.y)
+            * (o.z > 0.5 ? f.z : 1.0 - f.z);
+        float nd;
+        float ns;
+        float nStrength;
+        int nMask;
+        float nHeight;
+        paDInterpNode(node, nd, ns, nStrength, nMask, nHeight);
+        distance += w * nd;
+        softness += w * ns;
+        strength += w * nStrength;
+        height01 += w * nHeight;
+        if (w > nearestWeight) {
+            nearestWeight = w;
+            nearestMask = nMask;
+        }
+    }
+    float coverage = stormEnvelopeFromDistance(distance, softness, strength);
+    if (coverage <= 0.001) {
+        return 0.0;
+    }
+    float lowerBound = stormCoverageLowerBound(coverage, strength, (nearestMask & 7) == 7);
+    return paStormFieldBodyFromThreshold(p, lowerBound, saturate(height01), useDetail, nearCamera);
+}
+#endif
+
+// T202. The refinement's clearance from the field: the floor the build wrote
+// into A for the node whose dual cell contains p, one texel fetch, the way
+// the probe reads its floor. False where the node is uncovered or p is
+// outside the slab; the caller walks the descriptors as before.
+bool paStormFieldClearanceAt(vec3 p, out float clearance) {
+    clearance = 0.0;
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y >= float(PA_STORM_FIELD_Y)) {
+        if (paWorkloadCaptureActive()) {
+            paStormFieldRefineFallback++;
+        }
+        return false;
+    }
+    int k = int(c.y);
+    ivec2 tile = ivec2(
+        k - (k / PA_STORM_FIELD_TILES_X) * PA_STORM_FIELD_TILES_X,
+        k / PA_STORM_FIELD_TILES_X) * PaStormFieldXZ;
+    ivec2 xz = clamp(ivec2(floor(c.xz)), ivec2(0), ivec2(PaStormFieldXZ - 1));
+    if (paWorkloadCaptureActive()) {
+        paStormFieldRefineFetches++;
+    }
+    vec4 node = texelFetch(StormFieldSampler, tile + xz, 0);
+    if (node.g <= PA_STORM_FIELD_UNCOVERED * 0.5) {
+        if (paWorkloadCaptureActive()) {
+            paStormFieldRefineFallback++;
+        }
+        return false;
+    }
+    clearance = node.a;
+    return true;
+}
+
+// The exact threshold production applies at one point, for the oracle: L
+// where the descriptor path can produce material, else 1.
+// T199. This and the pass-2 branch below stay compiled into FINAL behind the
+// live PaStormFieldPass, which the renderer never uploads as 2 on FINAL:
+// T199c gated them out with a define and the T199 campaign measured FINAL
+// 30% slower at SIDE (12% at FAR) than t198_field_both_exact, whose only
+// source difference was that define - a compiler artifact, but the program
+// T198 accepted is the one with the branch in, so that is the one shipped.
+float paStormFieldReferenceFloorAt(vec3 q, out float unionDistanceOut) {
+    bool owns;
+    float height01;
+    float strength;
+    int roleMask;
+    float unionDistance;
+    float clearance;
+    // Exactly production's walk at q - its reach early-out, its own tile's
+    // candidates, its vertical rejection - because that is what the probe
+    // would have computed there and what the floor must not sit above.
+    paStormFieldBuildNode = false;
+    paStormFieldRejectMargin = 0.0;
+    float coverage = directStormShape(q, owns, height01, strength, roleMask, unionDistance, clearance);
+    unionDistanceOut = unionDistance;
+    if (!owns || coverage <= 0.001) {
+        return 1.0;
+    }
+    return stormCoverageLowerBound(coverage, strength, (roleMask & 7) == 7);
+}
+
+// ---------------------------------------------------------------------------
 // Lighting
 // ---------------------------------------------------------------------------
 
@@ -4419,6 +7104,37 @@ float henyeyGreenstein(float cosTheta, float g) {
 float dualLobePhase(float cosTheta) {
     return mix(henyeyGreenstein(cosTheta, -0.18), henyeyGreenstein(cosTheta, 0.62), 0.72);
 }
+
+#ifdef PA_ARM_FIELD_LOOKUP
+// T195 Task 7. The lookup side of a shared 3D storm field, priced without
+// building one.
+//
+// T194 measured what generating a field costs and what removing light and
+// probe descriptor traversal is worth; the term between them - what reading
+// the field back costs on the ray - was estimated, not measured, and T170's
+// "descriptor fetches are cheap" was measured on a 64 KB descriptor texture,
+// not on a multi-megabyte volume with different cache behaviour.
+//
+// This arm keeps the light cone and the probe scan's surrounding control flow
+// and replaces the density each would have computed with one trilinear fetch
+// from a stand-in volume: the resident 128^3 RGBA8 base-noise texture, 8 MB,
+// the same footprint as the 256x256x32 RG16F candidate, addressed over the
+// weather domain and the slab exactly as a field would be. The contents are
+// noise, so the image is invalid; the fetch count, the addressing pattern and
+// the cache footprint are the ones a real field would pay, which is what is
+// being priced. The light fetch feeds the production scatter chain, so the
+// arm also restores the term the no-light ceiling removed and a field would
+// not: everything downstream of the optical depth.
+vec3 paFieldStandInCoord(vec3 p) {
+    vec2 xz01 = (p.xz - WeatherOrigin) / WeatherExtent;
+    float y01 = (p.y - SlabBaseY) / max(SlabTopY - SlabBaseY, 1.0);
+    return vec3(xz01.x, y01, xz01.y);
+}
+
+vec2 paFieldStandInFetch(vec3 p) {
+    return texture(BaseNoiseSampler, paFieldStandInCoord(p), 0.0).rg;
+}
+#endif
 
 float lightMarchOpticalDepth(
         vec3 p,
@@ -4433,10 +7149,12 @@ float lightMarchOpticalDepth(
         // optical path instead of flattening the interior to a constant colour.
         if (paWorkloadCaptureActive()) {
             paLightMarchDensityEvaluations++;
+            paLightCheapProbes++;
         }
 #ifdef PA_ARM_LIGHT_CHEAP
         paArmLightingSample = true;
 #endif
+        paDensityConsumer = 9;
         float forwardDensity = cloudDensity(
             p + LightDir * 28.0,
             1.2,
@@ -4447,6 +7165,7 @@ float lightMarchOpticalDepth(
 #ifdef PA_ARM_LIGHT_CHEAP
         paArmLightingSample = false;
 #endif
+        paDensityConsumer = 0;
         return localDensity * 18.0 + forwardDensity * 82.0;
     }
     int steps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);
@@ -4492,6 +7211,12 @@ float lightMarchOpticalDepth(
         // at full strength as the earlier rounded prototype did.
         steps = clamp(int(ceil(desiredSteps - 0.0001)), 2, steps);
     }
+    // "Already opaque" uses the same 0.045 floor the validated early
+    // termination arm uses, so the two readings are commensurable.
+    if (paWorkloadCaptureActive()) {
+        paLightConeMarches++;
+        paLightMarchBelowFloor += paLodTransmittance < 0.045 ? 1 : 0;
+    }
     float opticalDepth = 0.0;
 #ifdef PA_ARM_LIGHT_STEP_WIDE
     // PM idea C: same tap count, wider spacing, so the cone covers a longer
@@ -4523,6 +7248,7 @@ float lightMarchOpticalDepth(
         pos += LightDir * stepLength;
         if (paWorkloadCaptureActive()) {
             paLightMarchDensityEvaluations++;
+            paLightConeTaps++;
         }
         float tapWeight = 1.0;
         if (gradedLight && float(i + 1) > desiredSteps) {
@@ -4559,7 +7285,62 @@ float lightMarchOpticalDepth(
 #ifdef PA_ARM_LIGHT_CHEAP
         paArmLightingSample = true;
 #endif
-        float density = cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
+        paLightTapOrdinal = i + 1;
+        paDensityConsumer = 2;
+#ifdef PA_ARM_FIELD_LOOKUP
+        // T195 Task 7. One fetch where the tap would have walked the
+        // descriptors, the base noise and - on the first two taps - the
+        // detail octaves. The loop, its weights and the early-out stay.
+        float density = paFieldStandInFetch(pos + offset).r * DensityMul;
+#else
+        // T196. The shared field serves the tap: same four taps, same
+        // weights, same early-out, one trilinear read instead of a walk.
+        // T199 retired bit 4 (the near taps on the exact walk); bit 8 is
+        // what production runs.
+#ifdef PA_LIGHT_AUDIT
+        // T198 Task 1. The field serves the tap exactly as t196_field_light
+        // does, and the exact production density is evaluated beside it at
+        // the same point with the same tap state (mip bias, detail flag, T149
+        // grading) - or, for variant 6, the field's own node equation there.
+        float density = (PaStormFieldEnabled & 8) != 0
+            ? paStormFieldLightDensityAt(pos + offset, detailTap)
+            : paStormFieldDensityAt(pos + offset);
+        {
+            vec3 paLaPoint = pos + offset;
+            float paLaExact;
+            if (PaLightAuditVariant == 6) {
+                paStormFieldBuildNode = true;
+                paStormFieldRejectMargin = 0.5 * paStormFieldVoxelY();
+                paLaExact = cloudDensity(paLaPoint, 0.0, false, false, false);
+                paStormFieldBuildNode = false;
+                paStormFieldRejectMargin = 0.0;
+            } else {
+                paLightAuditExactVariant = PaLightAuditVariant;
+                paLaExact = cloudDensity(paLaPoint, float(i) * 0.6, detailTap, false, false);
+                paLightAuditExactVariant = 0;
+            }
+            if (i < 4) {
+                float paLaErr = density - paLaExact;
+                paLaSumErr[i] += paLaErr;
+                paLaSumAbs[i] += abs(paLaErr);
+                paLaSumSq[i] += paLaErr * paLaErr;
+                paLaCount[i] += 1.0;
+                paLaOver[i] += paLaErr > 1.0e-6 ? 1.0 : 0.0;
+                paLaUnder[i] += paLaErr < -1.0e-6 ? 1.0 : 0.0;
+                paLaExactSum[i] += paLaExact;
+                paLaFieldSum[i] += density;
+            }
+        }
+#else
+        float density = (PaStormFieldEnabled & 1) != 0
+            ? ((PaStormFieldEnabled & 8) != 0
+                ? paStormFieldLightDensityAt(pos + offset, detailTap)
+                : paStormFieldDensityAt(pos + offset))
+            : cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
+#endif
+#endif
+        paDensityConsumer = 0;
+        paLightTapOrdinal = 0;
 #ifdef PA_ARM_LIGHT_CHEAP
         paArmLightingSample = false;
 #endif
@@ -4573,10 +7354,16 @@ float lightMarchOpticalDepth(
         // at 28.0 - a threshold no exterior cone reaches. This arm applies the
         // equivalent cut to every camera.
         if (opticalDepth * ExtinctionScale >= PA_ARM_LIGHT_EARLY_OUT) {
+            if (paWorkloadCaptureActive()) {
+                paLightConeEarlyOuts++;
+            }
             break;
         }
 #endif
         if (cameraStartsInsideSlab && opticalDepth * ExtinctionScale >= 28.0) {
+            if (paWorkloadCaptureActive()) {
+                paLightConeEarlyOuts++;
+            }
             break;
         }
         stepLength *= 1.42;
@@ -5007,7 +7794,9 @@ vec4 stormMaterialTraceAt(vec3 p, int stage) {
         * (1.0 + 0.68 * (1.0 - saturate(height01)) * 0.32);
     float density = owned ? bodyEroded * materialFactor * 0.73 * DensityMul : 0.0;
     bool cameraStartsInsideSlab = CameraPos.y >= SlabBaseY && CameraPos.y <= SlabTopY;
+    paDensityConsumer = 8;
     bool cameraInsideCloud = cloudDensity(CameraPos, 0.0, false, true, false) > 0.12;
+    paDensityConsumer = 0;
     vec3 traceViewDirection = normalize(p - CameraPos);
     float lightOd = lightMarchOpticalDepth(
         p, density, cameraStartsInsideSlab, cameraInsideCloud
@@ -5381,6 +8170,9 @@ float paT162CandidateWalk(vec3 samplePoint, bool readPayload) {
             continue;
         }
         groupVisited |= groupBit;
+        if (paWorkloadCaptureActive()) {
+            paDescriptorGroupsEntered++;
+        }
         int firstIndex = stormGroupFirstIndex(witnessIndex, groupSlot);
         int endIndex = min(stormGroupEndIndex(witnessIndex, groupSlot), StormLobeCount);
         checksum = paT162Consume(
@@ -5511,7 +8303,8 @@ void main() {
         ? PaRayTraceNdc * 0.5 + 0.5
         : paOracleCapture
             ? paOracleSourceFrag / max(PaOracleBaseSize, vec2(1.0))
-            : texCoord;
+            : texCoord + PaSampleJitter;
+    fragTemporalAux = vec4(0.0, 0.0, 0.0, 1.0);
     paViewFragCoord = paRayTraceActive()
         ? PaRayTraceFragCoord
         : paOracleCapture ? paOracleSourceFrag : gl_FragCoord.xy;
@@ -5519,6 +8312,185 @@ void main() {
     // march step, rain probe or density sample can ask about reachability.
     paBuildStormReachability();
     paBuildRainLocality();
+    // T188. The rain-support field generation pass. Each fragment of the
+    // 512x512 target is one column of the existing weather domain, and it runs
+    // the production function rather than a reimplementation of it, so the
+    // stored triple is what the ray would have computed at that column.
+    //
+    // This sits above every march path and returns, so no generation branch
+    // survives inside the loop; and PaRainFieldPass is baked to 0 in every
+    // program that does not generate, so the branch is not compiled into them
+    // at all.
+    // T196. The shared storm field's build pass. One fragment per node of
+    // the atlas, whose edge is PaStormFieldXZ tiles; pass 2 writes the oracle pair instead.
+    if (PaStormFieldPass != 0) {
+        ivec2 paNodeFrag = ivec2(gl_FragCoord.xy);
+        ivec2 paNodeTile = paNodeFrag / PaStormFieldXZ;
+        int paNodeSlice = paNodeTile.y * PA_STORM_FIELD_TILES_X + paNodeTile.x;
+        ivec2 paNodeXZ = paNodeFrag - paNodeTile * PaStormFieldXZ;
+        float paNodeVoxelXZ = paStormFieldVoxelXZ();
+        float paNodeVoxelY = paStormFieldVoxelY();
+        vec3 paNode = vec3(
+            WeatherOrigin.x + (float(paNodeXZ.x) + 0.5) * paNodeVoxelXZ,
+            SlabBaseY + (float(paNodeSlice) + 0.5) * paNodeVoxelY,
+            WeatherOrigin.y + (float(paNodeXZ.y) + 0.5) * paNodeVoxelXZ);
+        float paNodeUnionDistance;
+        vec4 paNodeValue = paStormFieldNodeAt(paNode, paNodeUnionDistance);
+        float paNodeFloor = paNodeValue.y;
+        float paNodeSlack = paLastStormFieldSlack;
+        if (PaStormFieldPass == 2) {
+            // Soundness oracle. The dense reference is the exact production
+            // threshold at 27 lattice points of the dual cell - its corners,
+            // edge and face centres and centre - plus 16 hashed points, and
+            // the pair (floor, reference minimum) is written for the CPU to
+            // count every node whose floor sits above its reference.
+            // Beside the floor check, the union distance's observed drop per
+            // block from the node to each sample, split by axis on the
+            // lattice points that move along one axis only: the constants the
+            // dilation assumes are measured rather than assumed.
+            float paRefMin = 1.0;
+            float paRefMaterial = 0.0;
+            float paLipschitzXZ = 0.0;
+            float paLipschitzY = 0.0;
+            // Strictly inside the cell: a point on the cell's boundary is the
+            // neighbouring node's, and the probe reads that node for it.
+            vec3 paHalf = vec3(0.5 * paNodeVoxelXZ, 0.5 * paNodeVoxelY, 0.5 * paNodeVoxelXZ)
+                * 0.999;
+            for (int paOz = -1; paOz <= 1; paOz++) {
+                for (int paOy = -1; paOy <= 1; paOy++) {
+                    for (int paOx = -1; paOx <= 1; paOx++) {
+                        vec3 paQ = paNode + vec3(float(paOx), float(paOy), float(paOz)) * paHalf;
+                        float paRefDistance;
+                        float paRef = paStormFieldReferenceFloorAt(paQ, paRefDistance);
+                        paRefMin = min(paRefMin, paRef);
+                        paRefMaterial = paRefMaterial + (paRef < 1.0 ? 1.0 : 0.0);
+                        if (paNodeUnionDistance < 1.0e8 && paRefDistance < 1.0e8) {
+                            float paDrop = paNodeUnionDistance - paRefDistance;
+                            if (paOy == 0 && (paOx != 0 || paOz != 0)) {
+                                paLipschitzXZ = max(paLipschitzXZ,
+                                    paDrop / length(vec2(float(paOx), float(paOz)) * paHalf.xz));
+                            }
+                            if (paOx == 0 && paOz == 0 && paOy != 0) {
+                                paLipschitzY = max(paLipschitzY, paDrop / paHalf.y);
+                            }
+                        }
+                    }
+                }
+            }
+            for (int paJ = 0; paJ < 16; paJ++) {
+                vec3 paSeed = vec3(paNodeFrag, paJ) * vec3(0.1031, 0.1030, 0.0973);
+                paSeed = fract(paSeed);
+                paSeed = paSeed + dot(paSeed, paSeed.yxz + 33.33);
+                vec3 paJitter = fract((paSeed.xxy + paSeed.yxx) * paSeed.zyx) * 2.0 - 1.0;
+                vec3 paQ = paNode + paJitter * paHalf;
+                float paRefDistance;
+                float paRef = paStormFieldReferenceFloorAt(paQ, paRefDistance);
+                paRefMin = min(paRefMin, paRef);
+                paRefMaterial = paRefMaterial + (paRef < 1.0 ? 1.0 : 0.0);
+            }
+            // A packs the material-sample count (integer thousands) with the
+            // vertical constant, so four channels carry five numbers exactly.
+            fragColor = vec4(
+                paNodeFloor,
+                paRefMin,
+                paNodeSlack,
+                paRefMaterial * 1000.0 + min(paLipschitzY, 998.0));
+            gl_FragDepth = 0.0;
+            return;
+        }
+        fragColor = paNodeValue;
+        gl_FragDepth = 0.0;
+        return;
+    }
+    if (PaRainFieldPass == 1 && PaRainGateField != 0) {
+        // T203. The rain gate field's build pass: one fragment per column
+        // cell of the weather domain, the cell's proofs and bounds written
+        // in place of T188's triple. Sits above the T188 build so a program
+        // with the gate baked on never compiles the old field's build.
+        ivec2 paGateGrid = textureSize(WeatherMapSampler, 0);
+        vec2 paGateHalf = (WeatherExtent / vec2(paGateGrid)) * 0.5;
+        fragColor = paRainGateBuildCell(
+            WeatherOrigin + texCoord * WeatherExtent, paGateHalf);
+        gl_FragDepth = 0.0;
+        return;
+    }
+    if (PaRainFieldPass == 1) {
+        vec2 fieldWorldXZ = WeatherOrigin + texCoord * WeatherExtent;
+        float fieldAttachY;
+        bool fieldOwnsGroup;
+#ifdef PA_ARM_FIELD_SLICES
+        // T194 Task 5. Price a 3D field build without building one.
+        //
+        // Every fragment of this 512x512 pass sweeps PA_ARM_FIELD_SLICES
+        // heights through the cloud slab and evaluates the production density
+        // at each, so the draw performs exactly 512 * 512 * slices voxel
+        // evaluations. Nothing is stored: the question is what generating a
+        // volume of this size costs, and storing it would only add bandwidth to
+        // a number that is already dominated by descriptor traversal.
+        //
+        // The accumulator is written to fragColor so no slice can be folded
+        // away, which is the same reason T141's amplification arm exists.
+        float paSliceAccum = 0.0;
+        float paSliceSpan = max(SlabTopY - SlabBaseY, 1.0);
+        for (int paSlice = 0; paSlice < PA_ARM_FIELD_SLICES; paSlice++) {
+            float paSliceY = SlabBaseY
+                + paSliceSpan * ((float(paSlice) + 0.5)
+                    / float(PA_ARM_FIELD_SLICES));
+            paSliceAccum += cloudDensity(
+                vec3(fieldWorldXZ.x, paSliceY, fieldWorldXZ.y),
+                0.0,
+                false,
+                false,
+                false
+            );
+        }
+        fragColor = vec4(paSliceAccum, 0.0, 0.0, 1.0);
+        gl_FragDepth = 0.0;
+        return;
+#endif
+        float fieldSupport = directStormRainSupportAt(
+            fieldWorldXZ, fieldAttachY, fieldOwnsGroup);
+        // T188 wrote alpha as a constant 1.0 marker that nothing read, so the
+        // certainty flag costs no extra channel, no extra texture and no extra
+        // byte per texel.
+        float fieldMixed = 1.0;
+        if (PaRainFieldConservative == 1) {
+            // T190 Task 2. Classification happens here, once per cell per
+            // frame, and never in the ray loop.
+            //
+            // A cell is safe only if the three quantities the ray actually
+            // decides on are uniform across it: descriptor ownership, which
+            // side of the support cutoff the column falls, and the attach
+            // height. The weather and morphology terms are excluded on purpose
+            // - localRainSupportAt samples those directly and they never come
+            // from the field, so they cannot be a source of field error.
+            //
+            // The cell grid is read from the weather map rather than from the
+            // field: the field is the render target of this very pass, and
+            // sampling a bound target is undefined. They are the same size by
+            // construction, which the sandbox asserts.
+            ivec2 paCellGrid = textureSize(WeatherMapSampler, 0);
+            vec2 paCellHalf = (WeatherExtent / vec2(paCellGrid)) * 0.5;
+            if (PaRainFieldClosedForm == 1
+                    && paCellProvablyUnowned(
+                        fieldWorldXZ - paCellHalf,
+                        fieldWorldXZ + paCellHalf)) {
+                // T192. Proven dry by one squared inequality per lobe.
+                // T190 paid four extra directStormRainSupportAt calls on
+                // every cell to reach this by sampling; the great
+                // majority of cells are nowhere near a storm.
+                fieldMixed = 0.0;
+            } else {
+                fieldMixed = paClassifyCellByCorners(
+                    fieldWorldXZ, paCellHalf, fieldSupport, fieldAttachY,
+                    fieldOwnsGroup);
+            }
+        }
+        fragColor = vec4(
+            fieldSupport, fieldAttachY, fieldOwnsGroup ? 1.0 : 0.0, fieldMixed);
+        gl_FragDepth = 0.0;
+        return;
+    }
     if (paRayTraceActive()) {
         paTraceIteration = int(gl_FragCoord.x);
         paTraceStage = int(gl_FragCoord.y);
@@ -5730,6 +8702,24 @@ void main() {
     float coarseStepCap = min(112.0, fineStep * 16.0);
 #endif
 
+#ifdef PA_ARM_FOOTPRINT
+    // Per fragment, not per step. This is the only division the footprint LOD
+    // performs on the whole ray.
+    float paFootprintCoefficient = paFootprintGrowthCoefficient(fineStep);
+#endif
+#ifdef PA_ARM_DETAIL_FOOTPRINT
+    // 22.7 and 8.4 blocks are the packed wavelengths the existing T149 graded
+    // path already names for the base and fine detail lookups.
+    {
+        float baseCutoff =
+            paDetailFootprintCoefficient(22.7) / PA_ARM_DETAIL_FOOTPRINT;
+        float fineCutoff =
+            paDetailFootprintCoefficient(8.4) / PA_ARM_DETAIL_FOOTPRINT;
+        paDetailCutoffDistSq = baseCutoff * baseCutoff;
+        paDetailFineCutoffDistSq = fineCutoff * fineCutoff;
+    }
+#endif
+
     float cosTheta = dot(rayDir, LightDir);
 
     float originJitterDistance = min(
@@ -5750,6 +8740,167 @@ void main() {
         paMrBaseStep = baseStep;
         paMrOriginJitter = searchBlue * originJitterDistance;
     }
+#ifdef PA_RAIN_PASS
+    // T205. The rain pass. Everything above - the ray, the slab, the scene
+    // clip, the coverage pretest, the strides and the search jitter - is
+    // the cloud march's own setup, so this march starts where the cloud
+    // march starts and rejects the rays it rejects. It walks the coarse
+    // stride only (the cloud march keeps rain on coarse strides by
+    // construction: a precipitation sample resets sinceHit to 100), asks
+    // the segment test on every step, and integrates the shaft's radiance
+    // against its own transmittance. What it cannot know is the cloud's
+    // transmittance at the rain, so it exports the rain's mass-weighted
+    // depth beside its radiance and total transmittance, and the split
+    // cloud program composites the two at that depth against its live
+    // transmittance. Exact wherever rain and body do not share a step.
+    {
+        float rpTransmittance = 1.0;
+        vec3 rpAccumulated = vec3(0.0);
+        float rpWeightedT = 0.0;
+        float rpWeightSum = 0.0;
+        float rpT = t;
+        for (int rpI = 0; rpI < paStepCap; rpI++) {
+            if (rpT >= t1 || rpTransmittance < 0.015) {
+                break;
+            }
+            float rpGrowth = 1.0 + (rpT / max(MaxRenderDistance, 1.0)) * 2.2;
+            float rpStep = min(min(coarseStep * rpGrowth, coarseStepCap), t1 - rpT);
+            vec3 rpP = CameraPos + rayDir * rpT;
+#ifdef PA_RAIN_PASS_FINE
+            // The cloud march samples rain finely for six steps after a body
+            // sample - the band just under the base where rain attaches -
+            // and coarsely everywhere else; run 2's coarse-only pass lost
+            // 22-36% of the mask's thin rain there. The gate cell's attach
+            // bound marks that band without a body walk: fine stride from
+            // PA_RAIN_PASS_FINE_BAND blocks below the cell's highest attach
+            // height to just above it, on cells the gate could not prove dry.
+            vec4 rpCell;
+            if (paRainGateCellAt(rpP.xz, rpCell)
+                    && (int(rpCell.r + 0.5) & PA_RAIN_GATE_DRY) == 0
+                    && rpP.y > rpCell.b - PA_RAIN_PASS_FINE_BAND
+                    && rpP.y < rpCell.b + 8.0) {
+                rpStep = min(fineStep * (cameraInsideCloud ? rpGrowth : 1.0), t1 - rpT);
+            }
+#endif
+            vec3 rpEnd = CameraPos + rayDir * (rpT + rpStep);
+            float rpRain = 0.0;
+            if (PuffDensityStage == 0 && rainSegmentMayContribute(rpP, rpEnd)) {
+                rpRain = rainShaftDensityOverSegment(rpP, rpEnd, 0.0) * DensityMul;
+            }
+#ifdef PA_RAIN_MASK_OUTPUT
+            paRainMassAccum += rpRain * rpStep * rpTransmittance;
+            bool rpActiveNow = rpRain > 0.0008;
+            if (rpActiveNow) {
+                if (paRainOnsetY < 0.0) {
+                    paRainOnsetY = rpP.y;
+                }
+                paRainTerminationY = rpP.y;
+                if (!paRainPrevActive) {
+                    paRainRuns += 1.0;
+                }
+            }
+            paRainPrevActive = rpActiveNow;
+#endif
+            if (rpRain > 0.0008) {
+                // The cloud march's own classification of a precipitation
+                // sample, line for line: the raster base and top for the
+                // ambient height, the local storm and darkness scalars, the
+                // rain fraction of a sample below the base.
+                vec4 rpWeather = sampleWeather(rpP.xz);
+                vec4 rpMorphology = sampleMorphology(rpP.xz);
+                float rpSlabSpan = max(SlabTopY - SlabBaseY, 1.0);
+                float rpBaseY = SlabBaseY + rpWeather.g * rpSlabSpan;
+                float rpTopY = SlabBaseY + rpWeather.b * rpSlabSpan;
+                int rpProfileId = cloudProfileId(rpMorphology);
+                float rpPuffHeight01 = 0.0;
+                bool rpDirectPuffBody = rpProfileId == 3
+                    && PuffShapeMode != 0
+                    && dominantDirectPuffHeightAt(rpP, rpPuffHeight01);
+                float rpH01 = rpDirectPuffBody
+                    ? rpPuffHeight01
+                    : saturate((rpP.y - rpBaseY) / max(rpTopY - rpBaseY, 2.0));
+                float rpDarkness = rpMorphology.b;
+                float rpStorm = 0.0;
+                if (rpProfileId == 4 || rpProfileId == 7) {
+                    rpStorm = 0.20 + rpWeather.a * 0.52;
+                } else if (rpProfileId == 5) {
+                    rpStorm = rpMorphology.a * 0.52;
+                }
+                rpStorm = saturate(rpStorm + rpMorphology.a * 0.16);
+                float rpRainFraction = rpDirectPuffBody
+                    ? 0.0
+                    : saturate(0.25 + max(rpMorphology.a, MaxPrecipitation) * 0.75);
+                float rpExtinction = rpRain * ExtinctionScale;
+                float rpStepTrans = exp(-rpExtinction * rpStep);
+                paLodDistance01 = saturate(rpT / MaxRenderDistance);
+                paLodTransmittance = rpTransmittance;
+                paLodRayVerticality = abs(rayDir.y);
+                float rpUnusedOpticalDepth = 0.0;
+                vec3 rpRadiance = sampleLighting(
+                    rpP,
+                    rpRain,
+                    rpH01,
+                    cosTheta,
+                    saturate(rpT / MaxRenderDistance),
+                    rpStorm,
+                    rpDarkness,
+                    rpRainFraction,
+                    cameraStartsInsideSlab,
+                    cameraInsideCloud,
+                    rpUnusedOpticalDepth
+                );
+                float rpAlpha = rpTransmittance * (1.0 - rpStepTrans);
+                rpAccumulated += rpRadiance * rpAlpha;
+                rpWeightedT += rpT * rpAlpha;
+                rpWeightSum += rpAlpha;
+                rpTransmittance *= rpStepTrans;
+            }
+            rpT += rpStep;
+        }
+        float rpMeanT = rpWeightSum > 0.0 ? rpWeightedT / rpWeightSum : t1;
+        gl_FragDepth = 1.0;
+#ifdef PA_RAIN_MASK_OUTPUT
+        // The mask's four channels with the depth folded into the run
+        // count's spare range, so the split cloud's mask can weight the
+        // mass by its transmittance at the rain.
+        fragColor = vec4(
+            paRainMassAccum,
+            max(paRainOnsetY, 0.0),
+            max(paRainTerminationY, 0.0),
+            paRainRuns * 4096.0 + floor(clamp(rpMeanT / MaxRenderDistance, 0.0, 1.0) * 4095.0 + 0.5));
+#else
+        fragColor = vec4(
+            rpAccumulated,
+            paRainPassPack(rpMeanT / MaxRenderDistance, rpTransmittance));
+#endif
+        return;
+    }
+#endif
+#ifdef PA_RAIN_SPLIT_COMPOSITE
+    // T205. The split cloud program: the rain pass's result for this pixel,
+    // composited at the rain's depth against the live transmittance below.
+    vec4 rainSplitIn = texelFetch(RainPassSampler, ivec2(gl_FragCoord.xy), 0);
+#ifdef PA_RAIN_MASK_OUTPUT
+    float rainSplitInMass = rainSplitIn.r;
+    float rainSplitInRuns = floor(rainSplitIn.a / 4096.0);
+    float rainSplitT = (rainSplitIn.a - rainSplitInRuns * 4096.0) / 4095.0 * MaxRenderDistance;
+    vec3 rainSplitRgb = vec3(0.0);
+    float rainSplitTr = 1.0;
+    bool rainSplitPending = rainSplitInMass > 0.0;
+#else
+    vec2 rainSplitDepthTr = paRainPassUnpack(rainSplitIn.a);
+    float rainSplitT = rainSplitDepthTr.x * MaxRenderDistance;
+    vec3 rainSplitRgb = rainSplitIn.rgb;
+    float rainSplitTr = rainSplitDepthTr.y;
+    float rainSplitInMass = 0.0;
+    bool rainSplitPending = rainSplitTr < 0.9998 || dot(rainSplitRgb, vec3(1.0)) > 0.0;
+#endif
+    // T207. The body's state at the rain's depth, exported by a temporal
+    // phase instead of composited (PaTemporalPhase != 0).
+    vec3 rainSplitBeforeRgb = vec3(0.0);
+    float rainSplitBeforeT = 1.0;
+    bool rainSplitDeferred = false;
+#endif
     float lastClearT = t0;
     bool hasClearBracket = true;
     float transmittance = 1.0;
@@ -5887,6 +9038,23 @@ void main() {
             paMrFlags |= PA_MR_EXECUTED | (fine ? PA_MR_FINE_AT_ENTRY : 0);
         }
         float distanceGrowth = 1.0 + (t / max(MaxRenderDistance, 1.0)) * 2.2;
+#ifdef PA_ARM_FOOTPRINT
+        // One multiply and one clamp. Everything else was hoisted.
+        float paFootprintGrowth = clamp(
+            paFootprintCoefficient * t, 1.0, PA_ARM_FOOTPRINT_MAX);
+        float stepLength = fine
+            ? fineStep * (cameraInsideCloud ? distanceGrowth : paFootprintGrowth)
+            : min(coarseStep * distanceGrowth, coarseStepCap);
+#else
+#ifdef PA_ARM_STEP_CURVE
+        float paCurveGrowth = paGradedStepGrowth(
+            t / max(MaxRenderDistance, 1.0),
+            distanceGrowth,
+            paStepFootprintPixels(t, fineStep));
+        float stepLength = fine
+            ? fineStep * (cameraInsideCloud ? distanceGrowth : paCurveGrowth)
+            : min(coarseStep * distanceGrowth, coarseStepCap);
+#else
 #ifdef PA_ARM_DISTANCE_STEP
         // PM idea A. Production already grows the coarse tier with distance and
         // the fine tier only when the camera is inside cloud; this arm gives the
@@ -5902,8 +9070,38 @@ void main() {
             ? fineStep * (cameraInsideCloud ? distanceGrowth : 1.0)
             : min(coarseStep * distanceGrowth, coarseStepCap);
 #endif
+#endif
+#endif
         // Never integrate optical depth past the scene/slab ray endpoint.
         stepLength = min(stepLength, t1 - t);
+#ifdef PA_RAIN_SPLIT_COMPOSITE
+        if (rainSplitPending && rainSplitT < t + stepLength) {
+            // The rain lies in this step: it sees the cloud in front of it
+            // and attenuates what follows. One composite, sub-step ordering
+            // resolved to before the step's own material.
+            if (PaTemporalPhase != 0) {
+                // T207. Deferred: the resolve composites the current frame's
+                // rain at this point from the exported (before, T_before).
+                rainSplitBeforeRgb = accumulated;
+                rainSplitBeforeT = transmittance;
+                rainSplitDeferred = true;
+            } else {
+            accumulated += rainSplitRgb * transmittance;
+            float rainSplitAlpha = transmittance * (1.0 - rainSplitTr);
+            weightedT += rainSplitT * rainSplitAlpha;
+            weightSum += rainSplitAlpha;
+#ifdef PA_RAIN_MASK_OUTPUT
+            // The reference mask never integrates rain behind a ray it has
+            // already terminated (transmittance under 0.015), so the split
+            // mask applies the same rule: run 1 counted that invisible rain
+            // as 1,762 "false" pixels the frame comparison could not see.
+            paRainMassAccum = transmittance >= 0.015 ? rainSplitInMass * transmittance : 0.0;
+#endif
+            transmittance *= rainSplitTr;
+            }
+            rainSplitPending = false;
+        }
+#endif
 
         // Consume expired oracle intervals. A zero channel is the terminator;
         // an overflow flag invalidates the cell in the Java report rather
@@ -6006,6 +9204,21 @@ void main() {
             // AABB entries could exhaust the march before the ray endpoint.
             sinceHit = 0;
             fine = true;
+#ifdef PA_ARM_FOOTPRINT
+            stepLength = fineStep
+                * (cameraInsideCloud
+                    ? distanceGrowth
+                    : clamp(paFootprintCoefficient * t, 1.0, PA_ARM_FOOTPRINT_MAX));
+#else
+#ifdef PA_ARM_STEP_CURVE
+            stepLength = fineStep
+                * (cameraInsideCloud
+                    ? distanceGrowth
+                    : paGradedStepGrowth(
+                        t / max(MaxRenderDistance, 1.0),
+                        distanceGrowth,
+                        paStepFootprintPixels(t, fineStep)));
+#else
 #ifdef PA_ARM_DISTANCE_STEP
             stepLength = fineStep
                 * (cameraInsideCloud
@@ -6014,6 +9227,8 @@ void main() {
 #else
             stepLength = fineStep
                 * (cameraInsideCloud ? distanceGrowth : 1.0);
+#endif
+#endif
 #endif
             stepLength = min(stepLength, t1 - t);
         }
@@ -6065,9 +9280,44 @@ void main() {
             int paProbeRoleMask;
             float paUnionDistance;
             float paMinClearance;
-            directStormShape(
-                p, paProbeOwned, paProbeHeight01, paProbeStrength, paProbeRoleMask,
-                paUnionDistance, paMinClearance);
+#ifdef PA_ARM_NO_REFINE
+            // T181 Task 5 ceiling, mandatory. The union-distance refinement is
+            // the largest descriptor consumer at 32% of group walks, and it had
+            // never been priced. Removing it uniformly leaves no clearance to
+            // advance on, so the ray falls through to the empty-span scan every
+            // time. Image-invalid by construction and a bound only.
+            paProbeOwned = false;
+            paProbeHeight01 = 0.0;
+            paProbeStrength = 0.0;
+            paProbeRoleMask = 0;
+            paUnionDistance = 0.0;
+            paMinClearance = 0.0;
+#else
+            // T202. Bit 32: the clearance floor of the node whose cell holds
+            // p, one texel fetch, in place of the walk. The floor is at most
+            // the walk's value anywhere in the cell, so the safe advance
+            // below can only shorten and never steps over material the walk
+            // would have stopped for. An uncovered node walks as before.
+            bool paRefineFromField = false;
+            if ((PaStormFieldEnabled & 32) != 0) {
+                paRefineFromField = paStormFieldClearanceAt(p, paMinClearance);
+                paProbeOwned = false;
+                paProbeHeight01 = 0.0;
+                paProbeStrength = 0.0;
+                paProbeRoleMask = 0;
+                paUnionDistance = 1.0e9;
+            }
+            if (!paRefineFromField) {
+                paDensityConsumer = 5;
+                directStormShape(
+                    p, paProbeOwned, paProbeHeight01, paProbeStrength, paProbeRoleMask,
+                    paUnionDistance, paMinClearance);
+                paDensityConsumer = 0;
+            }
+#endif
+            if (paWorkloadCaptureActive()) {
+                paRefineEvents++;
+            }
             // Per descriptor, not per group and not global. Every descriptor in
             // this fixture - BASE, CORE, TOWER and ANVIL - belongs to one
             // group, so a per-group bound would take the group's widest
@@ -6115,6 +9365,39 @@ void main() {
                 // found is still found. Dropping the scan and trusting the
                 // bracket refinement alone is what is unsafe - measured offline
                 // it skipped material on every ray, 1.4 to 39.2 blocks of it.
+#ifdef PA_ARM_FOOTPRINT
+                // The empty-span scan probes the lattice the fine march would
+                // have sampled, so it has to move with it or its safety
+                // argument stops holding.
+                float paScanStep = fineStep
+                    * (cameraInsideCloud
+                        ? distanceGrowth
+                        : clamp(paFootprintCoefficient * t, 1.0, PA_ARM_FOOTPRINT_MAX));
+#else
+#ifdef PA_ARM_STEP_CURVE
+#ifdef PA_ARM_SCAN_LATTICE_FIXED
+                // The empty-span scan's safety argument is that it probes
+                // exactly the lattice the fine march would have sampled, so
+                // anything the fine march would have found is still found.
+                // Widening the fine step widens that lattice too, which
+                // silently weakens the guarantee - the scan can then declare a
+                // span empty that a production-width march would have hit.
+                // This arm holds the scan at production spacing while the
+                // integration step still grows, to separate how much of the
+                // measured thin-material loss comes from the scan rather than
+                // from coarser integration.
+                float paScanStep = fineStep
+                    * (cameraInsideCloud ? distanceGrowth : 1.0);
+#else
+                float paScanStep = fineStep
+                    * (cameraInsideCloud
+                        ? distanceGrowth
+                        : paGradedStepGrowth(
+                            t / max(MaxRenderDistance, 1.0),
+                            distanceGrowth,
+                            paStepFootprintPixels(t, fineStep)));
+#endif
+#else
 #ifdef PA_ARM_DISTANCE_STEP
                 float paScanStep = fineStep
                     * (cameraInsideCloud
@@ -6123,6 +9406,8 @@ void main() {
 #else
                 float paScanStep = fineStep
                     * (cameraInsideCloud ? distanceGrowth : 1.0);
+#endif
+#endif
 #endif
                 // The evidence arm takes no probes, so the scan cannot advance
                 // and the branch below falls through to a single fine step -
@@ -6133,31 +9418,140 @@ void main() {
                 float paLastEmptyOffset = 0.0;
                 float paScanProbeCount = 0.0;
                 bool paScanFoundMaterial = false;
+                if (paWorkloadCaptureActive()) {
+                    paScanEvents++;
+                }
+#ifdef PA_ARM_NO_PROBE
+                // T180 Task 4 ceiling. The whole empty-span probe scan removed
+                // uniformly at compile time, for every lane. The march then
+                // falls back to a single fine step, exactly the pre-scan
+                // behaviour, so this is image-invalid and bounds the class.
+                for (int paProbe = 1; paProbe <= 0; paProbe++) {
+#elif defined(PA_ARM_PROBE_CAP)
+                // T181 Task 1. A uniform compile-time cap. The loop already
+                // exits early on material or span end, so this only binds on
+                // the scans that would have run past the new cap - which is
+                // precisely what the distribution counters measure.
+                for (int paProbe = 1; paProbe <= PA_ARM_PROBE_CAP; paProbe++) {
+#else
                 for (int paProbe = 1; paProbe <= PA_EMPTY_SPAN_PROBES; paProbe++) {
+#endif
                     float paProbeOffset = float(paProbe) * paScanStep;
                     if (paProbeOffset > paScanSpan) {
                         break;
                     }
                     float paProbeT = t + paProbeOffset;
                     paScanProbeCount = float(paProbe);
-                    float paProbeDensity = cloudDensity(
+                    paDensityConsumer = 3;
+                    float paProbeDensity;
+                    if ((PaStormFieldEnabled & 2) != 0) {
+                        // T196. The probe asks the field. The verdict is a
+                        // sound over-approximation of production's, so the
+                        // scan can never advance over material production
+                        // would have found; the audit below, monolith only
+                        // and capture only, counts the two disagreement
+                        // classes against production evaluated beside it.
+                        vec3 paProbePoint = CameraPos + rayDir * paProbeT;
+                        bool paProbePossible = paStormFieldMaterialPossible(paProbePoint);
+                        paProbeDensity = paProbePossible ? 1.0 : 0.0;
+                        // Only the audit view pays for production here, so
+                        // every other view sees the field workload alone and
+                        // the probe attribution measures what the ray runs.
+                        if (paWorkloadCaptureActive() && DebugView == 67) {
+                            float paProbeProduction = cloudDensity(
+                                paProbePoint, 0.0, DetailQuality > 0,
+                                paProbeT < 220.0 && !cameraInsideCloud, false);
+                            bool paProbeMaterial = paProbeProduction > 0.0008;
+                            if (paWorkloadCaptureActive()) {
+                                paStormFieldFalseEmpty += (!paProbePossible && paProbeMaterial) ? 1 : 0;
+                            }
+                            if (paWorkloadCaptureActive()) {
+                                paStormFieldFalseOccupied += (paProbePossible && !paProbeMaterial) ? 1 : 0;
+                            }
+                            if (paWorkloadCaptureActive()) {
+                                paStormFieldAgreeEmpty += (!paProbePossible && !paProbeMaterial) ? 1 : 0;
+                            }
+                            if (paWorkloadCaptureActive()) {
+                                paStormFieldAgreeOccupied += (paProbePossible && paProbeMaterial) ? 1 : 0;
+                            }
+                        }
+                    } else {
+                    paProbeDensity = cloudDensity(
                         CameraPos + rayDir * paProbeT,
                         0.0,
+#ifdef PA_ARM_PROBE_NO_DETAIL
+                        // T180 Task 5. The probe asks one question:
+                        // "is density here above 0.0008". Detail is subtractive
+                        // erosion - max(body - (1-fbm)*EROSION, 0) - so
+                        // suppressing it can only RAISE the value tested.
+                        // A probe that overestimates density finds material no
+                        // later than production does, so the scan can never
+                        // advance over material it would have found. Cheaper
+                        // and conservative in the safe direction.
+                        false,
+#else
                         DetailQuality > 0,
+#endif
                         paProbeT < 220.0 && !cameraInsideCloud,
                         false
                     );
+                    }
+                    paDensityConsumer = 0;
                     if (paProbeDensity > 0.0008) {
                         paScanFoundMaterial = true;
                         break;
                     }
                     paLastEmptyOffset = paProbeOffset;
                 }
+#ifdef PA_ARM_FIELD_LOOKUP
+                // T195 Task 7. The probe scan's lookup cost, on the flow the
+                // no-probe ceiling already bounds. A field-driven scan would
+                // take one fetch per probe on the lattice above and stop at
+                // material; production averages 11.3 (SIDE) to 12.5 (FAR)
+                // probes per scan event, so PA_ARM_FIELD_LOOKUP fetches per
+                // event, bounded by the span exactly as the probes are, is
+                // at or above what a real field would pay. The sink reaches
+                // the march through a uniform uploaded as exactly zero, so
+                // the fetches are executed and the advance is unchanged.
+                float paStandInSink = 0.0;
+                for (int paStandIn = 1; paStandIn <= PA_ARM_FIELD_LOOKUP; paStandIn++) {
+                    float paStandInOffset = float(paStandIn) * paScanStep;
+                    if (paStandInOffset > paScanSpan) {
+                        break;
+                    }
+                    paStandInSink += paFieldStandInFetch(
+                        CameraPos + rayDir * (t + paStandInOffset)).g;
+                }
+                paLastEmptyOffset += paStandInSink * PaDiagnosticEvalEpsilon;
+#endif
                 if (paCap) {
                     paMrScanProbes = paScanProbeCount;
                     paMrScanAdvance = paLastEmptyOffset;
                     paMrScanHitMaterial = paScanFoundMaterial ? 1.0 : 0.0;
                     paMrScanSpan = paScanSpan;
+                }
+                int paScanUsed = int(paScanProbeCount);
+                if (paWorkloadCaptureActive()) {
+                    paScanFoundMaterialCount += paScanFoundMaterial ? 1 : 0;
+                }
+                if (paWorkloadCaptureActive()) {
+                    paScanWastedProbes += paScanFoundMaterial ? paScanUsed : 0;
+                }
+                if (paWorkloadCaptureActive()) {
+                    paScanCapReached += (!paScanFoundMaterial
+                        && paScanUsed >= PA_EMPTY_SPAN_PROBES) ? 1 : 0;
+                }
+                if (paWorkloadCaptureActive()) {
+                    paScanProbes1To2 += (paScanUsed >= 1 && paScanUsed <= 2) ? 1 : 0;
+                }
+                if (paWorkloadCaptureActive()) {
+                    paScanProbes3To4 += (paScanUsed >= 3 && paScanUsed <= 4) ? 1 : 0;
+                }
+                if (paWorkloadCaptureActive()) {
+                    paScanProbes5To8 += (paScanUsed >= 5 && paScanUsed <= 8) ? 1 : 0;
+                }
+                if (paWorkloadCaptureActive()) {
+                    paScanProbes9To16 += paScanUsed >= 9 ? 1 : 0;
                 }
                 if (paLastEmptyOffset > paScanStep) {
                     // Crossed in one iteration, having sampled every fine-lattice
@@ -6184,8 +9578,18 @@ void main() {
             }
         }
         vec3 segmentEnd = CameraPos + rayDir * (t + stepLength);
+#ifdef PA_ARM_NO_RAIN_SEGMENT
+        // T182 Task 7 ceiling. rainSegmentMayContribute runs on every coarse
+        // step and, when MaxPrecipitation clears its gate, evaluates
+        // localRainSupportAt twice - each a full descriptor walk plus a
+        // complete candidate/group union in directStormShape. Removing it
+        // uniformly prices the whole class. Image-invalid wherever rain
+        // actually contributes, so a bound only.
+        bool localRainSegment = false;
+#else
         bool localRainSegment = PuffDensityStage == 0
             && rainSegmentMayContribute(p, segmentEnd);
+#endif
         if (paCap) {
             paMrStepLength = stepLength;
             paMrFlags |= (fine ? PA_MR_FINE_FINAL : 0)
@@ -6249,12 +9653,156 @@ void main() {
         // separate deterministic segment integral and can never force the
         // body marcher into a fine-step curtain below the cloud.
         paTraceCapture = paCap;
-        float bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
+        // T177. Everything the primary body call resolves is what a light tap
+        // spawned from this sample could reuse.
+        paCapturePrimaryGroups = true;
+        paDensityConsumer = 1;
+#ifdef PA_ARM_DENSITY_EVERY_2
+        // T175 ceiling. Every second primary step reuses the previous body
+        // density instead of evaluating it. Halves primary density calls while
+        // leaving the march structure, the step sizes and the lighting alone,
+        // so it prices "sample occupied material less often" on its own.
+        //
+        // Visually invalid by construction and never a candidate: it is a
+        // nearest-neighbour hold, not the interpolation a real design would use.
+        float bodyDensity;
+        if ((primaryStepParity & 1) == 0) {
+            bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
+            primaryHeldDensity = bodyDensity;
+        } else {
+            bodyDensity = primaryHeldDensity;
+        }
+        primaryStepParity++;
+#elif defined(PA_ARM_PRIMARY_FIELD_DENSITY)
+        // T201 ceiling. The primary body density is the shared field's own
+        // node density (A, the detail-free T196 value, one trilinear read)
+        // instead of the exact evaluation, so the march keeps its structure -
+        // steps, early-outs, the lighting spawned from occupied samples - and
+        // the delta prices the exact primary evaluation alone. Visually
+        // invalid (a 16-block node is not the body), never a candidate.
+        float bodyDensity = paStormFieldDensityAt(p);
+        bool paPrimaryCovered = true;
+#elif defined(PA_PRIMARY_DINTERP)
+        // T202 representation oracle: the distance-interpolated body, eight
+        // build-mode walks a sample. Quality only.
+        float bodyDensity = paStormDInterpOracleDensityAt(p, DetailQuality > 0, nearCamera);
+        bool paPrimaryCovered = true;
+#else
+        // T202. Bit 16: the body from the field's threshold and height with
+        // the noise, detail and erosion evaluated here, in place of the
+        // descriptor walk; an uncovered node evaluates exactly as before.
+        float bodyDensity;
+        bool paPrimaryCovered = true;
+        if ((PaStormFieldEnabled & 16) != 0) {
+            bodyDensity = paStormFieldPrimaryDensityAt(
+                p, DetailQuality > 0, nearCamera, paPrimaryCovered);
+        }
+        if ((PaStormFieldEnabled & 16) == 0 || !paPrimaryCovered) {
+            bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
+        }
+#endif
+#ifdef PA_PRIMARY_AUDIT
+        // T202 Task 3. The exact density beside the field's at every primary
+        // sample, accumulated per pixel; the march itself integrates the
+        // field's value, so the structure audited is the candidate's.
+        {
+            float paPaExact = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
+            float paPaErr = bodyDensity - paPaExact;
+            paPaCount += 1.0;
+            paPaSumErr += paPaErr;
+            paPaSumAbs += abs(paPaErr);
+            paPaSumSq += paPaErr * paPaErr;
+            paPaMaxAbs = max(paPaMaxAbs, abs(paPaErr));
+            paPaOver += paPaErr > 1.0e-6 ? 1.0 : 0.0;
+            paPaUnder += paPaErr < -1.0e-6 ? 1.0 : 0.0;
+            bool paPaExactZero = paPaExact <= 0.0;
+            bool paPaFieldZero = bodyDensity <= 0.0;
+            paPaZeroDisagree += paPaExactZero != paPaFieldZero ? 1.0 : 0.0;
+            paPaExactZeroFieldNot += (paPaExactZero && !paPaFieldZero) ? 1.0 : 0.0;
+            paPaFieldZeroExactNot += (!paPaExactZero && paPaFieldZero) ? 1.0 : 0.0;
+            paPaMaterialDisagree +=
+                (paPaExact > 0.0008) != (bodyDensity > 0.0008) ? 1.0 : 0.0;
+            paPaFallback += paPrimaryCovered ? 0.0 : 1.0;
+            paPaExactSum += paPaExact;
+            paPaFieldSum += bodyDensity;
+            if (paPaExact > 0.0 && paPaExact <= 0.05 * DensityMul) {
+                paPaEdgeCount += 1.0;
+                paPaEdgeSumAbs += abs(paPaErr);
+            }
+        }
+#endif
+        paCapturePrimaryGroups = false;
+        paDensityConsumer = 0;
         paTraceCapture = false;
+        // Each bin is incremented under its own guard rather than inside an
+        // else-if chain, so every increment is provably unreachable in a
+        // production frame - the T123 instrumentation invariant checks exactly
+        // that, and a chain would put the later branches out of its sight.
+        bool paMaterialNow = bodyDensity > 0.0008;
+        if (paWorkloadCaptureActive()) {
+            paPrimaryDensityCalls++;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryDensityZero += bodyDensity <= 0.0 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryDensityNegligible += (bodyDensity > 0.0 && !paMaterialNow) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryDensityLow += (paMaterialNow && bodyDensity <= 0.05) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryDensityMedium += (bodyDensity > 0.05 && bodyDensity <= 0.25) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryDensityHigh += bodyDensity > 0.25 ? 1 : 0;
+        }
+        // Runs are counted by transition so the average length is derived from
+        // real data rather than assumed to be geometric.
+        if (paWorkloadCaptureActive()) {
+            paPrimaryMaterialRuns += (paMaterialNow && !paPrimaryPrevMaterial) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryZeroRuns += (!paMaterialNow && paPrimaryPrevMaterial) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryPrevMaterial = paMaterialNow;
+        }
+#ifdef PA_ARM_SHAFT_RUNTIME_FALSE
+        // T204 Task 3. The shaft compiled in full and never executed: the
+        // predicate is conjoined with a live uniform uploaded as zero, which
+        // the compiler cannot fold, so the code's presence is paid and its
+        // execution is not. Image-invalid (no rain); a bound.
+        float rainDensity = (localRainSegment && PaDiagnosticEvalEpsilon < -0.5)
+            ? rainShaftDensityOverSegment(p, segmentEnd, 0.0) * DensityMul
+            : 0.0;
+#else
         float rainDensity = localRainSegment
             ? rainShaftDensityOverSegment(p, segmentEnd, 0.0) * DensityMul
             : 0.0;
+#endif
         float density = bodyDensity + rainDensity;
+#ifdef PA_RAIN_MASK_OUTPUT
+        {
+            // Optical mass, not raw density: what the frame would actually show
+            // is the rain that survives the transmittance in front of it, and
+            // thin-rain retention is meaningless measured on occluded shafts.
+            paRainMassAccum += rainDensity * stepLength * transmittance;
+            bool paRainActiveNow = rainDensity > 0.0008;
+            if (paRainActiveNow) {
+                if (paRainOnsetY < 0.0) {
+                    paRainOnsetY = p.y;
+                }
+                paRainTerminationY = p.y;
+                // A second run on one ray is a gap in the shaft, which is the
+                // failure a coarse field would produce and a mean error hides.
+                if (!paRainPrevActive) {
+                    paRainRuns += 1.0;
+                }
+            }
+            paRainPrevActive = paRainActiveNow;
+        }
+#endif
         if (paOracleCapture && density <= 0.0008) {
             paOracleCloseCapturedInterval(
                 paOraclePublished,
@@ -6407,10 +9955,18 @@ void main() {
                     ? lastClearT
                     : max(t0, t - stepLength);
                 float bracketHigh = t;
+#ifdef PA_ARM_NO_BRACKET
+                // T180 Task 4 ceiling. The four bisections removed uniformly.
+                // The surface is then localized only to the coarse stride, so
+                // this is image-invalid and bounds the class.
+                for (int refinement = 0; refinement < 0; refinement++) {
+#else
                 for (int refinement = 0; refinement < 4; refinement++) {
+#endif
                     float bracketMid = 0.5 * (bracketLow + bracketHigh);
                     vec3 bracketPos = CameraPos + rayDir * bracketMid;
                     bool bracketNearCamera = bracketMid < 220.0 && !cameraInsideCloud;
+                    paDensityConsumer = 4;
                     float bracketDensity = cloudDensity(
                         bracketPos,
                         0.0,
@@ -6418,6 +9974,7 @@ void main() {
                         bracketNearCamera,
                         false
                     );
+                    paDensityConsumer = 0;
                     if (bracketDensity > 0.0008) {
                         bracketHigh = bracketMid;
                     } else {
@@ -7038,6 +10595,31 @@ void main() {
         return;
     }
 
+#ifdef PA_RAIN_SPLIT_COMPOSITE
+    if (rainSplitPending && PaTemporalPhase == 0) {
+        // The march ended before the rain's depth - opaque cloud in front,
+        // the step budget, or the ray's end - so the rain sits behind what
+        // was integrated.
+        accumulated += rainSplitRgb * transmittance;
+        float rainSplitAlpha = transmittance * (1.0 - rainSplitTr);
+        weightedT += rainSplitT * rainSplitAlpha;
+        weightSum += rainSplitAlpha;
+#ifdef PA_RAIN_MASK_OUTPUT
+        paRainMassAccum = transmittance >= 0.015 ? rainSplitInMass * transmittance : 0.0;
+#endif
+        transmittance *= rainSplitTr;
+        rainSplitPending = false;
+    }
+    if (PaTemporalPhase != 0) {
+        // T207. A ray the march finished before the rain's depth (or one
+        // carrying no rain) splits at its end: the whole body is "before".
+        if (!rainSplitDeferred) {
+            rainSplitBeforeRgb = accumulated;
+            rainSplitBeforeT = transmittance;
+        }
+        fragTemporalAux = vec4(rainSplitBeforeRgb, rainSplitBeforeT);
+    }
+#endif
     float alpha = saturate(1.0 - transmittance);
     bool currentCloudHit = weightSum > 0.0005;
     float representativeT = currentCloudHit ? weightedT / weightSum : 0.0;
@@ -7107,6 +10689,64 @@ void main() {
     }
     float resultDepthDerivative = currentCloudHit ? fwidth(resultDepth) : 0.0;
 
+#ifdef PA_LIGHT_AUDIT
+    // T198 Task 1. One accumulator per capture, taps 0-3 in RGBA; the CPU
+    // joins the captures and classes the pixels from the anchor frame.
+    gl_FragDepth = 1.0;
+    if (PaLightAuditOutput == 1) {
+        fragColor = vec4(paLaSumAbs[0], paLaSumAbs[1], paLaSumAbs[2], paLaSumAbs[3]);
+    } else if (PaLightAuditOutput == 2) {
+        fragColor = vec4(paLaSumSq[0], paLaSumSq[1], paLaSumSq[2], paLaSumSq[3]);
+    } else if (PaLightAuditOutput == 3) {
+        fragColor = vec4(paLaCount[0], paLaCount[1], paLaCount[2], paLaCount[3]);
+    } else if (PaLightAuditOutput == 4) {
+        fragColor = vec4(paLaOver[0], paLaOver[1], paLaOver[2], paLaOver[3]);
+    } else if (PaLightAuditOutput == 5) {
+        fragColor = vec4(paLaUnder[0], paLaUnder[1], paLaUnder[2], paLaUnder[3]);
+    } else if (PaLightAuditOutput == 6) {
+        fragColor = vec4(paLaExactSum[0], paLaExactSum[1], paLaExactSum[2], paLaExactSum[3]);
+    } else if (PaLightAuditOutput == 7) {
+        fragColor = vec4(paLaFieldSum[0], paLaFieldSum[1], paLaFieldSum[2], paLaFieldSum[3]);
+    } else {
+        fragColor = vec4(paLaSumErr[0], paLaSumErr[1], paLaSumErr[2], paLaSumErr[3]);
+    }
+    return;
+#endif
+#ifdef PA_PRIMARY_AUDIT
+    // T202 Task 3. Four accumulators a capture, selected by the same output
+    // uniform the light audit uses; the CPU sums the captures over the frame.
+    gl_FragDepth = 1.0;
+    if (PaLightAuditOutput == 1) {
+        fragColor = vec4(paPaZeroDisagree, paPaMaterialDisagree, paPaOver, paPaUnder);
+    } else if (PaLightAuditOutput == 2) {
+        fragColor = vec4(paPaExactSum, paPaFieldSum, paPaEdgeCount, paPaEdgeSumAbs);
+    } else if (PaLightAuditOutput == 3) {
+        fragColor = vec4(paPaMaxAbs, paPaFallback, paPaExactZeroFieldNot, paPaFieldZeroExactNot);
+    } else {
+        fragColor = vec4(paPaCount, paPaSumErr, paPaSumAbs, paPaSumSq);
+    }
+    return;
+#endif
+#ifdef PA_RAIN_MASK_OUTPUT
+    // T188 Task 0. R = rain optical mass, G = onset height, B = termination
+    // height, A = contiguous rain runs. Zero mass is "no rain here", which is
+    // what makes the pair of masks comparable as sets rather than as images.
+    gl_FragDepth = 1.0;
+#ifdef PA_RAIN_SPLIT_COMPOSITE
+    // T205. The rain pass's mask, its mass weighted by this march's
+    // transmittance at the rain - what the reference's own integration did
+    // sample by sample.
+    fragColor = vec4(paRainMassAccum, rainSplitIn.g, rainSplitIn.b, rainSplitInRuns);
+#else
+    fragColor = vec4(
+        paRainMassAccum,
+        max(paRainOnsetY, 0.0),
+        max(paRainTerminationY, 0.0),
+        paRainRuns
+    );
+#endif
+    return;
+#endif
     // Counter channels are unpremultiplied floating-point integers. The
     // on-demand readback sums them across the target, so this path is never
     // composited or used as temporal history.
@@ -7152,7 +10792,654 @@ void main() {
     }
     if (DebugView == 26) {
         gl_FragDepth = 1.0;
-        fragColor = vec4(float(paDetailOctaveEvaluations), 0.0, 0.0, 0.0);
+        fragColor = vec4(
+            float(paDetailOctaveEvaluations),
+            float(paDescriptorCandidateRanks),
+            float(paDescriptorGroupsEntered),
+            float(paDescriptorUnionContributors)
+        );
+        return;
+    }
+    if (DebugView == 37) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paPrimaryDensityCalls),
+            float(paPrimaryDensityZero),
+            float(paPrimaryDensityNegligible),
+            float(paPrimaryDensityLow)
+        );
+        return;
+    }
+    if (DebugView == 38) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paPrimaryDensityMedium),
+            float(paPrimaryDensityHigh),
+            float(paPrimaryMaterialRuns),
+            float(paPrimaryZeroRuns)
+        );
+        return;
+    }
+    if (DebugView == 59) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainSegCalls),
+            float(paRainSegSupport0),
+            float(paRainSegSupport1),
+            float(paRainSegHeightSkip)
+        );
+        return;
+    }
+    if (DebugView == 60) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainSegTrueAt0),
+            float(paRainSegTrueAt1),
+            0.0,
+            0.0
+        );
+        return;
+    }
+    if (DebugView == 57) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainPrecipLow),
+            float(paRainOutsideCircle),
+            float(paRainOutsideAabb),
+            float(paRainOutsideExact)
+        );
+        return;
+    }
+    if (DebugView == 58) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainAcceptedZeroSupport),
+            0.0,
+            0.0,
+            0.0
+        );
+        return;
+    }
+    if (DebugView == 55) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainSupportCalls),
+            float(paRainSupportPruned),
+            float(paRainSameExactXZ),
+            float(paRainSameBlock)
+        );
+        return;
+    }
+    if (DebugView == 56) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainSameTile8),
+            0.0,
+            0.0,
+            0.0
+        );
+        return;
+    }
+    // T188 Task 3. What the ray still pays for rain support: the field fetches
+    // that replaced a traversal, and the out-of-domain columns that did not.
+    if (DebugView == 61) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainFieldFetches),
+            float(paRainFieldFallbacks),
+            float(paRainFieldSafeHits),
+            float(paRainFieldMixedFallbacks)
+        );
+        return;
+    }
+    // T190 Task 1. WHY a column disagrees, not just how often.
+    //
+    // The ~0.22% disagreement has to be attributed before a classifier can be
+    // designed against it: a classifier that proves ownership uniform is no use
+    // if the disagreements are actually support-cutoff crossings.
+    if (DebugView == 65) {
+        gl_FragDepth = 1.0;
+        vec2 paWhyWorldXZ = WeatherOrigin + texCoord * WeatherExtent;
+        float paWhyExactAttachY;
+        bool paWhyExactOwns;
+        float paWhyExactSupport = directStormRainSupportAt(
+            paWhyWorldXZ, paWhyExactAttachY, paWhyExactOwns);
+        float paWhyFieldAttachY;
+        bool paWhyFieldOwns;
+        float paWhyFieldSupport = paRainFieldSupportAt(
+            paWhyWorldXZ, paWhyFieldAttachY, paWhyFieldOwns);
+        bool paWhyOwnDiffers = paWhyExactOwns != paWhyFieldOwns;
+        // Only meaningful where ownership agrees; otherwise the ownership
+        // disagreement is the cause and counting a second one double-reports it.
+        bool paWhySupportDiffers = !paWhyOwnDiffers
+            && ((paWhyExactSupport > PA_FIELD_SUPPORT_CUTOFF)
+                != (paWhyFieldSupport > PA_FIELD_SUPPORT_CUTOFF));
+        bool paWhyAttachDiffers = !paWhyOwnDiffers && !paWhySupportDiffers
+            && paWhyExactOwns
+            && abs(paWhyExactAttachY - paWhyFieldAttachY)
+                > PA_FIELD_ATTACH_TOLERANCE;
+        fragColor = vec4(
+            paWhyOwnDiffers ? 1.0 : 0.0,
+            paWhySupportDiffers ? 1.0 : 0.0,
+            paWhyAttachDiffers ? 1.0 : 0.0,
+            1.0
+        );
+        return;
+    }
+    // T190 Task 5. The mixed-cell census, read off the field the build wrote.
+    //
+    // Each capture pixel takes the cell its own texCoord lands in, so the
+    // sample is stratified over the grid; 129,600 pixels cover 49.4% of the
+    // 262,144 cells, which makes this an estimate of the mixed fraction rather
+    // than an exact count, and it is reported as one.
+    if (DebugView == 66) {
+        gl_FragDepth = 1.0;
+        ivec2 paCensusSize = textureSize(RainFieldSampler, 0);
+        ivec2 paCensusTexel = clamp(
+            ivec2(floor(texCoord * vec2(paCensusSize))),
+            ivec2(0),
+            paCensusSize - ivec2(1)
+        );
+        vec4 paCensusCell = texelFetch(RainFieldSampler, paCensusTexel, 0);
+        // T192. Channel B now carries the closed-form triage rate instead of
+        // the supported-cell count, which no decision read. The bound is
+        // re-evaluated here rather than stored, so the census measures the
+        // classifier itself rather than what some build happened to write.
+        vec2 paCensusCellSize = WeatherExtent / vec2(paCensusSize);
+        vec2 paCensusCentre = WeatherOrigin
+            + (vec2(paCensusTexel) + 0.5) * paCensusCellSize;
+        bool paCensusProvenDry = paCellProvablyUnowned(
+            paCensusCentre - paCensusCellSize * 0.5,
+            paCensusCentre + paCensusCellSize * 0.5);
+        fragColor = vec4(
+            paCensusCell.a >= 0.5 ? 1.0 : 0.0,
+            paCensusCell.b >= 0.5 ? 1.0 : 0.0,
+            paCensusProvenDry ? 1.0 : 0.0,
+            1.0
+        );
+        return;
+    }
+    // T189. Is the field texture filtered at all?
+    //
+    // T188 attributed its false rain to bilinear interpolation of a boolean.
+    // That explanation requires texture() to actually interpolate, and RGBA32F
+    // linear filtering is not universally honoured - a driver that declines it
+    // returns the nearest texel and the whole diagnosis collapses. Measuring
+    // the premise is cheaper than assuming it twice.
+    //
+    // Columns are the capture grid spread over the whole domain, so they land
+    // at arbitrary sub-texel offsets. If any interpolation happens at all, a
+    // filtered fetch of a 0/1 channel MUST return fractions near cell borders.
+    if (DebugView == 64) {
+        gl_FragDepth = 1.0;
+        vec2 paFilterWorldXZ = WeatherOrigin + texCoord * WeatherExtent;
+        vec2 paFilterUv = (paFilterWorldXZ - WeatherOrigin) / WeatherExtent;
+        ivec2 paFilterSize = textureSize(RainFieldSampler, 0);
+        ivec2 paFilterTexel = clamp(
+            ivec2(floor(paFilterUv * vec2(paFilterSize))),
+            ivec2(0),
+            paFilterSize - ivec2(1)
+        );
+        vec4 paFiltered = texture(RainFieldSampler, paFilterUv);
+        vec4 paExactTexel = texelFetch(RainFieldSampler, paFilterTexel, 0);
+        // A fraction in a channel that only ever stores 0.0 or 1.0 is proof of
+        // interpolation; its absence over the whole grid is proof of none.
+        bool paOwnFractional = paFiltered.b > 0.01 && paFiltered.b < 0.99;
+        fragColor = vec4(
+            paOwnFractional ? 1.0 : 0.0,
+            abs(paFiltered.b - paExactTexel.b),
+            abs(paFiltered.r - paExactTexel.r),
+            1.0
+        );
+        return;
+    }
+    // T189 Task 3. The field's error against the function it stands in for,
+    // measured at the same column by both paths in the same invocation.
+    //
+    // The sample positions are the capture grid mapped across the whole weather
+    // domain. 480x270 does not divide 512x512, so the columns land at arbitrary
+    // sub-texel offsets rather than on cell centres - which is the only place
+    // an interpolation or quantisation error can show up at all.
+    if (DebugView == 63) {
+        gl_FragDepth = 1.0;
+        vec2 paErrWorldXZ = WeatherOrigin + texCoord * WeatherExtent;
+        float paExactAttachY;
+        bool paExactOwns;
+        float paExactSupport = directStormRainSupportAt(
+            paErrWorldXZ, paExactAttachY, paExactOwns);
+        float paFieldAttachY;
+        bool paFieldOwns;
+        float paFieldSupport = paRainFieldSupportAt(
+            paErrWorldXZ, paFieldAttachY, paFieldOwns);
+        // Height is only comparable where both paths agree a storm owns the
+        // column; an unowned column has no attach height to be wrong about,
+        // and counting its fallback would report the ownership error twice.
+        bool paBothOwn = paExactOwns && paFieldOwns;
+        fragColor = vec4(
+            abs(paExactSupport - paFieldSupport),
+            paBothOwn ? abs(paExactAttachY - paFieldAttachY) : 0.0,
+            paExactOwns == paFieldOwns ? 0.0 : 1.0,
+            paBothOwn ? 1.0 : 0.0
+        );
+        return;
+    }
+    // T188 Task 4. What ONE field cell costs to build, measured with the same
+    // counters the ray path uses. The march above already moved them, so the
+    // delta around a single generation-equivalent call is the per-cell figure;
+    // multiplying by the cell count gives the build's descriptor work without
+    // instrumenting a pass whose output is a texture rather than a capture.
+    //
+    // Each capture pixel takes the cell its own texCoord lands in, so the
+    // sample is stratified across the grid rather than clustered.
+    if (DebugView == 62) {
+        gl_FragDepth = 1.0;
+        int paFieldShapeBefore = paDirectStormShapeCalls;
+        int paFieldGroupBefore = paDescriptorGroupsEntered;
+        int paFieldLobeBefore = paLobesVisited;
+        int paFieldSdfBefore = paLobeExactSdf;
+        ivec2 paFieldSize = textureSize(WeatherMapSampler, 0);
+        vec2 paFieldCellUv =
+            (floor(texCoord * vec2(paFieldSize)) + 0.5) / vec2(paFieldSize);
+        float paFieldAttachY;
+        bool paFieldOwns;
+        directStormRainSupportAt(
+            WeatherOrigin + paFieldCellUv * WeatherExtent,
+            paFieldAttachY,
+            paFieldOwns
+        );
+        fragColor = vec4(
+            float(paDirectStormShapeCalls - paFieldShapeBefore),
+            float(paDescriptorGroupsEntered - paFieldGroupBefore),
+            float(paLobesVisited - paFieldLobeBefore),
+            float(paLobeExactSdf - paFieldSdfBefore)
+        );
+        return;
+    }
+    // T196. The shared field's counters. 67: the probe decision audit,
+    // monolith only. 68: what building one node costs, evaluated for the node
+    // this fragment maps to. 69: fetches served and the probe's field verdicts.
+    if (DebugView == 67) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paStormFieldFalseEmpty),
+            float(paStormFieldFalseOccupied),
+            float(paStormFieldAgreeEmpty),
+            float(paStormFieldAgreeOccupied)
+        );
+        return;
+    }
+    if (DebugView == 68) {
+        gl_FragDepth = 1.0;
+        int paNodeShapeBefore = paDirectStormShapeCalls;
+        int paNodeGroupBefore = paDescriptorGroupsEntered;
+        int paNodeLobeBefore = paLobesVisited;
+        int paNodeSdfBefore = paLobeExactSdf;
+        // The fragment grid is mapped onto the node grid so the sampled nodes
+        // tile the field rather than one slice of it.
+        vec3 paNodeCoord = vec3(
+            texCoord.x * float(PaStormFieldXZ),
+            fract(texCoord.y * 7.0) * float(PA_STORM_FIELD_Y),
+            texCoord.y * float(PaStormFieldXZ));
+        vec3 paNodeSample = vec3(
+            WeatherOrigin.x + (floor(paNodeCoord.x) + 0.5) * paStormFieldVoxelXZ(),
+            SlabBaseY + (floor(paNodeCoord.y) + 0.5) * paStormFieldVoxelY(),
+            WeatherOrigin.y + (floor(paNodeCoord.z) + 0.5) * paStormFieldVoxelXZ());
+        float paNodeSampleDistance;
+        paStormFieldNodeAt(paNodeSample, paNodeSampleDistance);
+        fragColor = vec4(
+            float(paDirectStormShapeCalls - paNodeShapeBefore),
+            float(paDescriptorGroupsEntered - paNodeGroupBefore),
+            float(paLobesVisited - paNodeLobeBefore),
+            float(paLobeExactSdf - paNodeSdfBefore)
+        );
+        return;
+    }
+    if (DebugView == 69) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paStormFieldLightFetches),
+            float(paStormFieldProbeFetches),
+            float(paStormFieldProbeProvablyEmpty),
+            float(paStormFieldProbeFallback)
+        );
+        return;
+    }
+    if (DebugView == 70) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paStormFieldPrimaryFetches),
+            float(paStormFieldPrimaryFallback),
+            float(paStormFieldRefineFetches),
+            float(paStormFieldRefineFallback)
+        );
+        return;
+    }
+    // T203. 71-72: where the rain-support walks end up and how the window
+    // decides on supported samples (Task 1). 73-74: the gate's census on
+    // the ray (Task 8). 75: the gate's soundness oracle. 76: the census of
+    // the field's proofs. 77: what building one gate cell costs.
+    if (DebugView == 71) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainWalkUnowned),
+            float(paRainWalkOwnedNoBase),
+            float(paRainWalkOwnedEnvelopeZero),
+            float(paRainWalkOwnedEroded)
+        );
+        return;
+    }
+    if (DebugView == 72) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainWalkOwnedSupported),
+            float(paRainSegSupported),
+            float(paRainSegAboveAttach),
+            float(paRainSegBelowWindow)
+        );
+        return;
+    }
+    if (DebugView == 73) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainGateFetches),
+            float(paRainGateDryRejects),
+            float(paRainGateWindowRejects),
+            float(paRainGateFallbacks)
+        );
+        return;
+    }
+    if (DebugView == 74) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainGateOutOfDomain),
+            float(paRainGatePrecipFallbacks),
+            float(paRainGateFallbackWalks),
+            float(paRainGateFallbackSupported)
+        );
+        return;
+    }
+    // T203 Task 4. The gate's soundness, measured on the field the frame
+    // built. Each fragment takes the cell its texCoord lands in, reads the
+    // cell's claims, and evaluates the exact production rain support at
+    // nine lattice points strictly inside the cell and eight hashed ones. A
+    // dry claim is violated by any sample a group owns with support above
+    // the cutoff; the attach bounds are violated by any such sample whose
+    // attach height lies outside them. Both counts must be zero: the gate
+    // rejects by these claims, and a violated claim is missed rain.
+    if (DebugView == 75 || DebugView == 76) {
+        gl_FragDepth = 1.0;
+        ivec2 paOracleGrid = textureSize(RainFieldSampler, 0);
+        ivec2 paOracleCell = clamp(
+            ivec2(floor(texCoord * vec2(paOracleGrid))), ivec2(0), paOracleGrid - ivec2(1));
+        vec4 paOracleField = texelFetch(RainFieldSampler, paOracleCell, 0);
+        int paOracleFlags = int(paOracleField.r + 0.5);
+        bool paOracleDry = (paOracleFlags & PA_RAIN_GATE_DRY) != 0;
+        bool paOraclePrecip = (paOracleFlags & PA_RAIN_GATE_PRECIP) != 0;
+        if (DebugView == 76) {
+            int paReason = int(paOracleField.a + 0.5);
+            fragColor = vec4(
+                paReason == 1 ? 1.0 : 0.0,
+                paReason == 2 ? 1.0 : 0.0,
+                paReason == 3 ? 1.0 : 0.0,
+                paOraclePrecip ? 1.0 : 0.0
+            );
+            return;
+        }
+        vec2 paOracleHalf = (WeatherExtent / vec2(paOracleGrid)) * 0.5;
+        vec2 paOracleCentre = WeatherOrigin
+            + (vec2(paOracleCell) + 0.5) / vec2(paOracleGrid) * WeatherExtent;
+        float paFalseDry = 0.0;
+        float paWindowViolations = 0.0;
+        float paExcessAbove = 0.0;
+        float paExcessBelow = 0.0;
+        for (int paSample = 0; paSample < 17; paSample++) {
+            vec2 paOffset;
+            if (paSample < 9) {
+                paOffset = vec2(float(paSample - (paSample / 3) * 3 - 1),
+                    float(paSample / 3 - 1)) * 0.999;
+            } else {
+                vec3 paSeed = fract(vec3(paOracleCell, paSample) * vec3(0.1031, 0.1030, 0.0973));
+                paSeed = paSeed + dot(paSeed, paSeed.yxz + 33.33);
+                paOffset = fract((paSeed.xx + paSeed.yz) * paSeed.zy) * 2.0 - 1.0;
+            }
+            vec2 paQ = paOracleCentre + paOffset * paOracleHalf;
+            float paQAttach;
+            bool paQOwns;
+            float paQSupport = directStormRainSupportAt(paQ, paQAttach, paQOwns);
+            bool paQRain = paQOwns && paQSupport > 0.01;
+            paFalseDry = paFalseDry + ((paOracleDry && paQRain) ? 1.0 : 0.0);
+            // The lower bound is compared as the gate and production compute
+            // it - attach minus the window against the stored Amin minus the
+            // window - not as a reconstructed Amin: the first run's 117
+            // "violations" were single-lobe columns whose attach equals Amin
+            // exactly and whose (Amin - 184) + 184 rounded above it.
+            bool paAbove = !paOracleDry && paQRain && paQAttach > paOracleField.b;
+            bool paBelow = !paOracleDry && paQRain
+                && paQAttach - PA_RAIN_GATE_WINDOW < paOracleField.g;
+            paWindowViolations = paWindowViolations + ((paAbove || paBelow) ? 1.0 : 0.0);
+            // The excess in blocks, summed, so a miss reads as a margin.
+            paExcessAbove = paExcessAbove + (paAbove ? paQAttach - paOracleField.b : 0.0);
+            paExcessBelow = paExcessBelow
+                + (paBelow ? paOracleField.g - (paQAttach - PA_RAIN_GATE_WINDOW) : 0.0);
+        }
+        // The excess in milli-blocks: the capture prints whole numbers.
+        fragColor = vec4(
+            paFalseDry,
+            paWindowViolations,
+            paExcessAbove * 1000.0,
+            paExcessBelow * 1000.0
+        );
+        return;
+    }
+    // T204. The shaft path per pixel, for the CPU's warp-tile census: true
+    // segment tests (the shaft's gate), shaft samples, positive segments.
+    if (DebugView == 78) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainSegTrueAt0 + paRainSegTrueAt1),
+            float(paRainShaftSamples),
+            float(paRainShaftPositiveSegments),
+            0.0
+        );
+        return;
+    }
+    if (DebugView == 77) {
+        gl_FragDepth = 1.0;
+        int paGateShapeBefore = paDirectStormShapeCalls;
+        int paGateGroupBefore = paDescriptorGroupsEntered;
+        int paGateLobeBefore = paLobesVisited;
+        int paGateSdfBefore = paLobeExactSdf;
+        ivec2 paGateCostGrid = textureSize(WeatherMapSampler, 0);
+        vec2 paGateCostHalf = (WeatherExtent / vec2(paGateCostGrid)) * 0.5;
+        vec2 paGateCostCentre = WeatherOrigin
+            + (floor(texCoord * vec2(paGateCostGrid)) + 0.5) / vec2(paGateCostGrid) * WeatherExtent;
+        paRainGateBuildCell(paGateCostCentre, paGateCostHalf);
+        fragColor = vec4(
+            float(paDirectStormShapeCalls - paGateShapeBefore),
+            float(paDescriptorGroupsEntered - paGateGroupBefore),
+            float(paLobesVisited - paGateLobeBefore),
+            float(paLobeExactSdf - paGateSdfBefore)
+        );
+        return;
+    }
+    if (DebugView == 52) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paShapePrimary),
+            float(paShapeLight),
+            float(paShapeProbe),
+            float(paShapeBracket)
+        );
+        return;
+    }
+    if (DebugView == 53) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paShapeRefine),
+            float(paShapeRainSegment),
+            float(paShapeRainShaft),
+            float(paShapeCamera)
+        );
+        return;
+    }
+    if (DebugView == 54) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paShapeLightForward),
+            float(paShapeUntagged),
+            0.0,
+            0.0
+        );
+        return;
+    }
+    if (DebugView == 49) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRefineEvents),
+            float(paScanEvents),
+            float(paScanFoundMaterialCount),
+            float(paScanCapReached)
+        );
+        return;
+    }
+    if (DebugView == 50) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paScanProbes1To2),
+            float(paScanProbes3To4),
+            float(paScanProbes5To8),
+            float(paScanProbes9To16)
+        );
+        return;
+    }
+    if (DebugView == 51) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paScanWastedProbes),
+            0.0,
+            0.0,
+            0.0
+        );
+        return;
+    }
+    if (DebugView == 46) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paProbeCalls),
+            float(paProbeGroupWalks),
+            float(paProbeExactSdf),
+            float(paBracketCalls)
+        );
+        return;
+    }
+    if (DebugView == 47) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paBracketGroupWalks),
+            float(paBracketExactSdf),
+            float(paOtherCalls),
+            float(paOtherGroupWalks)
+        );
+        return;
+    }
+    if (DebugView == 48) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paOtherExactSdf),
+            0.0,
+            0.0,
+            0.0
+        );
+        return;
+    }
+    if (DebugView == 44) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paDomChangeZero),
+            float(paDomChangeBelowEpsilon),
+            float(paDomChangeTiny),
+            float(paDomChangeMeaningful)
+        );
+        return;
+    }
+    if (DebugView == 45) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paDomZeroLight),
+            float(paDomZeroPrimary),
+            float(paDomWouldRejectWithExactBlend),
+            0.0
+        );
+        return;
+    }
+    if (DebugView == 42) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paLobeExactSdf),
+            float(paLobeExactSdfNoChange),
+            float(paLobeVisitsLight),
+            float(paLobeExactSdfLight)
+        );
+        return;
+    }
+    if (DebugView == 43) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paLobeCheapRejectLight),
+            float(paLobeDominanceRejects),
+            0.0,
+            0.0
+        );
+        return;
+    }
+    if (DebugView == 39) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paReuseTapsClassified),
+            float(paReuseTapsEmpty),
+            float(paReuseSufficient),
+            float(paReusePartial)
+        );
+        return;
+    }
+    if (DebugView == 40) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paReuseWrong),
+            float(paReuseGroupsEnteredInTaps),
+            float(paReuseSuffOrd1),
+            float(paReuseSuffOrd2)
+        );
+        return;
+    }
+    if (DebugView == 41) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paReuseSuffOrd3),
+            float(paReuseSuffOrd4),
+            0.0,
+            0.0
+        );
+        return;
+    }
+    if (DebugView == 35) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paLightConeMarches),
+            float(paLightConeTaps),
+            float(paLightConeEarlyOuts),
+            float(paLightCheapProbes)
+        );
+        return;
+    }
+    if (DebugView == 36) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paDetailFetchPrimary),
+            float(paDetailFetchLight),
+            float(paDetailFetchSecondOctave),
+            float(paLightMarchBelowFloor)
+        );
         return;
     }
     if (DebugView == 28) {

@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 12;
+    private static final int STAGES = 56;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -102,6 +102,50 @@ final class StormWorkloadRuntimeCapture {
             case 9 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_DESCRIPTOR;
             case 10 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_LIGHT;
             case 11 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_DETAIL;
+            case 12 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LIGHT_ATTRIBUTION;
+            case 13 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DETAIL_ATTRIBUTION;
+            case 14 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY_DENSITY_A;
+            case 15 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY_DENSITY_B;
+            case 16 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_A;
+            case 17 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_B;
+            case 18 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_C;
+            case 19 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LOBE_A;
+            case 20 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LOBE_B;
+            case 21 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DOMINANCE_A;
+            case 22 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DOMINANCE_B;
+            case 23 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_CONSUMER_A;
+            case 24 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_CONSUMER_B;
+            case 25 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_CONSUMER_C;
+            case 26 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SCAN_A;
+            case 27 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SCAN_B;
+            case 28 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SCAN_C;
+            case 29 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_A;
+            case 30 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_B;
+            case 31 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_C;
+            case 32 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_A;
+            case 33 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_B;
+            case 34 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_C;
+            case 35 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_D;
+            case 36 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_E;
+            case 37 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_F;
+            case 38 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_A;
+            case 39 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_B;
+            case 40 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_C;
+            case 41 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_D;
+            case 42 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_E;
+            case 43 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_F;
+            case 44 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_A;
+            case 45 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_B;
+            case 46 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_C;
+            case 47 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_STORM_FIELD_D;
+            case 48 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_A;
+            case 49 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_B;
+            case 50 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_C;
+            case 51 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_D;
+            case 52 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_E;
+            case 53 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_F;
+            case 54 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_GATE_G;
+            case 55 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_SHAFT_LANES;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -142,6 +186,13 @@ final class StormWorkloadRuntimeCapture {
             request.values[request.stage][1] = second;
             request.values[request.stage][2] = third;
             request.values[request.stage][3] = fourth;
+            if (view() == VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_SHAFT_LANES) {
+                // T204. The per-pixel image is censused here, before the
+                // sums replace it: the R channel is the true segment tests
+                // of that pixel, and the tiles are the warp shapes a
+                // fragment shader is likely scheduled in.
+                request.shaftLanes = ShaftLanes.census(pixels, target.width, target.height);
+            }
             request.width = target.width;
             request.height = target.height;
             request.stage++;
@@ -178,6 +229,7 @@ final class StormWorkloadRuntimeCapture {
         private int stage;
         private int width;
         private int height;
+        private ShaftLanes shaftLanes = ShaftLanes.ZERO;
 
         private Request(String view, long token) {
             this.view = view;
@@ -191,14 +243,140 @@ final class StormWorkloadRuntimeCapture {
                     values[1][0], values[1][1], values[1][2],
                     values[2][0], values[2][1], values[2][2], values[2][3],
                     values[3][0], values[3][1], values[3][2], values[3][3],
-                    values[4][0],
+                    values[4][0], values[4][1], values[4][2], values[4][3],
                     values[5][0], values[5][1], values[5][2], values[5][3],
                     values[6][0], values[6][1], values[6][2], values[6][3],
                     ThresholdWork.of(values[7]),
                     ThresholdWork.of(values[8]),
                     ThresholdWork.of(values[9]),
                     ThresholdWork.of(values[10]),
-                    ThresholdWork.of(values[11]));
+                    ThresholdWork.of(values[11]),
+                    values[12][0], values[12][1], values[12][2], values[12][3],
+                    values[13][0], values[13][1], values[13][2], values[13][3],
+                    values[14][0], values[14][1], values[14][2], values[14][3],
+                    values[15][0], values[15][1], values[15][2], values[15][3],
+                    values[16][0], values[16][1], values[16][2], values[16][3],
+                    values[17][0], values[17][1], values[17][2], values[17][3],
+                    values[18][0], values[18][1],
+                    values[19][0], values[19][1], values[19][2], values[19][3],
+                    values[20][0], values[20][1],
+                    values[21][0], values[21][1], values[21][2], values[21][3],
+                    values[22][0], values[22][1], values[22][2],
+                    values[23][0], values[23][1], values[23][2], values[23][3],
+                    values[24][0], values[24][1], values[24][2], values[24][3],
+                    values[25][0],
+                    values[26][0], values[26][1], values[26][2], values[26][3],
+                    values[27][0], values[27][1], values[27][2], values[27][3],
+                    values[28][0],
+                    values[29][0], values[29][1], values[29][2], values[29][3],
+                    values[30][0], values[30][1], values[30][2], values[30][3],
+                    values[31][0], values[31][1],
+                    values[32][0], values[32][1], values[32][2], values[32][3],
+                    values[33][0],
+                    values[34][0], values[34][1], values[34][2], values[34][3],
+                    values[35][0],
+                    values[36][0], values[36][1], values[36][2], values[36][3],
+                    values[37][0], values[37][1],
+                    values[38][0], values[38][1],
+                    values[38][2], values[38][3],
+                    values[39][0], values[39][1], values[39][2], values[39][3],
+                    FieldProbe.of(values[40], values[41]),
+                    FieldCertainty.of(values[42], values[43]),
+                    StormField.of(values[44], values[45], values[46], values[47]),
+                    RainGate.of(values[48], values[49], values[50], values[51], values[52],
+                            values[53], values[54]),
+                    shaftLanes.withCounters(values[55][0], values[55][1], values[55][2]));
+        }
+    }
+
+    /**
+     * T204. The shaft path's spatial census, computed on the CPU from the
+     * per-pixel view 78: pixels whose march found any true segment test,
+     * and the 8x4, 4x8 and 16x16 tiles with any such pixel and with every
+     * pixel such. A warp whose lanes hold one positive pixel runs the shaft
+     * path for all 32; the tile fraction with any positive is the
+     * any-lane rate, and the all-positive fraction is how coherent the
+     * work is where it happens.
+     */
+    record ShaftLanes(
+            double trueSegments,
+            double samples,
+            double positiveSegments,
+            double positivePixels,
+            double tiles8x4, double tiles8x4Any, double tiles8x4All,
+            double tiles4x8Any, double tiles4x8All,
+            double tiles16x16, double tiles16x16Any,
+            double maxPerPixel
+    ) {
+        static final ShaftLanes ZERO = new ShaftLanes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        ShaftLanes withCounters(double segments, double shaftSamples, double positives) {
+            return new ShaftLanes(segments, shaftSamples, positives, positivePixels,
+                    tiles8x4, tiles8x4Any, tiles8x4All, tiles4x8Any, tiles4x8All,
+                    tiles16x16, tiles16x16Any, maxPerPixel);
+        }
+
+        static ShaftLanes census(FloatBuffer pixels, int width, int height) {
+            double positive = 0.0D;
+            double max = 0.0D;
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    float v = pixels.get((y * width + x) * 4);
+                    positive += v > 0.0F ? 1.0D : 0.0D;
+                    max = Math.max(max, v);
+                }
+            }
+            double[] t84 = tiles(pixels, width, height, 8, 4);
+            double[] t48 = tiles(pixels, width, height, 4, 8);
+            double[] t16 = tiles(pixels, width, height, 16, 16);
+            return new ShaftLanes(0.0D, 0.0D, 0.0D, positive, t84[0], t84[1], t84[2],
+                    t48[1], t48[2], t16[0], t16[1], max);
+        }
+
+        /** {count, any-positive, all-positive} over tiles of the given shape. */
+        private static double[] tiles(FloatBuffer pixels, int width, int height,
+                int tileW, int tileH) {
+            double count = 0.0D;
+            double any = 0.0D;
+            double all = 0.0D;
+            for (int ty = 0; ty < height; ty += tileH) {
+                for (int tx = 0; tx < width; tx += tileW) {
+                    boolean anyPositive = false;
+                    boolean allPositive = true;
+                    for (int y = ty; y < Math.min(ty + tileH, height); y++) {
+                        for (int x = tx; x < Math.min(tx + tileW, width); x++) {
+                            boolean p = pixels.get((y * width + x) * 4) > 0.0F;
+                            anyPositive |= p;
+                            allPositive &= p;
+                        }
+                    }
+                    count++;
+                    any += anyPositive ? 1.0D : 0.0D;
+                    all += allPositive ? 1.0D : 0.0D;
+                }
+            }
+            return new double[] {count, any, all};
+        }
+
+        String format() {
+            return " shaftTrueSegments=" + fmt(trueSegments)
+                    + " shaftSamples=" + fmt(samples)
+                    + " shaftPositiveSegments=" + fmt(positiveSegments)
+                    + " shaftPositivePixels=" + fmt(positivePixels)
+                    + " shaftTiles8x4=" + fmt(tiles8x4)
+                    + " shaftTiles8x4Any=" + fmt(tiles8x4Any)
+                    + " shaftTiles8x4All=" + fmt(tiles8x4All)
+                    + " shaftTiles4x8Any=" + fmt(tiles4x8Any)
+                    + " shaftTiles4x8All=" + fmt(tiles4x8All)
+                    + " shaftTiles16x16=" + fmt(tiles16x16)
+                    + " shaftTiles16x16Any=" + fmt(tiles16x16Any)
+                    + " shaftAnyLaneFraction8x4=" + String.format(Locale.ROOT, "%.4f",
+                            tiles8x4Any / Math.max(1.0D, tiles8x4))
+                    + " shaftAllLaneFraction8x4=" + String.format(Locale.ROOT, "%.4f",
+                            tiles8x4All / Math.max(1.0D, tiles8x4))
+                    + " shaftAnyLaneFraction16x16=" + String.format(Locale.ROOT, "%.4f",
+                            tiles16x16Any / Math.max(1.0D, tiles16x16))
+                    + " shaftMaxTrueSegmentsPerPixel=" + fmt(maxPerPixel);
         }
     }
 
@@ -206,6 +384,155 @@ final class StormWorkloadRuntimeCapture {
     record CaptureRequest(String status, long token) {
         boolean accepted() {
             return token != NO_TOKEN && status.startsWith("acquiring");
+        }
+    }
+
+    /**
+     * T189. The rain field measured against the exact function, and the test of
+     * whether the field texture is filtered at all.
+     *
+     * <p>The filter test exists because T188 attributed its false rain to
+     * bilinear interpolation of a boolean channel. That explanation requires
+     * the texture to actually interpolate, and RGBA32F linear filtering is not
+     * universally honoured; a driver that declines it returns the nearest texel
+     * and the diagnosis is simply wrong. Zero fractional samples over a grid of
+     * sub-texel-offset columns settles it either way.
+     */
+    /**
+     * T190. The attribution of the field's column disagreements, and the census
+     * of what the build could prove safe.
+     *
+     * <p>The attribution exists because a classifier has to be designed against
+     * the actual cause. T188 designed against a cause it had assumed, and the
+     * fix changed zero pixels.
+     */
+    record FieldCertainty(
+            double ownershipDiffers,
+            double supportCutoffDiffers,
+            double attachDiffers,
+            double attributionSamples,
+            double mixedCells,
+            double ownedCells,
+            double provablyDryCells,
+            double censusSamples
+    ) {
+        static final FieldCertainty ZERO =
+                new FieldCertainty(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+
+        static FieldCertainty of(double[] why, double[] census) {
+            return new FieldCertainty(
+                    why[0], why[1], why[2], why[3],
+                    census[0], census[1], census[2], census[3]);
+        }
+    }
+
+    /**
+     * T196. The shared storm field: the probe decision audit, the per-node
+     * build cost and the fetches served.
+     */
+    /**
+     * T203. The rain gate: the walk classes and window decisions of the
+     * segment test (Task 1), the gate's census on the ray (Task 8), its
+     * soundness oracle, the census of its proofs, and the per-cell build
+     * cost (Task 5). Grouped for the same 255-slot reason as StormField.
+     */
+    record RainGate(
+            double walkUnowned,
+            double walkOwnedNoBase,
+            double walkOwnedEnvelopeZero,
+            double walkOwnedEroded,
+            double walkOwnedSupported,
+            double segSupported,
+            double segAboveAttach,
+            double segBelowWindow,
+            double gateFetches,
+            double gateDryRejects,
+            double gateWindowRejects,
+            double gateFallbacks,
+            double gateOutOfDomain,
+            double gatePrecipFallbacks,
+            double gateFallbackWalks,
+            double gateFallbackSupported,
+            double oracleFalseDry,
+            double oracleWindowViolations,
+            double oracleExcessAbove,
+            double oracleExcessBelow,
+            double censusUnowned,
+            double censusNoBase,
+            double censusEnvelope,
+            double censusPrecip,
+            double cellShapeCalls,
+            double cellGroupWalks,
+            double cellLobeVisits,
+            double cellExactSdf
+    ) {
+        static final RainGate ZERO = new RainGate(
+                0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                0.0D, 0.0D, 0.0D, 0.0D);
+
+        static RainGate of(double[] a, double[] b, double[] c, double[] d, double[] e,
+                double[] f, double[] g) {
+            return new RainGate(
+                    a[0], a[1], a[2], a[3],
+                    b[0], b[1], b[2], b[3],
+                    c[0], c[1], c[2], c[3],
+                    d[0], d[1], d[2], d[3],
+                    e[0], e[1], e[2], e[3],
+                    f[0], f[1], f[2], f[3],
+                    g[0], g[1], g[2], g[3]);
+        }
+    }
+
+    record StormField(
+            double probeFalseEmpty,
+            double probeFalseOccupied,
+            double probeAgreeEmpty,
+            double probeAgreeOccupied,
+            double nodeShapeCalls,
+            double nodeGroupWalks,
+            double nodeLobeVisits,
+            double nodeExactSdf,
+            double lightFetches,
+            double probeFetches,
+            double probeProvablyEmpty,
+            double probeFallback,
+            // T202. The body consumers' fetches and their exact fallbacks.
+            double primaryFetches,
+            double primaryFallback,
+            double refineFetches,
+            double refineFallback
+    ) {
+        static final StormField ZERO = new StormField(
+                0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                0.0D, 0.0D, 0.0D, 0.0D);
+
+        static StormField of(double[] audit, double[] node, double[] fetches, double[] body) {
+            return new StormField(
+                    audit[0], audit[1], audit[2], audit[3],
+                    node[0], node[1], node[2], node[3],
+                    fetches[0], fetches[1], fetches[2], fetches[3],
+                    body[0], body[1], body[2], body[3]);
+        }
+    }
+
+    record FieldProbe(
+            double supportErrorSum,
+            double attachErrorSum,
+            double ownershipDisagreements,
+            double bothOwnSamples,
+            double fractionalOwnSamples,
+            double ownFilterDeltaSum,
+            double supportFilterDeltaSum,
+            double filterSamples
+    ) {
+        static final FieldProbe ZERO =
+                new FieldProbe(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+
+        static FieldProbe of(double[] error, double[] filter) {
+            return new FieldProbe(
+                    error[0], error[1], error[2], error[3],
+                    filter[0], filter[1], filter[2], filter[3]);
         }
     }
 
@@ -218,13 +545,79 @@ final class StormWorkloadRuntimeCapture {
             double cloudDensityCalls,
             double densityZeroCalls, double segmentTestCalls, double segmentTestPositive,
             double boxBoundRejects, double detailOctaveEvaluations,
+            double descriptorCandidateRanks, double descriptorGroupsEntered,
+            double descriptorUnionContributors,
             double oracleSkippedDistance, double oraclePreCloudDistance,
             double oracleHoleDistance, double oraclePostCloudDistance,
             double oracleSkipEvents, double oracleIntervalsSeen,
             double oracleOverflowPixels, double oracleOpticalExits,
             ThresholdWork stepsAfterAlpha, ThresholdWork densityAfterAlpha,
             ThresholdWork descriptorAfterAlpha, ThresholdWork lightAfterAlpha,
-            ThresholdWork detailAfterAlpha
+            ThresholdWork detailAfterAlpha,
+            double lightConeMarches, double lightConeTaps,
+            double lightConeEarlyOuts, double lightCheapProbes,
+            double detailFetchPrimary, double detailFetchLight,
+            double detailFetchSecondOctave, double lightMarchBelowFloor,
+            double primaryDensityCalls, double primaryDensityZero,
+            double primaryDensityNegligible, double primaryDensityLow,
+            double primaryDensityMedium, double primaryDensityHigh,
+            double primaryMaterialRuns, double primaryZeroRuns,
+            double reuseTapsClassified, double reuseTapsEmpty,
+            double reuseSufficient, double reusePartial,
+            double reuseWrong, double reuseGroupsEnteredInTaps,
+            double reuseSuffOrd1, double reuseSuffOrd2,
+            double reuseSuffOrd3, double reuseSuffOrd4,
+            double lobeExactSdf, double lobeExactSdfNoChange,
+            double lobeVisitsLight, double lobeExactSdfLight,
+            double lobeCheapRejectLight, double lobeDominanceRejects,
+            double domChangeZero, double domChangeBelowEpsilon,
+            double domChangeTiny, double domChangeMeaningful,
+            double domZeroLight, double domZeroPrimary,
+            double domWouldRejectWithExactBlend,
+            double probeCalls, double probeGroupWalks, double probeExactSdf,
+            double bracketCalls, double bracketGroupWalks, double bracketExactSdf,
+            double otherCalls, double otherGroupWalks, double otherExactSdf,
+            double refineEvents, double scanEvents, double scanFoundMaterial,
+            double scanCapReached,
+            double scanProbes1To2, double scanProbes3To4,
+            double scanProbes5To8, double scanProbes9To16,
+            double scanWastedProbes,
+            double shapePrimary, double shapeLight, double shapeProbe,
+            double shapeBracket,
+            double shapeRefine, double shapeRainSegment, double shapeRainShaft,
+            double shapeCamera,
+            double shapeLightForward, double shapeUntagged,
+            double rainSupportCalls, double rainSupportPruned,
+            double rainSameExactXZ, double rainSameBlock,
+            double rainSameTile8,
+            double rainPrecipLow, double rainOutsideCircle,
+            double rainOutsideAabb, double rainOutsideExact,
+            double rainAcceptedZeroSupport,
+            double rainSegCalls, double rainSegSupport0, double rainSegSupport1,
+            double rainSegHeightSkip,
+            double rainSegTrueAt0, double rainSegTrueAt1,
+            // T188. Ray-side field use, then the per-cell build cost.
+            double rainFieldFetches, double rainFieldFallbacks,
+            // T190. Lookups the field answered, and those that paid the
+            // exact traversal because the cell was not provably uniform.
+            double rainFieldSafeHits, double rainFieldMixedFallbacks,
+            double fieldCellShapeCalls, double fieldCellGroupWalks,
+            double fieldCellLobeVisits, double fieldCellExactSdf,
+            // T189. The field measured against the function it replaces, and
+            // whether the texture is filtered at all. Grouped because the
+            // record sits at the JVM's 255-parameter ceiling.
+            FieldProbe fieldProbe,
+            // T190. Why columns disagree, and how much of the field the
+            // build could prove safe.
+            FieldCertainty fieldCertainty,
+            // T196. The shared storm field's audit, build cost and fetches.
+            StormField stormField,
+            // T203. The rain gate's walk classes, census, oracle and build cost.
+            RainGate rainGate,
+            // T204. The shaft path's counters and the CPU's warp-tile
+            // census of view 78, grouped: the record is at the 255-slot
+            // ceiling.
+            ShaftLanes shaftLanes
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -244,11 +637,48 @@ final class StormWorkloadRuntimeCapture {
                     directStormShapeCalls, groupFieldCalls, lobesVisited, cloudDensityCalls,
                     densityZeroCalls, segmentTestCalls, segmentTestPositive,
                     boxBoundRejects, detailOctaveEvaluations,
+                    0.0D, 0.0D, 0.0D,
                     0.0D, 0.0D, 0.0D, 0.0D,
                     0.0D, 0.0D, 0.0D, 0.0D,
                     ThresholdWork.ZERO, ThresholdWork.ZERO, ThresholdWork.ZERO,
-                    ThresholdWork.ZERO, ThresholdWork.ZERO);
+                    ThresholdWork.ZERO, ThresholdWork.ZERO,
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T175 primary density histogram, absent from the legacy shape.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T177 reuse validity, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T178 lobe attribution, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T179 dominance histogram, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T180 consumer attribution, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T181 scan distribution, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T182 shape attribution, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T184 rain-support reuse, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T185 ownership prune diagnostics, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T186 segment-sample split, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T188 rain-field use and per-cell build cost, plus T190's
+                    // safe/fallback split, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D,
+                    0.0D, 0.0D, 0.0D, 0.0D,
+                    // T189 field probe, likewise absent.
+                    FieldProbe.ZERO,
+                    // T190 certainty census, likewise absent.
+                    FieldCertainty.ZERO,
+                    // T196 storm field, likewise absent.
+                    StormField.ZERO, RainGate.ZERO, ShaftLanes.ZERO);
         }
+
+        private static String ratio(double numerator, double denominator) {
+            return denominator <= 0.0D ? "n/a" : String.format("%.4f", numerator / denominator);
+        }
+
         String format() {
             return "T123 workload view=" + view
                     + " captureToken=" + captureToken
@@ -272,6 +702,12 @@ final class StormWorkloadRuntimeCapture {
                     + " detailOctaveEvaluations=" + fmt(detailOctaveEvaluations)
                     + " lightEvaluationsPerPixel=" + perPixel(lightMarchDensityEvaluations)
                     + " detailOctaveEvaluationsPerPixel=" + perPixel(detailOctaveEvaluations)
+                    // T168. The traversal question is how many descriptors enter
+                    // the loop versus how many change the answer, so both are
+                    // reported per density call rather than per pixel.
+                    + " descriptorCandidateRanks=" + fmt(descriptorCandidateRanks)
+                    + " descriptorGroupsEntered=" + fmt(descriptorGroupsEntered)
+                    + " descriptorUnionContributors=" + fmt(descriptorUnionContributors)
                     + " oracleSkippedDistance=" + fmt(oracleSkippedDistance)
                     + " oraclePreCloudDistance=" + fmt(oraclePreCloudDistance)
                     + " oracleHoleDistance=" + fmt(oracleHoleDistance)
@@ -285,7 +721,405 @@ final class StormWorkloadRuntimeCapture {
                     + " densityAfterAlpha=" + densityAfterAlpha.format()
                     + " descriptorAfterAlpha=" + descriptorAfterAlpha.format()
                     + " lightAfterAlpha=" + lightAfterAlpha.format()
-                    + " detailAfterAlpha=" + detailAfterAlpha.format();
+                    + " detailAfterAlpha=" + detailAfterAlpha.format()
+                    // T169. Taps alone cannot separate "more material sampled"
+                    // from "more lighting per sample", so marches and taps are
+                    // reported apart, and detail is split by the path that
+                    // asked for it.
+                    + " lightConeMarches=" + fmt(lightConeMarches)
+                    + " lightConeTaps=" + fmt(lightConeTaps)
+                    + " lightConeEarlyOuts=" + fmt(lightConeEarlyOuts)
+                    + " lightCheapProbes=" + fmt(lightCheapProbes)
+                    + " lightMarchBelowFloor=" + fmt(lightMarchBelowFloor)
+                    + " tapsPerConeMarch=" + ratio(lightConeTaps, lightConeMarches)
+                    + " coneMarchesPerDensityCall=" + ratio(lightConeMarches, cloudDensityCalls)
+                    + " detailFetchPrimary=" + fmt(detailFetchPrimary)
+                    + " detailFetchLight=" + fmt(detailFetchLight)
+                    + " primaryDensityCalls=" + fmt(primaryDensityCalls)
+                    + " primaryDensityZero=" + fmt(primaryDensityZero)
+                    + " primaryDensityNegligible=" + fmt(primaryDensityNegligible)
+                    + " primaryDensityLow=" + fmt(primaryDensityLow)
+                    + " primaryDensityMedium=" + fmt(primaryDensityMedium)
+                    + " primaryDensityHigh=" + fmt(primaryDensityHigh)
+                    + " primaryMaterialRuns=" + fmt(primaryMaterialRuns)
+                    + " primaryZeroRuns=" + fmt(primaryZeroRuns)
+                    // Derived here so the report cannot restate them wrongly:
+                    // T174 conflated primary and lighting density calls and
+                    // reported 25.37 per pixel when the primary march makes
+                    // 11.28. These ratios are primary-only by construction.
+                    + " primaryDensityPerPixel="
+                    + ratio(primaryDensityCalls, (double) width * (double) height)
+                    + " materialFraction="
+                    + ratio(primaryDensityLow + primaryDensityMedium + primaryDensityHigh,
+                            primaryDensityCalls)
+                    + " emptyFraction="
+                    + ratio(primaryDensityZero + primaryDensityNegligible, primaryDensityCalls)
+                    + " meanMaterialRun="
+                    + ratio(primaryDensityLow + primaryDensityMedium + primaryDensityHigh,
+                            primaryMaterialRuns)
+                    + " meanEmptyRun="
+                    + ratio(primaryDensityZero + primaryDensityNegligible, primaryZeroRuns)
+                    + " detailFetchSecondOctave=" + fmt(detailFetchSecondOctave)
+                    + " detailFetchLightShare=" + ratio(detailFetchLight,
+                            detailFetchPrimary + detailFetchLight)
+                    // T177. Reuse validity, derived here for the same reason
+                    // the primary ratios are: so a report cannot restate them
+                    // wrongly. "Classified" counts only taps that reached the
+                    // candidate walk and resolved at least one contributing
+                    // group; taps that resolved none are counted separately
+                    // rather than being scored as trivially reusable.
+                    + " reuseTapsClassified=" + fmt(reuseTapsClassified)
+                    + " reuseTapsEmpty=" + fmt(reuseTapsEmpty)
+                    + " reuseSufficient=" + fmt(reuseSufficient)
+                    + " reusePartial=" + fmt(reusePartial)
+                    + " reuseWrong=" + fmt(reuseWrong)
+                    + " reuseGroupsEnteredInTaps=" + fmt(reuseGroupsEnteredInTaps)
+                    + " reuseSuffOrd1=" + fmt(reuseSuffOrd1)
+                    + " reuseSuffOrd2=" + fmt(reuseSuffOrd2)
+                    + " reuseSuffOrd3=" + fmt(reuseSuffOrd3)
+                    + " reuseSuffOrd4=" + fmt(reuseSuffOrd4)
+                    + " reuseValidFraction="
+                    + ratio(reuseSufficient, reuseTapsClassified)
+                    + " reusePartialFraction="
+                    + ratio(reusePartial, reuseTapsClassified)
+                    + " reuseWrongFraction="
+                    + ratio(reuseWrong, reuseTapsClassified)
+                    + " groupsPerLightTap="
+                    + ratio(reuseGroupsEnteredInTaps, lightConeTaps)
+                    // T178. A lobe VISIT is not an expensive lobe EVALUATION.
+                    // Production already rejects some visits cheaply through
+                    // the T121 bound; only the lobes that pay a full exact SDF
+                    // and then fail to move the union are opportunity.
+                    + " lobeExactSdf=" + fmt(lobeExactSdf)
+                    + " lobeExactSdfNoChange=" + fmt(lobeExactSdfNoChange)
+                    + " lobeVisitsLight=" + fmt(lobeVisitsLight)
+                    + " lobeExactSdfLight=" + fmt(lobeExactSdfLight)
+                    + " lobeCheapRejectLight=" + fmt(lobeCheapRejectLight)
+                    + " lobeDominanceRejects=" + fmt(lobeDominanceRejects)
+                    // T179. What each exact SDF did to the union. "Zero" is the
+                    // strict ceiling: those lobes could have been skipped with
+                    // no image consequence at all.
+                    + " domChangeZero=" + fmt(domChangeZero)
+                    + " domChangeBelowEpsilon=" + fmt(domChangeBelowEpsilon)
+                    + " domChangeTiny=" + fmt(domChangeTiny)
+                    + " domChangeMeaningful=" + fmt(domChangeMeaningful)
+                    + " domZeroLight=" + fmt(domZeroLight)
+                    + " domZeroPrimary=" + fmt(domZeroPrimary)
+                    + " domWouldRejectWithExactBlend="
+                    + fmt(domWouldRejectWithExactBlend)
+                    + " domZeroFraction=" + ratio(domChangeZero, lobeExactSdf)
+                    + " domZeroPerGroupWalk=" + ratio(domChangeZero, groupFieldCalls)
+                    + " domExactBlendGainPerGroupWalk="
+                    + ratio(domWouldRejectWithExactBlend, groupFieldCalls)
+                    // T180. Direct consumer attribution. T175 derived the
+                    // "48% segment/probe/quadrature" class by subtraction;
+                    // these are tagged at the real call sites instead, so the
+                    // buckets are disjoint and sum back to the total.
+                    + " probeCalls=" + fmt(probeCalls)
+                    + " probeGroupWalks=" + fmt(probeGroupWalks)
+                    + " probeExactSdf=" + fmt(probeExactSdf)
+                    + " bracketCalls=" + fmt(bracketCalls)
+                    + " bracketGroupWalks=" + fmt(bracketGroupWalks)
+                    + " bracketExactSdf=" + fmt(bracketExactSdf)
+                    + " otherCalls=" + fmt(otherCalls)
+                    + " otherGroupWalks=" + fmt(otherGroupWalks)
+                    + " otherExactSdf=" + fmt(otherExactSdf)
+                    + " probeWalkShare=" + ratio(probeGroupWalks, groupFieldCalls)
+                    + " bracketWalkShare=" + ratio(bracketGroupWalks, groupFieldCalls)
+                    + " otherWalkShare=" + ratio(otherGroupWalks, groupFieldCalls)
+                    + " probeSdfShare=" + ratio(probeExactSdf, lobeExactSdf)
+                    + " bracketSdfShare=" + ratio(bracketExactSdf, lobeExactSdf)
+                    // T181. The probe cap is 16 but the loop exits early, so
+                    // these say whether 16 ever binds - and how much of the
+                    // scan is duplicated by the fine march that follows it.
+                    + " refineEvents=" + fmt(refineEvents)
+                    + " scanEvents=" + fmt(scanEvents)
+                    + " scanFoundMaterial=" + fmt(scanFoundMaterial)
+                    + " scanCapReached=" + fmt(scanCapReached)
+                    + " scanProbes1To2=" + fmt(scanProbes1To2)
+                    + " scanProbes3To4=" + fmt(scanProbes3To4)
+                    + " scanProbes5To8=" + fmt(scanProbes5To8)
+                    + " scanProbes9To16=" + fmt(scanProbes9To16)
+                    + " scanWastedProbes=" + fmt(scanWastedProbes)
+                    + " probesPerScan=" + ratio(probeCalls, scanEvents)
+                    + " scanCapBindFraction=" + ratio(scanCapReached, scanEvents)
+                    + " scanMaterialFraction=" + ratio(scanFoundMaterial, scanEvents)
+                    + " wastedProbeFraction=" + ratio(scanWastedProbes, probeCalls)
+                    // T182. directStormShape by consumer. shapeUntagged must be
+                    // zero and shapeTagged must equal directStormShapeCalls, or
+                    // the attribution is incomplete and no share derived from it
+                    // can be trusted - which is exactly how T180 went wrong.
+                    + " shapePrimary=" + fmt(shapePrimary)
+                    + " shapeLight=" + fmt(shapeLight)
+                    + " shapeProbe=" + fmt(shapeProbe)
+                    + " shapeBracket=" + fmt(shapeBracket)
+                    + " shapeRefine=" + fmt(shapeRefine)
+                    + " shapeRainSegment=" + fmt(shapeRainSegment)
+                    + " shapeRainShaft=" + fmt(shapeRainShaft)
+                    + " shapeCamera=" + fmt(shapeCamera)
+                    + " shapeLightForward=" + fmt(shapeLightForward)
+                    + " shapeUntagged=" + fmt(shapeUntagged)
+                    + " shapeTagged=" + fmt(shapePrimary + shapeLight + shapeProbe
+                            + shapeBracket + shapeRefine + shapeRainSegment
+                            + shapeRainShaft + shapeCamera + shapeLightForward)
+                    // T183. The tolerance was half a call, which is stricter than
+                    // the capture can be: each debug view is a separately rendered
+                    // frame, so the totals are sampled from different frames and
+                    // disagree by a fraction of a percent. 0.5% is two orders of
+                    // magnitude above that variance and two orders below the
+                    // smallest consumer ever found (rain shaft, 0.77% at SIDE), so
+                    // it still fails if a real consumer goes missing.
+                    // shapeUntagged stays a strict zero - that is the structural
+                    // check, and this is only the arithmetic one.
+                    + " shapeAccountingResidual="
+                    + fmt(shapePrimary + shapeLight + shapeProbe + shapeBracket
+                            + shapeRefine + shapeRainSegment + shapeRainShaft
+                            + shapeCamera + shapeLightForward + shapeUntagged
+                            - directStormShapeCalls)
+                    + " shapeAccountingResidualFraction="
+                    + ratio(Math.abs(shapePrimary + shapeLight + shapeProbe
+                            + shapeBracket + shapeRefine + shapeRainSegment
+                            + shapeRainShaft + shapeCamera + shapeLightForward
+                            + shapeUntagged - directStormShapeCalls),
+                            directStormShapeCalls)
+                    + " shapeAccountingClosed="
+                    + (shapeUntagged == 0.0D
+                        && Math.abs(shapePrimary + shapeLight + shapeProbe
+                            + shapeBracket + shapeRefine + shapeRainSegment
+                            + shapeRainShaft + shapeCamera + shapeLightForward
+                            + shapeUntagged - directStormShapeCalls)
+                                <= 0.005D * Math.max(1.0D, directStormShapeCalls))
+                    + " shapeRainSegmentShare="
+                    + ratio(shapeRainSegment, directStormShapeCalls)
+                    // T184. localRainSupportAt is a pure function of worldXZ
+                    // within a frame, so these say how much of it is literally
+                    // recomputed - measured against the immediately preceding
+                    // query, which is the only cache shape worth building.
+                    + " rainSupportCalls=" + fmt(rainSupportCalls)
+                    + " rainSupportPruned=" + fmt(rainSupportPruned)
+                    + " rainSameExactXZ=" + fmt(rainSameExactXZ)
+                    + " rainSameBlock=" + fmt(rainSameBlock)
+                    + " rainSameTile8=" + fmt(rainSameTile8)
+                    + " rainPrunedFraction=" + ratio(rainSupportPruned, rainSupportCalls)
+                    + " rainExactReuseFraction="
+                    + ratio(rainSameExactXZ, rainSupportCalls)
+                    + " rainBlockReuseFraction="
+                    + ratio(rainSameBlock, rainSupportCalls)
+                    + " rainTileReuseFraction="
+                    + ratio(rainSameTile8, rainSupportCalls)
+                    // T185. The prune is a conjunct, so each half is counted
+                    // separately: if the precipitation half fails, tightening
+                    // the geometry cannot help no matter how loose it is.
+                    + " rainPrecipLow=" + fmt(rainPrecipLow)
+                    + " rainOutsideCircle=" + fmt(rainOutsideCircle)
+                    + " rainOutsideAabb=" + fmt(rainOutsideAabb)
+                    + " rainOutsideExact=" + fmt(rainOutsideExact)
+                    + " rainAcceptedZeroSupport=" + fmt(rainAcceptedZeroSupport)
+                    + " rainPrecipLowFraction=" + ratio(rainPrecipLow, rainSupportCalls)
+                    + " rainOutsideCircleFraction="
+                    + ratio(rainOutsideCircle, rainSupportCalls)
+                    + " rainOutsideAabbFraction="
+                    + ratio(rainOutsideAabb, rainSupportCalls)
+                    + " rainOutsideExactFraction="
+                    + ratio(rainOutsideExact, rainSupportCalls)
+                    + " rainFalsePositiveFraction="
+                    + ratio(rainAcceptedZeroSupport,
+                            Math.max(1.0D, rainSupportCalls - rainSupportPruned))
+                    // T186. The two-sample rule is an OR with an early return,
+                    // so the second sample is already conditional. These say
+                    // how often it runs at all and how often it is the one
+                    // that finds the rain - which is what a one-sample arm
+                    // would actually remove, and lose.
+                    + " rainSegCalls=" + fmt(rainSegCalls)
+                    + " rainSegSupport0=" + fmt(rainSegSupport0)
+                    + " rainSegSupport1=" + fmt(rainSegSupport1)
+                    + " rainSegHeightSkip=" + fmt(rainSegHeightSkip)
+                    + " rainSegTrueAt0=" + fmt(rainSegTrueAt0)
+                    + " rainSegTrueAt1=" + fmt(rainSegTrueAt1)
+                    + " rainSupportPerSegCall="
+                    + ratio(rainSegSupport0 + rainSegSupport1, rainSegCalls)
+                    + " rainSecondSampleRunFraction="
+                    + ratio(rainSegSupport1, rainSegCalls)
+                    + " rainSecondSampleDecidesFraction="
+                    + ratio(rainSegTrueAt1,
+                            Math.max(1.0D, rainSegTrueAt0 + rainSegTrueAt1))
+                    + " lobeVisitsPerGroupWalk=" + ratio(lobesVisited, groupFieldCalls)
+                    + " exactSdfPerGroupWalk=" + ratio(lobeExactSdf, groupFieldCalls)
+                    + " cheapRejectPerGroupWalk="
+                    + ratio(conservativeDescriptorRejects, groupFieldCalls)
+                    + " contributorsPerGroupWalk="
+                    + ratio(descriptorUnionContributors, groupFieldCalls)
+                    + " wastedSdfPerGroupWalk="
+                    + ratio(lobeExactSdfNoChange, groupFieldCalls)
+                    + " wastedSdfFraction="
+                    + ratio(lobeExactSdfNoChange, lobeExactSdf)
+                    // T188. The structural proof. Fetches are the traversals the
+                    // field removed from the ray; fallbacks are the columns
+                    // outside the field domain that still have to walk, and are
+                    // the honest cost of keeping the answer exact at the edge.
+                    + " rainFieldFetches=" + fmt(rainFieldFetches)
+                    + " rainFieldFallbacks=" + fmt(rainFieldFallbacks)
+                    + " rainFieldFallbackFraction="
+                    + ratio(rainFieldFallbacks,
+                            Math.max(1.0D, rainFieldFetches + rainFieldFallbacks))
+                    // The build side, per cell. Multiplying by the cell count
+                    // gives the generation pass's descriptor work, which is the
+                    // half of the trade a cloud-ray saving alone hides.
+                    + " fieldCellShapeCalls=" + fmt(fieldCellShapeCalls)
+                    + " fieldCellGroupWalks=" + fmt(fieldCellGroupWalks)
+                    + " fieldCellLobeVisits=" + fmt(fieldCellLobeVisits)
+                    + " fieldCellExactSdf=" + fmt(fieldCellExactSdf)
+                    + " fieldCellShapeCallsPerPixel="
+                    + perPixel(fieldCellShapeCalls)
+                    + " fieldCellGroupWalksPerPixel="
+                    + perPixel(fieldCellGroupWalks)
+                    + " fieldCellExactSdfPerPixel="
+                    + perPixel(fieldCellExactSdf)
+                    // T189. Ownership is the channel that failed, so its
+                    // disagreement rate is reported over every sampled column,
+                    // while the two continuous errors are means over the
+                    // columns where a comparison is meaningful at all.
+                    + " fieldOwnershipDisagreements="
+                    + fmt(fieldProbe.ownershipDisagreements())
+                    + " fieldOwnershipDisagreementFraction="
+                    + ratio(fieldProbe.ownershipDisagreements(),
+                            Math.max(1.0D, (double) width * (double) height))
+                    + " fieldBothOwnSamples=" + fmt(fieldProbe.bothOwnSamples())
+                    + " fieldSupportErrorSum=" + fmt(fieldProbe.supportErrorSum())
+                    + " fieldMeanSupportError="
+                    + ratio(fieldProbe.supportErrorSum(),
+                            Math.max(1.0D, (double) width * (double) height))
+                    + " fieldAttachErrorSum=" + fmt(fieldProbe.attachErrorSum())
+                    + " fieldMeanAttachError="
+                    + ratio(fieldProbe.attachErrorSum(),
+                            Math.max(1.0D, fieldProbe.bothOwnSamples()))
+                    // T189. The premise test. Zero fractional samples over a
+                    // grid of sub-texel-offset columns means the texture is not
+                    // being filtered, whatever GL_LINEAR was asked for - and
+                    // then interpolation cannot be the cause of anything.
+                    + " fieldFractionalOwnSamples=" + fmt(fieldProbe.fractionalOwnSamples())
+                    + " fieldFilterSamples=" + fmt(fieldProbe.filterSamples())
+                    + " fieldFractionalOwnFraction="
+                    + ratio(fieldProbe.fractionalOwnSamples(),
+                            Math.max(1.0D, fieldProbe.filterSamples()))
+                    + " fieldOwnFilterDeltaSum=" + fmt(fieldProbe.ownFilterDeltaSum())
+                    + " fieldSupportFilterDeltaSum=" + fmt(fieldProbe.supportFilterDeltaSum())
+                    + " fieldTextureIsFiltered="
+                    + (fieldProbe.ownFilterDeltaSum()
+                            + fieldProbe.supportFilterDeltaSum() > 0.0D)
+                    // T190. What actually causes a column to disagree, so the
+                    // classifier is designed against the measured cause rather
+                    // than an assumed one.
+                    + " whyOwnershipDiffers=" + fmt(fieldCertainty.ownershipDiffers())
+                    + " whySupportCutoffDiffers="
+                    + fmt(fieldCertainty.supportCutoffDiffers())
+                    + " whyAttachDiffers=" + fmt(fieldCertainty.attachDiffers())
+                    + " whySamples=" + fmt(fieldCertainty.attributionSamples())
+                    + " whyOwnershipFraction="
+                    + ratio(fieldCertainty.ownershipDiffers(),
+                            Math.max(1.0D, fieldCertainty.attributionSamples()))
+                    // The census. Sampled over 49.4% of the cells, so a mixed
+                    // FRACTION rather than an exact count.
+                    + " censusMixedCells=" + fmt(fieldCertainty.mixedCells())
+                    + " censusOwnedCells=" + fmt(fieldCertainty.ownedCells())
+                    + " censusProvablyDryCells=" + fmt(fieldCertainty.provablyDryCells())
+                    + " closedFormTriageFraction="
+                    + ratio(fieldCertainty.provablyDryCells(),
+                            Math.max(1.0D, fieldCertainty.censusSamples()))
+                    + " censusSamples=" + fmt(fieldCertainty.censusSamples())
+                    + " mixedCellFraction="
+                    + ratio(fieldCertainty.mixedCells(),
+                            Math.max(1.0D, fieldCertainty.censusSamples()))
+                    // The rate that decides the architecture: what fraction of
+                    // ray lookups the field answered outright.
+                    + " rainFieldSafeHits=" + fmt(rainFieldSafeHits)
+                    + " rainFieldMixedFallbacks=" + fmt(rainFieldMixedFallbacks)
+                    + " fallbackFraction="
+                    + ratio(rainFieldMixedFallbacks,
+                            Math.max(1.0D, rainFieldSafeHits + rainFieldMixedFallbacks))
+                    + " fallbacksPerPixel=" + perPixel(rainFieldMixedFallbacks)
+                    // T196. The probe audit is the soundness figure on the ray:
+                    // falseEmpty must be a strict zero. The node cost is what
+                    // one field node pays in the ray's own counters, so the
+                    // build can be compared with the traversal it removes.
+                    + " stormFieldProbeFalseEmpty=" + fmt(stormField.probeFalseEmpty())
+                    + " stormFieldProbeFalseOccupied=" + fmt(stormField.probeFalseOccupied())
+                    + " stormFieldProbeAgreeEmpty=" + fmt(stormField.probeAgreeEmpty())
+                    + " stormFieldProbeAgreeOccupied=" + fmt(stormField.probeAgreeOccupied())
+                    + " stormFieldProbeFalseOccupiedFraction="
+                    + ratio(stormField.probeFalseOccupied(),
+                            Math.max(1.0D, stormField.probeFalseEmpty()
+                                    + stormField.probeFalseOccupied()
+                                    + stormField.probeAgreeEmpty()
+                                    + stormField.probeAgreeOccupied()))
+                    + " stormFieldNodeShapeCalls=" + fmt(stormField.nodeShapeCalls())
+                    + " stormFieldNodeGroupWalks=" + fmt(stormField.nodeGroupWalks())
+                    + " stormFieldNodeLobeVisits=" + fmt(stormField.nodeLobeVisits())
+                    + " stormFieldNodeExactSdf=" + fmt(stormField.nodeExactSdf())
+                    + " stormFieldNodeShapeCallsPerPixel=" + perPixel(stormField.nodeShapeCalls())
+                    + " stormFieldNodeGroupWalksPerPixel=" + perPixel(stormField.nodeGroupWalks())
+                    + " stormFieldNodeExactSdfPerPixel=" + perPixel(stormField.nodeExactSdf())
+                    + " stormFieldLightFetches=" + fmt(stormField.lightFetches())
+                    + " stormFieldProbeFetches=" + fmt(stormField.probeFetches())
+                    + " stormFieldLightFetchesPerPixel=" + perPixel(stormField.lightFetches())
+                    + " stormFieldProbeFetchesPerPixel=" + perPixel(stormField.probeFetches())
+                    + " stormFieldProbeProvablyEmpty=" + fmt(stormField.probeProvablyEmpty())
+                    + " stormFieldProbeFallback=" + fmt(stormField.probeFallback())
+                    // T202. The body consumers: how many primary samples and
+                    // refinement events the field served, and how many each
+                    // handed back to the exact walk.
+                    + " stormFieldPrimaryFetches=" + fmt(stormField.primaryFetches())
+                    + " stormFieldPrimaryFallback=" + fmt(stormField.primaryFallback())
+                    + " stormFieldRefineFetches=" + fmt(stormField.refineFetches())
+                    + " stormFieldRefineFallback=" + fmt(stormField.refineFallback())
+                    + " stormFieldPrimaryFetchesPerPixel=" + perPixel(stormField.primaryFetches())
+                    + " stormFieldRefineFetchesPerPixel=" + perPixel(stormField.refineFetches())
+                    // T203. Where the rain-support walks end up (Task 1),
+                    // the gate's census on the ray (Task 8), its soundness
+                    // oracle and proof census, and the per-cell build cost.
+                    + " rainWalkUnowned=" + fmt(rainGate.walkUnowned())
+                    + " rainWalkOwnedNoBase=" + fmt(rainGate.walkOwnedNoBase())
+                    + " rainWalkOwnedEnvelopeZero=" + fmt(rainGate.walkOwnedEnvelopeZero())
+                    + " rainWalkOwnedEroded=" + fmt(rainGate.walkOwnedEroded())
+                    + " rainWalkOwnedSupported=" + fmt(rainGate.walkOwnedSupported())
+                    + " rainSegSupported=" + fmt(rainGate.segSupported())
+                    + " rainSegAboveAttach=" + fmt(rainGate.segAboveAttach())
+                    + " rainSegBelowWindow=" + fmt(rainGate.segBelowWindow())
+                    + " rainGateFetches=" + fmt(rainGate.gateFetches())
+                    + " rainGateDryRejects=" + fmt(rainGate.gateDryRejects())
+                    + " rainGateWindowRejects=" + fmt(rainGate.gateWindowRejects())
+                    + " rainGateFallbacks=" + fmt(rainGate.gateFallbacks())
+                    + " rainGateOutOfDomain=" + fmt(rainGate.gateOutOfDomain())
+                    + " rainGatePrecipFallbacks=" + fmt(rainGate.gatePrecipFallbacks())
+                    + " rainGateFallbackWalks=" + fmt(rainGate.gateFallbackWalks())
+                    + " rainGateFallbackSupported=" + fmt(rainGate.gateFallbackSupported())
+                    + " rainGateRejectFraction="
+                    + ratio(rainGate.gateDryRejects() + rainGate.gateWindowRejects(),
+                            Math.max(1.0D, rainGate.gateFetches()))
+                    + " rainGateFallbackFraction="
+                    + ratio(rainGate.gateFallbacks(), Math.max(1.0D, rainGate.gateFetches()))
+                    + " rainGateFallbackPrecision="
+                    + ratio(rainGate.gateFallbackSupported(),
+                            Math.max(1.0D, rainGate.gateFallbackWalks()))
+                    + " rainGateOracleFalseDry=" + fmt(rainGate.oracleFalseDry())
+                    + " rainGateOracleWindowViolations=" + fmt(rainGate.oracleWindowViolations())
+                    + " rainGateOracleExcessAboveMilliBlocks=" + fmt(rainGate.oracleExcessAbove())
+                    + " rainGateOracleExcessBelowMilliBlocks=" + fmt(rainGate.oracleExcessBelow())
+                    + " rainGateOracleDryCells="
+                    + fmt(rainGate.censusUnowned() + rainGate.censusNoBase() + rainGate.censusEnvelope())
+                    + " rainGateCensusUnowned=" + fmt(rainGate.censusUnowned())
+                    + " rainGateCensusNoBase=" + fmt(rainGate.censusNoBase())
+                    + " rainGateCensusEnvelope=" + fmt(rainGate.censusEnvelope())
+                    + " rainGateCensusPrecip=" + fmt(rainGate.censusPrecip())
+                    + " rainGateCellShapeCalls=" + fmt(rainGate.cellShapeCalls())
+                    + " rainGateCellGroupWalks=" + fmt(rainGate.cellGroupWalks())
+                    + " rainGateCellLobeVisits=" + fmt(rainGate.cellLobeVisits())
+                    + " rainGateCellExactSdf=" + fmt(rainGate.cellExactSdf())
+                    + " rainGateCellShapeCallsPerPixel=" + perPixel(rainGate.cellShapeCalls())
+                    + " rainGateCellExactSdfPerPixel=" + perPixel(rainGate.cellExactSdf())
+                    // T204. The shaft path and its spatial census.
+                    + " shaftPositivePixelFraction=" + perPixel(shaftLanes.positivePixels())
+                    + shaftLanes.format();
         }
 
         double oraclePostOpacityDistance() {

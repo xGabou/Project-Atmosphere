@@ -1,0 +1,32 @@
+PHASE4R_RESULT|T171 the GPU sampler records only fresh timer results|PASSED|invariant satisfied
+PHASE4R_RESULT|T172 precompute arms compile and stay out of FINAL|PASSED|invariant satisfied
+T172_PRECOMPUTE texels=5|minEdge=11.363636|edgeBound=0.75|channelsPinned=true
+PHASE4R_RESULT|T172 the CPU precompute still matches the shader formula|PASSED|invariant satisfied
+T175_WORKLOAD_VIEWS declared=16|allEnabled=true
+PHASE4R_RESULT|T175 every workload debug view is actually enabled|PASSED|invariant satisfied
+PHASE4R_RESULT|T163 FINAL is specialized against the dead precipitation path|PASSED|invariant satisfied
+
+> Task :addMixinsToJar
+> Task :jar
+> Task :configureReobfTaskForReobfJar
+> Task :reobfJar
+> Task :addMixinsToJarJar
+> Task :jarJar SKIPPED
+> Task :test
+
+> Task :volumetricStabilityDiagnosticsSandbox
+PHASE4R_RESULT|T078 rain and rendered-body agreement|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 independent lifecycle generations|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 same-frame history invalidation|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 shaftDensity maxPrecipitation argument|PASSED|invariant satisfied
+
+> Task :check
+> Task :configureReobfTaskForReobfJarJar
+> Task :reobfJarJar SKIPPED
+> Task :assemble
+> Task :build
+
+BUILD SUCCESSFUL in 14m 55s
+24 actionable tasks: 18 executed, 6 up-to-date
+
+[exited with code 0]

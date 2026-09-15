@@ -29,8 +29,33 @@ public record StormLobeDescriptor(
         float verticalDevelopment,
         float detailWeight
 ) {
-    public static final int TEXELS_PER_DESCRIPTOR = 4;
+    /**
+     * T172. Five, not four.
+     *
+     * <p>Texel 3 used to carry {@code (seed01, lifecycleStage,
+     * verticalDevelopment, packedGroupRole)}, of which the shader read only
+     * {@code .w}. Its three unused channels now carry the sample-independent
+     * values the march would otherwise recompute once per descriptor per
+     * density sample, and the three displaced fields move to a fifth texel that
+     * only the CPU round-trip reads.
+     *
+     * <p>The point of that arrangement is that the hot loop's fetch pattern is
+     * unchanged: it already fetched texel 3 for the role, so the precomputed
+     * values arrive for free. Texel 4 is never fetched by the shader.
+     */
+    public static final int TEXELS_PER_DESCRIPTOR = 5;
     public static final int FLOATS_PER_DESCRIPTOR = TEXELS_PER_DESCRIPTOR * 4;
+
+    /**
+     * Must equal {@code STORM_MIN_EDGE_BLOCKS} in
+     * {@code cloud_atmosphere_volume.fsh}. The sandbox parses the shader and
+     * fails the build if the two drift, because a precomputed value that no
+     * longer matches what the shader would have computed is a silent image
+     * change.
+     */
+    static final float STORM_MIN_EDGE_BLOCKS = 11.363636F;
+    /** Must equal {@code STORM_VERTICAL_EDGE_BOUND_FRACTION} in the shader. */
+    static final float STORM_VERTICAL_EDGE_BOUND_FRACTION = 0.75F;
     private static final int ROLE_PACK_BASE = 8;
     private static final int MEMBER_INDEX_PACK_BASE = 64;
     private static final int MEMBER_COUNT_PACK_BASE = 64;
@@ -149,7 +174,9 @@ public record StormLobeDescriptor(
                 texels[offset], texels[offset + 1], texels[offset + 2], texels[offset + 3],
                 texels[offset + 4], texels[offset + 5], texels[offset + 6], texels[offset + 7],
                 texels[offset + 8], texels[offset + 9], texels[offset + 10], texels[offset + 11],
-                texels[offset + 12], texels[offset + 13], texels[offset + 14], 1.0F
+                // T172: seed / lifecycle / vertical development moved to texel 4
+                // when texel 3's spare channels were given to the precompute.
+                texels[offset + 16], texels[offset + 17], texels[offset + 18], 1.0F
         );
     }
 
@@ -215,10 +242,12 @@ public record StormLobeDescriptor(
         destination[offset + 9] = shearZ;
         destination[offset + 10] = density * detailWeight;
         destination[offset + 11] = edgeSoftness;
-        destination[offset + 12] = seed01;
-        destination[offset + 13] = lifecycleStage;
-        destination[offset + 14] = verticalDevelopment;
         destination[offset + 15] = packedGroupRole();
+        destination[offset + 16] = seed01;
+        destination[offset + 17] = lifecycleStage;
+        destination[offset + 18] = verticalDevelopment;
+        destination[offset + 19] = 0.0F;
+        writePrecomputedInvariants(destination, offset);
     }
 
     /** Writes a live cell directly into reusable upload storage without allocating a descriptor. */
@@ -252,15 +281,83 @@ public record StormLobeDescriptor(
         destination[offset + 9] = sin * shear;
         destination[offset + 10] = clamp01(cell.density());
         destination[offset + 11] = Math.max(0.001F, clamp01(cell.edgeSoftness()));
-        destination[offset + 12] = clamp01(cell.seed01());
-        destination[offset + 13] = clamp01(cell.lifecycleStage());
-        destination[offset + 14] = clamp01(cell.verticalDevelopment());
         destination[offset + 15] = packTopology(
                 groupSlot,
                 cell.morphologyMemberCount(),
                 cell.morphologyMemberIndex(),
                 role.gpuId()
         );
+        destination[offset + 16] = clamp01(cell.seed01());
+        destination[offset + 17] = clamp01(cell.lifecycleStage());
+        destination[offset + 18] = clamp01(cell.verticalDevelopment());
+        destination[offset + 19] = 0.0F;
+        writePrecomputedInvariants(destination, offset);
+    }
+
+    /**
+     * T172. Fills texel 3's three spare channels with the descriptor values the
+     * shader's group walk would otherwise recompute at every density sample.
+     *
+     * <p>T170 measured those two terms at 1.395x (edge width) and 1.035x
+     * (ownership extents) at the SIDE pose, and T171 reconfirmed the combined
+     * hoist at 1.421x - the largest image-identical opportunity in the line.
+     * Neither term takes a sample position: both are pure functions of the
+     * descriptor payload and the role, so their value is fixed for the life of
+     * a frame's descriptor set.
+     *
+     * <p>This is deliberately a literal float transcription of
+     * {@code stormEdgeWidthBlocksFromData} and the ownership extents in
+     * {@code directStormGroupField}, and deliberately NOT a call into
+     * {@link StormLobeEvaluator#edgeWidthBlocks}. The evaluator computes the
+     * same quantity in double for CPU geometry work; this has to reproduce what
+     * the shader produced, bit for bit where the hardware allows, because any
+     * difference is an image change rather than a rounding improvement.
+     *
+     * <p>Must be called after texels 0-11 and offset+15 are written: it reads
+     * the radii, the orientation, the edge softness and the packed role.
+     */
+    static void writePrecomputedInvariants(float[] destination, int offset) {
+        float majorRadius = destination[offset + 4];
+        float minorRadius = destination[offset + 5];
+        float sinOrientation = destination[offset + 6];
+        float cosOrientation = destination[offset + 7];
+        float edgeSoftness = destination[offset + 11];
+        int role = unpackRole(Math.round(destination[offset + 15]));
+
+        // stormEdgeWidthBlocksFromData, transcribed.
+        float normalized = role == 3
+                ? Math.max(0.12F, edgeSoftness * 1.65F)
+                : (role == 0
+                        ? Math.max(0.06F, edgeSoftness * 0.66F)
+                        : Math.max(0.06F, edgeSoftness * 0.62F));
+        float horizontal = normalized * Math.min(majorRadius, minorRadius);
+        // stormDescriptorVerticalBounds, transcribed.
+        float roleBaseY = destination[offset + 2];
+        float roleTopY = destination[offset + 3];
+        if (role == 1) {
+            roleTopY += 32.0F;
+        } else if (role == 2) {
+            roleBaseY -= 28.0F;
+        } else if (role == 3) {
+            roleBaseY -= 12.0F;
+            roleTopY += 16.0F;
+        }
+        float halfHeight = Math.max(roleTopY - roleBaseY, 1.0F) * 0.5F;
+        destination[offset + 12] = Math.max(STORM_MIN_EDGE_BLOCKS,
+                Math.min(horizontal, halfHeight * STORM_VERTICAL_EDGE_BOUND_FRACTION));
+
+        // The ownership ellipse's rotated extents, and the 1.85 widening and
+        // unit floor the walk applies to them, transcribed together so the
+        // shader consumes a finished radius rather than re-deriving one.
+        float extentX = floatLength(majorRadius * cosOrientation, minorRadius * sinOrientation);
+        float extentZ = floatLength(majorRadius * sinOrientation, minorRadius * cosOrientation);
+        destination[offset + 13] = Math.max(extentX * 1.85F, 1.0F);
+        destination[offset + 14] = Math.max(extentZ * 1.85F, 1.0F);
+    }
+
+    /** GLSL {@code length(vec2)} at float precision. */
+    private static float floatLength(float x, float y) {
+        return (float) Math.sqrt((double) (x * x + y * y));
     }
 
     private static float clamp01(float value) {

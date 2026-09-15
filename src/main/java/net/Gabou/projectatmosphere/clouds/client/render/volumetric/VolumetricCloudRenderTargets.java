@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 
 /**
@@ -25,6 +26,7 @@ public final class VolumetricCloudRenderTargets {
     private static RenderTarget stormDescriptorTarget;
     private static RenderTarget puffCandidateTarget;
     private static RenderTarget shadowTarget;
+    private static RenderTarget rainFieldTarget;
     /** T153-only ground-truth interval map; never sampled by production. */
     private static RenderTarget visibleVolumeOracleTarget;
     private static final RenderTarget[] cloudTargets = new RenderTarget[2];
@@ -152,6 +154,350 @@ public final class VolumetricCloudRenderTargets {
         return cumulusStageTopTarget;
     }
 
+    /**
+     * T188. The precomputed rain-support field, on the same domain and at the
+     * same resolution as the weather and morphology maps it sits beside.
+     *
+     * <p>RGBA32F rather than the RGBA16F those maps use, because channel G is
+     * an attach height in world blocks. Half float carries an ulp of 0.5 near
+     * a 1000-block storm top, which would put a quantisation error into the
+     * stored value on top of the spatial one this field is measured for, and
+     * confound the two.
+     *
+     * <p>Filtered LINEAR to match the maps it joins: the field is a smooth
+     * scalar sampled at arbitrary XZ, so the alternative is a visible
+     * eight-block staircase at every rain edge.
+     */
+    public static RenderTarget prepareRainFieldTarget(int size) {
+        if (rainFieldTarget == null || rainFieldTarget.width != size) {
+            if (rainFieldTarget != null) {
+                rainFieldTarget.destroyBuffers();
+            }
+            rainFieldTarget = createFloatMap(size, size, GL11.GL_LINEAR);
+        }
+        return rainFieldTarget;
+    }
+
+    public static RenderTarget rainFieldTargetOrNull() {
+        return rainFieldTarget;
+    }
+
+    /**
+     * T205. The rain pass's target, the cloud target's size: rgb the rain
+     * radiance, a two 12-bit values packed exactly in a float, so RGBA32F
+     * and unfiltered - the split cloud program fetches its own texel.
+     *
+     * <p>T206: production. Allocated on the first FINAL frame and whenever
+     * the cloud target's size changes (a resolution transition frees the old
+     * one here, on the spot), released with every other target in
+     * {@link #destroyAll} - resize, level change, resource reload, the pass
+     * disabled, shutdown. Each allocation and release is logged with the
+     * T199 pattern so a session log pairs them.
+     */
+    private static RenderTarget rainPassTarget;
+
+    public static RenderTarget prepareRainPassTarget(int width, int height) {
+        if (rainPassTarget == null || rainPassTarget.width != width
+                || rainPassTarget.height != height) {
+            if (rainPassTarget != null) {
+                net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                        "T206_RAIN_PASS_RELEASE reason=resize size={}x{}",
+                        rainPassTarget.width, rainPassTarget.height);
+                rainPassTarget.destroyBuffers();
+                rainPassTarget = null;
+            }
+            rainPassTarget = createFloatMap(width, height, GL11.GL_NEAREST);
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T206_RAIN_PASS_ALLOC format=RGBA32F size={}x{} bytes={}",
+                    width, height, (long) width * height * 16L);
+        }
+        return rainPassTarget;
+    }
+
+    public static RenderTarget rainPassTargetOrNull() {
+        return rainPassTarget;
+    }
+
+    /** T206. {@code "WxH"} of the resident rain-pass target, or {@code "none"}. */
+    public static String rainPassTargetSize() {
+        return rainPassTarget == null ? "none"
+                : rainPassTarget.width + "x" + rainPassTarget.height;
+    }
+
+    /**
+     * T207. The four raw temporal phase targets, at the cloud (phase)
+     * resolution: RGBA16F body + depth, plus an RGBA16F aux attachment
+     * (the body's accumulation and transmittance at the rain's depth) on
+     * colour attachment 1. Raw march output only - nothing resolved is ever
+     * written into one - so each can be reprojected once from its own origin
+     * frame. LINEAR, because the resolve reads history at non-integer
+     * positions; its exact lattice fetch uses texelFetch, which ignores the
+     * filter. Allocated on the first temporal frame, released with every
+     * other target.
+     */
+    private static final RenderTarget[] phaseTargets =
+            new RenderTarget[CloudTemporalPhaseState.PHASES];
+    private static final int[] phaseAuxTextures = new int[CloudTemporalPhaseState.PHASES];
+    /**
+     * T207. The resolved lattice: twice the phase resolution, RGBA16F +
+     * depth, the composite's source when temporal reconstruction is on.
+     * Consumed by the composite and the captures; never bound as a phase
+     * (the sandbox asserts it).
+     */
+    private static RenderTarget temporalResolvedTarget;
+    /**
+     * T209. The spatial upscale's layer at the display size: RGBA16F
+     * premultiplied + depth, the composite's one-to-one source when the
+     * upscale is on. Never bound as a phase or resolve input.
+     */
+    private static RenderTarget spatialUpscaleTarget;
+
+    public static boolean preparePhaseTargets(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return false;
+        }
+        RenderTarget current = phaseTargets[0];
+        if (current == null || current.width != width || current.height != height) {
+            destroyPhaseTargets("resize");
+            for (int i = 0; i < phaseTargets.length; i++) {
+                RenderTarget target = new TextureTarget(width, height, true, Minecraft.ON_OSX);
+                target.setFilterMode(GL11.GL_LINEAR);
+                configureClamp(target.getColorTextureId());
+                upgradeColorToRgba16f(target.getColorTextureId(), width, height);
+                configureDepth(target.getDepthTextureId());
+                target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+                phaseTargets[i] = target;
+                phaseAuxTextures[i] = createAuxTexture(width, height);
+                target.bindWrite(true);
+                GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT1,
+                        GL11.GL_TEXTURE_2D, phaseAuxTextures[i], 0);
+                target.unbindWrite();
+            }
+            // New buffers hold nothing; resolving against them would read
+            // the clear colour as content.
+            CloudTemporalPhaseState.invalidateAll();
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T207_PHASES_ALLOC phases={} format=RGBA16F+depth+RGBA16Faux size={}x{}"
+                            + " bytes={}",
+                    phaseTargets.length, width, height,
+                    (long) phaseTargets.length * width * height * (8L + 4L + 8L));
+        }
+        return true;
+    }
+
+    public static RenderTarget phaseTarget(int phase) {
+        return phaseTargets[phase & 3];
+    }
+
+    public static int phaseAuxTexture(int phase) {
+        return phaseAuxTextures[phase & 3];
+    }
+
+    public static boolean phaseTargetsReady() {
+        return phaseTargets[0] != null && phaseAuxTextures[0] != 0;
+    }
+
+    /**
+     * T207. Binds a phase target for the march with both colour attachments
+     * drawn and the aux cleared to "no rain split" (before = 0, T = 1).
+     */
+    public static void clearAndBindPhase(RenderTarget target) {
+        clearAndBind(target);
+        GL20.glDrawBuffers(new int[] {GL30.GL_COLOR_ATTACHMENT0, GL30.GL_COLOR_ATTACHMENT1});
+        GL30.glClearBufferfv(GL11.GL_COLOR, 1, new float[] {0.0F, 0.0F, 0.0F, 1.0F});
+    }
+
+    public static RenderTarget prepareTemporalResolvedTarget(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        if (temporalResolvedTarget == null || temporalResolvedTarget.width != width
+                || temporalResolvedTarget.height != height) {
+            if (temporalResolvedTarget != null) {
+                net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                        "T207_RESOLVED_RELEASE reason=resize size={}x{}",
+                        temporalResolvedTarget.width, temporalResolvedTarget.height);
+                temporalResolvedTarget.destroyBuffers();
+                temporalResolvedTarget = null;
+            }
+            RenderTarget target = new TextureTarget(width, height, true, Minecraft.ON_OSX);
+            target.setFilterMode(GL11.GL_LINEAR);
+            configureClamp(target.getColorTextureId());
+            upgradeColorToRgba16f(target.getColorTextureId(), width, height);
+            configureDepth(target.getDepthTextureId());
+            target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+            temporalResolvedTarget = target;
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T207_RESOLVED_ALLOC format=RGBA16F+depth size={}x{} bytes={}",
+                    width, height, (long) width * height * 12L);
+        }
+        return temporalResolvedTarget;
+    }
+
+    public static RenderTarget temporalResolvedTargetOrNull() {
+        return temporalResolvedTarget;
+    }
+
+    public static RenderTarget prepareSpatialUpscaleTarget(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        if (spatialUpscaleTarget == null || spatialUpscaleTarget.width != width
+                || spatialUpscaleTarget.height != height) {
+            releaseSpatialUpscaleTarget("resize");
+            RenderTarget target = new TextureTarget(width, height, true, Minecraft.ON_OSX);
+            target.setFilterMode(GL11.GL_NEAREST);
+            configureClamp(target.getColorTextureId());
+            upgradeColorToRgba16f(target.getColorTextureId(), width, height);
+            configureDepth(target.getDepthTextureId());
+            target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+            spatialUpscaleTarget = target;
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T209_UPSCALE_ALLOC format=RGBA16F+depth size={}x{} bytes={}",
+                    width, height, (long) width * height * 12L);
+        }
+        return spatialUpscaleTarget;
+    }
+
+    public static RenderTarget spatialUpscaleTargetOrNull() {
+        return spatialUpscaleTarget;
+    }
+
+    /** T209. Releases the upscale layer alone (the upscale switched off, a resize). */
+    public static void releaseSpatialUpscaleTarget(String reason) {
+        if (spatialUpscaleTarget != null) {
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T209_UPSCALE_RELEASE reason={} size={}x{}", reason,
+                    spatialUpscaleTarget.width, spatialUpscaleTarget.height);
+            spatialUpscaleTarget.destroyBuffers();
+            spatialUpscaleTarget = null;
+        }
+    }
+
+    /** T207. {@code "phases=N WxH resolved=WxH"} for lifecycle evidence. */
+    public static String temporalTargetStatus() {
+        return "phases=" + (phaseTargets[0] == null ? "none"
+                : phaseTargets[0].width + "x" + phaseTargets[0].height)
+                + " resolved=" + (temporalResolvedTarget == null ? "none"
+                : temporalResolvedTarget.width + "x" + temporalResolvedTarget.height)
+                + " upscale=" + (spatialUpscaleTarget == null ? "none"
+                : spatialUpscaleTarget.width + "x" + spatialUpscaleTarget.height);
+    }
+
+    /** Releases the temporal targets alone (temporal reconstruction switched off). */
+    public static void releaseTemporalTargets(String reason) {
+        destroyPhaseTargets(reason);
+        if (temporalResolvedTarget != null) {
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T207_RESOLVED_RELEASE reason={} size={}x{}", reason,
+                    temporalResolvedTarget.width, temporalResolvedTarget.height);
+            temporalResolvedTarget.destroyBuffers();
+            temporalResolvedTarget = null;
+        }
+    }
+
+    private static void destroyPhaseTargets(String reason) {
+        if (phaseTargets[0] == null) {
+            return;
+        }
+        net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                "T207_PHASES_RELEASE reason={} phases={} size={}x{}", reason,
+                phaseTargets.length, phaseTargets[0].width, phaseTargets[0].height);
+        for (int i = 0; i < phaseTargets.length; i++) {
+            if (phaseTargets[i] != null) {
+                phaseTargets[i].destroyBuffers();
+                phaseTargets[i] = null;
+            }
+            if (phaseAuxTextures[i] != 0) {
+                GL11.glDeleteTextures(phaseAuxTextures[i]);
+                phaseAuxTextures[i] = 0;
+            }
+        }
+        CloudTemporalPhaseState.invalidateAll();
+    }
+
+    private static int createAuxTexture(int width, int height) {
+        int texture = GL11.glGenTextures();
+        int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        try {
+            RenderSystem.bindTexture(texture);
+            GlStateManager._texImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_RGBA16F, width, height, 0,
+                    GL11.GL_RGBA, GL30.GL_HALF_FLOAT, null);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
+        } finally {
+            RenderSystem.bindTexture(previousTexture);
+        }
+        return texture;
+    }
+
+    /**
+     * T196. The field atlas: 8x4 tiles of one slice each, XZ nodes square.
+     * T197. Sized from the resolution the campaign selects, so 256 is a
+     * 2048x1024 atlas (8.4 MB), 384 is 3072x1536 (18.9 MB) and 512 is
+     * 4096x2048 (33.6 MB); a change of resolution reallocates both targets.
+     */
+    private static RenderTarget stormFieldTarget;
+    private static int stormFieldTargetXZ;
+    private static RenderTarget stormFieldOracleTarget;
+    private static int stormFieldOracleTargetXZ;
+
+    /** T197. The resolution the resident field atlas was allocated for, 0 when none. */
+    public static int stormFieldTargetXZ() {
+        return stormFieldTarget == null ? 0 : stormFieldTargetXZ;
+    }
+
+    /**
+     * T196. The shared storm field: RG16F, four bytes a node; T198 widened
+     * it to RGBA16F (threshold, floor, height, density), eight.
+     * LINEAR for the light cone's bilinear reads within a tile; the probe
+     * reads it with texelFetch and is unaffected.
+     */
+    public static RenderTarget prepareStormFieldTarget(int xz) {
+        if (stormFieldTarget != null && stormFieldTargetXZ != xz) {
+            stormFieldTarget.destroyBuffers();
+            stormFieldTarget = null;
+        }
+        if (stormFieldTarget == null) {
+            // T198. RGBA16F: threshold, floor, height, density.
+            stormFieldTarget = createHalfFloatMap(
+                    StormFieldGeometry.atlasWidth(xz), StormFieldGeometry.atlasHeight(xz),
+                    GL11.GL_LINEAR);
+            stormFieldTargetXZ = xz;
+            // The memory the report quotes is what was actually allocated.
+            // T199: once per lifetime on the production path (XZ is
+            // constant), so a second line in a session names the release
+            // that preceded it - see destroyAll.
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T199_FIELD_ALLOC format={} {}", StormFieldGeometry.FORMAT,
+                    StormFieldGeometry.describe(xz));
+        }
+        return stormFieldTarget;
+    }
+
+    /** T196. The soundness oracle's pair, full float so the CPU can compare exactly. */
+    public static RenderTarget prepareStormFieldOracleTarget(int xz) {
+        if (stormFieldOracleTarget != null && stormFieldOracleTargetXZ != xz) {
+            releaseStormFieldOracleTarget();
+        }
+        if (stormFieldOracleTarget == null) {
+            stormFieldOracleTarget = createFloatMap(
+                    StormFieldGeometry.atlasWidth(xz), StormFieldGeometry.atlasHeight(xz),
+                    GL11.GL_NEAREST);
+            stormFieldOracleTargetXZ = xz;
+        }
+        return stormFieldOracleTarget;
+    }
+
+    public static void releaseStormFieldOracleTarget() {
+        if (stormFieldOracleTarget != null) {
+            stormFieldOracleTarget.destroyBuffers();
+            stormFieldOracleTarget = null;
+        }
+    }
+
     public static RenderTarget weatherTargetOrNull() {
         return weatherTarget;
     }
@@ -197,6 +543,14 @@ public final class VolumetricCloudRenderTargets {
         int height = Math.max(1, Mth.ceil(mainTarget.height * safeScale));
         RenderTarget current = cloudTargets[0];
         if (current == null || current.width != width || current.height != height) {
+            // T199. A resolution transition recreates the cloud targets and
+            // nothing else: the storm field's atlas is world-space, not
+            // screen-space, and survives here. Logged so the session shows it.
+            if (current != null && stormFieldTarget != null) {
+                net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                        "T199_FIELD_KEPT cloudTargets={}x{}->{}x{} xz={}",
+                        current.width, current.height, width, height, stormFieldTargetXZ);
+            }
             destroyCloudTargets();
             for (int i = 0; i < 2; i++) {
                 RenderTarget target = new TextureTarget(width, height, true, Minecraft.ON_OSX);
@@ -282,18 +636,24 @@ public final class VolumetricCloudRenderTargets {
     }
 
     public static void onResize() {
-        destroyAll();
+        destroyAll("resize");
     }
 
     public static void onLevelChanged() {
-        destroyAll();
+        destroyAll("levelChanged");
     }
 
+    /**
+     * Every release path ends here: the pass disabled, a resource reload, a
+     * logout or level change, the client closing. T199: the storm field's
+     * release is logged with the reason so a session log shows each
+     * allocation paired with what freed it.
+     */
     public static void shutdown() {
-        destroyAll();
+        destroyAll("shutdown");
     }
 
-    private static void destroyAll() {
+    private static void destroyAll(String reason) {
         CloudWeatherMapRenderer.invalidateCache();
         if (weatherTarget != null) {
             weatherTarget.destroyBuffers();
@@ -331,6 +691,31 @@ public final class VolumetricCloudRenderTargets {
             shadowTarget.destroyBuffers();
             shadowTarget = null;
         }
+        if (rainFieldTarget != null) {
+            rainFieldTarget.destroyBuffers();
+            rainFieldTarget = null;
+        }
+        if (stormFieldTarget != null) {
+            stormFieldTarget.destroyBuffers();
+            stormFieldTarget = null;
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T199_FIELD_RELEASE reason={} xz={}", reason, stormFieldTargetXZ);
+        }
+        if (rainPassTarget != null) {
+            // T206. The T205 campaign never released this target; production
+            // frees it wherever the cloud targets are freed.
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T206_RAIN_PASS_RELEASE reason={} size={}x{}", reason,
+                    rainPassTarget.width, rainPassTarget.height);
+            rainPassTarget.destroyBuffers();
+            rainPassTarget = null;
+        }
+        releaseStormFieldOracleTarget();
+        // T207. The temporal phases and the resolved lattice, on every
+        // release path with the rest.
+        releaseTemporalTargets(reason);
+        // T209. The upscale layer, on every release path with the rest.
+        releaseSpatialUpscaleTarget(reason);
         if (visibleVolumeOracleTarget != null) {
             visibleVolumeOracleTarget.destroyBuffers();
             visibleVolumeOracleTarget = null;
@@ -360,6 +745,34 @@ public final class VolumetricCloudRenderTargets {
 
     static long resolutionGeneration() {
         return resolutionGeneration;
+    }
+
+    /** T196. A two-channel half-float target, for the storm field's (density, floor). */
+    private static RenderTarget createRg16fMap(int width, int height, int filterMode) {
+        RenderTarget target = new TextureTarget(width, height, false, Minecraft.ON_OSX);
+        target.setFilterMode(filterMode);
+        configureClamp(target.getColorTextureId());
+        int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        try {
+            RenderSystem.bindTexture(target.getColorTextureId());
+            GlStateManager._texImage2D(
+                    GL11.GL_TEXTURE_2D, 0, GL30.GL_RG16F, width, height, 0,
+                    GL30.GL_RG, GL30.GL_HALF_FLOAT, null);
+        } finally {
+            RenderSystem.bindTexture(previousTexture);
+        }
+        target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        return target;
+    }
+
+    /** T198. A four-channel half-float target, for the storm field. */
+    private static RenderTarget createHalfFloatMap(int width, int height, int filterMode) {
+        RenderTarget target = new TextureTarget(width, height, false, Minecraft.ON_OSX);
+        target.setFilterMode(filterMode);
+        configureClamp(target.getColorTextureId());
+        upgradeColorToRgba16f(target.getColorTextureId(), width, height);
+        target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        return target;
     }
 
     private static RenderTarget createFloatMap(int width, int height, int filterMode) {

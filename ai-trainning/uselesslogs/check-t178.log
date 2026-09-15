@@ -1,0 +1,575 @@
+
+> Configure project :
+MixinGradle is skipping eclipse integration, extension not found
+files(...) dependencies are not deobfuscated. Use a flatDir repository instead: https://docs.gradle.org/current/userguide/declaring_repositories.html#sub:flat_dir_resolver
+Cannot deobfuscate dependency of type DefaultFileCollectionDependency_Decorated, using obfuscated version!
+
+> Task :architectureBoundaryCheck
+> Task :downloadMcpConfig
+> Task :extractSrg UP-TO-DATE
+> Task :createMcpToSrg UP-TO-DATE
+> Task :compileJava UP-TO-DATE
+> Task :generateLeanFinalShader UP-TO-DATE
+> Task :processResources
+> Task :classes
+> Task :compileTestJava
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses
+
+> Task :cloudMorphologyTopologySandbox
+Structured tower topology heightRadiusR2=0.271449 heightRadialR2=0.223182 crownSeparation=135.000 stageRadiusMeans=0.900000/0.866667/0.820000/0.830000 stageRadialMeans=0.305000/0.373333/0.366667/0.330000
+PUFF topology type=cumulus_humilis placement=production samples=4096 meanMembers=7.000 disconnectedBirth=0(0.000%) disconnectedTarget=0(0.000%) meanComponentsBirthTarget=1.0000/1.0000 nearestBirth[p05/p50/p95/max]=0.2735/0.2999/0.4463/0.4583 nearestTarget[p05/p50/p95/max]=0.2626/0.2879/0.4284/0.4400 primaryBirth[p50/p95/max]=0.5304/0.8020/0.8959 nearestCentreMinRadius[p05/p50]=0.5706/0.6388 centreSpread[p50/p95/max]=0.5502/0.5828/0.6135 footprint[p50/p95/max]=0.8317/0.8752/0.9117 centroidOffset[p50/p95/max]=0.1225/0.1466/0.1603 centreAnisotropy[p50/p95/max]=1.5498/1.8029/1.9205 baseSpreadMax=0.0180 shoulderBirth[min/max]=0.4823/0.5305 shoulderTarget[min/max]=0.4630/0.5093 basePairMin=0.4630 upperSupportMax=1.0791 upperOffset[min/max]=0.4034/0.6135 upperProtrusion[p05/p50]=0.1538/0.2583 upperSpanMin=15.2274 upperCoreMin=0.5075 structuralMass[p05/p50/p95]=0.5745/0.6111/0.6492 radius120Members[birth/target]=0.000%/0.000% radius120GroupsNone[birth/target]=100.000%/100.000%
+PUFF topology type=cumulus_mediocris placement=production samples=4096 meanMembers=8.000 disconnectedBirth=0(0.000%) disconnectedTarget=0(0.000%) meanComponentsBirthTarget=1.0000/1.0000 nearestBirth[p05/p50/p95/max]=0.2739/0.3033/0.4443/0.4583 nearestTarget[p05/p50/p95/max]=0.2630/0.2912/0.4265/0.4400 primaryBirth[p50/p95/max]=0.5852/0.8161/0.8999 nearestCentreMinRadius[p05/p50]=0.5711/0.6484 centreSpread[p50/p95/max]=0.6162/0.6464/0.6766 footprint[p50/p95/max]=0.9384/0.9773/1.0106 centroidOffset[p50/p95/max]=0.1352/0.1516/0.1685 centreAnisotropy[p50/p95/max]=1.6660/1.7772/1.8705 baseSpreadMax=0.0180 shoulderBirth[min/max]=0.4823/0.5305 shoulderTarget[min/max]=0.4630/0.5093 basePairMin=0.4630 upperSupportMax=1.2943 upperOffset[min/max]=0.4390/0.6766 upperProtrusion[p05/p50]=0.2098/0.3955 upperSpanMin=31.3435 upperCoreMin=0.7607 structuralMass[p05/p50/p95]=0.9046/0.9591/1.0176 radius120Members[birth/target]=0.000%/0.000% radius120GroupsNone[birth/target]=100.000%/100.000%
+PUFF carrier type=cumulus_humilis samples=512 carrier=0.000 material=0.186 threshold=.0008 disconnected=0 parentCorridorMin=0.05481337 baseCorridorMin=0.09725269 outsideEnvelopeLeaks=0/87552 permutationDeltaMax=0.000e+00 sampledPositiveDensityMin=0.00003788
+PUFF carrier type=cumulus_mediocris samples=512 carrier=0.000 material=0.186 threshold=.0008 disconnected=0 parentCorridorMin=0.06168347 baseCorridorMin=0.09719829 outsideEnvelopeLeaks=0/89088 permutationDeltaMax=0.000e+00 sampledPositiveDensityMin=0.00030245
+PUFF analytic type=cumulus_humilis samples=512 disconnected[.02/.05/.15/baseSlice]=0/0/0/0 widthHeight[baseMax/upperMax/upperMinorMin]=1.4347/1.2626/0.7505 footprint[min/max]=0.7703/0.9023 groupHeight[min/max]=0.9376/1.1061 groupWidthHeight[min/max]=1.3198/1.7362 projected[minWidth/anisoMax]=1.1359/1.3085 upperOffsetMin=0.4115 middleSeparationMin=0.7137 crownSeparationMin=n/a crownRiseMin=0.2378 upperParentSeparationMin=0.1811 junction[protrusion/bridge]=2.096/2.059 upperSilhouetteExposureMin=0.797
+PUFF analytic type=cumulus_mediocris samples=512 disconnected[.02/.05/.15/baseSlice]=0/0/0/0 widthHeight[baseMax/upperMax/upperMinorMin]=1.3744/1.1185/0.6767 footprint[min/max]=0.8734/1.0075 groupHeight[min/max]=1.2030/1.4352 groupWidthHeight[min/max]=1.1443/1.4890 projected[minWidth/anisoMax]=1.2696/1.3189 upperOffsetMin=0.4511 middleSeparationMin=0.7777 crownSeparationMin=0.9595 crownRiseMin=0.3600 upperParentSeparationMin=0.2020 junction[protrusion/bridge]=-3.590/-2.208 upperSilhouetteExposureMin=0.875
+T133_GUARD_FAIL_FIRST|aspectRatio=rejects(0.7333,0.4800)|anvilSpan=rejects(990.0,1500.0)
+T098_BLEND_SATURATION|pairs=1152|saturated=1024(88.9%)|requestedBlocks=37.58..297.00|meanRequested=162.05|cap=48.00|worstEffectiveOverRequested=0.1616
+T098_ROLE_DIAMETERS|base=1044.0..1044.0|core=504.0..504.0|lowerTower=352.8..352.8|upperTower=300.6..300.6|anvilUnion=1269.9..1287.3
+T098_ROLE_RATIOS|core/base=0.483..0.483|lowerTower/base=0.338..0.338|upperTower/base=0.288..0.288|anvil/base=1.216..1.233|anvil/upperTower=4.22..4.28
+T098_T127_TARGETS|base=900..1100|core=420..520|lowerTower=273..390|upperTower=230..414|anvilSpan=1150..1450|relationships core/base=0.45-0.50 lowerTower/core=0.65-0.75 anvil/base=1.20-1.35 anvil/upperTower=3.5-5.0
+T098_PROPORTION_GUARD|coreOverBase=0.483|lowerTowerOverCore=0.700|anvilOverBase=1.224|anvilOverUpperTower=4.251|narrowing=0.852|allRelationshipsSatisfied=true|rejectsOldLowerTower=0.625|rejectsOldAnvilOverUpper=5.917
+T133_ASPECT_CONTRACT|band=0.55..0.70|widestLobeSpan=990.000..990.000|aspectPlan=0.6698..0.6818|aspectResolvedLower=0.6558..0.6825|aspectResolvedUpper=0.6100..0.6330
+T133_ANVIL_CONTRACT|band=1150..1450|widestLobe=990.000..990.000|unionSpan=1268.710..1286.527|anvilMembers=4|widestOverBase=0.9483..0.9483|unionOverBase=1.2152..1.2323
+T134_SCALE_CONTRACT|members=10|planRadius=450.0|groupRadius=400.0|baseDrop=120.0|topRise=780.0|footprint=1200..1500|height=720..880
+T134_RESOLVED_CENTRE_ENVELOPE|matureLowerMin=1265.701|matureUpperMax=1416.327
+PUFF analyticalWorstPrimaryRatio=0.886564 parameters[group=1.650 radial=0.300..0.640 angularJitter=0.280]
+
+> Task :cloudRegionMotionSandbox
+Cloud region motion self-check passed.
+
+> Task :materialAdvectionSandbox
+Material advection self-check passed.
+
+> Task :stormDensityThresholdSandbox
+--- T100 measured cloud noise statistics ---
+samples                     = 262144
+detail FBM sd                        = 0.0742
+detail FBM p05                       = 0.3568
+base carrier p05                     = 0.7121
+base carrier p95                     = 0.8453
+storm base field sd                  = 0.3287
+base low FBM sd                      = 0.0790
+detail band share R                  = 0.8520
+detail band share G                  = 0.1225
+detail band share B                  = 0.0255
+--- derived ---
+required CORE_FILL (weakest live minimum) = 0.9289
+recorded CORE_FILL                   = 0.4500
+effective fill BASE @ 0.7832         = 0.8018
+p05 retained BASE @ 0.7832           = 0.0083
+effective fill BASE @ 0.8792         = 0.6073
+p05 retained BASE @ 0.8792           = 0.0093
+effective fill CORE @ 0.9485         = 0.4914
+p05 retained CORE @ 0.9485           = 0.0101
+effective fill CORE @ 1.0000         = 0.4500
+p05 retained CORE @ 1.0000           = 0.0273
+effective fill TOWER @ 0.9700        = 0.4589
+p05 retained TOWER @ 0.9700          = 0.0103
+effective fill TOWER @ 0.9539        = 0.4831
+p05 retained TOWER @ 0.9539          = 0.0101
+effective fill ANVIL @ 0.8222        = 0.7173
+p05 retained ANVIL @ 0.8222          = 0.0087
+effective fill ANVIL @ 0.7231        = 0.9498
+p05 retained ANVIL @ 0.7231          = 0.0077
+effective fill ANVIL @ 0.7851        = 0.7975
+p05 retained ANVIL @ 0.7851          = 0.0084
+effective fill ANVIL @ 0.7992        = 0.7661
+p05 retained ANVIL @ 0.7992          = 0.0085
+analytic occupied sd                 = 0.2290
+recorded MIN_OCCUPIED_REGION_SD      = 0.1148
+lowest detail wavelength (blocks)    = 22.7273
+min variance region (blocks)         = 68.1818
+PHASE4S_RESULT|T100 measured noise thresholds|PASSED|all recorded statistics and derivations reproduced
+
+> Task :stormMaterialContinuityDiagnosticsSandbox
+T128_TRACE_HEADER|Y|roles|coverage|strength|baseNoise|detailFbm|body|erosion|density|coreFill|height01|extinction|opticalDepth|direct|ambient|phaseShadow|final|branch
+T128_TRACE|208|[]|0.04234|0.83394|0.72563|0.48510|0.00000|0.00000|0.00000|0.69344|0.00000|cpu-field-only; shader-light-capture-required
+T128_TRACE|224|[BASE]|0.74226|0.83394|0.48668|0.46854|0.59162|0.23384|0.35778|0.69344|0.00000|cpu-field-only; shader-light-capture-required
+T128_TRACE|240|[BASE, CORE]|0.83394|0.83394|0.74570|0.48198|0.81993|0.22793|0.59200|0.69344|0.20126|cpu-field-only; shader-light-capture-required
+T128_TRACE|256|[BASE, CORE]|0.83394|0.83394|0.70045|0.40272|0.78789|0.26280|0.52509|0.69344|0.22241|cpu-field-only; shader-light-capture-required
+T128_TRACE|272|[BASE, CORE, TOWER]|0.88288|0.88288|0.00000|0.49074|0.37992|0.22408|0.15584|0.82662|0.29592|cpu-field-only; shader-light-capture-required
+T128_TRACE|288|[BASE, CORE, TOWER]|0.95762|0.95762|0.02935|0.53396|0.40846|0.20506|0.20340|0.71350|0.38847|cpu-field-only; shader-light-capture-required
+T128_TRACE|304|[BASE, CORE, TOWER]|0.95852|0.95852|0.13027|0.51018|0.46997|0.21552|0.25445|0.71191|0.39951|cpu-field-only; shader-light-capture-required
+T128_TRACE|320|[CORE, TOWER]|0.95667|0.95667|0.00000|0.49350|0.29319|0.22286|0.07033|0.47888|0.34833|cpu-field-only; shader-light-capture-required
+T128_TRACE|336|[CORE, TOWER]|0.94159|0.94159|0.02148|0.48659|0.30821|0.22590|0.08231|0.50224|0.44712|cpu-field-only; shader-light-capture-required
+T128_TRACE|352|[CORE, TOWER]|0.92366|0.92366|0.60955|0.46689|0.72389|0.23457|0.48932|0.53099|0.54591|cpu-field-only; shader-light-capture-required
+T128_TRACE|368|[CORE, TOWER, ANVIL]|0.92122|0.92122|0.64594|0.48890|0.74962|0.22489|0.52473|0.53499|0.59078|cpu-field-only; shader-light-capture-required
+T128_TRACE|384|[CORE, TOWER, ANVIL]|0.91679|0.91679|0.12217|0.51242|0.37917|0.21454|0.16463|0.54230|0.40814|cpu-field-only; shader-light-capture-required
+T128_TRACE|400|[CORE, TOWER, ANVIL]|0.87495|0.87495|0.50518|0.46787|0.64983|0.23414|0.41569|0.61506|0.47536|cpu-field-only; shader-light-capture-required
+T128_TRACE|416|[CORE, TOWER, ANVIL]|0.81254|0.81254|0.94911|0.53865|0.96395|0.20300|0.76096|0.73748|0.42153|cpu-field-only; shader-light-capture-required
+T128_TRACE|432|[TOWER, ANVIL]|0.80055|0.80055|0.99972|0.39835|0.99980|0.26473|0.73507|0.76319|0.52825|cpu-field-only; shader-light-capture-required
+T128_TRACE|448|[TOWER, ANVIL]|0.80102|0.80102|0.84091|0.43670|0.88729|0.24785|0.63944|0.76218|0.61189|cpu-field-only; shader-light-capture-required
+T128_TRACE|464|[ANVIL]|0.79745|0.79745|0.81827|0.51446|0.87125|0.21364|0.65761|0.76996|0.58995|cpu-field-only; shader-light-capture-required
+T128_TRACE|480|[ANVIL]|0.79745|0.79745|0.92735|0.53726|0.94853|0.20360|0.74493|0.76996|0.71032|cpu-field-only; shader-light-capture-required
+T128_TRACE|496|[ANVIL]|0.79745|0.79745|0.60681|0.50186|0.72143|0.21918|0.50225|0.76996|0.83070|cpu-field-only; shader-light-capture-required
+T128_TRACE|512|[ANVIL]|0.79745|0.79745|0.45249|0.51849|0.61210|0.21187|0.40023|0.76996|0.95108|cpu-field-only; shader-light-capture-required
+T128_TRACE|528|[ANVIL]|0.72763|0.79745|0.71939|0.52888|0.78212|0.20729|0.57482|0.76996|1.00000|cpu-field-only; shader-light-capture-required
+T128_LARGEST_DENSITY_STEP|Y=352|density=0.48932|roles=[CORE, TOWER]
+
+> Task :stormMorphologySandbox
+T125_METRICS|coreTowerOverlap=1.0000|towerAnvilOverlap=1.0000|canopyTower=6.0991|upperBase=1.8372|neckRatio=0.9708
+T126_METRICS|radiusDerivative=0.0903|areaDerivative=0.1724|coreTowerRun=104.0000/29.5000|embeddedTowerRun=104.0000/59.0000|towerAnvilRun=92.0000/26.2500|canopyTower=6.1330/5.6159|undersideSd=9.1334/8.5227|anisotropyEnvelopeLow=1.4242/1.7500/1.9200
+PHASE4S_RESULT|T101 interior noise influence|PASSED|invariant satisfied
+PHASE4S_RESULT|T102 occupied-region density variance|PASSED|invariant satisfied
+PHASE4S_RESULT|T103 multi-scale spectral contribution|PASSED|invariant satisfied
+PHASE4S_RESULT|T104 geometric distance field|PASSED|invariant satisfied
+PHASE4S_RESULT|T105 positive storm structure|PASSED|invariant satisfied
+PHASE4S_RESULT|T106 rejected morphology forms|PASSED|invariant satisfied
+PHASE4S_RESULT|T117 envelope-side LOD cross-fade|PASSED|invariant satisfied
+PHASE4S_RESULT|T124 live-calibrated macro coherence|PASSED|invariant satisfied
+PHASE4S_RESULT|T125 live-calibrated role-envelope transitions|PASSED|invariant satisfied
+PHASE4S_RESULT|T126 live 3c039aa7 structural continuity|PASSED|invariant satisfied
+
+> Task :stormVolumetricGeometrySandbox
+PHASE4T_RESULT|T132 authoritative control separation|PASSED|invariant satisfied
+PHASE4T_RESULT|T133 production default unchanged|PASSED|invariant satisfied
+PHASE4T_RESULT|T123 instrumentation only|PASSED|invariant satisfied guardedCounterMutations=70
+T143_REACH_GUARD|probes=388800|falseNegatives=0|worstMargin=88.090 blocks at BASE major=24.0 minor=24.0 radius=171.14763120863816 y=302.5|nonVacuousCentres=360
+PHASE4T_RESULT|T143 reachability bound has no false negatives|PASSED|invariant satisfied
+PHASE4T_RESULT|T143 reach bound and gate keep one derivation|PASSED|invariant satisfied
+T145_RAIN_GATE|verticalProbes=240|verticalFalseNegatives=0|ellipseProbes=69120|ellipseFalseNegatives=0|ownedProbes=32304
+PHASE4T_RESULT|T145 rain locality gate is conservative|PASSED|invariant satisfied
+T150_VISIBILITY_GUARD|playNear=beyond_render_distance|playVisNear=ok|playNearNearestDistance=2010.1|playVisNearNearestDistance=402.3
+PHASE4T_RESULT|T150 storm visibility guard rejects stormless benchmark poses|PASSED|invariant satisfied
+T121_BOUND_SEARCH|probes=29297664|worstViolationBlocks=0.000000000|worstCase=CORE major=40.0 minor=20.0 bound=64.0 sdf=63.99999999999999
+PHASE4T_RESULT|T121 vertical bound conservative|PASSED|invariant satisfied
+T121_MARGIN_DERIVATION|sdfShortfall=0.000003815|hSaturationThreshold=0.000005722|reachable=false|compareUlpAt32768=0.003906250|requiredMargin=0.003910065|adopted=0.000976563
+PHASE4T_RESULT|T121 float32 boundary margin|PASSED|invariant satisfied
+T121_UNION_PROOF|probes=194724|unsafe=0
+PHASE4T_RESULT|T121 guard admits no union contribution|PASSED|invariant satisfied
+T121_SOFTNESS_BOUNDARY|probes=71982|roleMaskFlips=15546
+T121_SOFTNESS_WITNESS|lobeSoftness=11.363636 verticalLowerBound=11.363637 lobeDistance=11.363633
+PHASE4T_RESULT|T121 softness margin closes role-mask flip|PASSED|invariant satisfied
+PHASE4T_RESULT|T121/T122 shader guards|PASSED|invariant satisfied
+PHASE4T_RESULT|T132 workload capture freshness|PASSED|invariant satisfied
+PHASE4T_RESULT|T132 deterministic image neutrality|PASSED|invariant satisfied
+PHASE4T_RESULT|T132 repeated sampling median|PASSED|invariant satisfied
+PHASE4T_RESULT|T132 criterion 5 attribution|PASSED|invariant satisfied
+T098_CARRIER|quantity=bakedRChannel|samples=262144|p05=0.5693|p50=0.6713|p95=0.7620
+T098_CARRIER|quantity=shaderCarrierRaw|samples=262144|p05=0.7123|p50=0.7836|p95=0.8452
+T098_CARRIER|quantity=shaderCarrierRaw_severeColumn|samples=20801|p05=0.7125|p50=0.7834|p95=0.8444
+T098_CARRIER_WINDOW|p05Constant=0.7128|p95Constant=0.8451|rawBelowP05=75.91%|shaderBelowP05=5.11%|severeColumnBelowP05=5.06%|shaderAboveP95=5.04%
+T098_EROSION|fixture=38bc5412|step=20|erosionConstant=0.44|visibleDensityFloor=0.02
+T098_EROSION_ROLE|BASE |samples=71645  |meanBody=0.3768|meanErosion=0.2297|erosionOverBody=0.610|erosion>=body=46.5%|consumed>50%=58.8%|consumed>90%=47.7%|densityPositive=53.5%|densityVisible=52.6%|meanDensity=0.2443
+T098_EROSION_ROLE|CORE |samples=4250   |meanBody=0.6902|meanErosion=0.2298|erosionOverBody=0.333|erosion>=body=2.3%|consumed>50%=18.7%|consumed>90%=2.5%|densityPositive=97.7%|densityVisible=97.5%|meanDensity=0.4637
+T098_EROSION_ROLE|TOWER|samples=4376   |meanBody=0.6619|meanErosion=0.2298|erosionOverBody=0.347|erosion>=body=7.6%|consumed>50%=24.0%|consumed>90%=8.6%|densityPositive=92.4%|densityVisible=91.7%|meanDensity=0.4437
+T098_EROSION_ROLE|ANVIL|samples=58378  |meanBody=0.5819|meanErosion=0.2295|erosionOverBody=0.394|erosion>=body=13.8%|consumed>50%=35.4%|consumed>90%=15.4%|densityPositive=86.2%|densityVisible=85.1%|meanDensity=0.3778
+T098_ANVIL|stage|role|fixture|n|mean|p05|p50|p95|variance|cv|meanGradPerBlock|pct>=0.80|pct>=0.90|pct>=0.99|pctZero
+T098_ANVIL|envelope      |CORE |0| 19098|0.9056|0.7506|0.9183|0.9842|0.00488|0.0772|0.00000| 92.48| 56.97|  3.34|  0.00
+T098_ANVIL|baseField     |CORE |0| 19098|0.5290|0.0000|0.5481|1.0000|0.11000|0.6269|0.00000| 28.34| 18.77|  7.96|  5.68
+T098_ANVIL|bodyAfterRemap|CORE |0| 19098|0.6979|0.3901|0.7128|1.0000|0.04706|0.3108|0.00000| 38.10| 24.39|  8.96|  0.12
+T098_ANVIL|detailFbm     |CORE |0| 19098|0.4781|0.3556|0.4759|0.6066|0.00555|0.1558|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |CORE |0| 19098|0.4696|0.1376|0.4830|0.7756|0.04666|0.4600|0.00937|  1.89|  0.00|  0.00|  1.28
+T098_ANVIL|envelope      |TOWER|0| 18229|0.8713|0.6786|0.8966|0.9681|0.00945|0.1116|0.00000| 79.77| 49.60|  0.00|  0.00
+T098_ANVIL|baseField     |TOWER|0| 18229|0.5601|0.0023|0.5944|1.0000|0.10749|0.5853|0.00000| 31.45| 20.99|  9.40|  4.38
+T098_ANVIL|bodyAfterRemap|TOWER|0| 18229|0.6887|0.2582|0.7201|1.0000|0.05914|0.3531|0.00000| 40.05| 25.84| 10.23|  0.33
+T098_ANVIL|detailFbm     |TOWER|0| 18229|0.4775|0.3577|0.4753|0.6080|0.00554|0.1559|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |TOWER|0| 18229|0.4628|0.0235|0.4903|0.7799|0.05613|0.5119|0.00962|  2.25|  0.00|  0.00|  4.31
+T098_ANVIL|envelope      |ANVIL|0|218245|0.7694|0.6088|0.8055|0.8063|0.00362|0.0782|0.00000| 56.78|  0.00|  0.00|  0.00
+T098_ANVIL|baseField     |ANVIL|0|218245|0.5258|0.0000|0.5426|1.0000|0.10874|0.6271|0.00000| 27.44| 18.17|  7.81|  5.41
+T098_ANVIL|bodyAfterRemap|ANVIL|0|218245|0.6455|0.2678|0.6602|1.0000|0.06236|0.3868|0.00000| 33.69| 21.47|  8.36|  0.00
+T098_ANVIL|detailFbm     |ANVIL|0|218245|0.4780|0.3561|0.4762|0.6069|0.00553|0.1555|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |ANVIL|0|218245|0.4186|0.0234|0.4306|0.7726|0.06080|0.5891|0.01059|  1.72|  0.00|  0.00|  3.64
+T098_ANVIL|envelope      |CORE |1| 18655|0.9055|0.7488|0.9176|0.9842|0.00493|0.0775|0.00000| 92.35| 57.15|  3.50|  0.00
+T098_ANVIL|baseField     |CORE |1| 18655|0.5344|0.0000|0.5554|1.0000|0.11076|0.6228|0.00000| 28.91| 19.41|  8.57|  5.68
+T098_ANVIL|bodyAfterRemap|CORE |1| 18655|0.7001|0.3821|0.7177|1.0000|0.04863|0.3150|0.00000| 39.00| 25.05|  9.46|  0.19
+T098_ANVIL|detailFbm     |CORE |1| 18655|0.4777|0.3566|0.4758|0.6070|0.00552|0.1556|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |CORE |1| 18655|0.4722|0.1288|0.4869|0.7776|0.04772|0.4626|0.01168|  2.07|  0.00|  0.00|  1.82
+T098_ANVIL|envelope      |TOWER|1| 17969|0.8715|0.6787|0.8968|0.9681|0.00941|0.1113|0.00000| 79.91| 49.57|  0.00|  0.00
+T098_ANVIL|baseField     |TOWER|1| 17969|0.5249|0.0000|0.5423|0.9992|0.10676|0.6225|0.00000| 26.94| 17.50|  7.12|  5.14
+T098_ANVIL|bodyAfterRemap|TOWER|1| 17969|0.6649|0.2725|0.6825|0.9995|0.05757|0.3609|0.00000| 35.17| 21.93|  7.77|  0.31
+T098_ANVIL|detailFbm     |TOWER|1| 17969|0.4776|0.3571|0.4758|0.6049|0.00548|0.1549|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |TOWER|1| 17969|0.4387|0.0327|0.4518|0.7718|0.05481|0.5336|0.01256|  1.59|  0.00|  0.00|  3.91
+T098_ANVIL|envelope      |ANVIL|1|218247|0.7694|0.6088|0.8055|0.8063|0.00361|0.0781|0.00000| 56.75|  0.00|  0.00|  0.00
+T098_ANVIL|baseField     |ANVIL|1|218247|0.5305|0.0000|0.5501|1.0000|0.10807|0.6197|0.00000| 27.82| 18.40|  7.92|  5.13
+T098_ANVIL|bodyAfterRemap|ANVIL|1|218247|0.6490|0.2698|0.6658|1.0000|0.06194|0.3835|0.00000| 34.14| 21.76|  8.50|  0.00
+T098_ANVIL|detailFbm     |ANVIL|1|218247|0.4780|0.3564|0.4763|0.6069|0.00554|0.1557|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |ANVIL|1|218247|0.4219|0.0246|0.4358|0.7735|0.06053|0.5831|0.01270|  1.75|  0.00|  0.00|  3.55
+T098_ANVIL|envelope      |CORE |2| 18789|0.9055|0.7473|0.9184|0.9842|0.00494|0.0777|0.00000| 92.43| 57.28|  3.49|  0.00
+T098_ANVIL|baseField     |CORE |2| 18789|0.5294|0.0000|0.5505|1.0000|0.10925|0.6243|0.00000| 27.80| 18.42|  8.00|  5.34
+T098_ANVIL|bodyAfterRemap|CORE |2| 18789|0.6931|0.3475|0.7151|1.0000|0.05214|0.3294|0.00000| 38.31| 23.94|  9.00|  0.37
+T098_ANVIL|detailFbm     |CORE |2| 18789|0.4783|0.3573|0.4768|0.6067|0.00554|0.1556|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |CORE |2| 18789|0.4672|0.1053|0.4880|0.7752|0.04923|0.4749|0.01010|  2.01|  0.00|  0.00|  3.12
+T098_ANVIL|envelope      |TOWER|2| 18306|0.8714|0.6779|0.8963|0.9681|0.00938|0.1111|0.00000| 79.73| 49.52|  0.00|  0.00
+T098_ANVIL|baseField     |TOWER|2| 18306|0.5391|0.0000|0.5635|1.0000|0.10841|0.6107|0.00000| 28.92| 19.44|  8.34|  5.25
+T098_ANVIL|bodyAfterRemap|TOWER|2| 18306|0.6760|0.2916|0.6959|1.0000|0.05678|0.3525|0.00000| 36.87| 23.68|  9.16|  0.36
+T098_ANVIL|detailFbm     |TOWER|2| 18306|0.4778|0.3555|0.4762|0.6066|0.00555|0.1560|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |TOWER|2| 18306|0.4498|0.0447|0.4648|0.7753|0.05417|0.5175|0.01118|  1.91|  0.00|  0.00|  3.35
+T098_ANVIL|envelope      |ANVIL|2|217699|0.7692|0.6088|0.8055|0.8063|0.00362|0.0783|0.00000| 56.69|  0.00|  0.00|  0.00
+T098_ANVIL|baseField     |ANVIL|2|217699|0.5399|0.0001|0.5645|1.0000|0.10848|0.6100|0.00000| 29.05| 19.38|  8.34|  5.03
+T098_ANVIL|bodyAfterRemap|ANVIL|2|217699|0.6561|0.2732|0.6773|1.0000|0.06213|0.3799|0.00000| 35.45| 22.81|  8.93|  0.00
+T098_ANVIL|detailFbm     |ANVIL|2|217699|0.4781|0.3565|0.4760|0.6072|0.00554|0.1557|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |ANVIL|2|217699|0.4290|0.0275|0.4473|0.7747|0.06074|0.5745|0.01154|  1.87|  0.00|  0.00|  3.44
+T098_ANVIL|envelope      |CORE |3| 20749|0.9073|0.7536|0.9261|0.9840|0.00484|0.0767|0.00000| 92.66| 57.30|  3.11|  0.00
+T098_ANVIL|baseField     |CORE |3| 20749|0.5352|0.0001|0.5539|1.0000|0.10742|0.6124|0.00000| 28.34| 18.93|  8.20|  5.04
+T098_ANVIL|bodyAfterRemap|CORE |3| 20749|0.6991|0.3821|0.7159|1.0000|0.04872|0.3157|0.00000| 38.58| 24.48|  9.08|  0.28
+T098_ANVIL|detailFbm     |CORE |3| 20749|0.4782|0.3554|0.4767|0.6073|0.00553|0.1556|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |CORE |3| 20749|0.4720|0.1262|0.4864|0.7758|0.04711|0.4599|0.01108|  1.86|  0.00|  0.00|  2.12
+T098_ANVIL|envelope      |TOWER|3| 20156|0.8719|0.6821|0.8990|0.9681|0.00920|0.1100|0.00000| 80.13| 49.80|  0.00|  0.00
+T098_ANVIL|baseField     |TOWER|3| 20156|0.5447|0.0000|0.5733|1.0000|0.10978|0.6082|0.00000| 29.94| 20.20|  8.66|  5.08
+T098_ANVIL|bodyAfterRemap|TOWER|3| 20156|0.6808|0.2667|0.7067|1.0000|0.05808|0.3540|0.00000| 38.17| 24.54|  9.43|  0.24
+T098_ANVIL|detailFbm     |TOWER|3| 20156|0.4776|0.3556|0.4756|0.6075|0.00561|0.1568|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |TOWER|3| 20156|0.4548|0.0300|0.4764|0.7761|0.05509|0.5161|0.01119|  1.97|  0.00|  0.00|  3.94
+T098_ANVIL|envelope      |ANVIL|3|217254|0.7693|0.6088|0.8055|0.8063|0.00361|0.0781|0.00000| 56.62|  0.00|  0.00|  0.00
+T098_ANVIL|baseField     |ANVIL|3|217254|0.5320|0.0000|0.5520|1.0000|0.10846|0.6190|0.00000| 28.12| 18.64|  7.92|  5.23
+T098_ANVIL|bodyAfterRemap|ANVIL|3|217254|0.6504|0.2730|0.6678|1.0000|0.06197|0.3827|0.00000| 34.39| 22.03|  8.51|  0.00
+T098_ANVIL|detailFbm     |ANVIL|3|217254|0.4779|0.3565|0.4761|0.6068|0.00553|0.1555|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |ANVIL|3|217254|0.4233|0.0261|0.4379|0.7735|0.06054|0.5813|0.01176|  1.78|  0.00|  0.00|  3.49
+T098_ANVIL|envelope      |CORE |4| 19534|0.9050|0.7467|0.9179|0.9842|0.00494|0.0776|0.00000| 92.30| 56.67|  3.24|  0.00
+T098_ANVIL|baseField     |CORE |4| 19534|0.5127|0.0000|0.5246|0.9980|0.10783|0.6405|0.00000| 26.04| 16.85|  6.51|  6.06
+T098_ANVIL|bodyAfterRemap|CORE |4| 19534|0.6843|0.3813|0.6954|0.9987|0.04863|0.3223|0.00000| 36.30| 22.20|  7.50|  0.29
+T098_ANVIL|detailFbm     |CORE |4| 19534|0.4782|0.3561|0.4764|0.6063|0.00556|0.1559|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |CORE |4| 19534|0.4570|0.1244|0.4659|0.7714|0.04715|0.4751|0.01085|  1.66|  0.00|  0.00|  1.92
+T098_ANVIL|envelope      |TOWER|4| 18068|0.8723|0.6798|0.8999|0.9681|0.00936|0.1109|0.00000| 79.86| 49.98|  0.00|  0.00
+T098_ANVIL|baseField     |TOWER|4| 18068|0.5165|0.0000|0.5241|0.9999|0.10682|0.6327|0.00000| 26.04| 17.16|  7.67|  5.36
+T098_ANVIL|bodyAfterRemap|TOWER|4| 18068|0.6588|0.2795|0.6731|0.9999|0.05761|0.3643|0.00000| 33.91| 21.31|  8.37|  0.25
+T098_ANVIL|detailFbm     |TOWER|4| 18068|0.4777|0.3559|0.4758|0.6073|0.00554|0.1558|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |TOWER|4| 18068|0.4323|0.0338|0.4433|0.7722|0.05537|0.5443|0.01107|  1.72|  0.00|  0.00|  3.61
+T098_ANVIL|envelope      |ANVIL|4|217260|0.7692|0.6088|0.8055|0.8063|0.00363|0.0783|0.00000| 56.59|  0.00|  0.00|  0.00
+T098_ANVIL|baseField     |ANVIL|4|217260|0.5335|0.0000|0.5541|1.0000|0.10844|0.6172|0.00000| 28.31| 18.76|  8.01|  5.15
+T098_ANVIL|bodyAfterRemap|ANVIL|4|217260|0.6514|0.2725|0.6698|1.0000|0.06204|0.3824|0.00000| 34.63| 22.17|  8.60|  0.00
+T098_ANVIL|detailFbm     |ANVIL|4|217260|0.4781|0.3563|0.4763|0.6072|0.00554|0.1557|0.00000|  0.00|  0.00|  0.00|  0.00
+T098_ANVIL|finalDensity  |ANVIL|4|217260|0.4243|0.0261|0.4399|0.7732|0.06060|0.5801|0.01157|  1.80|  0.00|  0.00|  3.48
+T098_ANVIL_SCALE|stage|transects|decorrelationBlocks|anvilMajorRadiusBlocks|featuresAcrossAnvil
+T098_ANVIL_SCALE|baseField   |  125|              40.0|                 507.6|               25.38
+T098_ANVIL_SCALE|detailFbm   |  125|               8.0|                 507.6|              126.90
+T098_ANVIL_SCALE|finalDensity|  125|              40.0|                 507.6|               25.38
+T098_ANVIL_OPTICAL|rays=248|meanSaturationDepthBlocks=74.8|p05=40.0|p50=62.5|p95=140.0|anvilChordBlocks=1015.2|anvilThicknessBlocks=210.6|visibleSkinFractionOfChord=0.0736
+T098_ANVIL_ALPHA|view|rays|meanAlpha|alphaVariance|alphaCV|meanAbsNeighbourDelta|pctAlphaAbove0.97|pctAlphaBelow0.05
+T098_ANVIL_ALPHA|SIDE | 4608|0.9995|0.000000|0.0000|0.000033|100.00|  0.00
+T098_ANVIL_ALPHA|ABOVE| 4608|0.9995|0.000002|0.0014|0.000095| 99.96|  0.00
+T098_ANVIL_SENSITIVITY|opticalScale|meanAlpha|alphaVariance|alphaCV|meanAbsNeighbourDelta|pctAbove0.97|meanSaturationDepthBlocks
+T098_ANVIL_SENSITIVITY|1.000|0.9864|0.000001|0.0010|0.000996|100.00|    87.0
+T098_ANVIL_SENSITIVITY|0.500|0.9857|0.000000|0.0005|0.000522|100.00|   156.5
+T098_ANVIL_SENSITIVITY|0.250|0.9854|0.000001|0.0009|0.000300| 99.93|   292.0
+T098_ANVIL_SENSITIVITY|0.120|0.9843|0.000067|0.0083|0.000537| 98.55|   586.8
+T098_ANVIL_SENSITIVITY|0.060|0.9762|0.001207|0.0356|0.002167| 89.95|  1087.8
+T098_ANVIL_SENSITIVITY|0.030|0.9010|0.006272|0.0879|0.008859|  0.82|    -1.0
+T098_SURFACE|view|arm|rays|meanT50|reliefRmsBlocks|reliefP05|reliefP95|neighbourDeltaBlocks|dominantWavelengthBlocks|meanRampT10toT90|meanEnvelopeToAlpha50
+T098_SURFACE|SIDE |production |  9398|   193.6|  58.375|  -82.34|  108.61|  11.290|      12.0|    41.74|    -2.15
+T098_SURFACE_STAGE|SIDE |envelope=116.006|firstDensity=49.812|alpha10=53.645|alpha50=58.375|alpha90=80.502
+T098_SURFACE|SIDE |erosionOff |  9407|   178.4|  50.628|  -69.18|   92.12|   8.914|      12.0|    28.00|    -3.69
+T098_SURFACE|SIDE |bodyOnly   |  9407|   178.4|  50.628|  -69.18|   92.12|   8.914|      12.0|    28.00|    -3.69
+T098_SURFACE|ABOVE|production | 27556|   262.2|  27.724|  -44.32|   47.66|   9.166|      12.0|    47.66|    -5.43
+T098_SURFACE_STAGE|ABOVE|envelope=82.223|firstDensity=22.703|alpha10=25.046|alpha50=27.724|alpha90=29.104
+T098_SURFACE|ABOVE|erosionOff | 27556|   249.9|  22.727|  -37.77|   38.71|   7.498|      12.0|    35.46|    -8.99
+T098_SURFACE|ABOVE|bodyOnly   | 27556|   249.9|  22.727|  -37.77|   38.71|   7.498|      12.0|    35.46|    -8.99
+T098_SURFACE_LIGHT|points=3939|meanOpticalDepth=17.040|p05=0.740|p50=16.425|p95=37.891|variance=124.3432|neighbourDelta=2.1957
+T098_SURFACE_LIGHT_TRANSMITTANCE|meanDirectLight=0.05583|p05=0.00000|p50=0.00000|p95=0.47694|variance=0.03461828|cv=3.33263|pctBelow0.01=83.57
+T098_SURFACE_SHADING|points=3939|meanLuminance=0.45911|p05=0.40731|p50=0.41366|p95=0.75211|variance=0.01125613|cv=0.23109|neighbourDelta=0.01660|range8bit=87.92
+T098_SURFACE_SCATTER_OCTAVE|meanThirdOctave=0.19055|variance=0.07471229|cv=1.43442
+T098_SURFACE_SPECTRUM|windowBlocks|reliefRmsProduction|reliefRmsErosionOff|erosionContributionBlocks|projectedPxAtSide
+T098_SURFACE_SPECTRUM|          12|            20.021|            16.130|                   3.891|             2.71
+T098_SURFACE_SPECTRUM|          24|            32.313|            27.578|                   4.735|             5.42
+T098_SURFACE_SPECTRUM|          48|            58.674|            54.375|                   4.300|            10.83
+T098_SURFACE_SPECTRUM|          96|            92.340|            86.184|                   6.156|            21.67
+T098_SURFACE_SPECTRUM|         192|           111.690|           104.958|                   6.733|            43.33
+T098_SURFACE_ROLE|role|points|reliefRmsBlocks|neighbourDeltaBlocks
+T098_SURFACE_ROLE|BASE |  13106|        50.216|            17.336
+T098_SURFACE_ROLE|TOWER|    616|        21.734|             8.459
+T098_SURFACE_ROLE|ANVIL|   7663|        43.264|            10.445
+T098_DESCRIPTOR_MAP|role|member|centre|major|minor|baseY|topY|vSpan
+T098_DESCRIPTOR|BASE |0|(-33.0,-77.0)|525.7|473.1|136.0|583.6|448
+T098_DESCRIPTOR|BASE |1|(-66.5,-38.7)|527.8|475.0|152.6|600.2|448
+T098_DESCRIPTOR|CORE |2|(-49.4,-64.0)|297.5|267.7|352.3|633.1|281
+T098_DESCRIPTOR|CORE |3|(-29.8,-94.8)|279.0|251.1|405.6|702.0|296
+T098_DESCRIPTOR|TOWER|4|(-14.4,-106.0)|224.3|184.0|433.5|800.1|367
+T098_DESCRIPTOR|TOWER|5|(-1.3,-95.4)|198.1|162.4|592.0|927.4|335
+T098_DESCRIPTOR|ANVIL|6|(-109.9,-77.1)|507.6|294.4|769.6|980.2|211
+T098_DESCRIPTOR|ANVIL|7|(-18.8,-10.9)|484.3|280.9|777.1|987.7|211
+T098_DESCRIPTOR|ANVIL|8|(77.3,-144.1)|488.4|283.2|783.6|994.2|211
+T098_DESCRIPTOR|ANVIL|9|(170.7,-80.5)|498.4|289.1|789.1|999.7|211
+T098_VPROFILE|y|equivDiam|largestCompDiam|cells|comps|base|core|tower|anvil|dominant
+T098_VPROFILE|  136.0|   764.6|   540.7|1148  |54 |1148  |0     |0     |0     |BASE
+T098_VPROFILE|  168.0|   885.6|   823.3|1540  |41 |1540  |0     |0     |0     |BASE
+T098_VPROFILE|  200.0|   973.3|   946.2|1860  |34 |1860  |0     |0     |0     |BASE
+T098_VPROFILE|  232.0|  1011.0|   973.5|2007  |29 |2007  |0     |0     |0     |BASE
+T098_VPROFILE|  264.0|  1024.8|   998.6|2062  |24 |2062  |0     |0     |0     |BASE
+T098_VPROFILE|  296.0|  1029.2|  1010.8|2080  |24 |2080  |0     |0     |0     |BASE
+T098_VPROFILE|  328.0|  1025.0|  1005.0|2063  |27 |2063  |0     |0     |0     |BASE
+T098_VPROFILE|  360.0|  1029.2|  1001.1|2080  |26 |2080  |0     |0     |0     |BASE
+T098_VPROFILE|  392.0|  1010.5|   974.9|2005  |33 |2005  |0     |0     |0     |BASE
+T098_VPROFILE|  424.0|   958.8|   932.7|1805  |37 |1474  |331   |0     |0     |BASE
+T098_VPROFILE|  456.0|   941.4|   910.8|1740  |29 |1334  |350   |56    |0     |BASE
+T098_VPROFILE|  488.0|   878.7|   850.4|1516  |30 |1102  |356   |58    |0     |BASE
+T098_VPROFILE|  520.0|   819.3|   793.1|1318  |28 |905   |350   |63    |0     |BASE
+T098_VPROFILE|  552.0|   762.6|   741.3|1142  |17 |722   |339   |81    |0     |BASE
+T098_VPROFILE|  584.0|   704.3|   683.0|974   |18 |547   |325   |102   |0     |BASE
+T098_VPROFILE|  616.0|   645.1|   606.4|817   |24 |381   |269   |167   |0     |BASE
+T098_VPROFILE|  648.0|   591.5|   570.5|687   |22 |254   |210   |223   |0     |BASE
+T098_VPROFILE|  680.0|   534.0|   481.9|560   |16 |169   |21    |370   |0     |TOWER
+T098_VPROFILE|  712.0|   588.1|   508.6|679   |31 |0     |0     |357   |322   |TOWER
+T098_VPROFILE|  744.0|   683.8|   574.9|918   |26 |0     |0     |292   |626   |ANVIL
+T098_VPROFILE|  776.0|   820.9|   801.1|1323  |14 |0     |0     |244   |1079  |ANVIL
+T098_VPROFILE|  808.0|  1163.3|  1156.9|2657  |15 |0     |0     |196   |2461  |ANVIL
+T098_VPROFILE|  840.0|  1586.2|  1582.1|4940  |16 |0     |0     |150   |4790  |ANVIL
+T098_VPROFILE|  872.0|  1781.4|  1780.6|6231  |4  |0     |0     |116   |6115  |ANVIL
+T098_VPROFILE|  904.0|  1815.0|  1815.0|6468  |1  |0     |0     |84    |6384  |ANVIL
+T098_VPROFILE|  936.0|  1814.4|  1814.4|6464  |1  |0     |0     |0     |6464  |ANVIL
+T098_VPROFILE|  968.0|  1771.8|  1770.4|6164  |7  |0     |0     |0     |6164  |ANVIL
+T098_VPROFILE| 1000.0|  1588.7|  1582.0|4956  |26 |0     |0     |0     |4956  |ANVIL
+T098_TRANSITION|candidate|band y616-776|meanLargestCompDiam|meanComponents|meanCells
+T098_TRANSITION|current                     |   590.6|    22.5|   831.7
+T098_TRANSITION|towerTop+120                |   607.0|    21.3|   851.7
+T098_TRANSITION|towerTop+200                |   612.8|    20.3|   860.8
+T098_TRANSITION|anvilBase-120               |  1122.5|    27.2|  2818.8
+T098_TRANSITION|anvilBase-200               |  1448.3|    24.7|  4383.5
+T098_TRANSITION|towerWide x1.5              |   709.5|    15.0|  1069.2
+T098_TRANSITION|tower+160 anvil-160         |  1304.1|    21.2|  3630.0
+T098_TRANSITION|tower+160 anvil-160 wide1.25|  1308.8|    21.0|  3645.7
+T098_TRANSITION|coreTop+100                 |   609.4|    21.0|   855.8
+T098_TRANSITION|coreTop+150                 |   616.8|    20.8|   868.5
+T098_TRANSITION|coreTop+220                 |   627.1|    20.0|   883.3
+T098_TRANSITION|coreTop+150 towerTop+120    |   622.3|    19.7|   877.7
+T098_TRANSITION|baseTop+100                 |   706.5|    17.7|  1095.7
+T098_TRANSITION|baseTop+180                 |   798.9|    21.0|  1329.0
+T098_TRANSITION|baseTop+260                 |   861.2|    21.7|  1537.8
+T098_TRANSITION|baseTop+180 coreTop+150     |   802.4|    20.8|  1338.8
+T098_TRANSITION|bridge r=200                |   591.8|    22.2|   833.5
+T098_TRANSITION|bridge r=260                |   631.8|    19.5|   894.5
+T098_TRANSITION|bridge r=320                |   703.5|    15.2|  1052.8
+T098_TRANSITION|bridge r=380                |   790.3|    13.2|  1286.7
+T098_TRANSITION|bridge r=320 baseTop+180    |   810.2|    20.5|  1362.2
+T098_PERCOLATION|columnDiameter|meanConnectedFraction|meanComponents|meanOccupiedCells|featureWidths
+T098_PERCOLATION|     200|   0.999|     1.1|    250.7|    2.00
+T098_PERCOLATION|     260|   0.999|     1.5|    415.4|    2.60
+T098_PERCOLATION|     320|   0.996|     2.9|    643.7|    3.20
+T098_PERCOLATION|     380|   0.996|     3.0|    942.2|    3.80
+T098_PERCOLATION|     440|   0.994|     4.0|   1267.2|    4.40
+T098_PERCOLATION|     500|   0.993|     5.5|   1627.7|    5.00
+T098_PERCOLATION|     560|   0.992|     6.9|   2025.8|    5.60
+T098_PERCOLATION|     640|   0.988|     9.5|   2636.5|    6.40
+T098_PERCOLATION|     720|   0.985|    11.7|   3322.0|    7.20
+T098_PERCOLATION|     800|   0.979|    15.4|   4075.3|    8.00
+T098_PERCOLATION|     920|   0.983|    19.6|   5374.6|    9.20
+T098_PERCOLATION|    1040|   0.977|    27.0|   6822.8|   10.40
+T098_SKIRT|lowestAnvilBaseY=769.6
+T098_SKIRT|y|set|cells|components|largestFrac|anvilCells|anvilCovP50|anvilCovP90|belowAnvilBase
+T098_SKIRT|   616|full    |  1261|    24|   0.893|       0|   0.000|   0.000|yes
+T098_SKIRT|   616|noAnvil |  1283|    27|   0.881|       0|   0.000|   0.000|yes
+T098_SKIRT|   648|full    |  1061|    20|   0.943|       0|   0.000|   0.000|yes
+T098_SKIRT|   648|noAnvil |  1102|    25|   0.927|       0|   0.000|   0.000|yes
+T098_SKIRT|   680|full    |   887|    21|   0.811|       0|   0.000|   0.000|yes
+T098_SKIRT|   680|noAnvil |   887|    19|   0.788|       0|   0.000|   0.000|yes
+T098_SKIRT|   712|full    |  1061|    40|   0.755|     498|   0.148|   0.210|yes
+T098_SKIRT|   712|noAnvil |   659|    16|   0.932|       0|   0.000|   0.000|yes
+T098_SKIRT|   744|full    |  1438|    35|   0.578|     979|   0.312|   0.402|yes
+T098_SKIRT|   744|noAnvil |   513|     4|   0.984|       0|   0.000|   0.000|yes
+T098_SKIRT|   776|full    |  2042|    18|   0.989|    1659|   0.526|   0.608|no
+T098_SKIRT|   776|noAnvil |   452|     1|   1.000|       0|   0.000|   0.000|no
+T098_ANVIL_SOFT|edgeSoftness|effectiveMultiplier|meanComponents|meanLargestFrac|meanCells|anvilSpanKept
+T098_ANVIL_SOFT|       0.440|               0.726|    23.2|   0.883|   3453.0|    1800
+T098_ANVIL_SOFT|       0.360|               0.594|    23.2|   0.883|   3453.0|    1800
+T098_ANVIL_SOFT|       0.280|               0.462|    23.2|   0.883|   3453.0|    1800
+T098_ANVIL_SOFT|       0.220|               0.363|    23.2|   0.883|   3453.0|    1800
+T098_ANVIL_SOFT|       0.160|               0.264|    19.6|   0.906|   3437.9|    1800
+T098_ANVIL_SOFT|       0.120|               0.198|    16.1|   0.928|   3411.6|    1800
+T098_ANVIL_SOFT|       0.080|               0.132|    11.1|   0.948|   3371.6|    1800
+T098_SOFTHEIGHT|role|member|softnessBlocks|halfHeight|softOverHalfHeight|smallerRadius|degenerate
+T098_SOFTHEIGHT|BASE |0|         162.4|     223.8|             0.726|        473.1|no
+T098_SOFTHEIGHT|BASE |1|         163.0|     223.8|             0.728|        475.0|no
+T098_SOFTHEIGHT|CORE |2|          79.7|     140.4|             0.567|        267.7|no
+T098_SOFTHEIGHT|CORE |3|          74.7|     148.2|             0.504|        251.1|no
+T098_SOFTHEIGHT|TOWER|4|          50.2|     183.3|             0.274|        184.0|no
+T098_SOFTHEIGHT|TOWER|5|          44.3|     167.7|             0.264|        162.4|no
+T098_SOFTHEIGHT|ANVIL|6|          89.5|     105.3|             0.850|        294.4|no
+T098_SOFTHEIGHT|ANVIL|7|          89.5|     105.3|             0.850|        280.9|no
+T098_SOFTHEIGHT|ANVIL|8|          89.5|     105.3|             0.850|        283.2|no
+T098_SOFTHEIGHT|ANVIL|9|          89.5|     105.3|             0.850|        289.1|no
+T098_EXTENT_GUARD|worstSoftnessOverHalfHeight=0.750 (ANVIL#6)|bound=1.000|rejectsPreFixAnvil=2.280|PASSED
+T098_OPTICAL|y|cells>=0.02|meanDensityOverCells|sumDensity|p50|p90|maxDensity|axisOpticalDepth|dominantRole
+T098_OPTICAL|  136.0|     1774|  0.4513|     801.2| 0.4609| 0.7666| 0.8642|    306.8|BASE
+T098_OPTICAL|  168.0|     2397|  0.4475|    1073.1| 0.4479| 0.7577| 0.8557|    320.5|BASE
+T098_OPTICAL|  200.0|     2939|  0.4847|    1425.2| 0.5204| 0.7661| 0.8688|    527.8|BASE
+T098_OPTICAL|  232.0|     3132|  0.4720|    1479.1| 0.5012| 0.7620| 0.8739|    554.6|BASE
+T098_OPTICAL|  264.0|     3194|  0.4452|    1422.4| 0.4621| 0.7541| 0.8565|    531.5|BASE
+T098_OPTICAL|  296.0|     3232|  0.4548|    1470.2| 0.4649| 0.7590| 0.8526|    460.4|BASE
+T098_OPTICAL|  328.0|     3216|  0.4782|    1538.0| 0.5087| 0.7604| 0.8794|    517.1|BASE
+T098_OPTICAL|  360.0|     3262|  0.4767|    1555.5| 0.5011| 0.7657| 0.8711|    439.8|BASE
+T098_OPTICAL|  392.0|     3142|  0.4578|    1438.9| 0.4788| 0.7574| 0.8780|    446.6|BASE
+T098_OPTICAL|  424.0|     2822|  0.4623|    1305.0| 0.4788| 0.7609| 0.8737|    382.8|BASE
+T098_OPTICAL|  456.0|     2743|  0.4657|    1277.6| 0.4786| 0.7582| 0.8622|    373.3|BASE
+T098_OPTICAL|  488.0|     2376|  0.4799|    1140.9| 0.5080| 0.7636| 0.8790|    466.9|BASE
+T098_OPTICAL|  520.0|     2048|  0.4722|     967.6| 0.4912| 0.7660| 0.8724|    425.8|BASE
+T098_OPTICAL|  552.0|     1778|  0.4693|     834.6| 0.4883| 0.7563| 0.8673|    394.7|BASE
+T098_OPTICAL|  584.0|     1539|  0.4647|     715.4| 0.4656| 0.7643| 0.8515|    242.1|BASE
+T098_OPTICAL|  616.0|     1261|  0.4660|     587.9| 0.4751| 0.7617| 0.8664|    267.8|BASE
+T098_OPTICAL|  648.0|     1061|  0.4518|     479.4| 0.4362| 0.7559| 0.8735|    287.5|BASE
+T098_OPTICAL|  680.0|      887|  0.4932|     437.6| 0.5152| 0.7685| 0.8518|    293.4|TOWER
+T098_OPTICAL|  712.0|     1061|  0.5024|     533.1| 0.5381| 0.7690| 0.8451|    199.5|TOWER
+T098_OPTICAL|  744.0|     1438|  0.5116|     735.9| 0.5609| 0.7711| 0.8544|    257.6|ANVIL
+T098_OPTICAL|  776.0|     2042|  0.4567|     933.0| 0.4762| 0.7546| 0.8476|    528.7|ANVIL
+T098_OPTICAL|  808.0|     4149|  0.4472|    1856.6| 0.4611| 0.7558| 0.8749|    657.9|ANVIL
+T098_OPTICAL|  840.0|     8035|  0.4412|    3545.7| 0.4547| 0.7491| 0.8598|    861.5|ANVIL
+T098_OPTICAL|  872.0|    11143|  0.4460|    4970.7| 0.4618| 0.7459| 0.8748|    903.9|ANVIL
+T098_OPTICAL|  904.0|    12139|  0.4449|    5401.3| 0.4634| 0.7507| 0.8790|    825.2|ANVIL
+T098_OPTICAL|  936.0|    12175|  0.4463|    5434.5| 0.4621| 0.7472| 0.8726|    761.9|ANVIL
+T098_OPTICAL|  968.0|    11597|  0.4355|    5053.6| 0.4464| 0.7435| 0.8680|    591.2|ANVIL
+T098_OPTICAL| 1000.0|     9130|  0.4623|    4223.1| 0.4815| 0.7590| 0.8706|    486.7|ANVIL
+T098_WEBBING|samples=130536|positiveExcess=99143|p50=5.14|p99=17.57|max=24.56|worstAtY=640|analyticPerUnionCap=12.0
+T098_MARCH|strategy|factor|label|distance|targetY|coarseSegs|fineSegs|firstFineT|refFirstT|falseNegSegs|falseNegBlocks|iters|exhausted|sdfEvals|marchedDepth|refDepth|firstMaterialT|itersToMaterial|refMaterialSpan|itersNeeded
+T098_MARCH|current   |1.12|waist       |  736.7| 680.0|     0|   128|     0.0|   436.0|     0|      0.0|  128|     YES|       0|      6.3|    255.6|    438.4|   125|    616.0|   300
+T098_MARCH|current   |1.40|waist       |  920.9| 680.0|     3|   125|   169.7|   620.0|     0|      0.0|  128|     YES|       0|      0.0|    254.1|     -1.0|    -1|    634.0|    -1
+T098_MARCH|current   |1.60|waist       | 1052.5| 680.0|     5|   123|   282.8|   752.0|     0|      0.0|  128|     YES|       0|      0.0|    269.9|     -1.0|    -1|    668.0|    -1
+T098_MARCH|current   |1.70|waist       | 1118.3| 680.0|     6|   122|   339.4|   818.0|     0|      0.0|  128|     YES|       0|      0.0|    270.8|     -1.0|    -1|    670.0|    -1
+T098_MARCH|current   |2.00|waist       | 1315.6| 680.0|    10|   118|   565.7|  1016.0|     0|      0.0|  128|     YES|       0|      0.0|    277.1|     -1.0|    -1|    664.0|    -1
+T098_MARCH|current   |2.60|waist       | 1710.3| 680.0|    17|   111|   961.7|  1450.0|     0|      0.0|  128|     YES|       0|      0.0|    210.5|     -1.0|    -1|    504.0|    -1
+T098_MARCH|current   |1.70|baseControl | 1118.3| 300.0|     8|   120|   452.5|   684.0|     0|      0.0|  128|     YES|       0|     88.5|    430.0|    685.9|    75|    968.0|   349
+T098_MARCH|current   |1.70|anvilControl| 1118.3| 900.0|     6|   122|   339.4|   620.0|     0|      0.0|  128|     YES|       0|     40.2|    590.4|    618.7|    86|   1066.0|   388
+T098_MARCH|B_window  |1.12|waist       |  736.7| 680.0|     4|   124|     0.0|   436.0|     1|     56.6|  128|     YES|       0|     43.7|    255.6|    495.0|    81|    616.0|   256
+T098_MARCH|B_window  |1.40|waist       |  920.9| 680.0|     7|   121|   169.7|   620.0|     1|     44.7|  128|     YES|       0|     40.5|    254.1|    664.7|    84|    634.0|   264
+T098_MARCH|B_window  |1.60|waist       | 1052.5| 680.0|     9|   119|   282.8|   752.0|     1|     25.8|  128|     YES|       0|     39.2|    269.9|    777.8|    86|    668.0|   275
+T098_MARCH|B_window  |1.70|waist       | 1118.3| 680.0|    10|   118|   339.4|   818.0|     1|     16.4|  128|     YES|       0|     38.6|    270.8|    834.4|    87|    670.0|   277
+T098_MARCH|B_window  |2.00|waist       | 1315.6| 680.0|    14|   114|   565.7|  1016.0|     1|     26.7|  128|     YES|       0|     39.1|    277.1|   1060.7|    91|    664.0|   279
+T098_MARCH|B_window  |2.60|waist       | 1710.3| 680.0|    21|   107|   961.7|  1450.0|     1|      6.6|  128|     YES|       0|     33.9|    210.5|   1456.6|    98|    504.0|   241
+T098_MARCH|B_window  |1.70|baseControl | 1118.3| 300.0|    10|   118|   452.5|   684.0|     1|     16.0|  128|     YES|       0|    108.3|    430.0|    700.0|    49|    968.0|   323
+T098_MARCH|B_window  |1.70|anvilControl| 1118.3| 900.0|     9|   119|   339.4|   620.0|     1|     46.9|  128|     YES|       0|     97.5|    590.4|    618.7|    56|   1066.0|   358
+T098_MARCH|C_cooldown|1.12|waist       |  736.7| 680.0|     8|   120|     0.0|   436.0|     2|    101.4|  128|     YES|       0|    126.1|    255.6|    537.4|    33|    616.0|   208
+T098_MARCH|C_cooldown|1.40|waist       |  920.9| 680.0|    11|   117|   169.7|   620.0|     2|     87.1|  128|     YES|       0|    122.8|    254.1|    707.1|    36|    634.0|   216
+T098_MARCH|C_cooldown|1.60|waist       | 1052.5| 680.0|    13|   115|   282.8|   752.0|     2|     68.2|  128|     YES|       0|    111.0|    269.9|    820.2|    38|    668.0|   227
+T098_MARCH|C_cooldown|1.70|waist       | 1118.3| 680.0|    14|   114|   339.4|   818.0|     2|     54.8|  128|     YES|       0|    105.1|    270.8|    876.8|    39|    670.0|   229
+T098_MARCH|C_cooldown|2.00|waist       | 1315.6| 680.0|    18|   110|   565.7|  1016.0|     2|     69.1|  128|     YES|       0|    106.8|    277.1|   1103.1|    43|    664.0|   231
+T098_MARCH|C_cooldown|2.60|waist       | 1710.3| 680.0|    25|   103|   961.7|  1450.0|     1|     49.1|  128|     YES|       0|     88.4|    210.5|   1499.1|    50|    504.0|   193
+T098_MARCH|C_cooldown|1.70|baseControl | 1118.3| 300.0|    12|   116|   452.5|   684.0|     1|     37.2|  128|     YES|       0|    165.8|    430.0|    721.2|    25|    968.0|   299
+T098_MARCH|C_cooldown|1.70|anvilControl| 1118.3| 900.0|    12|   116|   339.4|   620.0|     2|     61.0|  128|     YES|       0|    174.9|    590.4|    618.7|    26|   1066.0|   328
+T098_MARCH|E_sdf     |1.12|waist       |  736.7| 680.0|     8|   120|   230.6|   436.0|     0|      0.0|  128|     YES|      18|     61.9|    255.6|    439.2|    68|    616.0|   243
+T098_MARCH|E_sdf     |1.40|waist       |  920.9| 680.0|    10|   118|   367.3|   620.0|     0|      0.0|  128|     YES|      20|     48.8|    254.1|    621.8|    83|    634.0|   263
+T098_MARCH|E_sdf     |1.60|waist       | 1052.5| 680.0|    11|   117|   475.2|   752.0|     0|      0.0|  128|     YES|      20|     39.8|    269.9|    754.5|    91|    668.0|   280
+T098_MARCH|E_sdf     |1.70|waist       | 1118.3| 680.0|    12|   116|   533.7|   818.0|     0|      0.0|  128|     YES|      20|     36.8|    270.8|    820.1|    94|    670.0|   284
+T098_MARCH|E_sdf     |2.00|waist       | 1315.6| 680.0|    15|   113|   714.7|  1016.0|     0|      0.0|  128|     YES|      21|     32.2|    277.1|   1015.3|   101|    664.0|   289
+T098_MARCH|E_sdf     |2.60|waist       | 1710.3| 680.0|    21|   107|  1090.6|  1450.0|     0|      0.0|  128|     YES|      22|      7.9|    210.5|   1451.2|   124|    504.0|   267
+T098_MARCH|E_sdf     |1.70|baseControl | 1118.3| 300.0|    10|   118|   517.2|   684.0|     0|      0.0|  128|     YES|      10|     95.3|    430.0|    683.3|    58|    968.0|   332
+T098_MARCH|E_sdf     |1.70|anvilControl| 1118.3| 900.0|     9|   119|   463.9|   620.0|     0|      0.0|  128|     YES|      14|     73.6|    590.4|    619.5|    54|   1066.0|   356
+T098_MARCH|perDesc_b0|1.12|waist       |  736.7| 680.0|     6|   122|   286.2|   436.0|     0|      0.0|  128|     YES|      14|     80.3|    255.6|    438.2|    50|    616.0|   225
+T098_MARCH|perDesc_b0|1.40|waist       |  920.9| 680.0|     9|   119|   473.2|   620.0|     0|      0.0|  128|     YES|      14|     78.2|    254.1|    621.7|    52|    634.0|   232
+T098_MARCH|perDesc_b0|1.60|waist       | 1052.5| 680.0|    12|   116|   609.4|   752.0|     0|      0.0|  128|     YES|      14|     72.8|    269.9|    754.3|    54|    668.0|   243
+T098_MARCH|perDesc_b0|1.70|waist       | 1118.3| 680.0|    13|   115|   676.2|   818.0|     0|      0.0|  128|     YES|      14|     71.1|    270.8|    817.6|    54|    670.0|   244
+T098_MARCH|perDesc_b0|2.00|waist       | 1315.6| 680.0|    16|   112|   873.3|  1016.0|     0|      0.0|  128|     YES|      13|     68.7|    277.1|   1014.7|    57|    664.0|   245
+T098_MARCH|perDesc_b0|2.60|waist       | 1710.3| 680.0|    24|   104|  1275.0|  1450.0|     0|      0.0|  128|     YES|      16|     56.7|    210.5|   1451.8|    75|    504.0|   218
+T098_MARCH|perDesc_b0|1.70|baseControl | 1118.3| 300.0|    10|   118|   521.5|   684.0|     0|      0.0|  128|     YES|      10|     95.7|    430.0|    684.1|    57|    968.0|   331
+T098_MARCH|perDesc_b0|1.70|anvilControl| 1118.3| 900.0|    10|   118|   539.0|   620.0|     0|      0.0|  128|     YES|      11|    115.3|    590.4|    620.3|    34|   1066.0|   336
+T098_MARCH|perDesc_b24|1.12|waist       |  736.7| 680.0|     5|   123|   258.3|   436.0|     0|      0.0|  128|     YES|      14|     72.5|    255.6|    438.6|    57|    616.0|   232
+T098_MARCH|perDesc_b24|1.40|waist       |  920.9| 680.0|     9|   119|   448.5|   620.0|     0|      0.0|  128|     YES|      15|     70.6|    254.1|    621.7|    59|    634.0|   239
+T098_MARCH|perDesc_b24|1.60|waist       | 1052.5| 680.0|    11|   117|   580.4|   752.0|     0|      0.0|  128|     YES|      15|     65.2|    269.9|    753.7|    61|    668.0|   250
+T098_MARCH|perDesc_b24|1.70|waist       | 1118.3| 680.0|    13|   115|   649.1|   818.0|     0|      0.0|  128|     YES|      16|     62.9|    270.8|    818.8|    62|    670.0|   252
+T098_MARCH|perDesc_b24|2.00|waist       | 1315.6| 680.0|    17|   111|   848.4|  1016.0|     0|      0.0|  128|     YES|      15|     59.1|    277.1|   1014.5|    65|    664.0|   253
+T098_MARCH|perDesc_b24|2.60|waist       | 1710.3| 680.0|    26|   102|  1246.9|  1450.0|     0|      0.0|  128|     YES|      19|     42.7|    210.5|   1451.9|    85|    504.0|   228
+T098_MARCH|perDesc_b24|1.70|baseControl | 1118.3| 300.0|     9|   119|   507.3|   684.0|     0|      0.0|  128|     YES|      10|     94.5|    430.0|    684.1|    60|    968.0|   334
+T098_MARCH|perDesc_b24|1.70|anvilControl| 1118.3| 900.0|    10|   118|   515.0|   620.0|     0|      0.0|  128|     YES|      13|    104.3|    590.4|    621.1|    41|   1066.0|   343
+T098_MARCH|perDesc_b48|1.12|waist       |  736.7| 680.0|     5|   123|   234.0|   436.0|     0|      0.0|  128|     YES|      15|     65.6|    255.6|    439.1|    64|    616.0|   239
+T098_MARCH|perDesc_b48|1.40|waist       |  920.9| 680.0|     9|   119|   421.9|   620.0|     0|      0.0|  128|     YES|      16|     62.2|    254.1|    619.9|    66|    634.0|   246
+T098_MARCH|perDesc_b48|1.60|waist       | 1052.5| 680.0|    13|   115|   556.1|   752.0|     0|      0.0|  128|     YES|      18|     54.9|    269.9|    754.1|    70|    668.0|   259
+T098_MARCH|perDesc_b48|1.70|waist       | 1118.3| 680.0|    15|   113|   622.7|   818.0|     0|      0.0|  128|     YES|      19|     51.2|    270.8|    820.7|    72|    670.0|   262
+T098_MARCH|perDesc_b48|2.00|waist       | 1315.6| 680.0|    22|   106|   802.7|  1016.0|     0|      0.0|  128|     YES|      23|     42.9|    277.1|   1014.9|    83|    664.0|   271
+T098_MARCH|perDesc_b48|2.60|waist       | 1710.3| 680.0|    23|   105|  1141.5|  1450.0|     0|      0.0|  128|     YES|      21|     27.1|    210.5|   1449.1|   111|    504.0|   254
+T098_MARCH|perDesc_b48|1.70|baseControl | 1118.3| 300.0|     9|   119|   483.3|   684.0|     0|      0.0|  128|     YES|      11|     92.4|    430.0|    684.8|    67|    968.0|   341
+T098_MARCH|perDesc_b48|1.70|anvilControl| 1118.3| 900.0|     9|   119|   489.5|   620.0|     0|      0.0|  128|     YES|      13|     90.2|    590.4|    620.3|    47|   1066.0|   349
+T098_MARCH|perDesc_b96|1.12|waist       |  736.7| 680.0|     6|   122|   166.5|   436.0|     0|      0.0|  128|     YES|      19|     49.3|    255.6|    438.7|    84|    616.0|   259
+T098_MARCH|perDesc_b96|1.40|waist       |  920.9| 680.0|     8|   120|   314.7|   620.0|     0|      0.0|  128|     YES|      20|     41.3|    254.1|    622.3|    96|    634.0|   276
+T098_MARCH|perDesc_b96|1.60|waist       | 1052.5| 680.0|     9|   119|   428.4|   752.0|     0|      0.0|  128|     YES|      20|     31.6|    269.9|    753.7|   102|    668.0|   291
+T098_MARCH|perDesc_b96|1.70|waist       | 1118.3| 680.0|    10|   118|   488.7|   818.0|     0|      0.0|  128|     YES|      20|     26.7|    270.8|    821.1|   105|    670.0|   295
+T098_MARCH|perDesc_b96|2.00|waist       | 1315.6| 680.0|    13|   115|   673.7|  1016.0|     0|      0.0|  128|     YES|      20|     18.2|    277.1|   1016.7|   111|    664.0|   299
+T098_MARCH|perDesc_b96|2.60|waist       | 1710.3| 680.0|    20|   108|  1056.3|  1450.0|     0|      0.0|  128|     YES|      21|      0.0|    210.5|     -1.0|    -1|    504.0|    -1
+T098_MARCH|perDesc_b96|1.70|baseControl | 1118.3| 300.0|     8|   120|   452.5|   684.0|     0|      0.0|  128|     YES|      12|     88.5|    430.0|    685.9|    75|    968.0|   349
+T098_MARCH|perDesc_b96|1.70|anvilControl| 1118.3| 900.0|     8|   120|   441.5|   620.0|     0|      0.0|  128|     YES|      14|     62.8|    590.4|    618.3|    59|   1066.0|   361
+T098_POLICY|policy|label|factor|iters|emptyFineIters|emptyFineBlocks|densityEvals|promoProbes|firstMaterialT|itersAtMaterial|itersLeft|finalTrans|finalAlpha|stepCapped|falseNegSegs|falseNegBlocks|refFirstT|refAlpha
+T098_POLICY|production|waist       |1.12| 122|   82|    205.0|   121|   20|    438.2|   89|   33|  0.0132|  0.9868|    no|   0|     0.0|    436.0|  1.0000
+T098_POLICY|production|waist       |1.40| 126|   80|    200.0|   125|   21|    620.4|   93|   33|  0.0145|  0.9855|    no|   0|     0.0|    619.0|  1.0000
+T098_POLICY|production|waist       |1.70| 128|   78|    195.0|   128|   24|    817.9|   99|   29|  0.0395|  0.9605|   YES|   0|     0.0|    818.0|  1.0000
+T098_POLICY|production|waist       |1.90| 128|   83|    207.5|   128|   29|    949.0|  106|   22|  0.1129|  0.8871|   YES|   0|     0.0|    949.0|  1.0000
+T098_POLICY|production|waist       |2.60| 128|   95|    237.5|   128|   24|     -1.0|   -1|    0|  1.0000|  0.0000|   YES|   0|     0.0|   1449.0|  1.0000
+T098_POLICY|production|baseControl |1.70| 120|   81|    202.5|   119|   15|    684.7|   95|   25|  0.0146|  0.9854|    no|   0|     0.0|    683.0|  1.0000
+T098_POLICY|production|anvilControl|1.70|  92|   52|    130.0|    91|   13|    620.0|   67|   25|  0.0142|  0.9858|    no|   0|     0.0|    618.0|  1.0000
+T098_POLICY|production|lowerTower  |1.70|  76|   37|     92.5|    75|   11|    632.5|   53|   23|  0.0118|  0.9882|    no|   0|     0.0|    632.0|  1.0000
+T098_POLICY|production|upperTower  |1.70| 128|  113|    282.5|   128|   24|     -1.0|   -1|    0|  1.0000|  0.0000|   YES|   0|     0.0|    933.0|  1.0000
+T098_POLICY|production384|waist       |1.12| 122|   82|    205.0|   121|   20|    438.2|   89|   33|  0.0132|  0.9868|    no|   0|     0.0|    436.0|  1.0000
+T098_POLICY|production384|waist       |1.40| 126|   80|    200.0|   125|   21|    620.4|   93|   33|  0.0145|  0.9855|    no|   0|     0.0|    619.0|  1.0000
+T098_POLICY|production384|waist       |1.70| 136|   78|    195.0|   135|   24|    817.9|   99|   37|  0.0130|  0.9870|    no|   0|     0.0|    818.0|  1.0000
+T098_POLICY|production384|waist       |1.90| 142|   83|    207.5|   141|   29|    949.0|  106|   36|  0.0137|  0.9863|    no|   0|     0.0|    949.0|  1.0000
+T098_POLICY|production384|waist       |2.60| 184|  122|    305.0|   183|   29|   1450.1|  156|   28|  0.0146|  0.9854|    no|   0|     0.0|   1449.0|  1.0000
+T098_POLICY|production384|baseControl |1.70| 120|   81|    202.5|   119|   15|    684.7|   95|   25|  0.0146|  0.9854|    no|   0|     0.0|    683.0|  1.0000
+T098_POLICY|production384|anvilControl|1.70|  92|   52|    130.0|    91|   13|    620.0|   67|   25|  0.0142|  0.9858|    no|   0|     0.0|    618.0|  1.0000
+T098_POLICY|production384|lowerTower  |1.70|  76|   37|     92.5|    75|   11|    632.5|   53|   23|  0.0118|  0.9882|    no|   0|     0.0|    632.0|  1.0000
+T098_POLICY|production384|upperTower  |1.70| 217|  170|    425.0|   216|   34|    934.2|  186|   31|  0.0149|  0.9851|    no|   0|     0.0|    933.0|  1.0000
+T098_POLICY|scan16    |waist       |1.12|  47|    2|      5.0|   128|   12|    438.2|   14|   33|  0.0132|  0.9868|    no|   0|     0.0|    436.0|  1.0000
+T098_POLICY|scan16    |waist       |1.40|  52|    2|     40.0|   131|   12|    620.4|   19|   33|  0.0145|  0.9855|    no|   0|     0.0|    619.0|  1.0000
+T098_POLICY|scan16    |waist       |1.70|  64|    2|     35.0|   141|   15|    817.9|   27|   37|  0.0130|  0.9870|    no|   0|     0.0|    818.0|  1.0000
+T098_POLICY|scan16    |waist       |1.90|  71|    8|     47.5|   148|   21|    949.0|   35|   36|  0.0137|  0.9863|    no|   0|     0.0|    949.0|  1.0000
+T098_POLICY|scan16    |waist       |2.60|  71|    2|     25.0|   192|   16|   1450.1|   43|   28|  0.0146|  0.9854|    no|   0|     0.0|   1449.0|  1.0000
+T098_POLICY|scan16    |baseControl |1.70|  45|    1|      2.5|   125|    7|    684.7|   20|   25|  0.0146|  0.9854|    no|   0|     0.0|    683.0|  1.0000
+T098_POLICY|scan16    |anvilControl|1.70|  45|    2|     10.0|    96|    8|    620.0|   20|   25|  0.0142|  0.9858|    no|   0|     0.0|    618.0|  1.0000
+T098_POLICY|scan16    |lowerTower  |1.70|  43|    2|     12.5|    79|    7|    632.5|   20|   23|  0.0118|  0.9882|    no|   0|     0.0|    632.0|  1.0000
+T098_POLICY|scan16    |upperTower  |1.70|  59|    2|     25.0|   228|   16|    934.2|   28|   31|  0.0149|  0.9851|    no|   0|     0.0|    933.0|  1.0000
+T098_POLICY|scan-coarse2|waist       |1.12|  47|    2|      5.0|    87|   12|    438.2|   14|   33|  0.0132|  0.9868|    no|   0|     0.0|    436.0|  1.0000
+T098_POLICY|scan-coarse2|waist       |1.40|  53|    3|     40.0|    92|   12|    620.4|   20|   33|  0.0145|  0.9855|    no|   0|     0.0|    619.0|  1.0000
+T098_POLICY|scan-coarse2|waist       |1.70|  65|    3|     35.0|   103|   15|    817.9|   28|   37|  0.0130|  0.9870|    no|   0|     0.0|    818.0|  1.0000
+T098_POLICY|scan-coarse2|waist       |1.90|  71|    8|     47.5|   110|   21|    949.0|   35|   36|  0.0137|  0.9863|    no|   0|     0.0|    949.0|  1.0000
+T098_POLICY|scan-coarse2|waist       |2.60|  72|    3|     25.0|   132|   16|   1450.1|   44|   28|  0.0146|  0.9854|    no|   0|     0.0|   1449.0|  1.0000
+T098_POLICY|scan-coarse2|baseControl |1.70|  45|    1|      2.5|    85|    7|    684.7|   20|   25|  0.0146|  0.9854|    no|   0|     0.0|    683.0|  1.0000
+T098_POLICY|scan-coarse2|anvilControl|1.70|  46|    3|     10.0|    71|    8|    620.0|   21|   25|  0.0142|  0.9858|    no|   0|     0.0|    618.0|  1.0000
+T098_POLICY|scan-coarse2|lowerTower  |1.70|  43|    2|     12.5|    61|    7|    632.5|   20|   23|  0.0118|  0.9882|    no|   0|     0.0|    632.0|  1.0000
+T098_POLICY|scan-coarse2|upperTower  |1.70|  60|    3|     25.0|   144|   16|    934.2|   29|   31|  0.0149|  0.9851|    no|   0|     0.0|    933.0|  1.0000
+T098_POLICY|bisectOnly|waist       |1.12|  47|    0|      0.0|    50|   13|    436.2|   14|   33|  0.0147|  0.9853|    no|   1|    36.5|    436.0|  1.0000
+T098_POLICY|bisectOnly|waist       |1.40|  53|    0|      0.0|    56|   13|    619.2|   19|   34|  0.0134|  0.9866|    no|   1|     1.4|    619.0|  1.0000
+T098_POLICY|bisectOnly|waist       |1.70|  64|    1|      2.5|    67|   16|    819.2|   28|   36|  0.0142|  0.9858|    no|   1|     4.9|    818.0|  1.0000
+T098_POLICY|bisectOnly|waist       |1.90|  73|    8|     20.0|    80|   22|    950.3|   36|   37|  0.0138|  0.9862|    no|   1|     7.5|    949.0|  1.0000
+T098_POLICY|bisectOnly|waist       |2.60|  72|    0|      0.0|    75|   17|   1448.9|   43|   29|  0.0143|  0.9857|    no|   1|    16.1|   1449.0|  1.0000
+T098_POLICY|bisectOnly|baseControl |1.70|  47|    0|      0.0|    50|    8|    683.5|   21|   26|  0.0134|  0.9866|    no|   1|    39.2|    683.0|  1.0000
+T098_POLICY|bisectOnly|anvilControl|1.70|  46|    0|      0.0|    49|    9|    618.8|   20|   26|  0.0135|  0.9865|    no|   1|    32.0|    618.0|  1.0000
+T098_POLICY|bisectOnly|lowerTower  |1.70|  43|    1|      2.5|    46|    8|    633.8|   21|   22|  0.0136|  0.9864|    no|   1|    28.0|    632.0|  1.0000
+T098_POLICY|bisectOnly|upperTower  |1.70|  60|    0|      0.0|    63|   17|    933.0|   28|   32|  0.0138|  0.9862|    no|   1|    16.2|    933.0|  1.0000
+T098_PROMOTION|rays=9|shippedStepCapped=4|shippedNeverReached=2|shippedEmptyFineIters=701|correctedEmptyFineIters=23|correctedStepCapped=0|bisectOnlySkippedSegments=9|worstEntryErrorBlocks=0.00|worstAlphaError=0.00000
+PHASE4T_RESULT|T098 promotion reaches material within budget|PASSED|invariant satisfied
+T098_MARCH_GUARD|falseNegatives=0 at every distance|per-descriptor rule reaches opaque material 1.12x-2.00x|and beats the global bound at every distance|pre-fix rule still starves from 1.40x|PASSED
+T098_HIT_DEPTH|probes=19685|legacyDiscardedHits=8330|correctedDiscardedHits=0
+T098_HIT_DEPTH_LEGACY_WITNESS|renderChunks=8 far=512.0 representativeT=512.0 legacyDepth=1.0
+PHASE4T_RESULT|T098 cloud hit depth never saturates|PASSED|invariant satisfied
+PHASE4R_RESULT|T074 storm silhouette|PASSED|invariant satisfied
+PHASE4R_RESULT|T075 descriptor locality|PASSED|invariant satisfied
+PHASE4R_RESULT|T076 independent GLSL parity|PASSED|invariant satisfied
+PHASE4R_RESULT|T077 descriptor smooth-union composition|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 descriptor slot validity|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 incomplete group fallback|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 rejected async build re-request|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 cluster-only signatures|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 candidate group witness coverage|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 candidate non-authority|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 bounded per-group intersection|PASSED|invariant satisfied
+PHASE4R_RESULT|T111 production storm shader compiles|PASSED|invariant satisfied
+PHASE4R_RESULT|T161 lean FINAL shader specializes and compiles|PASSED|invariant satisfied
+PHASE4R_RESULT|T140 oracle variants compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T162 attribution arms compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T166 attribution arms compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T167 refinement arms compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T168 footprint arms compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T169 lighting and detail arms compile and stay out of FINAL|PASSED|invariant satisfied
+PHASE4R_RESULT|T170 primary march arms compile and stay out of FINAL|PASSED|invariant satisfied
+T170_WIRING campaigns=23|armMatrices=19|violations=0
+PHASE4R_RESULT|T170 every registered campaign is wired into every dispatch site|PASSED|invariant satisfied
+T170_WIRING_NEGATIVE mutations=5|allDetected=true
+PHASE4R_RESULT|T170 the campaign wiring invariant detects an omitted wire|PASSED|invariant satisfied
+T171_CONTROLS duplicates=2|byteIdenticalToFinal=true
+PHASE4R_RESULT|T171 program identity controls are byte-identical to FINAL|PASSED|invariant satisfied
+T171_SAMPLING freshnessGate=wired|duplicateCounter=wired|dispersion=wired
+PHASE4R_RESULT|T171 the GPU sampler records only fresh timer results|PASSED|invariant satisfied
+PHASE4R_RESULT|T172 precompute arms compile and stay out of FINAL|PASSED|invariant satisfied
+T172_PRECOMPUTE texels=6|minEdge=11.363636|edgeBound=0.75|channelsPinned=true
+PHASE4R_RESULT|T172 the CPU precompute still matches the shader formula|PASSED|invariant satisfied
+T175_WORKLOAD_VIEWS declared=21|allEnabled=true
+PHASE4R_RESULT|T175 every workload debug view is actually enabled|PASSED|invariant satisfied
+PHASE4R_RESULT|T163 FINAL is specialized against the dead precipitation path|PASSED|invariant satisfied
+
+> Task :test
+
+> Task :volumetricStabilityDiagnosticsSandbox
+PHASE4R_RESULT|T078 rain and rendered-body agreement|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 independent lifecycle generations|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 same-frame history invalidation|PASSED|invariant satisfied
+PHASE4R_RESULT|T079 shaftDensity maxPrecipitation argument|PASSED|invariant satisfied
+
+> Task :check
+
+BUILD SUCCESSFUL in 15m 44s
+18 actionable tasks: 13 executed, 5 up-to-date

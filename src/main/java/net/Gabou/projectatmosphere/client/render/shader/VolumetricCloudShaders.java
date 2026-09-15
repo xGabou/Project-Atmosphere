@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.client.render.shader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.CoreCostDiagnosticProgram;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormCampaignRegistry;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
@@ -44,10 +45,12 @@ public final class VolumetricCloudShaders {
     private static ShaderInstance volumeShader;
     private static ShaderInstance leanFinalVolumeShader;
     /**
-     * The generated diagnostic builds, keyed by the arm that selects them.
-     * There are several dozen; a field, a ResourceLocation, a registration
-     * line and a switch case per program meant every attribution campaign
-     * added four more places to forget.
+     * The generated builds, keyed by the program that selects them: the
+     * campaign arms, loaded only while their campaign is armed, and (T206)
+     * the two production programs FINAL draws with, loaded always. There are
+     * several dozen; a field, a ResourceLocation, a registration line and a
+     * switch case per program meant every attribution campaign added four
+     * more places to forget.
      */
     private static final java.util.Map<CoreCostDiagnosticProgram, ShaderInstance>
             diagnosticVolumeShaders =
@@ -69,7 +72,10 @@ public final class VolumetricCloudShaders {
                         event.getResourceProvider(), CUMULUS_LAYER_SPLAT_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> cumulusLayerSplatShader = loaded);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), VOLUME_ID, DefaultVertexFormat.POSITION_TEX),
-                loaded -> volumeShader = loaded);
+                loaded -> {
+                    volumeShader = loaded;
+                    logProgramBinarySize("diagnostic_monolith", loaded);
+                });
         // Registered defensively. If the generated program is missing or fails
         // to compile, that must not abort the registration of the other cloud
         // programs: the renderer's own guard then refuses to draw FINAL with
@@ -80,19 +86,71 @@ public final class VolumetricCloudShaders {
             event.registerShader(new ShaderInstance(
                             event.getResourceProvider(), LEAN_FINAL_VOLUME_ID,
                             DefaultVertexFormat.POSITION_TEX),
-                    loaded -> leanFinalVolumeShader = loaded);
+                    loaded -> {
+                        leanFinalVolumeShader = loaded;
+                        logProgramBinarySize("lean_final", loaded);
+                    });
             diagnosticVolumeShaders.clear();
+            // T206. FINAL's frame is three programs: the gate build and the
+            // rain pass draw before the split cloud program. They register
+            // unconditionally and inside this try: a link failure of either
+            // propagates to the catch below, which nulls the lean program so
+            // the renderer session-disables with the same loud status a
+            // failed FINAL link produces - never a FINAL frame without rain,
+            // never the monolith in its place.
+            int productionPrograms = 2;
             for (CoreCostDiagnosticProgram program : CoreCostDiagnosticProgram.values()) {
-                if (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
-                        || program == CoreCostDiagnosticProgram.LEAN_FINAL) {
+                if (program.finalSupportProgram()) {
+                    registerProductionVolumeProgram(event, program);
+                    productionPrograms++;
+                }
+            }
+            // T191. Campaign arms are loaded only while their campaign is
+            // armed. Every arm ever measured used to be compiled and linked on
+            // every startup - 139 full-size fragment programs by T190 - which
+            // is minutes of compilation and enough memory pressure that one
+            // launch died in the middle of it. Nothing about a historical
+            // experiment requires it to be a live program on a run that cannot
+            // select it.
+            //
+            // The source, the generated variants and the evidence all stay in
+            // the tree; only the ShaderInstance is conditional.
+            java.util.Set<String> activeCampaigns =
+                    StormCampaignRegistry.activeCampaignIds();
+            // A campaign's arms are not confined to its own prefix: matrices
+            // reuse earlier campaigns' programs as controls. Registering only
+            // the prefix match leaves those controls unloaded, which the
+            // renderer can only report as a missing program mid-sweep.
+            java.util.Set<CoreCostDiagnosticProgram> selectable =
+                    StormCampaignRegistry.programsSelectableByActiveCampaigns();
+            int registered = 0;
+            int skipped = 0;
+            for (CoreCostDiagnosticProgram program : CoreCostDiagnosticProgram.values()) {
+                if (program.isProductionProgram()) {
+                    continue;
+                }
+                if (!activeCampaigns.contains(program.campaignId())
+                        && !selectable.contains(program)) {
+                    skipped++;
                     continue;
                 }
                 registerDiagnosticVolumeProgram(event, program);
+                registered++;
             }
+            ProjectAtmosphere.LOGGER.info(
+                    "T191_VARIANT_SCOPE declared={} activeCampaigns={} registered={}"
+                            + " skipped={} crossCampaignControls={}"
+                            + " productionAlwaysLoaded={}",
+                    CoreCostDiagnosticProgram.values().length - productionPrograms,
+                    activeCampaigns.isEmpty() ? "none" : String.join(",", activeCampaigns),
+                    registered, skipped, selectable.size(), productionPrograms);
         } catch (IOException | RuntimeException failure) {
             leanFinalVolumeShader = null;
+            diagnosticVolumeShaders.remove(CoreCostDiagnosticProgram.RAIN_PASS);
+            diagnosticVolumeShaders.remove(CoreCostDiagnosticProgram.RAIN_GATE_BUILD);
             ProjectAtmosphere.LOGGER.error(
-                    "[VolumetricClouds] lean FINAL program {} failed to load;"
+                    "[VolumetricClouds] a production cloud program failed to load"
+                            + " (FINAL {} or one of its rain programs);"
                             + " the volumetric pass will session-disable rather than"
                             + " silently render FINAL with the diagnostic program",
                     LEAN_FINAL_VOLUME_ID, failure);
@@ -137,6 +195,46 @@ public final class VolumetricCloudShaders {
     }
 
     /**
+     * T191. Why a diagnostic program is unavailable, for the renderer's status
+     * line. A campaign arm selected without its marker is a setup mistake with
+     * an obvious fix, and it must not read as a compile failure.
+     */
+    public static String missingProgramReason(CoreCostDiagnosticProgram program) {
+        if (program == null || volumeShader(program) != null) {
+            return "loaded";
+        }
+        if (program.isProductionProgram()) {
+            return "production_program_failed_to_load";
+        }
+        String campaign = program.campaignId();
+        return StormCampaignRegistry.activeCampaignIds().contains(campaign)
+                ? "campaign_" + campaign + "_active_but_program_failed_to_load"
+                : "campaign_" + campaign + "_not_armed:"
+                        + " create its marker file and restart the client";
+    }
+
+    /**
+     * T206. Registers one production program FINAL's frame draws with. Unlike
+     * a diagnostic program, a failure here is not caught: it propagates to the
+     * caller's catch, which takes FINAL down with it. A FINAL frame drawn
+     * without its rain pass would be a frame without rain, and the monolith
+     * is never the fallback.
+     */
+    private static void registerProductionVolumeProgram(
+            RegisterShadersEvent event,
+            CoreCostDiagnosticProgram program) throws IOException {
+        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(
+                ProjectAtmosphere.MODID, program.resourceName());
+        event.registerShader(
+                new ShaderInstance(event.getResourceProvider(), id,
+                        DefaultVertexFormat.POSITION_TEX),
+                loaded -> {
+                    diagnosticVolumeShaders.put(program, loaded);
+                    logProgramBinarySize(program.serializedName(), loaded);
+                });
+    }
+
+    /**
      * Registers one generated diagnostic program. A diagnostic program that
      * fails to build must not take the renderer down with it, so the failure
      * is logged and the slot left empty; the campaign that selects it reports
@@ -151,7 +249,10 @@ public final class VolumetricCloudShaders {
             event.registerShader(
                     new ShaderInstance(event.getResourceProvider(), id,
                             DefaultVertexFormat.POSITION_TEX),
-                    loaded -> diagnosticVolumeShaders.put(program, loaded));
+                    loaded -> {
+                        diagnosticVolumeShaders.put(program, loaded);
+                        logProgramBinarySize(program.serializedName(), loaded);
+                    });
         } catch (IOException | RuntimeException failure) {
             ProjectAtmosphere.LOGGER.error(
                     "[VolumetricClouds] diagnostic program {} failed to load",
@@ -159,9 +260,43 @@ public final class VolumetricCloudShaders {
         }
     }
 
-    /** True when the separately linked lean FINAL program is available. */
+    /**
+     * T204. The linked program's binary length (ARB_get_program_binary), the
+     * one compiler characteristic the driver exposes without vendor tooling:
+     * on NVIDIA the binary carries the assembled machine code, so its size
+     * tracks the instruction count. Logged once per program at link time,
+     * so a campaign's arms can be compared for code presence.
+     */
+    private static void logProgramBinarySize(String name, ShaderInstance shader) {
+        try {
+            if (!org.lwjgl.opengl.GL.getCapabilities().GL_ARB_get_program_binary) {
+                return;
+            }
+            int bytes = org.lwjgl.opengl.GL41.glGetProgrami(shader.getId(),
+                    org.lwjgl.opengl.GL41.GL_PROGRAM_BINARY_LENGTH);
+            ProjectAtmosphere.LOGGER.info("T204_PROGRAM_BINARY program={} bytes={}", name, bytes);
+            if ("lean_final".equals(name)) {
+                // T207. The phase's aux attachment is fragment output 1; the
+                // linker assigns the locations, so the assignment is evidence
+                // rather than an assumption.
+                ProjectAtmosphere.LOGGER.info("T207_FRAG_DATA program={} fragColor={} fragTemporalAux={}",
+                        name,
+                        org.lwjgl.opengl.GL30.glGetFragDataLocation(shader.getId(), "fragColor"),
+                        org.lwjgl.opengl.GL30.glGetFragDataLocation(shader.getId(), "fragTemporalAux"));
+            }
+        } catch (RuntimeException failure) {
+            ProjectAtmosphere.LOGGER.debug("program binary length unavailable for {}", name, failure);
+        }
+    }
+
+    /**
+     * True when every program a FINAL frame draws with is available: the lean
+     * program and, since T206, the gate build and the rain pass.
+     */
     public static boolean leanFinalShaderReady() {
-        return leanFinalVolumeShader != null;
+        return leanFinalVolumeShader != null
+                && diagnosticVolumeShaders.get(CoreCostDiagnosticProgram.RAIN_PASS) != null
+                && diagnosticVolumeShaders.get(CoreCostDiagnosticProgram.RAIN_GATE_BUILD) != null;
     }
 
     public static ShaderInstance morphologySplatShader() {

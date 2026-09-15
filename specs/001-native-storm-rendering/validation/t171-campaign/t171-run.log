@@ -1,0 +1,77 @@
+T171 harness stability campaign - 05Sep2026 17:42-17:44
+Launch: ./gradlew runClient --no-daemon --max-workers=1 -PpaBenchHeap=4G
+
+T171_HARNESS_STABILITY_BEGIN poses=2 arms=35 mode=ULTRA steps=96 resolutionScale=NaN target=1920x1080
+
+--- decision block ---
+T171_CELL pose=SIDE arm=lean_final#a1 block=a program=lean_final samples=60 duplicatesRejected=0 cloudP50=22.5290 cloudP95=24.4204 cloudMean=22.5552 cloudSd=1.0914 cloudCv=0.04839 cloudMin=20.5629 cloudMax=25.7004
+T171_CELL pose=SIDE arm=lean_final#a2 block=a program=lean_final samples=60 duplicatesRejected=0 cloudP50=22.2628 cloudP95=24.2821 cloudMean=22.3684 cloudSd=1.0961 cloudCv=0.04900 cloudMin=20.0315 cloudMax=26.7192
+T171_CELL pose=SIDE arm=lean_final#a3 block=a program=lean_final samples=60 duplicatesRejected=0 cloudP50=22.4010 cloudP95=23.6298 cloudMean=22.3217 cloudSd=0.9205 cloudCv=0.04124 cloudMin=20.5107 cloudMax=24.5903
+T171_CELL pose=SIDE arm=lean_final#a4 block=a program=lean_final samples=60 duplicatesRejected=0 cloudP50=22.4502 cloudP95=24.3599 cloudMean=22.5631 cloudSd=1.0937 cloudCv=0.04847 cloudMin=20.6868 cloudMax=26.5544
+T171_CELL pose=SIDE arm=lean_final#b1 block=b program=lean_final samples=60 duplicatesRejected=0 cloudP50=22.0580 cloudP95=23.5254 cloudMean=22.1550 cloudSd=0.8849 cloudCv=0.03994 cloudMin=20.1411 cloudMax=24.2033
+T171_CELL pose=SIDE arm=t171_dup_a#b1 block=b program=t171_dup_a samples=60 duplicatesRejected=0 cloudP50=22.3631 cloudP95=24.5350 cloudMean=22.5531 cloudSd=1.1136 cloudCv=0.04938 cloudMin=20.0243 cloudMax=25.3850
+T171_CELL pose=SIDE arm=t171_dup_b#b1 block=b program=t171_dup_b samples=60 duplicatesRejected=0 cloudP50=22.1850 cloudP95=23.9565 cloudMean=22.1337 cloudSd=0.9586 cloudCv=0.04331 cloudMin=20.5435 cloudMax=24.1562
+T171_CELL pose=SIDE arm=lean_final#b2 block=b program=lean_final samples=60 duplicatesRejected=0 cloudP50=22.4328 cloudP95=24.3190 cloudMean=22.5943 cloudSd=1.0016 cloudCv=0.04433 cloudMin=20.7217 cloudMax=25.3000
+T171_CELL pose=SIDE arm=t171_dup_a#b2 block=b program=t171_dup_a samples=60 duplicatesRejected=0 cloudP50=22.8741 cloudP95=24.5944 cloudMean=23.0337 cloudSd=0.9589 cloudCv=0.04163 cloudMin=21.3176 cloudMax=25.2948
+T171_CELL pose=SIDE arm=t171_dup_b#b2 block=b program=t171_dup_b samples=60 duplicatesRejected=0 cloudP50=22.1317 cloudP95=23.9401 cloudMean=22.4121 cloudSd=0.9890 cloudCv=0.04413 cloudMin=20.8957 cloudMax=25.0726
+T171_CELL pose=SIDE arm=t171_dup_b#c1 block=c program=t171_dup_b samples=60 duplicatesRejected=0 cloudP50=22.2208 cloudP95=24.3159 cloudMean=22.3273 cloudSd=1.0780 cloudCv=0.04828 cloudMin=20.7350 cloudMax=26.0895
+T171_CELL pose=SIDE arm=t171_dup_a#c1 block=c program=t171_dup_a samples=60 duplicatesRejected=0 cloudP50=22.2106 cloudP95=23.7005 cloudMean=22.2636 cloudSd=0.9182 cloudCv=0.04124 cloudMin=20.7360 cloudMax=25.8775
+T171_CELL pose=SIDE arm=lean_final#c1 block=c program=lean_final samples=60 duplicatesRejected=0 cloudP50=22.4010 cloudP95=24.2422 cloudMean=22.5209 cloudSd=1.1421 cloudCv=0.05071 cloudMin=20.6899 cloudMax=26.1980
+T171_CELL pose=SIDE arm=t171_dup_b#c2 block=c program=t171_dup_b samples=60 duplicatesRejected=0 cloudP50=22.3427 cloudP95=24.1265 cloudMean=22.5090 cloudSd=1.1760 cloudCv=0.05225 cloudMin=20.5322 cloudMax=27.7422
+T171_CELL pose=SIDE arm=t171_dup_a#c2 block=c program=t171_dup_a samples=60 duplicatesRejected=0 cloudP50=22.3836 cloudP95=24.2627 cloudMean=22.3972 cloudSd=1.0582 cloudCv=0.04725 cloudMin=20.8251 cloudMax=25.6471
+T171_CELL pose=SIDE arm=lean_final#c2 block=c program=lean_final samples=60 duplicatesRejected=0 cloudP50=22.0436 cloudP95=24.1961 cloudMean=22.3228 cloudSd=1.0549 cloudCv=0.04726 cloudMin=20.7278 cloudMax=25.4454
+T171_CELL pose=SIDE arm=lean_final#d060 block=d program=lean_final samples=60 duplicatesRejected=0 cloudP50=22.5413 cloudP95=25.5457 cloudMean=22.9257 cloudSd=1.4282 cloudCv=0.06230 cloudMin=20.9183 cloudMax=29.4226
+T171_CELL pose=SIDE arm=lean_final#d120 block=d program=lean_final samples=120 duplicatesRejected=0 cloudP50=22.7553 cloudP95=24.6231 cloudMean=22.8111 cloudSd=0.9581 cloudCv=0.04200 cloudMin=20.7780 cloudMax=25.7802
+T171_CELL pose=SIDE arm=lean_final#d240 block=d program=lean_final samples=240 duplicatesRejected=0 cloudP50=22.2034 cloudP95=24.5514 cloudMean=22.3410 cloudSd=1.1242 cloudCv=0.05032 cloudMin=20.1708 cloudMax=28.8471
+T171_CELL pose=SIDE arm=t170_fpmax5#e1 block=e program=t170_fpmax5 samples=60 duplicatesRejected=0 cloudP50=12.5880 cloudP95=13.5086 cloudMean=12.5133 cloudSd=0.7729 cloudCv=0.06177 cloudMin=10.7694 cloudMax=14.2817
+T171_CELL pose=SIDE arm=t170_fpmax6#e1 block=e program=t170_fpmax6 samples=60 duplicatesRejected=0 cloudP50=11.1636 cloudP95=11.5855 cloudMean=11.1306 cloudSd=0.2724 cloudCv=0.02448 cloudMin=10.6496 cloudMax=11.6664
+T171_CELL pose=SIDE arm=t170_fpmax8#e1 block=e program=t170_fpmax8 samples=60 duplicatesRejected=0 cloudP50=11.2650 cloudP95=11.7248 cloudMean=11.2576 cloudSd=0.3480 cloudCv=0.03091 cloudMin=10.5472 cloudMax=12.6638
+T171_CELL pose=SIDE arm=t170_fpmax5#e2 block=e program=t170_fpmax5 samples=60 duplicatesRejected=0 cloudP50=11.0971 cloudP95=11.6224 cloudMean=11.1368 cloudSd=0.2734 cloudCv=0.02455 cloudMin=10.6772 cloudMax=11.9316
+T171_CELL pose=SIDE arm=t170_fpmax6#e2 block=e program=t170_fpmax6 samples=60 duplicatesRejected=0 cloudP50=11.1636 cloudP95=11.7125 cloudMean=11.1954 cloudSd=0.3174 cloudCv=0.02835 cloudMin=10.6301 cloudMax=12.5563
+T171_CELL pose=SIDE arm=t170_fpmax8#e2 block=e program=t170_fpmax8 samples=60 duplicatesRejected=0 cloudP50=11.0633 cloudP95=12.1754 cloudMean=11.2585 cloudSd=0.6113 cloudCv=0.05430 cloudMin=10.7203 cloudMax=14.0913
+T171_CELL pose=SIDE arm=t169_stack_fast#f1 block=f program=t169_stack_fast samples=60 duplicatesRejected=0 cloudP50=12.5932 cloudP95=13.5916 cloudMean=12.7280 cloudSd=0.5826 cloudCv=0.04577 cloudMin=11.8385 cloudMax=14.5736
+T171_CELL pose=SIDE arm=t170_desc_nosdf#f1 block=f program=t170_desc_nosdf samples=60 duplicatesRejected=0 cloudP50=12.5737 cloudP95=13.6499 cloudMean=12.6442 cloudSd=0.5311 cloudCv=0.04200 cloudMin=11.5866 cloudMax=13.8189
+T171_CELL pose=SIDE arm=t170_desc_constedge#f1 block=f program=t170_desc_constedge samples=60 duplicatesRejected=0 cloudP50=16.0573 cloudP95=17.0588 cloudMean=16.0509 cloudSd=0.5721 cloudCv=0.03564 cloudMin=14.3135 cloudMax=17.4254
+T171_CELL pose=SIDE arm=t170_desc_hoist#f1 block=f program=t170_desc_hoist samples=60 duplicatesRejected=0 cloudP50=15.6344 cloudP95=16.3891 cloudMean=15.6138 cloudSd=0.5375 cloudCv=0.03443 cloudMin=14.3155 cloudMax=16.6420
+T171_CELL pose=SIDE arm=t170_stack_hoist#f1 block=f program=t170_stack_hoist samples=60 duplicatesRejected=0 cloudP50=8.7757 cloudP95=9.1126 cloudMean=8.8063 cloudSd=0.2155 cloudCv=0.02447 cloudMin=8.3282 cloudMax=9.3256
+T171_CELL pose=SIDE arm=t169_stack_fast#f2 block=f program=t169_stack_fast samples=60 duplicatesRejected=0 cloudP50=12.6136 cloudP95=13.8506 cloudMean=12.8213 cloudSd=0.6590 cloudCv=0.05140 cloudMin=11.8487 cloudMax=15.1245
+T171_CELL pose=SIDE arm=t170_desc_nosdf#f2 block=f program=t170_desc_nosdf samples=60 duplicatesRejected=0 cloudP50=12.5727 cloudP95=13.2997 cloudMean=12.5950 cloudSd=0.4519 cloudCv=0.03588 cloudMin=11.7965 cloudMax=13.5414
+T171_CELL pose=SIDE arm=t170_desc_constedge#f2 block=f program=t170_desc_constedge samples=60 duplicatesRejected=0 cloudP50=15.9898 cloudP95=17.3844 cloudMean=16.0537 cloudSd=0.7256 cloudCv=0.04520 cloudMin=14.6729 cloudMax=18.2282
+T171_CELL pose=SIDE arm=t170_desc_hoist#f2 block=f program=t170_desc_hoist samples=60 duplicatesRejected=0 cloudP50=15.8413 cloudP95=17.0097 cloudMean=15.8724 cloudSd=0.6785 cloudCv=0.04275 cloudMin=14.6852 cloudMax=17.2227
+T171_CELL pose=SIDE arm=t170_stack_hoist#f2 block=f program=t170_stack_hoist samples=60 duplicatesRejected=0 cloudP50=8.7306 cloudP95=9.1853 cloudMean=8.7714 cloudSd=0.2362 cloudCv=0.02693 cloudMin=8.3200 cloudMax=9.3368
+T171_CELL pose=FAR arm=lean_final#a1 block=a program=lean_final samples=60 duplicatesRejected=0 cloudP50=13.9827 cloudP95=15.7942 cloudMean=14.2629 cloudSd=0.7483 cloudCv=0.05246 cloudMin=13.5014 cloudMax=16.7516
+T171_CELL pose=FAR arm=lean_final#a2 block=a program=lean_final samples=60 duplicatesRejected=0 cloudP50=13.9848 cloudP95=16.2959 cloudMean=14.3794 cloudSd=0.8825 cloudCv=0.06137 cloudMin=13.5414 cloudMax=16.7997
+T171_CELL pose=FAR arm=lean_final#a3 block=a program=lean_final samples=60 duplicatesRejected=0 cloudP50=14.0984 cloudP95=16.3482 cloudMean=14.5325 cloudSd=0.9823 cloudCv=0.06759 cloudMin=13.4779 cloudMax=17.3752
+T171_CELL pose=FAR arm=lean_final#a4 block=a program=lean_final samples=60 duplicatesRejected=0 cloudP50=14.1947 cloudP95=16.3881 cloudMean=14.5886 cloudSd=0.9888 cloudCv=0.06778 cloudMin=13.5854 cloudMax=17.4612
+T171_CELL pose=FAR arm=lean_final#b1 block=b program=lean_final samples=60 duplicatesRejected=0 cloudP50=13.8045 cloudP95=16.4424 cloudMean=13.8913 cloudSd=1.2697 cloudCv=0.09140 cloudMin=11.2630 cloudMax=17.0127
+T171_CELL pose=FAR arm=t171_dup_a#b1 block=b program=t171_dup_a samples=60 duplicatesRejected=0 cloudP50=14.2254 cloudP95=16.6205 cloudMean=14.6069 cloudSd=1.1041 cloudCv=0.07559 cloudMin=13.3796 cloudMax=18.1780
+T171_CELL pose=FAR arm=t171_dup_b#b1 block=b program=t171_dup_b samples=60 duplicatesRejected=0 cloudP50=13.9715 cloudP95=16.1894 cloudMean=14.0861 cloudSd=1.2421 cloudCv=0.08818 cloudMin=11.8149 cloudMax=17.0035
+T171_CELL pose=FAR arm=lean_final#b2 block=b program=lean_final samples=60 duplicatesRejected=0 cloudP50=13.5864 cloudP95=16.1669 cloudMean=13.7675 cloudSd=1.1054 cloudCv=0.08029 cloudMin=11.7381 cloudMax=16.9861
+T171_CELL pose=FAR arm=t171_dup_a#b2 block=b program=t171_dup_a samples=60 duplicatesRejected=0 cloudP50=13.9438 cloudP95=16.1137 cloudMean=14.3119 cloudSd=0.9664 cloudCv=0.06753 cloudMin=13.3622 cloudMax=18.2292
+T171_CELL pose=FAR arm=t171_dup_b#b2 block=b program=t171_dup_b samples=60 duplicatesRejected=0 cloudP50=14.1271 cloudP95=16.0440 cloudMean=14.3649 cloudSd=0.9929 cloudCv=0.06912 cloudMin=12.5553 cloudMax=17.0435
+T171_CELL pose=FAR arm=t171_dup_b#c1 block=c program=t171_dup_b samples=60 duplicatesRejected=0 cloudP50=14.1466 cloudP95=15.6119 cloudMean=14.0144 cloudSd=1.0890 cloudCv=0.07770 cloudMin=11.8108 cloudMax=16.4014
+T171_CELL pose=FAR arm=t171_dup_a#c1 block=c program=t171_dup_a samples=60 duplicatesRejected=0 cloudP50=13.8762 cloudP95=15.5361 cloudMean=13.7437 cloudSd=1.0469 cloudCv=0.07618 cloudMin=11.0377 cloudMax=16.3369
+T171_CELL pose=FAR arm=lean_final#c1 block=c program=lean_final samples=60 duplicatesRejected=0 cloudP50=13.7728 cloudP95=16.0266 cloudMean=13.7840 cloudSd=1.1583 cloudCv=0.08403 cloudMin=11.0848 cloudMax=16.4096
+T171_CELL pose=FAR arm=t171_dup_b#c2 block=c program=t171_dup_b samples=60 duplicatesRejected=0 cloudP50=14.0708 cloudP95=16.4065 cloudMean=14.4870 cloudSd=0.9104 cloudCv=0.06284 cloudMin=13.5004 cloudMax=16.6892
+T171_CELL pose=FAR arm=t171_dup_a#c2 block=c program=t171_dup_a samples=60 duplicatesRejected=0 cloudP50=14.1711 cloudP95=16.5571 cloudMean=14.4997 cloudSd=0.9269 cloudCv=0.06393 cloudMin=13.5721 cloudMax=17.5503
+T171_CELL pose=FAR arm=lean_final#c2 block=c program=lean_final samples=60 duplicatesRejected=0 cloudP50=14.0841 cloudP95=16.0983 cloudMean=14.3523 cloudSd=0.7292 cloudCv=0.05081 cloudMin=13.5987 cloudMax=16.6195
+T171_CELL pose=FAR arm=lean_final#d060 block=d program=lean_final samples=60 duplicatesRejected=0 cloudP50=14.1691 cloudP95=16.4127 cloudMean=14.4758 cloudSd=1.0165 cloudCv=0.07022 cloudMin=13.4851 cloudMax=18.3378
+T171_CELL pose=FAR arm=lean_final#d120 block=d program=lean_final samples=120 duplicatesRejected=0 cloudP50=14.1896 cloudP95=16.2284 cloudMean=14.5392 cloudSd=0.8767 cloudCv=0.06030 cloudMin=13.5404 cloudMax=17.7562
+T171_CELL pose=FAR arm=lean_final#d240 block=d program=lean_final samples=240 duplicatesRejected=0 cloudP50=13.8609 cloudP95=15.9386 cloudMean=14.1063 cloudSd=0.8678 cloudCv=0.06152 cloudMin=11.7299 cloudMax=17.0271
+T171_CELL pose=FAR arm=t170_fpmax5#e1 block=e program=t170_fpmax5 samples=60 duplicatesRejected=0 cloudP50=5.0606 cloudP95=5.4006 cloudMean=5.0498 cloudSd=0.2228 cloudCv=0.04412 cloudMin=4.5681 cloudMax=5.6084
+T171_CELL pose=FAR arm=t170_fpmax6#e1 block=e program=t170_fpmax6 samples=60 duplicatesRejected=0 cloudP50=5.0452 cloudP95=5.3955 cloudMean=5.0284 cloudSd=0.2503 cloudCv=0.04979 cloudMin=4.5148 cloudMax=5.7108
+T171_CELL pose=FAR arm=t170_fpmax8#e1 block=e program=t170_fpmax8 samples=60 duplicatesRejected=0 cloudP50=5.0166 cloudP95=5.2961 cloudMean=5.0097 cloudSd=0.2224 cloudCv=0.04440 cloudMin=4.5742 cloudMax=5.4999
+T171_CELL pose=FAR arm=t170_fpmax5#e2 block=e program=t170_fpmax5 samples=60 duplicatesRejected=0 cloudP50=5.0627 cloudP95=5.4610 cloudMean=5.0687 cloudSd=0.2795 cloudCv=0.05515 cloudMin=4.4175 cloudMax=5.9095
+T171_CELL pose=FAR arm=t170_fpmax6#e2 block=e program=t170_fpmax6 samples=60 duplicatesRejected=0 cloudP50=4.9971 cloudP95=5.4968 cloudMean=5.0272 cloudSd=0.3085 cloudCv=0.06137 cloudMin=4.5292 cloudMax=6.3222
+T171_CELL pose=FAR arm=t170_fpmax8#e2 block=e program=t170_fpmax8 samples=60 duplicatesRejected=0 cloudP50=5.0934 cloudP95=5.6238 cloudMean=5.0772 cloudSd=0.3003 cloudCv=0.05915 cloudMin=4.5210 cloudMax=5.7661
+T171_CELL pose=FAR arm=t169_stack_fast#f1 block=f program=t169_stack_fast samples=60 duplicatesRejected=0 cloudP50=5.2746 cloudP95=5.5726 cloudMean=5.2557 cloudSd=0.2324 cloudCv=0.04421 cloudMin=4.7811 cloudMax=5.9136
+T171_CELL pose=FAR arm=t170_desc_nosdf#f1 block=f program=t170_desc_nosdf samples=60 duplicatesRejected=0 cloudP50=12.7887 cloudP95=12.9700 cloudMean=12.7885 cloudSd=0.1122 cloudCv=0.00877 cloudMin=12.5870 cloudMax=13.0591
+T171_CELL pose=FAR arm=t170_desc_constedge#f1 block=f program=t170_desc_constedge samples=60 duplicatesRejected=0 cloudP50=9.2447 cloudP95=10.4980 cloudMean=9.2371 cloudSd=0.7982 cloudCv=0.08641 cloudMin=7.7844 cloudMax=11.2077
+T171_CELL pose=FAR arm=t170_desc_hoist#f1 block=f program=t170_desc_hoist samples=60 duplicatesRejected=0 cloudP50=8.7982 cloudP95=10.0895 cloudMean=8.8749 cloudSd=0.7575 cloudCv=0.08535 cloudMin=7.6605 cloudMax=10.3680
+T171_CELL pose=FAR arm=t170_stack_hoist#f1 block=f program=t170_stack_hoist samples=60 duplicatesRejected=0 cloudP50=4.4001 cloudP95=4.7800 cloudMean=4.4293 cloudSd=0.1980 cloudCv=0.04471 cloudMin=4.0704 cloudMax=4.9449
+T171_CELL pose=FAR arm=t169_stack_fast#f2 block=f program=t169_stack_fast samples=60 duplicatesRejected=0 cloudP50=5.2347 cloudP95=5.5808 cloudMean=5.2394 cloudSd=0.2514 cloudCv=0.04799 cloudMin=4.8118 cloudMax=5.9412
+T171_CELL pose=FAR arm=t170_desc_nosdf#f2 block=f program=t170_desc_nosdf samples=60 duplicatesRejected=0 cloudP50=8.1859 cloudP95=8.8474 cloudMean=8.2794 cloudSd=0.3016 cloudCv=0.03642 cloudMin=7.9421 cloudMax=9.6563
+T171_CELL pose=FAR arm=t170_desc_constedge#f2 block=f program=t170_desc_constedge samples=60 duplicatesRejected=0 cloudP50=8.9764 cloudP95=10.0485 cloudMean=9.0467 cloudSd=0.6807 cloudCv=0.07525 cloudMin=7.8787 cloudMax=11.4330
+T171_CELL pose=FAR arm=t170_desc_hoist#f2 block=f program=t170_desc_hoist samples=60 duplicatesRejected=0 cloudP50=8.6804 cloudP95=10.2789 cloudMean=8.8211 cloudSd=0.7774 cloudCv=0.08813 cloudMin=7.6278 cloudMax=11.3756
+T171_CELL pose=FAR arm=t170_stack_hoist#f2 block=f program=t170_stack_hoist samples=60 duplicatesRejected=0 cloudP50=4.3756 cloudP95=4.7340 cloudMean=4.3940 cloudSd=0.2185 cloudCv=0.04973 cloudMin=3.9793 cloudMax=4.9439
+T171_REJECTED count=0 none

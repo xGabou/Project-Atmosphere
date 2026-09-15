@@ -23,7 +23,17 @@ import java.util.Locale;
  *   <li><b>thin retention</b> - what fraction of faint material survives, which
  *       is what a coarser sample lattice erases first;</li>
  *   <li><b>hole retention</b> - what fraction of the openings between lobes
- *       stay open, which is what a coarser lattice fills in.</li>
+ *       stay open, which is what a coarser lattice fills in;</li>
+ *   <li><b>seam index</b> - how much sharper the cloud's <em>interior</em> got.
+ *       This one exists for the descriptor experiment specifically. The shader
+ *       carries a recorded prior failure at
+ *       {@code directStormGroupField}: dropping lobes whose local density was
+ *       zero "made blends collapse into visible primitive intersections". A
+ *       collapsed smooth union reads as a crease inside the cloud body, which
+ *       every averaged metric above can absorb - the silhouette is unchanged,
+ *       the thin edges are unchanged, and an SSIM window that is mostly intact
+ *       still scores well. Interior gradient excess is the thing that actually
+ *       moves when a union seam appears.</li>
  * </ul>
  *
  * <p>Diagnostic-only. Nothing here runs on a production frame.
@@ -51,10 +61,11 @@ final class StormArmQualityMetrics {
             double edgeBandSsim,
             double thinRetention,
             double holeRetention,
-            double alphaMassRatio
+            double alphaMassRatio,
+            double seamIndex
     ) {
         static Result failed(String reason) {
-            return new Result(false, reason, 0, 0, 0, 0, 0, 0, 0);
+            return new Result(false, reason, 0, 0, 0, 0, 0, 0, 0, 0);
         }
 
         String format() {
@@ -64,9 +75,9 @@ final class StormArmQualityMetrics {
             return String.format(Locale.ROOT,
                     "armQuality evaluated=true comparedPixels=%d silhouetteIoU=%.4f"
                             + " cloudRegionSSIM=%.4f edgeBandSSIM=%.4f thinRetention=%.4f"
-                            + " holeRetention=%.4f alphaMassRatio=%.4f",
+                            + " holeRetention=%.4f alphaMassRatio=%.4f seamIndex=%.5f",
                     comparedPixels, silhouetteIou, cloudRegionSsim, edgeBandSsim,
-                    thinRetention, holeRetention, alphaMassRatio);
+                    thinRetention, holeRetention, alphaMassRatio, seamIndex);
         }
     }
 
@@ -161,7 +172,51 @@ final class StormArmQualityMetrics {
                 windowedSsim(lumaA, lumaB, width, height, edgeBand),
                 thinTotal == 0 ? 1.0D : (double) thinKept / thinTotal,
                 holeTotal == 0 ? 1.0D : (double) holeKept / holeTotal,
-                massA <= 0.0D ? 1.0D : massB / massA);
+                massA <= 0.0D ? 1.0D : massB / massA,
+                interiorGradientExcess(alphaA, alphaB, width, height));
+    }
+
+    /**
+     * Mean increase in interior alpha gradient, over pixels well inside the
+     * cloud body.
+     *
+     * <p>Zero means the arm introduced no interior structure the anchor did not
+     * already have. A positive value means the arm made the inside of the cloud
+     * sharper - which is what a collapsed smooth union looks like, because the
+     * ordered blend that rounded two lobes together is gone and their surfaces
+     * meet at an angle instead.
+     *
+     * <p>Restricted to pixels whose whole neighbourhood is present, so the
+     * genuine silhouette edge - which is sharp in both images and is measured by
+     * the edge-band SSIM instead - cannot contribute.
+     */
+    private static double interiorGradientExcess(
+            double[] anchor, double[] arm, int width, int height) {
+        double total = 0.0D;
+        int counted = 0;
+        for (int y = 1; y < height - 1; y++) {
+            for (int x = 1; x < width - 1; x++) {
+                int i = y * width + x;
+                if (anchor[i] < THIN) {
+                    continue;
+                }
+                boolean interior = anchor[i - 1] >= PRESENT && anchor[i + 1] >= PRESENT
+                        && anchor[i - width] >= PRESENT && anchor[i + width] >= PRESENT;
+                if (!interior) {
+                    continue;
+                }
+                total += Math.max(0.0D,
+                        gradientMagnitude(arm, width, i) - gradientMagnitude(anchor, width, i));
+                counted++;
+            }
+        }
+        return counted == 0 ? 0.0D : total / counted;
+    }
+
+    private static double gradientMagnitude(double[] plane, int width, int index) {
+        double dx = plane[index + 1] - plane[index - 1];
+        double dy = plane[index + width] - plane[index - width];
+        return Math.sqrt(dx * dx + dy * dy) * 0.5D;
     }
 
     /** True when this present pixel touches an absent one, in four-connectivity. */

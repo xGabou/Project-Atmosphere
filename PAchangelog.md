@@ -1,3 +1,24 @@
+# Project Atmosphere 0.9.3.1
+## Compat with Project Landscape
+* Fixed a stall bug when loading world with PA and Project Landscape.
+---
+# Project Atmosphere 0.9.3
+## Compat with Project Landscape
+* Added a new compatibility layer for Project Landscape, which allows for better integration of weather and landscape features.
+* Removed the old fog created when entering a cloud.
+* [Project Landscape](https://github.com/Project-Landscape/Project-Landscape)
+
+# Project Atmosphere 0.9.2
+
+## Small Fixes And Compatibility
+
+* Added an early in-game compatibility screen for conflicting TFC seasonal-mod setups.
+* Removed the unused legacy launcher-auth configuration category and its ghost settings.
+* Updated GPU detection charts and vendor coverage.
+* Reduced redundant forecast biome lookups that could cause C2ME density-function work.
+
+---
+
 # Project Atmosphere 0.9.1 Alpha
 
 ## Atmospheric Continuity Update

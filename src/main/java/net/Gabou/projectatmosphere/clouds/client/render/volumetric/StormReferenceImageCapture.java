@@ -254,10 +254,34 @@ final class StormReferenceImageCapture {
                     + request.content.format(false);
             return;
         }
-        if (++request.frames < SETTLE_FRAMES) {
+        // T207. A temporal frame is resolved from the last four raw phases,
+        // so the settle waits a full cycle past the usual three: every phase
+        // the readback resolves was then rendered on the settled camera.
+        int settleFrames = VolumetricCloudRenderer.temporalPhaseActive()
+                ? SETTLE_FRAMES + CloudTemporalPhaseState.PHASES : SETTLE_FRAMES;
+        if (++request.frames < settleFrames) {
             latest = "acquiring view=" + request.view
-                    + " frames=" + request.frames + "/" + SETTLE_FRAMES;
+                    + " frames=" + request.frames + "/" + settleFrames;
             return;
+        }
+        if (VolumetricCloudRenderer.temporalPhaseActive()) {
+            // The readback must be a full lattice: a phase dropped by an
+            // invalidation during the settle would resolve a quarter of the
+            // sites from the current phase alone, and the capture would
+            // measure the fallback rather than the reconstruction.
+            long frame = VolumetricCloudRenderer.renderedFrameIndex() - 1L;
+            int validPhases = CloudTemporalPhaseState.validCount(frame);
+            if (validPhases < CloudTemporalPhaseState.PHASES) {
+                request.frames = settleFrames - 1;
+                latest = "acquiring view=" + request.view + " waiting_for_phases valid="
+                        + validPhases + " invalidations="
+                        + CloudTemporalPhaseState.invalidations();
+                return;
+            }
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T207_CAPTURE_PHASES view={} validPhases={} currentPhase={} invalidations={}",
+                    request.view, validPhases, CloudTemporalPhaseState.currentPhase(),
+                    CloudTemporalPhaseState.invalidations());
         }
 
         FloatBuffer buffer = BufferUtils.createFloatBuffer(target.width * target.height * 4);

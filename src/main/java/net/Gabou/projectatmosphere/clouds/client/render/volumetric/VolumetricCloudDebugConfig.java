@@ -46,7 +46,131 @@ public final class VolumetricCloudDebugConfig {
      */
     private static volatile int descriptorCountLimit = -1;
     private static volatile CoreCostDiagnosticProgram finalProgramOverride;
+    /**
+     * T188. Enables the rain-support field on the DIAGNOSTIC_MONOLITH.
+     *
+     * <p>Workload counters can only be read from the monolith, because every
+     * lean program bakes DebugView to a constant. The monolith is not a field
+     * program, so without this the ray-side fetch count and the post-field
+     * attribution both read zero - not because the field did nothing, but
+     * because the only program that can count was not using it.
+     *
+     * <p>Scoped to the monolith deliberately. Applying it to the timed arms
+     * would make an anchor pay for a generation pass it does not run.
+     */
+    private static volatile boolean rainFieldForcedOnMonolith;
     private static volatile boolean depthCompositeEnabled = true;
+
+    public static boolean rainFieldForcedOnMonolith() {
+        return rainFieldForcedOnMonolith;
+    }
+
+    public static void setRainFieldForcedOnMonolith(boolean forced) {
+        rainFieldForcedOnMonolith = forced;
+    }
+
+    /**
+     * T203. The rain gate field on the monolith, on the same reasoning as the
+     * rain field above: the counters that census the gate and the oracle
+     * that checks its proofs only exist on the monolith, so it must build
+     * and read the gate for them to describe anything. Never applied to a
+     * timed arm.
+     */
+    private static volatile boolean rainGateForcedOnMonolith;
+
+    public static boolean rainGateForcedOnMonolith() {
+        return rainGateForcedOnMonolith;
+    }
+
+    public static void setRainGateForcedOnMonolith(boolean forced) {
+        rainGateForcedOnMonolith = forced;
+    }
+
+    /**
+     * T196. The shared storm field's consumer bits on the monolith, on T188's
+     * reasoning: the monolith is the only program that counts, so it has to
+     * read the field for the counters to describe the post-field workload -
+     * the collapsed light and probe walks, the fetches, and the probe audit.
+     * Bits as PaStormFieldEnabled: 1 light, 2 probe, 8 exact-noise tap,
+     * 32 the refinement's clearance floor (T202); 16, the primary body from
+     * the field, is a campaign arm only. Never applied to a timed arm.
+     *
+     * <p>T199. FINAL bakes {@link StormFieldGeometry#PRODUCTION_CONSUMER_BITS},
+     * so the monolith defaults to the same value: a debug view renders the
+     * image FINAL renders. A campaign that needs the monolith on another
+     * lookup - or on none, 0 - sets it explicitly and restores production
+     * with {@link #resetStormFieldMonolithBits()} when it retires.
+     */
+    private static volatile int stormFieldForcedOnMonolith =
+            StormFieldGeometry.PRODUCTION_CONSUMER_BITS;
+
+    /**
+     * T196. One frame's soundness oracle: the next field build writes the
+     * node floor beside a dense reference floor and the renderer reads the
+     * pair back and reports it, then the ordinary build runs.
+     */
+    private static volatile boolean stormFieldSoundnessRequested;
+
+    public static int stormFieldForcedOnMonolith() {
+        return stormFieldForcedOnMonolith;
+    }
+
+    /** Campaign override; 0 means the monolith neither builds nor reads the field. */
+    public static void setStormFieldForcedOnMonolith(int enabledBits) {
+        stormFieldForcedOnMonolith = enabledBits;
+    }
+
+    /** T199. Back to production's consumers, and to lean-FINAL eligibility. */
+    public static void resetStormFieldMonolithBits() {
+        stormFieldForcedOnMonolith = StormFieldGeometry.PRODUCTION_CONSUMER_BITS;
+    }
+
+    public static void requestStormFieldSoundness() {
+        stormFieldSoundnessRequested = true;
+    }
+
+    public static boolean consumeStormFieldSoundnessRequest() {
+        boolean requested = stormFieldSoundnessRequested;
+        stormFieldSoundnessRequested = false;
+        return requested;
+    }
+
+    /**
+     * T198. The light-tap audit's selectors, uploaded every frame: which
+     * decomposition variant the exact side evaluates (0-7) and which
+     * accumulator the audit program writes (0-7). Read only by
+     * t198_light_audit.
+     */
+    private static volatile int lightAuditVariant;
+    private static volatile int lightAuditOutput;
+
+    public static int lightAuditVariant() {
+        return lightAuditVariant;
+    }
+
+    public static int lightAuditOutput() {
+        return lightAuditOutput;
+    }
+
+    public static void setLightAudit(int variant, int output) {
+        lightAuditVariant = Math.max(0, Math.min(7, variant));
+        lightAuditOutput = Math.max(0, Math.min(7, output));
+    }
+
+    /**
+     * T198. Which light lookup the audit program measures: 1 the T196 node
+     * density, 9 the exact-noise lookup. The audit program keeps the consumer
+     * bits live so one program serves both.
+     */
+    private static volatile int lightAuditFieldBits = 1;
+
+    public static int lightAuditFieldBits() {
+        return lightAuditFieldBits;
+    }
+
+    public static void setLightAuditFieldBits(int bits) {
+        lightAuditFieldBits = bits;
+    }
     private static volatile boolean sceneRayLimitEnabled = true;
     // Uniform ray probes can miss narrow world-space cloud footprints and cut
     // complete horizontal bands from an otherwise valid volume. Keep the A/B
@@ -65,6 +189,50 @@ public final class VolumetricCloudDebugConfig {
     private static volatile VolumetricPuffDensityStage puffDensityStage = VolumetricPuffDensityStage.FINAL;
     private static volatile VolumetricPuffTierFilter puffTierFilter = VolumetricPuffTierFilter.ALL;
     private static volatile boolean historyEnabled = true;
+    /**
+     * T207. Temporal lattice reconstruction. 0 off (one raw frame per frame,
+     * the T206 production path); 1 the four-phase lattice with coverage and
+     * depth validity; 2 the same plus the colour clip; 3 the current phase
+     * alone resolved through the lattice pass (the no-history baseline);
+     * 4 trust-all (diagnostic, ghosts by construction); 5 mode 1 without the
+     * T208 near-field guard (T207's validity, the control). The production
+     * default is {@link #PRODUCTION_TEMPORAL_MODE}; a campaign sets its arm.
+     * T207 banked mode 1: the resolve costs 0.1 ms, the lattice reaches
+     * 0.995 SSIM against production 0.50 at PLAY_VIS_NEAR (0.951 at SIDE,
+     * parity with the single frame, ahead on every structural term), and
+     * the moving-camera route keeps the mean ghost at 0.0007 with nothing
+     * older than the four-frame cycle. T208 added the near-field guard to
+     * mode 1 (in-cloud history within 96 blocks, under a texel or more of
+     * reprojection motion, at an ambiguous interval, is refused: the route's
+     * frames above 0.02 mean alpha error 14 -> 5). Set to 0 to ship the
+     * one-frame T206 path.
+     */
+    public static final int PRODUCTION_TEMPORAL_MODE = 1;
+    private static volatile int temporalMode = PRODUCTION_TEMPORAL_MODE;
+    /** T207. 1 makes the resolve write its acceptance class map instead of clouds; T208: 2 the body alone. */
+    private static volatile int temporalDebugOutput;
+    /**
+     * T208 attribution. True skips the rain pass and clears its target to
+     * "no rain" (T_r = 1), so every consumer - the split cloud program, the
+     * resolve - sees a rainless frame. Diagnostic only.
+     */
+    private static volatile boolean rainDisabled;
+    /**
+     * T208 attribution. True uploads PaTemporalPhase = 1 on a non-temporal
+     * frame, so the cloud target holds the body alone (the split deferred
+     * and never composited) - the body-only reference. Diagnostic only.
+     */
+    private static volatile boolean deferredSplitForced;
+    /**
+     * T209. The spatial upscale of the temporal lattice to the display
+     * (cloud_spatial_upscale.fsh): -1 off - the composite reads the lattice
+     * directly, as T207 shipped it; 0 the PA bilinear moved into its own pass
+     * (the control); 1 EASU on the premultiplied field; 2 depth-guided
+     * Catmull-Rom. The production default is {@link #PRODUCTION_SPATIAL_UPSCALE};
+     * a campaign sets its arm.
+     */
+    public static final int PRODUCTION_SPATIAL_UPSCALE = -1;
+    private static volatile int spatialUpscaleMethod = PRODUCTION_SPATIAL_UPSCALE;
     /**
      * Rank 1 reconstruction arm. False keeps the shipped composite accumulation
      * unchanged; true selects the coverage-alpha reconstruction, which removes
@@ -236,6 +404,46 @@ public final class VolumetricCloudDebugConfig {
         return historyEnabled;
     }
 
+    public static int temporalMode() {
+        return temporalMode;
+    }
+
+    public static void setTemporalMode(int mode) {
+        temporalMode = Math.max(0, Math.min(5, mode));
+    }
+
+    public static int temporalDebugOutput() {
+        return temporalDebugOutput;
+    }
+
+    public static void setTemporalDebugOutput(int output) {
+        temporalDebugOutput = output;
+    }
+
+    public static boolean rainDisabled() {
+        return rainDisabled;
+    }
+
+    public static void setRainDisabled(boolean disabled) {
+        rainDisabled = disabled;
+    }
+
+    public static boolean deferredSplitForced() {
+        return deferredSplitForced;
+    }
+
+    public static int spatialUpscaleMethod() {
+        return spatialUpscaleMethod;
+    }
+
+    public static void setSpatialUpscaleMethod(int method) {
+        spatialUpscaleMethod = Math.max(-1, Math.min(2, method));
+    }
+
+    public static void setDeferredSplitForced(boolean forced) {
+        deferredSplitForced = forced;
+    }
+
     public static void setHistoryEnabled(boolean enabled) {
         historyEnabled = enabled;
     }
@@ -348,6 +556,11 @@ public final class VolumetricCloudDebugConfig {
         puffDensityStage = VolumetricPuffDensityStage.FINAL;
         puffTierFilter = VolumetricPuffTierFilter.ALL;
         historyEnabled = true;
+        temporalMode = PRODUCTION_TEMPORAL_MODE;
+        temporalDebugOutput = 0;
+        rainDisabled = false;
+        deferredSplitForced = false;
+        spatialUpscaleMethod = PRODUCTION_SPATIAL_UPSCALE;
         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
         sentinelHeightsEnabled = false;
         fullResolutionEnabled = false;
