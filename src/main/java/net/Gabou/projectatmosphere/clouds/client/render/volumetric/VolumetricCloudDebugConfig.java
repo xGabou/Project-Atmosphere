@@ -256,6 +256,23 @@ public final class VolumetricCloudDebugConfig {
     public static final int PRODUCTION_ORIGIN_JITTER_MODE = 0;
     private static volatile int originJitterMode = PRODUCTION_ORIGIN_JITTER_MODE;
     /**
+     * T212. Macro-scale modulation of the coverage envelope before the final
+     * density threshold: 0 production, 1 on.
+     *
+     * <p>T212's attribution found the storm body is NOT over-filled at the
+     * boundary - the measured per-point boundary displacement is already
+     * +-33 blocks, and the rendered silhouette carries the ~12 px of non-
+     * elliptical roughness that predicts. The defect is that the ellipse
+     * harmonic is 2.3-3.6x larger than the macro band, and the base noise has
+     * no energy long enough to fight it: its lowest octave is ~50 blocks,
+     * which lands at harmonic ~28 on a 450-block anvil. This adds the missing
+     * band - one Worley octave at ~400 blocks - to the coverage envelope
+     * itself, where it displaces the surface coherently instead of speckling
+     * the density.
+     */
+    public static final int PRODUCTION_MACRO_ENVELOPE_MODE = 0;
+    private static volatile int macroEnvelopeMode = PRODUCTION_MACRO_ENVELOPE_MODE;
+    /**
      * T210 harness. True raises MaxPrecipitation to 0.85 on every program
      * (T188's rain-heavy forcing on the deterministic storm), identically for
      * the reference and the arms - a deliberately rain-heavy fixture.
@@ -481,6 +498,14 @@ public final class VolumetricCloudDebugConfig {
         originJitterMode = Math.max(0, Math.min(2, mode));
     }
 
+    public static int macroEnvelopeMode() {
+        return macroEnvelopeMode;
+    }
+
+    public static void setMacroEnvelopeMode(int mode) {
+        macroEnvelopeMode = Math.max(0, Math.min(1, mode));
+    }
+
     public static boolean rainHeavyForced() {
         return rainHeavyForced;
     }
@@ -616,6 +641,7 @@ public final class VolumetricCloudDebugConfig {
         spatialUpscaleMethod = PRODUCTION_SPATIAL_UPSCALE;
         rainLatticeMode = PRODUCTION_RAIN_LATTICE_MODE;
         originJitterMode = PRODUCTION_ORIGIN_JITTER_MODE;
+        macroEnvelopeMode = PRODUCTION_MACRO_ENVELOPE_MODE;
         rainHeavyForced = false;
         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
         sentinelHeightsEnabled = false;

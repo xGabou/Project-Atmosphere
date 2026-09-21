@@ -103,6 +103,7 @@
     { "name": "PaRainPassScale", "type": "int", "count": 1, "values": [ 1 ] },
     { "name": "PaRainCoarseMask", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaOriginJitterMode", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PaMacroEnvelope", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "DensityMul", "type": "float", "count": 1, "values": [ 1.0 ] },
     { "name": "CoverageMul", "type": "float", "count": 1, "values": [ 1.0 ] },
     { "name": "ExtinctionScale", "type": "float", "count": 1, "values": [ 0.09 ] },

@@ -226,7 +226,15 @@ final class StormT152MovingCameraFixture {
          * this route puts it through.
          */
         ORIGIN_JITTER_FINE("origin_jitter_fine", false, 1, 0.25F, -1, 0, 0),
-        ORIGIN_JITTER_COARSE("origin_jitter_coarse", false, 1, 0.25F, -1, 0, 1);
+        ORIGIN_JITTER_COARSE("origin_jitter_coarse", false, 1, 0.25F, -1, 0, 1),
+        /**
+         * T212M: the macro-envelope candidate under motion. It displaces the
+         * coverage surface over ~400 blocks, so unlike a density perturbation
+         * it moves whole chords - the question this route answers is whether
+         * that displacement crawls once history is reprojected.
+         */
+        MACRO_ENVELOPE_OFF("macro_envelope_off", false, 1, 0.25F, -1, 0, 0, 0),
+        MACRO_ENVELOPE_ON("macro_envelope_on", false, 1, 0.25F, -1, 0, 0, 1);
 
         private final String label;
         private final boolean history;
@@ -238,6 +246,8 @@ final class StormT152MovingCameraFixture {
         private final int rainLattice;
         /** T211. The ray-origin jitter mode. */
         private final int originJitter;
+        /** T212. The macro-envelope modulation mode. */
+        private final int macroEnvelope;
 
         Arm(String label, boolean history, int temporal, float resolutionScale) {
             this(label, history, temporal, resolutionScale, -1, 0);
@@ -254,6 +264,12 @@ final class StormT152MovingCameraFixture {
 
         Arm(String label, boolean history, int temporal, float resolutionScale, int upscale,
                 int rainLattice, int originJitter) {
+            this(label, history, temporal, resolutionScale, upscale, rainLattice, originJitter, 0);
+        }
+
+        Arm(String label, boolean history, int temporal, float resolutionScale, int upscale,
+                int rainLattice, int originJitter, int macroEnvelope) {
+            this.macroEnvelope = macroEnvelope;
             this.label = label;
             this.history = history;
             this.temporal = temporal;
@@ -284,7 +300,9 @@ final class StormT152MovingCameraFixture {
         /** T210M: native 1.0 against production rain and the masked lattice rain (rain-heavy). */
         RAIN(Arm.PRODUCTION_100, Arm.RAIN_PROD, Arm.RAIN_LATTICE),
         /** T211M: the production 0.50 reference, then the two ray-origin phases. */
-        ORIGIN_JITTER(Arm.PRODUCTION_050, Arm.ORIGIN_JITTER_FINE, Arm.ORIGIN_JITTER_COARSE);
+        ORIGIN_JITTER(Arm.PRODUCTION_050, Arm.ORIGIN_JITTER_FINE, Arm.ORIGIN_JITTER_COARSE),
+        /** T212M: the production 0.50 reference, then macro envelope off and on. */
+        MACRO_ENVELOPE(Arm.PRODUCTION_050, Arm.MACRO_ENVELOPE_OFF, Arm.MACRO_ENVELOPE_ON);
 
         private final Arm[] arms;
 
@@ -335,6 +353,7 @@ final class StormT152MovingCameraFixture {
     private static int originalUpscaleMethod = -1;
     private static int originalRainLatticeMode;
     private static int originalOriginJitterMode;
+    private static int originalMacroEnvelopeMode;
     private static boolean historyOverrideApplied;
     private static ArmSet armSet = ArmSet.HISTORY;
     private static boolean cameraModeApplied;
@@ -430,6 +449,7 @@ final class StormT152MovingCameraFixture {
         originalUpscaleMethod = VolumetricCloudDebugConfig.spatialUpscaleMethod();
         originalRainLatticeMode = VolumetricCloudDebugConfig.rainLatticeMode();
         originalOriginJitterMode = VolumetricCloudDebugConfig.originJitterMode();
+        originalMacroEnvelopeMode = VolumetricCloudDebugConfig.macroEnvelopeMode();
         referenceGhostFrames = new byte[ROUTE_FRAMES][];
         arm = armSet.first();
         routeIndex = 0;
@@ -591,6 +611,7 @@ final class StormT152MovingCameraFixture {
             VolumetricCloudDebugConfig.setSpatialUpscaleMethod(arm.upscale);
             VolumetricCloudDebugConfig.setRainLatticeMode(arm.rainLattice);
             VolumetricCloudDebugConfig.setOriginJitterMode(arm.originJitter);
+            VolumetricCloudDebugConfig.setMacroEnvelopeMode(arm.macroEnvelope);
             VolumetricCloudRenderer.invalidateHistory();
         }
         historyOverrideApplied = true;
@@ -605,6 +626,7 @@ final class StormT152MovingCameraFixture {
                 VolumetricCloudDebugConfig.setSpatialUpscaleMethod(originalUpscaleMethod);
                 VolumetricCloudDebugConfig.setRainLatticeMode(originalRainLatticeMode);
                 VolumetricCloudDebugConfig.setOriginJitterMode(originalOriginJitterMode);
+                VolumetricCloudDebugConfig.setMacroEnvelopeMode(originalMacroEnvelopeMode);
                 VolumetricCloudDebugConfig.setRainHeavyForced(false);
             }
             historyOverrideApplied = false;

@@ -366,6 +366,7 @@ final class StormT132AutoDriver {
     /** T211. One-shot: the capture-only route creates the suite fixture itself. */
     private static boolean t211FixtureRequested;
     private static boolean t211mRun;
+    private static boolean t212mRun;
     private static boolean restoreConfirmationAccepted;
     /**
      * The production configuration already has a debug/screenshot movement
@@ -441,7 +442,8 @@ final class StormT132AutoDriver {
         return Files.exists(T211_CAPTURES_MARKER)
                 && !rayTraceRunRequested()
                 && !performanceRunRequested()
-                && !originJitterMotionRunRequested();
+                && !originJitterMotionRunRequested()
+                && !macroEnvelopeMotionRunRequested();
     }
 
     private static final Path T211M_MARKER = Path.of("t211-origin-motion.txt");
@@ -449,6 +451,13 @@ final class StormT132AutoDriver {
     /** T211M. The ray-origin phase judged under motion on the T152 route. */
     private static boolean originJitterMotionRunRequested() {
         return Files.exists(T211M_MARKER);
+    }
+
+    private static final Path T212M_MARKER = Path.of("t212-macro-motion.txt");
+
+    /** T212M. The macro-envelope candidate judged under motion. */
+    private static boolean macroEnvelopeMotionRunRequested() {
+        return Files.exists(T212M_MARKER);
     }
 
     /**
@@ -7013,6 +7022,7 @@ final class StormT132AutoDriver {
                     advance(visualCaptureRunRequested() ? Phase.BEGIN_T098
                             : rayTraceRunRequested() || performanceRunRequested()
                             || originJitterMotionRunRequested()
+                            || macroEnvelopeMotionRunRequested()
                             ? Phase.RAYTRACE_FIXTURE : Phase.BEGIN_SUITE);
                 }
                 if (stageFrames > MATURE_TIMEOUT_FRAMES) {
@@ -7021,6 +7031,7 @@ final class StormT132AutoDriver {
                     advance(visualCaptureRunRequested() ? Phase.BEGIN_T098
                             : rayTraceRunRequested() || performanceRunRequested()
                             || originJitterMotionRunRequested()
+                            || macroEnvelopeMotionRunRequested()
                             ? Phase.RAYTRACE_FIXTURE : Phase.BEGIN_SUITE);
                 }
             }
@@ -7108,6 +7119,7 @@ final class StormT132AutoDriver {
                             || spatialMotionRunRequested()
                             || rainMotionRunRequested()
                             || originJitterMotionRunRequested()
+                            || macroEnvelopeMotionRunRequested()
                             ? Phase.T152_BEGIN
                             : (performanceRunRequested()
                                     ? Phase.T135_PREPARE : Phase.BEGIN_T098));
@@ -7153,8 +7165,12 @@ final class StormT132AutoDriver {
                 t210mRun = rainMotionRunRequested();
                 // T211M. The ray-origin phase under motion.
                 t211mRun = originJitterMotionRunRequested();
+                // T212M. The macro-envelope candidate under motion.
+                t212mRun = macroEnvelopeMotionRunRequested();
                 VolumetricCloudDebugConfig.setRainHeavyForced(t210mRun);
-                String begun = StormT152MovingCameraFixture.begin(t211mRun
+                String begun = StormT152MovingCameraFixture.begin(t212mRun
+                        ? StormT152MovingCameraFixture.ArmSet.MACRO_ENVELOPE
+                        : t211mRun
                         ? StormT152MovingCameraFixture.ArmSet.ORIGIN_JITTER
                         : t210mRun
                         ? StormT152MovingCameraFixture.ArmSet.RAIN

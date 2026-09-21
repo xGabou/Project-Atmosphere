@@ -327,6 +327,12 @@ public final class StormCampaignRegistry {
             new Campaign("T209", "t209-spatial-upscale.txt",
                     "spatialUpscaleRunRequested", "t209Run",
                     "T209_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            // T212M. The T152 route judging the macro-envelope candidate under
+            // motion. Above the sweeps, like T211M: a PERFORMANCE_ONLY row must
+            // not be the registry's newest.
+            new Campaign("T212M", "t212-macro-motion.txt",
+                    "macroEnvelopeMotionRunRequested", "t212mRun",
+                    null, Routing.PERFORMANCE_ONLY),
             // T211M. The T152 route judging the ray-origin phase under motion:
             // the production 0.50 reference, then the fine and coarse phases.
             // Placed before the sweeps: a PERFORMANCE_ONLY campaign must not

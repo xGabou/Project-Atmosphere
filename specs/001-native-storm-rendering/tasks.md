@@ -3643,6 +3643,52 @@ implementation, while visual polish remains independently active.
   Next: **T212 anvil silhouette via envelope falloff** - with the coverage-term theory eliminated,
   test whether `body` stays near 1 at the envelope boundary so `STORM_EROSION = 0.44` cannot cut
   through it. [SC-005, SC-016, SC-021]
+- [X] T212 [QUALITY] [US1] Anvil morphology / envelope breakup: find what actually controls the
+  smooth anvil envelope, then make the smallest evidence-based change. **The T211 hypothesis
+  (body over-filled near the boundary so `STORM_EROSION` cannot cut) is DISPROVED**, the real
+  mechanism is identified, and the candidate built from it is REJECTED - production unchanged.
+  ATTRIBUTION, three agreeing measurements: (a) a marker-gated trace of the real descriptors
+  (`T212_EDGE_WIDTH`) shows the anvil IS the only role clamped by the T098 vertical bound
+  (`halfHeight*0.75`, 240.9 -> 89.5 blocks) because it is the flattest role - but 89.5 is the
+  SECOND-WIDEST boundary in the storm, so a narrow transition is not the cause; (b) evaluating the
+  exact production noise (baked 128^3/32^3 volumes through the shader's own domains) at the
+  measured geometry gives `baseField` sd **0.319** (doc records 0.3294 - noise fully present) and a
+  permitted boundary displacement of **+-33 blocks, span 146**, identical across strengths
+  0.72-0.82 because `stormCoreFillForStrength` compensates exactly - so erosion authority and core
+  fill are both adequate; (c) integrating that density along the limb chord that actually renders
+  the silhouette smooths it only **1.5x**, predicting ~12 px of non-elliptical roughness, and the
+  real capture carries **11.5 px** - model and render agree. **The defect is a ratio and a missing
+  band**: ellipse harmonic / macro band = **2.70x SIDE, 3.90x LATERAL**, and the base noise has NO
+  macro energy at all - its lowest octave is ~50 blocks, which lands at harmonic ~28 on a 450-block
+  anvil. CANDIDATE: one Worley octave at ~400 blocks added to the coverage ENVELOPE (not the
+  density) before the threshold, on both the primary march and the rain-gate path so rain support
+  stays consistent (`macroEnvelopeMode`, `PaMacroEnvelope`, `stormMacroEnvelopeDomain`); envelope
+  rather than density because the limb chord averages per-point noise away but not a displacement
+  the whole chord shares. Two measured corrections en route: the first version sat in
+  `directStormFinalDensity`, which READS like the density function but is only called by the rain
+  gate and field build - the primary march composes density in `cloudDensity` - giving a perfect
+  null (IoU 0.9984-0.9993) that would have been a false "no effect"; the second had to be centred
+  on the channel's MEASURED statistics (mean 0.4794, sd 0.1163) instead of an assumed 0-1 range,
+  since uncentred it carried only 0.051 coverage sd (~8 blocks) plus a negative bias and merely
+  shrank the storm (perimeter FELL 3724->3534, area -4%). RESULT: ellipse **-7.1% SIDE / -16.2%
+  LATERAL**, perimeter **+8.7% / +13.4%**, area within 2%, components stable, no holes/speckle/wisp
+  damage, tower and lower mass untouched, static probe at least as still as production (max 1.00 vs
+  4.33). **But the macro band does NOT rise** (+0.5% / -18.6%) - it reads "less elliptical", not
+  "billowing" - and T212M motion costs **+10.2% route flicker** (OUTSIDE +18.1%, APPROACH +19.5%),
+  double the +5.1% that helped reject T211's jitter. Crawl signature is milder and BIDIRECTIONAL
+  (15 frames worse, 35 better, more perfectly-still frames overall), unlike T211's one-way failure.
+  Ghost 0.00159->0.00762 reported but NOT used: it is appearance-confounded by construction.
+  Cost is below the storm-variance noise floor (SIDE 8.21->8.17, PVN 7.84->7.39, candidate
+  nominally faster), **<=10 ms YES**. REJECTED for production on visual return vs temporal cost;
+  kept as diagnostic mode 1. No pinned constant touched - `stormDensityThresholdSandbox` reproduces
+  every statistic, so `morphology-thresholds.md` needs no revision. campaignGate x2, check build,
+  morphology sandbox all PASS. Evidence in `validation/t212-anvil-morphology.md` and
+  `validation/t212-campaign/`. Next: **T213 anvil boundary width combined with the macro band** -
+  displacement scales with the envelope half-width, so relaxing the anvil's vertical clamp
+  ANISOTROPICALLY (horizontal only) would multiply the existing macro field's effect ~1.7x at
+  w=150 without raising the coverage amplitude that drives the flicker; must be judged against the
+  T098 failure it was added to prevent (~150 blocks of haze hanging below the anvil base).
+  [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

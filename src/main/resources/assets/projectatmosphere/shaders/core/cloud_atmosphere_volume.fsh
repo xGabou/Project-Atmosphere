@@ -114,6 +114,13 @@ const float STORM_MIN_EDGE_BLOCKS = 11.363636;
 // Ceiling on the envelope boundary half-width as a fraction of a lobe's own
 // half-height. Mirrors StormLobeEvaluator.VERTICAL_EDGE_BOUND_FRACTION.
 const float STORM_VERTICAL_EDGE_BOUND_FRACTION = 0.75;
+// T212. The macro-envelope octave's measured statistics over the baked base
+// volume (200k samples), and how far one standard deviation of it moves the
+// coverage envelope. Centring on the real mean matters: the channel is not
+// centred on 0.5, and an uncentred term only shrank the storm.
+const float STORM_MACRO_OCTAVE_MEAN = 0.4794;
+const float STORM_MACRO_OCTAVE_SD = 0.1163;
+const float STORM_MACRO_ENVELOPE_AMPLITUDE = 0.16;
 // Cap fillet as a fraction of the lobe's smaller extent, bounded by the same
 // wavelength. Flat slabs and recognizable spheres are both rejected forms.
 const float STORM_CAP_ROUNDING_FRACTION = 0.35;
@@ -1357,6 +1364,9 @@ uniform int PaRainCoarseMask;
 // is actually integrated on, whose under-jittered sampling shells are the
 // horizontal terracing T211 measured.
 uniform int PaOriginJitterMode;
+// T212. 1 modulates the coverage envelope with one ~400-block Worley octave
+// before the density threshold, adding the macro band the body noise lacks.
+uniform int PaMacroEnvelope;
 
 bool paRayTraceActive() {
     return PaRayTraceMode != 0;
@@ -1667,6 +1677,21 @@ vec3 baseNoiseDomain(vec3 worldPos, float scale) {
 // a near-constant directional shear when the storm base domain was enlarged.
 // The clamp preserves legacy behaviour for other cloud families while holding
 // storm distortion to 8% of its sampling Jacobian.
+// T212. The macro-envelope domain: the same rotation as the body noise, no
+// warp, and one eighth the wave number, so the volume's lowest Worley octave
+// (period 8) lands at ~400 blocks instead of ~50. That is the only band long
+// enough to move a 450-block anvil at harmonics 3-8, which is where its
+// silhouette reads as an ellipse. The constant offset decorrelates it from
+// the body noise so the two do not carve the same features.
+vec3 stormMacroEnvelopeDomain(vec3 worldPos) {
+    vec3 rotated = vec3(
+        dot(worldPos, vec3(0.8138, 0.2962, -0.5000)),
+        dot(worldPos, vec3(-0.1401, 0.9408, 0.3085)),
+        dot(worldPos, vec3(0.5630, -0.1677, 0.8090))
+    );
+    return rotated * (STORM_BASE_NOISE_SCALE * 0.125) + vec3(0.37, 0.11, 0.73);
+}
+
 vec3 stormBaseNoiseDomain(vec3 worldPos) {
     vec3 rotated = vec3(
         dot(worldPos, vec3(0.8138, 0.2962, -0.5000)),
@@ -3584,6 +3609,22 @@ float directStormFinalDensity(
     }
     vec3 samplePos = p;
     samplePos.xz -= MaterialOffset;
+    if (PaMacroEnvelope != 0 && coverage > 0.12 && coverage < 0.98) {
+        // T212. Displace the envelope surface, not the density: inside the
+        // +/-edgeWidth soft band this moves coverage both ways, so the
+        // silhouette gains coherent protrusions and recesses that survive the
+        // limb chord's path integration. Skipped in the saturated interior,
+        // where it cannot change what is visible.
+        float macroOctave = texture(
+            BaseNoiseSampler, stormMacroEnvelopeDomain(samplePos), 0.0).g;
+        float macroSigned = (macroOctave - STORM_MACRO_OCTAVE_MEAN)
+            / STORM_MACRO_OCTAVE_SD;
+        coverage = saturate(coverage
+            + STORM_MACRO_ENVELOPE_AMPLITUDE * clamp(macroSigned, -2.5, 2.5));
+        if (coverage <= 0.0) {
+            return 0.0;
+        }
+    }
     float detailFbm;
     float carrier = stormBaseCarrierAt(samplePos, mipBias, detailFbm);
     bool embeddedConvectiveOverlap = (activeRoleMask & 7) == 7;
@@ -6343,6 +6384,28 @@ float cloudDensity(
             // what produced a smooth balloon that passed every
             // artifact-absence check.
             bool embeddedConvectiveOverlap = (directStormActiveRoleMask & 7) == 7;
+            if (PaMacroEnvelope != 0 && cloud > 0.12 && cloud < 0.98) {
+                // T212. The macro band the body noise does not have. `cloud`
+                // is still the coverage envelope here, so shifting it moves
+                // the envelope SURFACE coherently over ~400 blocks instead of
+                // speckling density - the limb chord averages per-point noise
+                // away, but not a displacement the whole chord shares. Skipped
+                // in the saturated interior, where it cannot change what is
+                // visible, and where the branch also keeps the extra fetch off
+                // the hot interior path.
+                // Centred and scaled on the channel's MEASURED statistics
+                // (mean 0.4794, sd 0.1163 over the baked volume), not on an
+                // assumed 0-1 range: the raw term had sd 0.051 in coverage,
+                // worth only ~8 blocks of boundary travel, and a slight
+                // negative bias that just shrank the storm. One sd now moves
+                // coverage by STORM_MACRO_ENVELOPE_AMPLITUDE.
+                float macroOctave = texture(
+                    BaseNoiseSampler, stormMacroEnvelopeDomain(samplePos), 0.0).g;
+                float macroSigned = (macroOctave - STORM_MACRO_OCTAVE_MEAN)
+                    / STORM_MACRO_OCTAVE_SD;
+                cloud = saturate(cloud
+                    + STORM_MACRO_ENVELOPE_AMPLITUDE * clamp(macroSigned, -2.5, 2.5));
+            }
             cloud = stormBody(
                 cloud,
                 directStormStrength,

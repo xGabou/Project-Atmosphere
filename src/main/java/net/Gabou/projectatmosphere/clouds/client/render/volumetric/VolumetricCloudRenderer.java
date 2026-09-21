@@ -738,6 +738,8 @@ public final class VolumetricCloudRenderer {
         // T211. The exterior ray-origin phase width (0 fineStep, 1 coarseStep).
         shader.safeGetUniform("PaOriginJitterMode").set(
                 VolumetricCloudDebugConfig.originJitterMode());
+        shader.safeGetUniform("PaMacroEnvelope").set(
+                VolumetricCloudDebugConfig.macroEnvelopeMode());
         float uploadedMaxRenderDistance = Math.max(300.0F, maxRenderDistance);
         lastMaxRenderDistance = uploadedMaxRenderDistance;
         boolean uploadedUseSceneDepth = sceneRayLimitEnabled && safeSceneDepth.valid();

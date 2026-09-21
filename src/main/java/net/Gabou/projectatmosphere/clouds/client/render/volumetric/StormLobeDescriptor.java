@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.Objects;
 import java.util.UUID;
@@ -316,6 +318,38 @@ public record StormLobeDescriptor(
      * <p>Must be called after texels 0-11 and offset+15 are written: it reads
      * the radii, the orientation, the edge softness and the packed role.
      */
+    /**
+     * T212 attribution. The envelope's boundary half-width is what decides how
+     * far the base noise can move the visible silhouette: coverage falls from
+     * strength to zero across +/- this many blocks, so a narrow width pins the
+     * silhouette to the descriptor geometry however strong the noise is. The
+     * anvil (role 3) is the flattest role, so the T098 vertical bound
+     * (halfHeight * 0.75) binds hardest exactly where the smooth-lens defect
+     * lives - this trace measures whether that is what actually happens.
+     *
+     * <p>Marker-gated ({@code run/t212-edge-trace.txt}) and budget-limited, so
+     * it is inert in production and cannot spam a campaign log.
+     */
+    private static final boolean T212_EDGE_TRACE =
+            Files.exists(Path.of("t212-edge-trace.txt"));
+    private static int t212TraceBudget = 48;
+
+    private static void t212TraceEdgeWidth(int role, float majorRadius, float minorRadius,
+            float edgeSoftness, float horizontal, float halfHeight, float verticalBound,
+            float edgeWidth) {
+        if (!T212_EDGE_TRACE || t212TraceBudget <= 0) {
+            return;
+        }
+        t212TraceBudget--;
+        String bound = edgeWidth <= STORM_MIN_EDGE_BLOCKS + 1.0e-4F ? "MIN_EDGE_FLOOR"
+                : verticalBound < horizontal ? "VERTICAL_HALFHEIGHT" : "HORIZONTAL_RADIUS";
+        net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                "T212_EDGE_WIDTH role={} majorRadius={} minorRadius={} edgeSoftness={}"
+                        + " horizontal={} halfHeight={} verticalBound={} edgeWidth={} boundBy={}",
+                role, majorRadius, minorRadius, edgeSoftness,
+                horizontal, halfHeight, verticalBound, edgeWidth, bound);
+    }
+
     static void writePrecomputedInvariants(float[] destination, int offset) {
         float majorRadius = destination[offset + 4];
         float minorRadius = destination[offset + 5];
@@ -343,8 +377,12 @@ public record StormLobeDescriptor(
             roleTopY += 16.0F;
         }
         float halfHeight = Math.max(roleTopY - roleBaseY, 1.0F) * 0.5F;
-        destination[offset + 12] = Math.max(STORM_MIN_EDGE_BLOCKS,
-                Math.min(horizontal, halfHeight * STORM_VERTICAL_EDGE_BOUND_FRACTION));
+        float verticalBound = halfHeight * STORM_VERTICAL_EDGE_BOUND_FRACTION;
+        float edgeWidth = Math.max(STORM_MIN_EDGE_BLOCKS,
+                Math.min(horizontal, verticalBound));
+        destination[offset + 12] = edgeWidth;
+        t212TraceEdgeWidth(role, majorRadius, minorRadius, edgeSoftness,
+                horizontal, halfHeight, verticalBound, edgeWidth);
 
         // The ownership ellipse's rotated extents, and the 1.85 widening and
         // unit floor the walk applies to them, transcribed together so the

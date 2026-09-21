@@ -479,8 +479,8 @@ public final class StormT098CaptureDriver {
         // structural fingerprint differs on every run (T210 saw the same), so
         // an across-run before/after would compare two different storms.
         for (int arm = 0; arm <= 1; arm++) {
-            String intent = "origin jitter "
-                    + (arm == 0 ? "fineStep (production)" : "coarseStep");
+            String intent = "macro envelope "
+                    + (arm == 0 ? "off (production)" : "on");
             built.add(new Shot("J" + arm + "_SIDE",
                     centreX + radius * 1.7D, midY, centreZ, intent,
                     VolumetricCloudRaymarchDebugView.FINAL, false, false, false,
@@ -568,8 +568,8 @@ public final class StormT098CaptureDriver {
         captureModeApplied = false;
         VolumetricCloudDebugConfig.setT098LegacyHitDepth(false);
         VolumetricCloudDebugConfig.setT098LegacyFinePromotion(false);
-        VolumetricCloudDebugConfig.setOriginJitterMode(
-                VolumetricCloudDebugConfig.PRODUCTION_ORIGIN_JITTER_MODE);
+        VolumetricCloudDebugConfig.setMacroEnvelopeMode(
+                VolumetricCloudDebugConfig.PRODUCTION_MACRO_ENVELOPE_MODE);
         VolumetricCloudDebugConfig.setT136ConstantLighting(false);
         CloudFieldVolumeRenderConfig.setCompositeDebugMode(CloudFieldCompositeDebugMode.FINAL);
         VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
@@ -636,7 +636,7 @@ public final class StormT098CaptureDriver {
                 // production. (The field is reused per defect; it carried the
                 // origin-jitter A/B before that was rejected under motion.)
                 if (shot.originJitter() >= 0) {
-                    VolumetricCloudDebugConfig.setOriginJitterMode(shot.originJitter());
+                    VolumetricCloudDebugConfig.setMacroEnvelopeMode(shot.originJitter());
                 }
                 if (Float.isFinite(shot.resolutionScale())) {
                     // Held for the whole settle window. A scale change destroys
