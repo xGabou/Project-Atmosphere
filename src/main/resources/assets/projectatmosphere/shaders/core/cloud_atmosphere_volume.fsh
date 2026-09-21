@@ -1352,6 +1352,11 @@ uniform int PaRainPassScale;
 // result) holds no rain writes "no rain" and returns before the march's
 // setup, so the lattice pass pays only where rain can be.
 uniform int PaRainCoarseMask;
+// T211. The exterior ray-origin phase: 0 one fineStep (production before
+// T211), 1 one coarseStep - the stride a low-density body such as the anvil
+// is actually integrated on, whose under-jittered sampling shells are the
+// horizontal terracing T211 measured.
+uniform int PaOriginJitterMode;
 
 bool paRayTraceActive() {
     return PaRayTraceMode != 0;
@@ -8762,6 +8767,8 @@ void main() {
     float originJitterDistance = min(
         paRayOriginJitterDistance(
             fineStep,
+            coarseStep,
+            PaOriginJitterMode,
             cameraStartsInsideSlab,
             cameraInsideCloud
         ),

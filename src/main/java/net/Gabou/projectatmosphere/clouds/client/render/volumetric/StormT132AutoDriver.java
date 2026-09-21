@@ -63,6 +63,17 @@ final class StormT132AutoDriver {
      */
     private static final Path RAYTRACE_MARKER = Path.of("t098-raytrace.txt");
     /**
+     * T211. The visual capture set on its own. The T098 frames are reachable
+     * only after the legacy {@code stormPerformanceSuite} completes, and that
+     * suite now times out in MOVE_TO_VIEW
+     * ({@code required_render_samples_timeout}) - it has not been on the
+     * campaign path since T166. T211 needs the frames, not the suite, so this
+     * marker routes a matured storm straight to the capture phase. It is its
+     * own marker rather than a condition on the campaign flags because those
+     * latch in T135_PREPARE, after WAIT_MATURE has already branched.
+     */
+    private static final Path T211_CAPTURES_MARKER = Path.of("t211-captures.txt");
+    /**
      * T135 marker. When present the run performs the five-mode performance
      * sweep before the T098 captures, at the SC-006 reference resolution.
      */
@@ -352,6 +363,9 @@ final class StormT132AutoDriver {
     private static long lastTopologyGeneration = Long.MIN_VALUE;
     private static int stableGenerationFrames;
     private static int suiteAttempts;
+    /** T211. One-shot: the capture-only route creates the suite fixture itself. */
+    private static boolean t211FixtureRequested;
+    private static boolean t211mRun;
     private static boolean restoreConfirmationAccepted;
     /**
      * The production configuration already has a debug/screenshot movement
@@ -415,6 +429,26 @@ final class StormT132AutoDriver {
 
     private static boolean rayTraceRunRequested() {
         return Files.exists(RAYTRACE_MARKER);
+    }
+
+    /**
+     * T211. True when the capture set should run without the legacy suite.
+     * A campaign, ray trace or motion marker always wins: this marker only
+     * routes a run that would otherwise have gone to the (bit-rotted)
+     * performance suite, so leaving it armed can never hijack a campaign.
+     */
+    private static boolean visualCaptureRunRequested() {
+        return Files.exists(T211_CAPTURES_MARKER)
+                && !rayTraceRunRequested()
+                && !performanceRunRequested()
+                && !originJitterMotionRunRequested();
+    }
+
+    private static final Path T211M_MARKER = Path.of("t211-origin-motion.txt");
+
+    /** T211M. The ray-origin phase judged under motion on the T152 route. */
+    private static boolean originJitterMotionRunRequested() {
+        return Files.exists(T211M_MARKER);
     }
 
     /**
@@ -6976,13 +7010,17 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "T132_AUTORUN storm mature: topologyGeneration={} stable for {} frames",
                             generation, stableGenerationFrames);
-                    advance(rayTraceRunRequested() || performanceRunRequested()
+                    advance(visualCaptureRunRequested() ? Phase.BEGIN_T098
+                            : rayTraceRunRequested() || performanceRunRequested()
+                            || originJitterMotionRunRequested()
                             ? Phase.RAYTRACE_FIXTURE : Phase.BEGIN_SUITE);
                 }
                 if (stageFrames > MATURE_TIMEOUT_FRAMES) {
                     ProjectAtmosphere.LOGGER.info(
                             "T132_AUTORUN storm never matured; proceeding at generation {}", generation);
-                    advance(rayTraceRunRequested() || performanceRunRequested()
+                    advance(visualCaptureRunRequested() ? Phase.BEGIN_T098
+                            : rayTraceRunRequested() || performanceRunRequested()
+                            || originJitterMotionRunRequested()
                             ? Phase.RAYTRACE_FIXTURE : Phase.BEGIN_SUITE);
                 }
             }
@@ -7069,6 +7107,7 @@ final class StormT132AutoDriver {
                             || temporalMotionGuardRunRequested()
                             || spatialMotionRunRequested()
                             || rainMotionRunRequested()
+                            || originJitterMotionRunRequested()
                             ? Phase.T152_BEGIN
                             : (performanceRunRequested()
                                     ? Phase.T135_PREPARE : Phase.BEGIN_T098));
@@ -7112,8 +7151,12 @@ final class StormT132AutoDriver {
                 // T210M. Rain-heavy, native 1.0 against production and the
                 // masked lattice rain.
                 t210mRun = rainMotionRunRequested();
+                // T211M. The ray-origin phase under motion.
+                t211mRun = originJitterMotionRunRequested();
                 VolumetricCloudDebugConfig.setRainHeavyForced(t210mRun);
-                String begun = StormT152MovingCameraFixture.begin(t210mRun
+                String begun = StormT152MovingCameraFixture.begin(t211mRun
+                        ? StormT152MovingCameraFixture.ArmSet.ORIGIN_JITTER
+                        : t210mRun
                         ? StormT152MovingCameraFixture.ArmSet.RAIN
                         : t209mRun
                         ? StormT152MovingCameraFixture.ArmSet.UPSCALE
@@ -8487,6 +8530,22 @@ final class StormT132AutoDriver {
                 if (begun.startsWith("t098_captures_started")) {
                     ProjectAtmosphere.LOGGER.info("T132_AUTORUN t098 captures begun: {}", begun);
                     advance(Phase.POLL_T098);
+                } else if (visualCaptureRunRequested()
+                        && begun.startsWith("t098_captures_no_fixture")
+                        && stageFrames <= ADOPT_TIMEOUT_FRAMES) {
+                    // T211. The capture set reads the suite fixture, which the
+                    // legacy suite would have created on its way past. On the
+                    // capture-only route nothing has, so create it directly -
+                    // this only resolves the adopted storm and its poses, it
+                    // starts no suite session and changes no renderer state -
+                    // and retry the capture begin on the next tick.
+                    if (!t211FixtureRequested) {
+                        t211FixtureRequested = true;
+                        ProjectAtmosphere.LOGGER.info(
+                                "T132_AUTORUN t211 capture fixture: {}",
+                                VolumetricCloudFrameDiagnostics.beginStormPerformanceBaseline(
+                                        player.getX(), player.getY(), player.getZ()));
+                    }
                 } else {
                     // Disabled or no fixture is not a failure of the run that
                     // just completed; finish exactly as before.

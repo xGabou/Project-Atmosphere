@@ -3603,6 +3603,46 @@ implementation, while visual polish remains independently active.
   not; the repeat should be captured adjacent to its original as `lat2_r2` is. campaignGate x2,
   check build PASS. Evidence in `validation/performance-rain-lattice.md` and
   `validation/t210-campaign/`. [SC-005, SC-006, SC-021]
+- [X] T211 [QUALITY] [US1] Cloud visual quality pass: audit how the clouds actually look on the
+  accepted T210 renderer and improve the weakest thing, with performance as a regression
+  constraint. Harness first - the T098 capture set is reachable only after the legacy
+  `stormPerformanceSuite`, which now times out in MOVE_TO_VIEW
+  (`required_render_samples_timeout`) and has not been on the campaign path since T166; added
+  `run/t211-captures.txt` (harness machinery, always defers to a campaign/ray-trace/motion
+  marker) to route a matured storm straight to the capture phase, and had that route create the
+  suite fixture itself via `beginStormPerformanceBaseline`. DEFECT AUDIT from the frames, ranked
+  by visibility: (1) **the anvil reads as a smooth geometric lens** - near-perfect ellipse
+  silhouette, top a clean arc with detail painted flat and no form shadowing, underside a uniform
+  dark sheet; (2) **horizontal step terracing on the anvil flanks** - period 6-11 px, up to
+  12.7/255 peak-to-peak (17-20 on later frames), autocorr 0.32-0.49; (3) **over-eroded lower mass
+  with no defined tower**. Deferred runner-up: a flat featureless interior. `1_FAR` and `3_UNDER`
+  landed inside terrain on this storm and are unusable - a fixture-placement defect to fix.
+  **METHOD: the storm's structural fingerprint differs on every launch, so all before/after must be
+  paired arms inside ONE run** - the first cross-run comparison gave encouraging numbers at
+  silhouette IoU 0.67-0.72 (two different storms) and was discarded; paired arms give 0.945-0.976.
+  RESULT: **both attempted changes measured and REJECTED; production rendering unchanged, no visual
+  change banked.** Change 1, the ray-origin phase widened from `fineStep` to `coarseStep`
+  (`originJitterMode`, `PaOriginJitterMode`): cause of defect 2 proven - the phase covers under a
+  third of the stride a low-density body is integrated on, so samples cluster into shells one
+  coarse step apart, matching the measured period; the full stride is required (a `2x fineStep`
+  arm left the periods identical to production). Stills improve a lot (ripple -28 to -65%, period
+  11 px -> 2 px, stacked plates -> soft billowing) but T211M motion rejects it: self-referential
+  flicker +5.1% route / **+21.6% ENTRY**, and frames 873-877 sustain 0.0064-0.0096 where production
+  is **exactly 0.00000** - sustained crawl - plus 5.3% faint-material loss top-down. A static
+  8-frame probe would have passed it (both arms converged, no pixel above 1.67/255): crawl only
+  appears once the camera moves. Root cause: `searchBlue` is seeded from SCREEN position and
+  deliberately un-animated, so camera motion reseeds each pixel and the depth shift scales with
+  phase width - the fix must be world-stable along the ray, not merely wider. Change 2, raising the
+  anvil coverage smoothstep from 0.56 to 0.86: **no visible effect** (0.19% of px changed by >1
+  level), hypothesis disproved, knob removed. `PRODUCTION_ORIGIN_JITTER_MODE = 0`; mode 1/2 kept as
+  diagnostics as T209/T210 kept theirs. Production timings SIDE 7.84 / PVN 7.41 ms (T210: 7.64 /
+  6.98) - the delta is storm-realization variance (`rawCloud` alone accounts for it), not a
+  regression; **<=10 ms YES** with 2.2-2.6 ms headroom. campaignGate PASS (it caught the
+  unregistered markers and the PERFORMANCE_ONLY-last-row rule - the T207 lesson), check build PASS.
+  Evidence in `validation/performance-cloud-visual-quality.md` and `validation/t211-campaign/`.
+  Next: **T212 anvil silhouette via envelope falloff** - with the coverage-term theory eliminated,
+  test whether `body` stays near 1 at the envelope boundary so `STORM_EROSION = 0.44` cannot cut
+  through it. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

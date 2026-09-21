@@ -735,6 +735,9 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("ExteriorFineStep").set(
                 PuffLobeSpatialIndex.exteriorFineStepWorld(profile.raymarchSteps(), stepScale)
         );
+        // T211. The exterior ray-origin phase width (0 fineStep, 1 coarseStep).
+        shader.safeGetUniform("PaOriginJitterMode").set(
+                VolumetricCloudDebugConfig.originJitterMode());
         float uploadedMaxRenderDistance = Math.max(300.0F, maxRenderDistance);
         lastMaxRenderDistance = uploadedMaxRenderDistance;
         boolean uploadedUseSceneDepth = sceneRayLimitEnabled && safeSceneDepth.valid();

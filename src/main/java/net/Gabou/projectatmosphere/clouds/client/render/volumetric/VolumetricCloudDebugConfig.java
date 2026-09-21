@@ -246,6 +246,16 @@ public final class VolumetricCloudDebugConfig {
     public static final int PRODUCTION_RAIN_LATTICE_MODE = 0;
     private static volatile int rainLatticeMode = PRODUCTION_RAIN_LATTICE_MODE;
     /**
+     * T211 defect 2. How far the blue-noise phase moves an exterior ray's
+     * origin: 0 one {@code fineStep} (production before T211), 1 one
+     * {@code coarseStep}, the stride a low-density body is actually
+     * integrated on. A camera inside the medium keeps its short, stable
+     * origin in both modes. The production default is
+     * {@link #PRODUCTION_ORIGIN_JITTER_MODE}.
+     */
+    public static final int PRODUCTION_ORIGIN_JITTER_MODE = 0;
+    private static volatile int originJitterMode = PRODUCTION_ORIGIN_JITTER_MODE;
+    /**
      * T210 harness. True raises MaxPrecipitation to 0.85 on every program
      * (T188's rain-heavy forcing on the deterministic storm), identically for
      * the reference and the arms - a deliberately rain-heavy fixture.
@@ -463,6 +473,14 @@ public final class VolumetricCloudDebugConfig {
         rainLatticeMode = Math.max(0, Math.min(2, mode));
     }
 
+    public static int originJitterMode() {
+        return originJitterMode;
+    }
+
+    public static void setOriginJitterMode(int mode) {
+        originJitterMode = Math.max(0, Math.min(2, mode));
+    }
+
     public static boolean rainHeavyForced() {
         return rainHeavyForced;
     }
@@ -597,6 +615,7 @@ public final class VolumetricCloudDebugConfig {
         deferredSplitForced = false;
         spatialUpscaleMethod = PRODUCTION_SPATIAL_UPSCALE;
         rainLatticeMode = PRODUCTION_RAIN_LATTICE_MODE;
+        originJitterMode = PRODUCTION_ORIGIN_JITTER_MODE;
         rainHeavyForced = false;
         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
         sentinelHeightsEnabled = false;

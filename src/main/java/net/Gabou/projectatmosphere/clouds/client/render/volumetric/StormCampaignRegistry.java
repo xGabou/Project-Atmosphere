@@ -327,6 +327,14 @@ public final class StormCampaignRegistry {
             new Campaign("T209", "t209-spatial-upscale.txt",
                     "spatialUpscaleRunRequested", "t209Run",
                     "T209_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            // T211M. The T152 route judging the ray-origin phase under motion:
+            // the production 0.50 reference, then the fine and coarse phases.
+            // Placed before the sweeps: a PERFORMANCE_ONLY campaign must not
+            // be the registry's last row (the wiring proof reads the newest
+            // row as a sweep - the T207 lesson).
+            new Campaign("T211M", "t211-origin-motion.txt",
+                    "originJitterMotionRunRequested", "t211mRun",
+                    null, Routing.PERFORMANCE_ONLY),
             // T210M. The T152 route, rain-heavy, native 1.0 against production
             // rain and the masked lattice rain; before the sweeps.
             new Campaign("T210M", "t210-rain-motion.txt",
@@ -357,7 +365,12 @@ public final class StormCampaignRegistry {
             "t098-raytrace.txt",
             // T195. Stops the client after T132_AUTORUN_FINISHED so the launch
             // returns when the campaign does; selects nothing.
-            "t132-autorun-exit.txt");
+            "t132-autorun-exit.txt",
+            // T211. Routes a matured storm straight to the T098 capture set,
+            // past the legacy stormPerformanceSuite that now times out in
+            // MOVE_TO_VIEW. It selects no arms and always defers to a
+            // campaign, ray-trace or motion marker.
+            "t211-captures.txt");
 
     /**
      * The marker path for one campaign, resolved the way the driver resolves

@@ -167,7 +167,15 @@ public final class StormT098CaptureDriver {
             String name, double x, double y, double z, String intent,
             VolumetricCloudRaymarchDebugView view, boolean rayTrace,
             boolean legacyHitDepth, boolean legacyFinePromotion,
-            float resolutionScale, boolean temporalPair) {
+            float resolutionScale, boolean temporalPair, int originJitter) {
+        Shot(String name, double x, double y, double z, String intent,
+                VolumetricCloudRaymarchDebugView view, boolean rayTrace,
+                boolean legacyHitDepth, boolean legacyFinePromotion,
+                float resolutionScale, boolean temporalPair) {
+            this(name, x, y, z, intent, view, rayTrace, legacyHitDepth,
+                    legacyFinePromotion, resolutionScale, temporalPair, -1);
+        }
+
         Shot(String name, double x, double y, double z, String intent) {
             this(name, x, y, z, intent, VolumetricCloudRaymarchDebugView.FINAL,
                     false, false, false);
@@ -467,6 +475,26 @@ public final class StormT098CaptureDriver {
                     "cost of the bounded empty-span scan",
                     VolumetricCloudRaymarchDebugView.FINAL));
         }
+        // T211 defect 2. The origin-jitter A/B, both arms on ONE storm: the
+        // structural fingerprint differs on every run (T210 saw the same), so
+        // an across-run before/after would compare two different storms.
+        for (int arm = 0; arm <= 1; arm++) {
+            String intent = "origin jitter "
+                    + (arm == 0 ? "fineStep (production)" : "coarseStep");
+            built.add(new Shot("J" + arm + "_SIDE",
+                    centreX + radius * 1.7D, midY, centreZ, intent,
+                    VolumetricCloudRaymarchDebugView.FINAL, false, false, false,
+                    Float.NaN, true, arm));
+            built.add(new Shot("J" + arm + "_LATERAL",
+                    centreX, midY, centreZ + radius * 1.9D, intent,
+                    VolumetricCloudRaymarchDebugView.FINAL, false, false, false,
+                    Float.NaN, true, arm));
+            built.add(new Shot("J" + arm + "_ABOVE",
+                    centreX + radius * 0.6D,
+                    topY + Math.max(120.0D, height * 0.45D), centreZ, intent,
+                    VolumetricCloudRaymarchDebugView.FINAL, false, false, false,
+                    Float.NaN, true, arm));
+        }
         built.add(new Shot("8_NEAR_EDGE", centreX + radius * 1.12D, baseY + height * 0.55D, centreZ,
                 "fine detail octaves at the outer boundary"));
         return List.copyOf(built);
@@ -540,6 +568,8 @@ public final class StormT098CaptureDriver {
         captureModeApplied = false;
         VolumetricCloudDebugConfig.setT098LegacyHitDepth(false);
         VolumetricCloudDebugConfig.setT098LegacyFinePromotion(false);
+        VolumetricCloudDebugConfig.setOriginJitterMode(
+                VolumetricCloudDebugConfig.PRODUCTION_ORIGIN_JITTER_MODE);
         VolumetricCloudDebugConfig.setT136ConstantLighting(false);
         CloudFieldVolumeRenderConfig.setCompositeDebugMode(CloudFieldCompositeDebugMode.FINAL);
         VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
@@ -601,6 +631,13 @@ public final class StormT098CaptureDriver {
                 VolumetricCloudDebugConfig.setT098LegacyHitDepth(shot.legacyHitDepth());
                 VolumetricCloudDebugConfig.setT098LegacyFinePromotion(
                         shot.legacyFinePromotion());
+                // T211. The visual arm under test, held for the whole settle
+                // window so the captured frame really is that arm's. -1 leaves
+                // production. (The field is reused per defect; it carried the
+                // origin-jitter A/B before that was rejected under motion.)
+                if (shot.originJitter() >= 0) {
+                    VolumetricCloudDebugConfig.setOriginJitterMode(shot.originJitter());
+                }
                 if (Float.isFinite(shot.resolutionScale())) {
                     // Held for the whole settle window. A scale change destroys
                     // and rebuilds the cloud targets and invalidates history, so

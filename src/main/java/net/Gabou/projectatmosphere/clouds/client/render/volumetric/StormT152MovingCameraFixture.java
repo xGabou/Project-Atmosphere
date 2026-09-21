@@ -217,7 +217,16 @@ final class StormT152MovingCameraFixture {
         UPSCALE_DEPTH("upscale_depth", false, 1, 0.25F, 2),
         /** T210M: production (phase-grid rain) and the masked lattice rain, both as the PA layer. */
         RAIN_PROD("rain_prod", false, 1, 0.25F, 0, 0),
-        RAIN_LATTICE("rain_lattice", false, 1, 0.25F, 0, 2);
+        RAIN_LATTICE("rain_lattice", false, 1, 0.25F, 0, 2),
+        /**
+         * T211M: the ray-origin phase under motion. The static capture set
+         * shows the coarse-stride phase converges (no pixel moves more than
+         * 1.67/255 over 8 frames with the camera still), but a dither only
+         * crawls once history is reprojected and rejected - which is what
+         * this route puts it through.
+         */
+        ORIGIN_JITTER_FINE("origin_jitter_fine", false, 1, 0.25F, -1, 0, 0),
+        ORIGIN_JITTER_COARSE("origin_jitter_coarse", false, 1, 0.25F, -1, 0, 1);
 
         private final String label;
         private final boolean history;
@@ -227,6 +236,8 @@ final class StormT152MovingCameraFixture {
         private final int upscale;
         /** T210. The rain lattice mode. */
         private final int rainLattice;
+        /** T211. The ray-origin jitter mode. */
+        private final int originJitter;
 
         Arm(String label, boolean history, int temporal, float resolutionScale) {
             this(label, history, temporal, resolutionScale, -1, 0);
@@ -238,12 +249,18 @@ final class StormT152MovingCameraFixture {
 
         Arm(String label, boolean history, int temporal, float resolutionScale, int upscale,
                 int rainLattice) {
+            this(label, history, temporal, resolutionScale, upscale, rainLattice, 0);
+        }
+
+        Arm(String label, boolean history, int temporal, float resolutionScale, int upscale,
+                int rainLattice, int originJitter) {
             this.label = label;
             this.history = history;
             this.temporal = temporal;
             this.resolutionScale = resolutionScale;
             this.upscale = upscale;
             this.rainLattice = rainLattice;
+            this.originJitter = originJitter;
         }
 
         String label() {
@@ -265,7 +282,9 @@ final class StormT152MovingCameraFixture {
         /** T209M: native 1.0 against the three upscaled layers of the 0.25 lattice. */
         UPSCALE(Arm.PRODUCTION_100, Arm.UPSCALE_BILINEAR, Arm.UPSCALE_EASU, Arm.UPSCALE_DEPTH),
         /** T210M: native 1.0 against production rain and the masked lattice rain (rain-heavy). */
-        RAIN(Arm.PRODUCTION_100, Arm.RAIN_PROD, Arm.RAIN_LATTICE);
+        RAIN(Arm.PRODUCTION_100, Arm.RAIN_PROD, Arm.RAIN_LATTICE),
+        /** T211M: the production 0.50 reference, then the two ray-origin phases. */
+        ORIGIN_JITTER(Arm.PRODUCTION_050, Arm.ORIGIN_JITTER_FINE, Arm.ORIGIN_JITTER_COARSE);
 
         private final Arm[] arms;
 
@@ -315,6 +334,7 @@ final class StormT152MovingCameraFixture {
     private static float originalResolutionScale = Float.NaN;
     private static int originalUpscaleMethod = -1;
     private static int originalRainLatticeMode;
+    private static int originalOriginJitterMode;
     private static boolean historyOverrideApplied;
     private static ArmSet armSet = ArmSet.HISTORY;
     private static boolean cameraModeApplied;
@@ -409,6 +429,7 @@ final class StormT152MovingCameraFixture {
         originalResolutionScale = VolumetricCloudDebugConfig.fixedResolutionScale();
         originalUpscaleMethod = VolumetricCloudDebugConfig.spatialUpscaleMethod();
         originalRainLatticeMode = VolumetricCloudDebugConfig.rainLatticeMode();
+        originalOriginJitterMode = VolumetricCloudDebugConfig.originJitterMode();
         referenceGhostFrames = new byte[ROUTE_FRAMES][];
         arm = armSet.first();
         routeIndex = 0;
@@ -569,6 +590,7 @@ final class StormT152MovingCameraFixture {
             VolumetricCloudDebugConfig.setFixedResolutionScale(arm.resolutionScale);
             VolumetricCloudDebugConfig.setSpatialUpscaleMethod(arm.upscale);
             VolumetricCloudDebugConfig.setRainLatticeMode(arm.rainLattice);
+            VolumetricCloudDebugConfig.setOriginJitterMode(arm.originJitter);
             VolumetricCloudRenderer.invalidateHistory();
         }
         historyOverrideApplied = true;
@@ -582,6 +604,7 @@ final class StormT152MovingCameraFixture {
                 VolumetricCloudDebugConfig.setFixedResolutionScale(originalResolutionScale);
                 VolumetricCloudDebugConfig.setSpatialUpscaleMethod(originalUpscaleMethod);
                 VolumetricCloudDebugConfig.setRainLatticeMode(originalRainLatticeMode);
+                VolumetricCloudDebugConfig.setOriginJitterMode(originalOriginJitterMode);
                 VolumetricCloudDebugConfig.setRainHeavyForced(false);
             }
             historyOverrideApplied = false;
