@@ -139,6 +139,16 @@ const float STORM_MACRO_DECK_GAIN = 2.69;
 // by the envelope band (+-edgeWidth, ~89 blocks at the anvil) rather than by
 // the coverage range, which is the geometrically correct limit.
 const float STORM_MACRO_BLOCKS_PER_SD = 38.0;
+// T214. The displacement in mode 3 is already independent of the envelope
+// half-width: the 2*bandWidth divisor cancels the band's own scaling, so one
+// sd moves the boundary by this many blocks whether the width is the anvil's
+// clamped 89.475 or its unclamped 240.9. The T098 vertical clamp is therefore
+// ALREADY compensated here; what it still does is CAP the displacement at
+// +-w. These are the amplitude arms that test whether more displacement, up
+// to that cap, turns the macro band into visible billowing. 55 clips ~10% of
+// samples at the cap; 89 is the cap itself and clips ~32%.
+const float STORM_MACRO_BLOCKS_PARTIAL = 55.0;
+const float STORM_MACRO_BLOCKS_FULL = 89.0;
 // Cap fillet as a fraction of the lobe's smaller extent, bounded by the same
 // wavelength. Flat slabs and recognizable spheres are both rejected forms.
 const float STORM_CAP_ROUNDING_FRACTION = 0.35;
@@ -3646,13 +3656,16 @@ float directStormFinalDensity(
         // envelope from the one the body renders.
         float deckWeight = smoothstep(0.55, 0.72, dominantHeight01)
             * (1.0 - smoothstep(0.93, 1.0, dominantHeight01));
-        if (PaMacroEnvelope == 3) {
+        if (PaMacroEnvelope >= 3) {
             float envStrength = max(envelopeStrength, 1.0e-3);
             float u = clamp(coverage / envStrength, 0.0, 1.0);
             float ssv = clamp(1.0 - u, 0.0, 1.0);
             float tParam = 0.5 - sin(asin(clamp(1.0 - 2.0 * ssv, -1.0, 1.0)) / 3.0);
             float bandWidth = max(paLastStormUnionSoftness, STORM_MIN_EDGE_BLOCKS);
-            float shift = (deckWeight * STORM_MACRO_BLOCKS_PER_SD
+            float blocksPerSd = PaMacroEnvelope == 4 ? STORM_MACRO_BLOCKS_PARTIAL
+    : PaMacroEnvelope == 5 ? STORM_MACRO_BLOCKS_FULL
+    : STORM_MACRO_BLOCKS_PER_SD;
+float shift = (deckWeight * blocksPerSd
                 * clamp(macroSigned, -2.5, 2.5)) / (2.0 * bandWidth);
             float tShifted = clamp(tParam + shift, 0.0, 1.0);
             float ssShifted = tShifted * tShifted * (3.0 - 2.0 * tShifted);
@@ -6463,7 +6476,7 @@ float cloudDensity(
                 float macroGain = PaMacroEnvelope == 1
                     ? 1.0
                     : mix(1.0, STORM_MACRO_DECK_GAIN, deckWeight);
-                if (PaMacroEnvelope == 3) {
+                if (PaMacroEnvelope >= 3) {
                     // Displace the envelope boundary in blocks. Invert the
                     // falloff to its smoothstep parameter, shift, re-evaluate.
                     float envStrength = max(directStormStrength, 1.0e-3);
@@ -6471,7 +6484,10 @@ float cloudDensity(
                     float ssv = clamp(1.0 - u, 0.0, 1.0);
                     float tParam = 0.5 - sin(asin(clamp(1.0 - 2.0 * ssv, -1.0, 1.0)) / 3.0);
                     float bandWidth = max(paLastStormUnionSoftness, STORM_MIN_EDGE_BLOCKS);
-                    float shift = (deckWeight * STORM_MACRO_BLOCKS_PER_SD
+                    float blocksPerSd = PaMacroEnvelope == 4 ? STORM_MACRO_BLOCKS_PARTIAL
+    : PaMacroEnvelope == 5 ? STORM_MACRO_BLOCKS_FULL
+    : STORM_MACRO_BLOCKS_PER_SD;
+float shift = (deckWeight * blocksPerSd
                         * clamp(macroSigned, -2.5, 2.5)) / (2.0 * bandWidth);
                     float tShifted = clamp(tParam + shift, 0.0, 1.0);
                     float ssShifted = tShifted * tShifted * (3.0 - 2.0 * tShifted);

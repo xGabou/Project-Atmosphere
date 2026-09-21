@@ -503,7 +503,7 @@ public final class VolumetricCloudDebugConfig {
     }
 
     public static void setMacroEnvelopeMode(int mode) {
-        macroEnvelopeMode = Math.max(0, Math.min(3, mode));
+        macroEnvelopeMode = Math.max(0, Math.min(5, mode));
     }
 
     public static boolean rainHeavyForced() {

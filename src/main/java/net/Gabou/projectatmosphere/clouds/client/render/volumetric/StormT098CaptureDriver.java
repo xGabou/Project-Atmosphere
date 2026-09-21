@@ -480,7 +480,7 @@ public final class StormT098CaptureDriver {
         // an across-run before/after would compare two different storms.
         for (int arm = 0; arm <= 1; arm++) {
             String intent = "macro envelope "
-                    + (arm == 0 ? "off (pre-T213 control)" : "deck-weighted blocks (production)");
+                    + (arm == 0 ? "38 blocks/sd (production)" : "89 blocks/sd (T214 at band cap)");
             built.add(new Shot("J" + arm + "_SIDE",
                     centreX + radius * 1.7D, midY, centreZ, intent,
                     VolumetricCloudRaymarchDebugView.FINAL, false, false, false,
@@ -636,9 +636,10 @@ public final class StormT098CaptureDriver {
                 // production. (The field is reused per defect; it carried the
                 // origin-jitter A/B before that was rejected under motion.)
                 if (shot.originJitter() >= 0) {
-                    // arm 1 selects mode 3, the T213 block-space variant.
+                    // T214 amplitude arms: 0 = production (38 b/sd),
+                    // 1 = partial (55 b/sd).
                     VolumetricCloudDebugConfig.setMacroEnvelopeMode(
-                            shot.originJitter() == 0 ? 0 : 3);
+                            shot.originJitter() == 0 ? 3 : 5);
                 }
                 if (Float.isFinite(shot.resolutionScale())) {
                     // Held for the whole settle window. A scale change destroys

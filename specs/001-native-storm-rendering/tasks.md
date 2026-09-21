@@ -3725,6 +3725,37 @@ implementation, while visual polish remains independently active.
   improved, `8_NEAR_EDGE`'s uniform dark sheet is the strongest remaining anvil defect, the
   block-space channel is now available to test on it, and T211's third-ranked defect (over-eroded
   lower mass / weak tower) sits directly below it. [SC-005, SC-016, SC-021]
+- [X] T214 [QUALITY] [US1] Anvil macro displacement compensation: does compensating the measured
+  ~2.69x vertical-clamp attenuation turn the macro band into billowing? **CASE C - the premise was
+  already satisfied and the amplitude lever is exhausted. Both arms REJECTED, production
+  unchanged.** CORRECTION THAT DEFINES THE TASK: T213's banked mode 3 is **already
+  clamp-independent**. `shift = deckWeight*38*macroSigned/(2*bandWidth)` and `d=(2t-1)*w`, so
+  `dd = 2w*dt = 38 blocks` with `w` cancelling exactly - verified numerically at **38.000 blocks
+  for w = 89.475, 141.0 AND 240.9**. The coverage-space arms (modes 1-2) were the attenuated ones,
+  which is exactly why T212 underperformed and why block space fixed it. Cross-check: an attenuated
+  mode 3 would be 38/2.69 = 14 b/sd, LESS than T212's 21.8, yet it produced far more macro energy.
+  **The clamp now binds as a CAP (`|dd| <= w = 89.475`), not a scale** - so literal "full 2.69x"
+  (102 b/sd) is ABOVE the cap and unreachable. Tested the only free parameter, amplitude, on paired
+  same-storm arms: M1 55 b/sd (1.45x, ~10% clipped), M2 89 b/sd (2.34x, the cap, ~32% clipped).
+  RESULT: **M1 visually indistinguishable** (IoU 0.986, LATERAL macro +1.2%); **M2 visually WORSE** -
+  crown flattens into a plateau, ellipse RISES +8.0% SIDE, mid/fine +49%/+39% at ABOVE, area -1.7
+  to -3.3%, and the tower neck narrows **24->18 (-25%)** at SIDE. Gradient is decisive: 0->38 b/sd
+  gave macro +23.8% LATERAL; 38->55 gives +1.2%; 38->89 gives +5.3%. Pushing against a cap flattens
+  lobes instead of deepening them. **MOST USEFUL RESULT - the flicker gradient: 38->89 b/sd (2.34x
+  displacement) costs only +2.2% route flicker with crawl essentially nil (1 frame vs 0).** T212's
+  coverage arm cost +10.2%, T213's block-space 38 b/sd cost +2.5% - so **temporal cost tracks the
+  modulation CHANNEL, not displacement magnitude**, and a future wider band is NOT disqualified on
+  stability grounds. Production unchanged: SIDE 7.84 / PVN 7.39 ms, **<=10 ms YES**.
+  `PRODUCTION_MACRO_ENVELOPE_MODE = 3` (38 b/sd); modes 4/5 kept as diagnostics. Four
+  `check-build-*.log` files were inspected and deliberately NOT staged (zero such files are tracked;
+  same class as the 190 other untracked run logs). campaignGate, check build, morphology sandbox all
+  PASS; no pinned constant touched. Evidence in `validation/t214-anvil-macro-compensation.md` and
+  `validation/t214-campaign/`. Next: **T215 the envelope BASIS, not its modulation** - preferred is
+  a non-elliptical anvil footprint at descriptor level (the ellipse harmonic dominates *because the
+  geometry is an ellipse*; every attempt T212-T214 modulated a smooth ellipse and hit a displacement
+  limit); secondary is widening the anvil band anisotropically (horizontal-only), now more
+  attractive since displacement is nearly free temporally, but still judged against the T098 haze
+  failure. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
