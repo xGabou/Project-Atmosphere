@@ -270,7 +270,7 @@ public final class VolumetricCloudDebugConfig {
      * itself, where it displaces the surface coherently instead of speckling
      * the density.
      */
-    public static final int PRODUCTION_MACRO_ENVELOPE_MODE = 0;
+    public static final int PRODUCTION_MACRO_ENVELOPE_MODE = 3;
     private static volatile int macroEnvelopeMode = PRODUCTION_MACRO_ENVELOPE_MODE;
     /**
      * T210 harness. True raises MaxPrecipitation to 0.85 on every program
@@ -503,7 +503,7 @@ public final class VolumetricCloudDebugConfig {
     }
 
     public static void setMacroEnvelopeMode(int mode) {
-        macroEnvelopeMode = Math.max(0, Math.min(1, mode));
+        macroEnvelopeMode = Math.max(0, Math.min(3, mode));
     }
 
     public static boolean rainHeavyForced() {

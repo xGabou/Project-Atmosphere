@@ -121,6 +121,24 @@ const float STORM_VERTICAL_EDGE_BOUND_FRACTION = 0.75;
 const float STORM_MACRO_OCTAVE_MEAN = 0.4794;
 const float STORM_MACRO_OCTAVE_SD = 0.1163;
 const float STORM_MACRO_ENVELOPE_AMPLITUDE = 0.16;
+// T213. The anvil's envelope half-width is clamped by the T098 vertical bound
+// (halfHeight * 0.75): measured on the fixture, 240.9 blocks of horizontally
+// derived width become 89.475, an attenuation of 2.69x. Boundary displacement
+// scales with that width, so the macro band T212 added is attenuated by the
+// same factor at exactly the deck whose silhouette reads as an ellipse, while
+// every other role is unclamped (BASE, CORE and TOWER are all bound by their
+// horizontal radius). This gain restores that factor, localised to the deck by
+// the storm's own normalised height so thinner roles are not over-perturbed.
+const float STORM_MACRO_DECK_GAIN = 2.69;
+// T213 mode 3. Displacement expressed in BLOCKS and applied in the envelope's
+// own falloff parameter instead of in coverage. Modulating coverage clips:
+// the deck gain drives a +-0.86 swing against a [0,1] channel that saturates
+// past ~0.5, so negative excursions zero the coverage and remove material
+// while positive ones clamp and push nothing outward - measured as shaving,
+// not billowing. In t-space the same displacement is symmetric and is bounded
+// by the envelope band (+-edgeWidth, ~89 blocks at the anvil) rather than by
+// the coverage range, which is the geometrically correct limit.
+const float STORM_MACRO_BLOCKS_PER_SD = 38.0;
 // Cap fillet as a fraction of the lobe's smaller extent, bounded by the same
 // wavelength. Flat slabs and recognizable spheres are both rejected forms.
 const float STORM_CAP_ROUNDING_FRACTION = 0.35;
@@ -1364,8 +1382,10 @@ uniform int PaRainCoarseMask;
 // is actually integrated on, whose under-jittered sampling shells are the
 // horizontal terracing T211 measured.
 uniform int PaOriginJitterMode;
-// T212. 1 modulates the coverage envelope with one ~400-block Worley octave
-// before the density threshold, adding the macro band the body noise lacks.
+// T212/T213. 0 production. 1 modulates the coverage envelope with one
+// ~400-block Worley octave before the density threshold (T212's flat-gain
+// candidate). 2 is the same band weighted by the deck the T098 vertical clamp
+// attenuates (T213).
 uniform int PaMacroEnvelope;
 
 bool paRayTraceActive() {
@@ -3619,8 +3639,31 @@ float directStormFinalDensity(
             BaseNoiseSampler, stormMacroEnvelopeDomain(samplePos), 0.0).g;
         float macroSigned = (macroOctave - STORM_MACRO_OCTAVE_MEAN)
             / STORM_MACRO_OCTAVE_SD;
-        coverage = saturate(coverage
-            + STORM_MACRO_ENVELOPE_AMPLITUDE * clamp(macroSigned, -2.5, 2.5));
+        // T213. The same deck weight AND the same channel as the primary
+        // march, so the gate's rain support keeps agreeing with the visible
+        // body. Mode 3 must displace in block space here too: applying the
+        // coverage-add branch would leave the gate seeing a different
+        // envelope from the one the body renders.
+        float deckWeight = smoothstep(0.55, 0.72, dominantHeight01)
+            * (1.0 - smoothstep(0.93, 1.0, dominantHeight01));
+        if (PaMacroEnvelope == 3) {
+            float envStrength = max(envelopeStrength, 1.0e-3);
+            float u = clamp(coverage / envStrength, 0.0, 1.0);
+            float ssv = clamp(1.0 - u, 0.0, 1.0);
+            float tParam = 0.5 - sin(asin(clamp(1.0 - 2.0 * ssv, -1.0, 1.0)) / 3.0);
+            float bandWidth = max(paLastStormUnionSoftness, STORM_MIN_EDGE_BLOCKS);
+            float shift = (deckWeight * STORM_MACRO_BLOCKS_PER_SD
+                * clamp(macroSigned, -2.5, 2.5)) / (2.0 * bandWidth);
+            float tShifted = clamp(tParam + shift, 0.0, 1.0);
+            float ssShifted = tShifted * tShifted * (3.0 - 2.0 * tShifted);
+            coverage = saturate((1.0 - ssShifted) * envStrength);
+        } else {
+            float macroGain = PaMacroEnvelope == 2
+                ? mix(1.0, STORM_MACRO_DECK_GAIN, deckWeight)
+                : 1.0;
+            coverage = saturate(coverage + macroGain
+                * STORM_MACRO_ENVELOPE_AMPLITUDE * clamp(macroSigned, -2.5, 2.5));
+        }
         if (coverage <= 0.0) {
             return 0.0;
         }
@@ -6403,8 +6446,40 @@ float cloudDensity(
                     BaseNoiseSampler, stormMacroEnvelopeDomain(samplePos), 0.0).g;
                 float macroSigned = (macroOctave - STORM_MACRO_OCTAVE_MEAN)
                     / STORM_MACRO_OCTAVE_SD;
-                cloud = saturate(cloud
-                    + STORM_MACRO_ENVELOPE_AMPLITUDE * clamp(macroSigned, -2.5, 2.5));
+                // T213. Weight the displacement by the deck the vertical clamp
+                // attenuates. The weight is a smooth, bounded, world-stable
+                // function of the storm's own normalised height - no screen
+                // space, no extra noise - and it multiplies a zero-mean term,
+                // so it cannot introduce an expand or shrink bias of its own.
+                // T213. The DESCRIPTOR's own normalised height, not the
+                // weather-modulated layer height `h01`: the anvil band is
+                // defined on the descriptor profile, and `h01` is a different
+                // coordinate entirely. Weighting on `h01` put the deck window
+                // in the wrong place - mode 2 hid that behind its gain of 1.0
+                // away from the deck, mode 3 multiplies by it and went null.
+                float deckHeight = directStormHeight01;
+                float deckWeight = smoothstep(0.55, 0.72, deckHeight)
+                    * (1.0 - smoothstep(0.93, 1.0, deckHeight));
+                float macroGain = PaMacroEnvelope == 1
+                    ? 1.0
+                    : mix(1.0, STORM_MACRO_DECK_GAIN, deckWeight);
+                if (PaMacroEnvelope == 3) {
+                    // Displace the envelope boundary in blocks. Invert the
+                    // falloff to its smoothstep parameter, shift, re-evaluate.
+                    float envStrength = max(directStormStrength, 1.0e-3);
+                    float u = clamp(cloud / envStrength, 0.0, 1.0);
+                    float ssv = clamp(1.0 - u, 0.0, 1.0);
+                    float tParam = 0.5 - sin(asin(clamp(1.0 - 2.0 * ssv, -1.0, 1.0)) / 3.0);
+                    float bandWidth = max(paLastStormUnionSoftness, STORM_MIN_EDGE_BLOCKS);
+                    float shift = (deckWeight * STORM_MACRO_BLOCKS_PER_SD
+                        * clamp(macroSigned, -2.5, 2.5)) / (2.0 * bandWidth);
+                    float tShifted = clamp(tParam + shift, 0.0, 1.0);
+                    float ssShifted = tShifted * tShifted * (3.0 - 2.0 * tShifted);
+                    cloud = saturate((1.0 - ssShifted) * envStrength);
+                } else {
+                    cloud = saturate(cloud + macroGain
+                        * STORM_MACRO_ENVELOPE_AMPLITUDE * clamp(macroSigned, -2.5, 2.5));
+                }
             }
             cloud = stormBody(
                 cloud,

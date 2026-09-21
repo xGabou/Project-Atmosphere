@@ -3689,6 +3689,42 @@ implementation, while visual polish remains independently active.
   w=150 without raising the coverage amplitude that drives the flicker; must be judged against the
   T098 failure it was added to prevent (~150 blocks of haze hanging below the anvil base).
   [SC-005, SC-016, SC-021]
+- [X] T213 [QUALITY] [US1] Macro-envelope vertical displacement: does the anvil's vertical envelope
+  explain why T212's correct macro band failed to billow? **YES - hypothesis CONFIRMED in two steps,
+  and the fix is KEPT: `PRODUCTION_MACRO_ENVELOPE_MODE = 3`. First banked visual change of the
+  T211-T213 line.** GEOMETRY: the anvil is the ONLY role bound by the T098 vertical clamp
+  (`halfHeight*0.75`) - 240.9 -> 89.475 blocks, a **2.69x attenuation** of displacement, at exactly
+  the deck that reads as an ellipse; BASE (141-145), CORE (63-72) and TOWER (37-44) are all bound by
+  horizontal radius and unattenuated. Displacement scales linearly with that width, so the clamp IS
+  the multiplier. **But a second bottleneck was hidden underneath it**: pushing 2.69x through the
+  COVERAGE channel drives a +-0.86 swing against a bounded [0,1] range that clips asymmetrically -
+  negatives zero the coverage and delete material, positives clamp and push nothing outward. M1
+  (coverage, deck gain 2.69) therefore **shaved** the crown instead of billowing: macro -29.5%
+  LATERAL, area -2%. M2 expresses the SAME band and weight as a displacement in the envelope's own
+  falloff parameter (invert smoothstep -> shift in blocks -> re-evaluate), symmetric and bounded by
+  the band (+-89 blocks) rather than by coverage. RESULT: **macro edge energy +23.8% LATERAL /
+  +5.8% SIDE** (first arm to raise macro at both poses), ellipse -4.7% LATERAL, ellipse/macro
+  -23%, area neutral (+0.1%/-0.7%), **holes -35%**, components stable, lower body/tower intact
+  (-1.2%/-0.2%), static probe stiller than production. **Motion +2.5% route flicker vs T212's
+  +10.2% - a 4x improvement**; crawl net-favourable (13 frames worse, 16 better, more
+  perfectly-still frames). Ghost 0.00099->0.00230 reported but NOT used (appearance-confounded).
+  Cost below the storm-variance floor (SIDE 7.79->7.81, PVN 7.83->7.68), post-bank SIDE 7.86 /
+  PVN 7.11, **<=10 ms YES**. CAVEAT recorded: a third run on the banked build reproduces LATERAL
+  strongly (+24.0% vs +23.8%) but SIDE is storm-variable (+1.6%, ellipse +10.5%) - **claim the gain
+  at LATERAL, treat SIDE as unproven**. TWO faults found, both of which produced near-perfect nulls
+  that would have read as clean negatives: (a) the deck weight used `h01` (weather-modulated LAYER
+  height) instead of `directStormHeight01` (the DESCRIPTOR's height the anvil band is defined on) -
+  mode 2 hid it behind its gain of 1.0 where the weight is zero, mode 3 multiplies by it and went to
+  exactly zero, so **M1's numbers are ungated coverage modulation, not a test of deck weighting**;
+  (b) the block-space displacement was initially only in `cloudDensity`, leaving the rain gate on the
+  coverage-add branch - banking that would have shipped rain support believing a different envelope
+  than the body, invisible to every still-frame metric. No pinned morphology constant touched;
+  `stormDensityThresholdSandbox` reproduces every statistic. campaignGate x2, check build,
+  morphology sandbox all PASS. Evidence in `validation/t213-macro-envelope-vertical.md` and
+  `validation/t213-campaign/`. Next: **T214 the anvil underside / cloud base** - with the rim
+  improved, `8_NEAR_EDGE`'s uniform dark sheet is the strongest remaining anvil defect, the
+  block-space channel is now available to test on it, and T211's third-ranked defect (over-eroded
+  lower mass / weak tower) sits directly below it. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

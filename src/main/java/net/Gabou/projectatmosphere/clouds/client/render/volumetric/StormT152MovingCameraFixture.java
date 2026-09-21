@@ -234,7 +234,7 @@ final class StormT152MovingCameraFixture {
          * that displacement crawls once history is reprojected.
          */
         MACRO_ENVELOPE_OFF("macro_envelope_off", false, 1, 0.25F, -1, 0, 0, 0),
-        MACRO_ENVELOPE_ON("macro_envelope_on", false, 1, 0.25F, -1, 0, 0, 1);
+        MACRO_ENVELOPE_ON("macro_envelope_on", false, 1, 0.25F, -1, 0, 0, 3);
 
         private final String label;
         private final boolean history;
