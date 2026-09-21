@@ -32,6 +32,10 @@ public final class VolumetricCloudRenderer {
     private static final int RAIN_PASS_TEXTURE_UNIT = CloudTextureUnitContract.RAIN_PASS_UNIT;
     /** T205. The rain pass's texture for the frame being drawn, or 0. */
     private static int rainPassTextureId;
+    /** T210. The rain target the resolve/composite reads this frame (the lattice one when it ran). */
+    private static RenderTarget lastRainCompositeTarget;
+    private static final CloudGpuTimer RAIN_LATTICE_TIMER = new CloudGpuTimer();
+    private static volatile float lastRainLatticeGpuMilliseconds = -1.0F;
     /**
      * T188. The field texture for the frame being drawn, or 0. Held here
      * because the manual bind has to happen after every shader.apply(),
@@ -71,6 +75,7 @@ public final class VolumetricCloudRenderer {
     private static volatile float lastGpuMilliseconds = -1.0F;
     private static volatile float lastRainFieldGpuMilliseconds = -1.0F;
     private static volatile float lastRainGateGpuMilliseconds = -1.0F;
+    private static boolean lastRainLatticeRan;
     private static volatile float lastRainPassGpuMilliseconds = -1.0F;
     /**
      * T199e. The field rebuilds every frame; these only count how often it
@@ -141,6 +146,16 @@ public final class VolumetricCloudRenderer {
      */
     public static float lastRainGateGpuMilliseconds() {
         return lastRainGateGpuMilliseconds;
+    }
+
+    /** T210. Milliseconds the lattice rain pass cost, or 0 when the frame drew none. */
+    public static float lastRainLatticeGpuMilliseconds() {
+        return lastRainLatticeGpuMilliseconds;
+    }
+
+    /** T210. The rain target the resolve composites this frame (lattice-sized when the lattice pass ran). */
+    public static RenderTarget lastRainCompositeTarget() {
+        return lastRainCompositeTarget;
     }
 
     /** T205. Milliseconds the rain pass cost on the GPU, or 0 when the frame drew none. */
@@ -249,6 +264,9 @@ public final class VolumetricCloudRenderer {
         // release their queries with the others.
         RAIN_GATE_TIMER.close();
         RAIN_PASS_TIMER.close();
+        RAIN_LATTICE_TIMER.close();
+        lastRainLatticeGpuMilliseconds = -1.0F;
+        lastRainCompositeTarget = null;
         lastRainFieldGpuMilliseconds = -1.0F;
         lastRainGateGpuMilliseconds = -1.0F;
         lastRainPassGpuMilliseconds = -1.0F;
@@ -457,6 +475,10 @@ public final class VolumetricCloudRenderer {
         lastRainPassGpuMilliseconds = program.rainSplitCloud()
                 ? Math.max(0.0F, RAIN_PASS_TIMER.getLastMilliseconds())
                 : 0.0F;
+        RAIN_LATTICE_TIMER.poll();
+        lastRainLatticeGpuMilliseconds = program.rainSplitCloud() && lastRainLatticeRan
+                ? Math.max(0.0F, RAIN_LATTICE_TIMER.getLastMilliseconds())
+                : 0.0F;
         // The timer holds its last resolved result, so a frame that builds no
         // field would otherwise report the previous arm's build cost and charge
         // a control for a pass it never ran. Zero unless this frame generated.
@@ -639,7 +661,7 @@ public final class VolumetricCloudRenderer {
         // Applied only to the rain-only capture pair, and identically to both
         // sides of it, so it changes what is visible and not what is compared.
         float paMaxPrecipitation = weather.maxPrecipitation();
-        if (program.rainMaskCapture()) {
+        if (program.rainMaskCapture() || VolumetricCloudDebugConfig.rainHeavyForced()) {
             paMaxPrecipitation = Math.max(paMaxPrecipitation, 0.85F);
         }
         shader.safeGetUniform("MaxPrecipitation").set(paMaxPrecipitation);
@@ -1019,12 +1041,28 @@ public final class VolumetricCloudRenderer {
         // target the cloud program then composites at the rain's depth.
         // T206: the production render order is field build, gate build,
         // rain pass, split cloud, then the composite/output path.
+        lastRainCompositeTarget = null;
         if (program.rainSplitCloud()) {
             ShaderInstance rainShader = VolumetricCloudShaders.volumeShader(
                     program.rainPassProgram());
+            // T210. On a temporal frame the rain can be evaluated at the
+            // lattice (twice the phase grid): mode 1 one pass at that size,
+            // mode 2 the phase-grid pass first and the lattice pass masked
+            // by it. Off, the target is the phase grid as before.
+            int rainLatticeMode = temporal ? VolumetricCloudDebugConfig.rainLatticeMode() : 0;
+            int rainPassScale = rainLatticeMode == 1 ? 2 : 1;
             RenderTarget rainPassTarget = rainShader == null ? null
                     : VolumetricCloudRenderTargets.prepareRainPassTarget(
-                            cloudTarget.width, cloudTarget.height);
+                            cloudTarget.width * rainPassScale, cloudTarget.height * rainPassScale);
+            RenderTarget rainLatticeTarget = rainShader == null || rainLatticeMode != 2 ? null
+                    : VolumetricCloudRenderTargets.prepareRainLatticeTarget(
+                            cloudTarget.width * 2, cloudTarget.height * 2);
+            if (rainLatticeMode != 2) {
+                VolumetricCloudRenderTargets.releaseRainLatticeTarget("modeOff");
+            }
+            lastRainLatticeRan = false;
+            shader.safeGetUniform("PaRainCoarseMask").set(0);
+            lastRainCompositeTarget = rainPassTarget;
             if (rainPassTarget == null && program.rainPassProgram().isProductionProgram()) {
                 // T206. The split cloud program fetches the rain-pass texel
                 // unconditionally; against no pass it would composite a zero
@@ -1054,6 +1092,8 @@ public final class VolumetricCloudRenderer {
                 // every frame of the cycle (a jittered rain pass rotated
                 // through four subpixel rays - a four-frame rain flicker).
                 rainShader.safeGetUniform("PaSampleJitter").set(0.0F, 0.0F);
+                rainShader.safeGetUniform("PaRainPassScale").set(1);
+                rainShader.safeGetUniform("PaRainCoarseMask").set(0);
                 rainShader.apply();
                 PuffLobeSpatialIndex.uploadDescriptors(rainShader.getId());
                 bindManualTextures(rainShader, puffCandidateTarget.getColorTextureId());
@@ -1065,8 +1105,29 @@ public final class VolumetricCloudRenderer {
                     unbindManualTextures();
                     rainShader.clear();
                 }
-                bindMarchTarget(cloudTarget, temporal);
                 rainPassTextureId = rainPassTarget.getColorTextureId();
+                if (rainLatticeTarget != null) {
+                    // T210 mode 2. The lattice pass, masked by the coarse
+                    // result it reads through RainPassSampler; the phase
+                    // program and the resolve then read the lattice target.
+                    VolumetricCloudRenderTargets.clearAndBind(rainLatticeTarget);
+                    rainShader.safeGetUniform("PaRainCoarseMask").set(1);
+                    rainShader.apply();
+                    PuffLobeSpatialIndex.uploadDescriptors(rainShader.getId());
+                    bindManualTextures(rainShader, puffCandidateTarget.getColorTextureId());
+                    RAIN_LATTICE_TIMER.begin();
+                    try {
+                        FullscreenQuad.draw(rainShader);
+                    } finally {
+                        RAIN_LATTICE_TIMER.end();
+                        unbindManualTextures();
+                        rainShader.clear();
+                    }
+                    rainPassTextureId = rainLatticeTarget.getColorTextureId();
+                    lastRainCompositeTarget = rainLatticeTarget;
+                    lastRainLatticeRan = true;
+                }
+                bindMarchTarget(cloudTarget, temporal);
             } else {
                 ProjectAtmosphere.LOGGER.warn(
                         "[VolumetricClouds] rain pass program unavailable for {}",
@@ -1074,6 +1135,12 @@ public final class VolumetricCloudRenderer {
             }
         }
 
+        // T210. The split reads the rain texel of its own lattice site when
+        // the target it composites is lattice-sized (mode 1, or mode 2 with
+        // the lattice pass run); the phase grid otherwise.
+        shader.safeGetUniform("PaRainPassScale").set(
+                lastRainCompositeTarget != null
+                        && lastRainCompositeTarget.width == cloudTarget.width * 2 ? 2 : 1);
         lastProgram = program;
         shader.apply();
         PuffLobeSpatialIndex.uploadDescriptors(shader.getId());

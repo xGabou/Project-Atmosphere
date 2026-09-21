@@ -326,7 +326,20 @@ public final class StormCampaignRegistry {
                     null, Routing.PERFORMANCE_ONLY),
             new Campaign("T209", "t209-spatial-upscale.txt",
                     "spatialUpscaleRunRequested", "t209Run",
-                    "T209_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "T209_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            // T210M. The T152 route, rain-heavy, native 1.0 against production
+            // rain and the masked lattice rain; before the sweeps.
+            new Campaign("T210M", "t210-rain-motion.txt",
+                    "rainMotionRunRequested", "t210mRun",
+                    null, Routing.PERFORMANCE_ONLY),
+            // T210. Rain at the lattice, on the natural fixture (SIDE and
+            // PLAY_VIS_NEAR) and, with the heavy marker, the rain-heavy SIDE.
+            new Campaign("T210H", "t210-rain-heavy.txt",
+                    "rainHeavyRunRequested", "t210Run",
+                    "T210_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            new Campaign("T210", "t210-rain-quality.txt",
+                    "rainQualityRunRequested", "t210Run",
+                    "T210_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.

@@ -85,15 +85,22 @@ uniform float MaxRenderDistance;
 // 1 lattice with coverage + depth validity; 2 the same plus the colour clip;
 // 3 current phase only (the no-history baseline: the fallback everywhere);
 // 4 trust-all (diagnostic - ghosts by construction, never production);
-// 5 mode 1 without the T208 near-field guard (T207's validity, the control:
-// the guard was judged against it on the motion route through one fixture
-// and shipped in mode 1).
+// 5 mode 1 without the T208 near-field guard (T207's validity, the
+// control); 6 mode 1 PLUS the T210 along-ray guard - a DIAGNOSTIC, not
+// production. T210 judged it against mode 1 on the T152 route and
+// rejected it, so production mode 1 is the T208 validity exactly.
 uniform int ResolveMode;
 // 0 clouds; 1 the acceptance class per pixel in R (see CLASS_*), for the
 // campaign's validity counters; 2 the body alone - the resolved lattice
 // without the rain composite (T208's attribution against a body-only
 // reference).
 uniform int DebugOutput;
+// T210. 1 when the rain pass ran at the lattice (twice the phase grid): the
+// rain texel of this lattice pixel is its own ray's, not its block's.
+uniform int RainPassLattice;
+// T210. The smoothed cloud density at the camera (CameraCloudDensityTracker):
+// the along-ray guard applies only with the camera inside the medium.
+uniform float CameraDensity;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -113,6 +120,18 @@ const float CLASS_FALLBACK = 8.0;
 // wide to say anything - the in-cloud openings episodes of the T207 route.
 const float CLASS_NEARFIELD = 9.0;
 const float NEAR_FIELD_DISTANCE = 96.0;
+// T210. The along-ray guard: the camera inside the medium has moved along
+// this ray by a block or more since the history phase was rendered, so the
+// history ray integrated medium this ray does not (or vice versa) - a
+// difference no point reprojection can remove and, on the view axis, one
+// the screen-space motion test never sees (T208 run 2, frames 1232-1241).
+// T210 REJECTED it for production. On the reproduced episode (frames
+// 1232-1236 and 1336-1358, peak ghost 0.2323) mode 6 and mode 1 differ by
+// +-0.5% and the peak is unchanged, while the arms are identical to six
+// decimals wherever CameraDensity == 0: the residual is a representation
+// error, not a history-acceptance one. Kept on mode 6 for re-measurement.
+const float CLASS_ALONGRAY = 10.0;
+const float ALONG_RAY_BLOCKS = 1.0;
 
 vec2 phaseJitter(int phase) {
     if (phase == 0) { return PhaseJitter0; }
@@ -388,12 +407,23 @@ void main() {
                 && reprojectDistance < NEAR_FIELD_DISTANCE
                 && motionTexels >= 1.0
                 && intervalAmbiguous;
+            // T210. Along the ray: the camera's displacement projected onto
+            // this ray, judged only with the camera inside the medium and
+            // where the neighbourhood is open enough for the extra medium to
+            // show (an ambiguous interval, or any texel below saturation).
+            float alongRay = abs(dot(camDelta, rayDir));
+            bool alongRayReject = ResolveMode == 6
+                && CameraDensity > 0.01
+                && alongRay >= ALONG_RAY_BLOCKS
+                && (intervalAmbiguous || alphaMin < 0.97);
             if (trustAll) {
                 acceptance = CLASS_ACCEPTED;
             } else if (parallaxTooLarge) {
                 acceptance = CLASS_DEPTH;
             } else if (nearFieldReject) {
                 acceptance = CLASS_NEARFIELD;
+            } else if (alongRayReject) {
+                acceptance = CLASS_ALONGRAY;
             } else if (newSky || newCloud) {
                 acceptance = CLASS_DISOCCLUSION;
             } else if (!coverageAgrees) {
@@ -438,7 +468,7 @@ void main() {
     // The current frame's rain at this block: the rain pass marched this
     // frame's phase, so its texel for this block is the ray of the current
     // phase - fetched, never interpolated (its A packs two 12-bit values).
-    vec4 rainIn = texelFetch(RainPassSampler, currentCoord, 0);
+    vec4 rainIn = texelFetch(RainPassSampler, RainPassLattice != 0 ? pixel : currentCoord, 0);
     float rainA = floor(rainIn.a / 4096.0);
     float rainB = rainIn.a - rainA * 4096.0;
     float rainT = rainA / 4095.0 * MaxRenderDistance;

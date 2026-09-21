@@ -195,7 +195,8 @@ public final class VolumetricCloudDebugConfig {
      * depth validity; 2 the same plus the colour clip; 3 the current phase
      * alone resolved through the lattice pass (the no-history baseline);
      * 4 trust-all (diagnostic, ghosts by construction); 5 mode 1 without the
-     * T208 near-field guard (T207's validity, the control). The production
+     * T208 near-field guard and the T210 along-ray guard (T207's validity,
+     * the control); 6 mode 1 without the along-ray guard (T208's production). The production
      * default is {@link #PRODUCTION_TEMPORAL_MODE}; a campaign sets its arm.
      * T207 banked mode 1: the resolve costs 0.1 ms, the lattice reaches
      * 0.995 SSIM against production 0.50 at PLAY_VIS_NEAR (0.951 at SIDE,
@@ -232,6 +233,24 @@ public final class VolumetricCloudDebugConfig {
      * a campaign sets its arm.
      */
     public static final int PRODUCTION_SPATIAL_UPSCALE = -1;
+    /**
+     * T210. Where the current frame's rain is evaluated on a temporal frame:
+     * 0 the rain pass at the phase grid, its texel replicated over the 2x2
+     * lattice block (production before T210); 1 the rain pass at the lattice
+     * grid (twice the phase grid, every lattice pixel its own ray); 2 the
+     * phase-grid pass first, then the lattice pass masked by it (a lattice
+     * pixel whose 3x3 coarse neighbourhood is dry never marches). Rain stays
+     * current-frame in every mode. The production default is
+     * {@link #PRODUCTION_RAIN_LATTICE_MODE}.
+     */
+    public static final int PRODUCTION_RAIN_LATTICE_MODE = 0;
+    private static volatile int rainLatticeMode = PRODUCTION_RAIN_LATTICE_MODE;
+    /**
+     * T210 harness. True raises MaxPrecipitation to 0.85 on every program
+     * (T188's rain-heavy forcing on the deterministic storm), identically for
+     * the reference and the arms - a deliberately rain-heavy fixture.
+     */
+    private static volatile boolean rainHeavyForced;
     private static volatile int spatialUpscaleMethod = PRODUCTION_SPATIAL_UPSCALE;
     /**
      * Rank 1 reconstruction arm. False keeps the shipped composite accumulation
@@ -409,7 +428,7 @@ public final class VolumetricCloudDebugConfig {
     }
 
     public static void setTemporalMode(int mode) {
-        temporalMode = Math.max(0, Math.min(5, mode));
+        temporalMode = Math.max(0, Math.min(6, mode));
     }
 
     public static int temporalDebugOutput() {
@@ -434,6 +453,22 @@ public final class VolumetricCloudDebugConfig {
 
     public static int spatialUpscaleMethod() {
         return spatialUpscaleMethod;
+    }
+
+    public static int rainLatticeMode() {
+        return rainLatticeMode;
+    }
+
+    public static void setRainLatticeMode(int mode) {
+        rainLatticeMode = Math.max(0, Math.min(2, mode));
+    }
+
+    public static boolean rainHeavyForced() {
+        return rainHeavyForced;
+    }
+
+    public static void setRainHeavyForced(boolean forced) {
+        rainHeavyForced = forced;
     }
 
     public static void setSpatialUpscaleMethod(int method) {
@@ -561,6 +596,8 @@ public final class VolumetricCloudDebugConfig {
         rainDisabled = false;
         deferredSplitForced = false;
         spatialUpscaleMethod = PRODUCTION_SPATIAL_UPSCALE;
+        rainLatticeMode = PRODUCTION_RAIN_LATTICE_MODE;
+        rainHeavyForced = false;
         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
         sentinelHeightsEnabled = false;
         fullResolutionEnabled = false;

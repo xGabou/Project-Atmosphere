@@ -699,6 +699,11 @@ public final class StormVolumetricGeometrySandbox {
                         + " the layer the composite reads one-to-one, is off in production until"
                         + " chosen, and compiles",
                 StormVolumetricGeometrySandbox::validateT209SpatialUpscale);
+        runCorrected("T210 the rain lattice and the along-ray guard are both OFF in"
+                        + " production (the campaign measured them and banked neither), the"
+                        + " lattice rain pass still compiles behind its coarse mask, the rain"
+                        + " stays current-frame and its targets are released",
+                StormVolumetricGeometrySandbox::validateT210RainLattice);
     }
 
     /**
@@ -801,6 +806,84 @@ public final class StormVolumetricGeometrySandbox {
     private static final int T209_EXPECTED_PRODUCTION_UPSCALE = -1;
 
     /**
+     * T210. Rain at the reconstructed lattice, and the along-ray temporal
+     * guard. BOTH were measured and BOTH were rejected for production, so
+     * this invariant's job is to keep them rejected while keeping them
+     * runnable:
+     *
+     * <ul>
+     *   <li>{@code PRODUCTION_RAIN_LATTICE_MODE = 0} - mode 1 (one rain pass
+     *       at the lattice) is the quality winner but costs +1.44 ms on the
+     *       forced-rain fixture and +1.23/+1.25 ms at SIDE, at or over the
+     *       1.25 ms bar; mode 2 (coarse pass then masked lattice pass) is
+     *       dominated by mode 1 on BOTH cost and quality - its coarse pass is
+     *       a full production rain pass, so the 28-47% the mask saves on the
+     *       lattice pass never pays for it - and it regresses full-frame SSIM
+     *       by 0.011-0.014.
+     *   <li>The along-ray guard is opt-in on resolve mode 6 only, never on
+     *       production mode 1: on the reproduced in-cloud opening it moved
+     *       the outlier frames by +-0.5% and left the peak unchanged.
+     * </ul>
+     *
+     * <p>Both stay compiled and wired so the comparison can be re-run.
+     */
+    private static void validateT210RainLattice() {
+        require(VolumetricCloudDebugConfig.PRODUCTION_RAIN_LATTICE_MODE
+                        == T210_EXPECTED_PRODUCTION_RAIN_LATTICE,
+                "the production rain lattice mode is not the one T210 chose (0): the lattice"
+                        + " rain pass is quality-positive but cost-limited and was not banked");
+        String resolve = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_temporal_resolve.fsh");
+        require(resolve.contains("bool alongRayReject = ResolveMode == 6"),
+                "the T210 along-ray guard is not opt-in on mode 6 - production mode 1 must be"
+                        + " the T208 validity exactly, because T210 rejected the guard");
+        require(resolve.contains("const float CLASS_ALONGRAY = 10.0;")
+                        && resolve.contains("uniform float CameraDensity;")
+                        && resolve.contains("uniform int RainPassLattice;"),
+                "the T210 along-ray class, its camera-density gate or the lattice rain fetch"
+                        + " is gone, so the rejected experiment can no longer be re-measured");
+        require(resolve.contains("texelFetch(RainPassSampler, RainPassLattice != 0 ? pixel : currentCoord, 0)"),
+                "the resolve no longer fetches the rain texel of its own lattice site");
+        String volume = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        require(volume.contains("if (PaRainCoarseMask != 0) {")
+                        && volume.contains("rpAnyRain = rpDepthTr.y < 0.995 || dot(rpTexel.rgb, vec3(1.0)) > 0.002;"),
+                "the T210 coarse visible-rain mask, or the tightened threshold the campaign"
+                        + " measured, is gone");
+        require(volume.contains("if (PaRainPassScale == 2) {"),
+                "the split no longer reads the rain texel of its own lattice site");
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/VolumetricCloudRenderer.java");
+        require(renderer.contains("int rainLatticeMode = temporal ? VolumetricCloudDebugConfig.rainLatticeMode() : 0;"),
+                "the rain lattice can be armed on a non-temporal frame, where there is no"
+                        + " lattice to evaluate it on");
+        String targets = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/VolumetricCloudRenderTargets.java");
+        require(targets.contains("releaseRainLatticeTarget(reason);")
+                        && targets.contains("\"T210_RAIN_LATTICE_ALLOC format=RGBA32F size={}x{} bytes={}\""),
+                "the T210 lattice rain target is not released with the other targets");
+        String driver = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/StormT132AutoDriver.java");
+        require(driver.contains("\"t210-rain-quality.txt\"") && driver.contains("\"t210-rain-heavy.txt\"")
+                        && driver.contains("\"t210-rain-motion.txt\"")
+                        && driver.contains("VolumetricCloudDebugConfig.setRainLatticeMode(t210Arm.rainLattice());"),
+                "the T210 campaigns are not wired, or a timing arm can inherit a lattice mode");
+        String fixture = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
+                + "client/render/volumetric/StormT152MovingCameraFixture.java");
+        require(fixture.contains("TEMPORAL_025_ALONGRAY(\"temporal_025_alongray\", false, 6, 0.25F)")
+                        && fixture.contains("RAIN(Arm.PRODUCTION_100, Arm.RAIN_PROD, Arm.RAIN_LATTICE)"),
+                "the T210 motion routes are not the along-ray A/B and the rain-lattice set");
+        System.out.println("T210_RAIN_LATTICE productionRainLattice="
+                + VolumetricCloudDebugConfig.PRODUCTION_RAIN_LATTICE_MODE
+                + "|alongRayGuard=mode6Diagnostic|productionTemporal=t208Exact"
+                + "|coarseMask=visibleRainOnly|rainCurrentFrame=true|latticeTargetReleased=true"
+                + "|modesCompiled=0|1|2");
+    }
+
+    /** T210. The production rain lattice mode the campaign decided on. */
+    private static final int T210_EXPECTED_PRODUCTION_RAIN_LATTICE = 0;
+
+    /**
      * T208. The near-field guard ships in the production mode (mode 5 is
      * T207's validity without it, the route's control) and rejects only where
      * all three hold - the sample within
@@ -834,7 +917,7 @@ public final class StormVolumetricGeometrySandbox {
         require(applyBody.contains("VolumetricCloudDebugConfig.setRainDisabled(false);")
                         && applyBody.contains("VolumetricCloudDebugConfig.setDeferredSplitForced(false);"),
                 "a timing arm can inherit an image arm's attribution switches");
-        require(driver.contains("long[] counts = new long[10];")
+        require(driver.contains("long[] counts = new long[11];")
                         && driver.contains("\"t208-temporal-cleanup.txt\"")
                         && driver.contains("\"t208-temporal-motion.txt\"")
                         && driver.contains("private static final int T208_CONTROL_MODE = 5;")
@@ -843,7 +926,7 @@ public final class StormVolumetricGeometrySandbox {
                         + " or a 0.125 phase arm is back");
         String fixture = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/clouds/"
                 + "client/render/volumetric/StormT152MovingCameraFixture.java");
-        require(fixture.contains("TEMPORAL(Arm.PRODUCTION_050, Arm.TEMPORAL_025, Arm.TEMPORAL_025_NOGUARD)")
+        require(fixture.contains("TEMPORAL(Arm.PRODUCTION_050, Arm.TEMPORAL_025, Arm.TEMPORAL_025_ALONGRAY, Arm.TEMPORAL_025_NOGUARD)")
                         && fixture.contains("TEMPORAL_025_NOGUARD(\"temporal_025_noguard\", false, 5, 0.25F)")
                         && !fixture.contains("0.125F"),
                 "the motion route is not production 0.50, then mode 1, then mode 5 through one fixture");
@@ -996,7 +1079,7 @@ public final class StormVolumetricGeometrySandbox {
                 "a temporal phase composites the rain in-march instead of deferring it");
         require(resolveSource.contains("outRgb = aux.rgb + aux.a * rainRgb + rainTr * (body.rgb - aux.rgb);")
                         && resolveSource.contains("outAlpha = 1.0 - bodyTransmittance * rainTr;")
-                        && resolveSource.contains("texelFetch(RainPassSampler, currentCoord, 0)"),
+                        && resolveSource.contains("texelFetch(RainPassSampler, RainPassLattice != 0 ? pixel : currentCoord, 0)"),
                 "the resolve does not composite the current frame's rain with the in-march equation");
         String generated = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
         String finalSource = readWorkspaceSource(generated + "cloud_atmosphere_volume_final.fsh");
@@ -1184,7 +1267,8 @@ public final class StormVolumetricGeometrySandbox {
                         && finalSource.contains("const int PaDiagnosticOptimizationMode = 0;")
                         && finalSource.contains("const int PaOraclePass = 0;"),
                 "FINAL's baked selectors are not production's");
-        require(finalSource.contains("texelFetch(RainPassSampler, ivec2(gl_FragCoord.xy), 0)")
+        require(finalSource.contains("texelFetch(RainPassSampler, rainSplitCoord, 0)")
+                        && finalSource.contains("if (PaRainPassScale == 2) {")
                         && finalSource.contains("if (rainSplitPending && rainSplitT < t + stepLength) {")
                         && finalSource.contains("transmittance *= rainSplitTr;"),
                 "FINAL no longer composites the rain pass at the rain's depth");
@@ -2653,7 +2737,7 @@ public final class StormVolumetricGeometrySandbox {
 
         String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
                 + "clouds/client/render/volumetric/VolumetricCloudRenderer.java");
-        require(renderer.contains("if (program.rainMaskCapture()) {")
+        require(renderer.contains("if (program.rainMaskCapture() || VolumetricCloudDebugConfig.rainHeavyForced()) {")
                         && renderer.contains("Math.max(paMaxPrecipitation, 0.85F)"),
                 "T188 rain-heavy fixture forcing is absent, so the mask is measured on"
                         + " a fixture too rain-sparse for missed rain to be visible");

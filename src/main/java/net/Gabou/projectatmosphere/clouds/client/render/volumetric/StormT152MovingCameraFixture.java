@@ -207,12 +207,17 @@ final class StormT152MovingCameraFixture {
          * judged against the T207 validity frame by frame, not across sessions.
          */
         TEMPORAL_025_NOGUARD("temporal_025_noguard", false, 5, 0.25F),
+        /** T210M diagnostic: mode 6 - the T208 production validity PLUS the rejected along-ray guard. */
+        TEMPORAL_025_ALONGRAY("temporal_025_alongray", false, 6, 0.25F),
         /** T209M reference: production (no temporal) at native 1.0 - 1920x1080. */
         PRODUCTION_100("production_100", false, 0, 1.0F, -1),
         /** T209M candidates: the 0.25 lattice through each upscale method's layer. */
         UPSCALE_BILINEAR("upscale_bilinear", false, 1, 0.25F, 0),
         UPSCALE_EASU("upscale_easu", false, 1, 0.25F, 1),
-        UPSCALE_DEPTH("upscale_depth", false, 1, 0.25F, 2);
+        UPSCALE_DEPTH("upscale_depth", false, 1, 0.25F, 2),
+        /** T210M: production (phase-grid rain) and the masked lattice rain, both as the PA layer. */
+        RAIN_PROD("rain_prod", false, 1, 0.25F, 0, 0),
+        RAIN_LATTICE("rain_lattice", false, 1, 0.25F, 0, 2);
 
         private final String label;
         private final boolean history;
@@ -220,17 +225,25 @@ final class StormT152MovingCameraFixture {
         private final float resolutionScale;
         /** T209. The spatial upscale method, -1 for none. */
         private final int upscale;
+        /** T210. The rain lattice mode. */
+        private final int rainLattice;
 
         Arm(String label, boolean history, int temporal, float resolutionScale) {
-            this(label, history, temporal, resolutionScale, -1);
+            this(label, history, temporal, resolutionScale, -1, 0);
         }
 
         Arm(String label, boolean history, int temporal, float resolutionScale, int upscale) {
+            this(label, history, temporal, resolutionScale, upscale, 0);
+        }
+
+        Arm(String label, boolean history, int temporal, float resolutionScale, int upscale,
+                int rainLattice) {
             this.label = label;
             this.history = history;
             this.temporal = temporal;
             this.resolutionScale = resolutionScale;
             this.upscale = upscale;
+            this.rainLattice = rainLattice;
         }
 
         String label() {
@@ -248,9 +261,11 @@ final class StormT152MovingCameraFixture {
      */
     enum ArmSet {
         HISTORY(Arm.HISTORY_OFF, Arm.HISTORY_ON),
-        TEMPORAL(Arm.PRODUCTION_050, Arm.TEMPORAL_025, Arm.TEMPORAL_025_NOGUARD),
+        TEMPORAL(Arm.PRODUCTION_050, Arm.TEMPORAL_025, Arm.TEMPORAL_025_ALONGRAY, Arm.TEMPORAL_025_NOGUARD),
         /** T209M: native 1.0 against the three upscaled layers of the 0.25 lattice. */
-        UPSCALE(Arm.PRODUCTION_100, Arm.UPSCALE_BILINEAR, Arm.UPSCALE_EASU, Arm.UPSCALE_DEPTH);
+        UPSCALE(Arm.PRODUCTION_100, Arm.UPSCALE_BILINEAR, Arm.UPSCALE_EASU, Arm.UPSCALE_DEPTH),
+        /** T210M: native 1.0 against production rain and the masked lattice rain (rain-heavy). */
+        RAIN(Arm.PRODUCTION_100, Arm.RAIN_PROD, Arm.RAIN_LATTICE);
 
         private final Arm[] arms;
 
@@ -299,6 +314,7 @@ final class StormT152MovingCameraFixture {
     private static int originalTemporalMode;
     private static float originalResolutionScale = Float.NaN;
     private static int originalUpscaleMethod = -1;
+    private static int originalRainLatticeMode;
     private static boolean historyOverrideApplied;
     private static ArmSet armSet = ArmSet.HISTORY;
     private static boolean cameraModeApplied;
@@ -392,6 +408,7 @@ final class StormT152MovingCameraFixture {
         originalTemporalMode = VolumetricCloudDebugConfig.temporalMode();
         originalResolutionScale = VolumetricCloudDebugConfig.fixedResolutionScale();
         originalUpscaleMethod = VolumetricCloudDebugConfig.spatialUpscaleMethod();
+        originalRainLatticeMode = VolumetricCloudDebugConfig.rainLatticeMode();
         referenceGhostFrames = new byte[ROUTE_FRAMES][];
         arm = armSet.first();
         routeIndex = 0;
@@ -551,6 +568,7 @@ final class StormT152MovingCameraFixture {
             VolumetricCloudDebugConfig.setTemporalDebugOutput(0);
             VolumetricCloudDebugConfig.setFixedResolutionScale(arm.resolutionScale);
             VolumetricCloudDebugConfig.setSpatialUpscaleMethod(arm.upscale);
+            VolumetricCloudDebugConfig.setRainLatticeMode(arm.rainLattice);
             VolumetricCloudRenderer.invalidateHistory();
         }
         historyOverrideApplied = true;
@@ -563,6 +581,8 @@ final class StormT152MovingCameraFixture {
                 VolumetricCloudDebugConfig.setTemporalMode(originalTemporalMode);
                 VolumetricCloudDebugConfig.setFixedResolutionScale(originalResolutionScale);
                 VolumetricCloudDebugConfig.setSpatialUpscaleMethod(originalUpscaleMethod);
+                VolumetricCloudDebugConfig.setRainLatticeMode(originalRainLatticeMode);
+                VolumetricCloudDebugConfig.setRainHeavyForced(false);
             }
             historyOverrideApplied = false;
         }

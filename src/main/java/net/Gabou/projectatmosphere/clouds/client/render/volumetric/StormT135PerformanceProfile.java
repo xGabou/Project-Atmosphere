@@ -128,6 +128,8 @@ public final class StormT135PerformanceProfile {
     private static final float[] temporalResolveMilliseconds = new float[SAMPLE_FRAMES];
     /** T209. The spatial upscale's own clock; zero when the frame ran none. */
     private static final float[] spatialUpscaleMilliseconds = new float[SAMPLE_FRAMES];
+    /** T210. The lattice rain pass's own clock; zero when the frame drew none. */
+    private static final float[] rainLatticeMilliseconds = new float[SAMPLE_FRAMES];
     private static float effectiveResolutionScale = Float.NaN;
     private static final List<Cell> results = new ArrayList<>();
 
@@ -183,7 +185,10 @@ public final class StormT135PerformanceProfile {
             // T209. The spatial upscale (lattice -> display), its own clock;
             // zero when the frame ran none.
             double spatialUpscaleP50,
-            double spatialUpscaleP95
+            double spatialUpscaleP95,
+            // T210. The lattice rain pass (mode 2's fine pass), its own clock.
+            double rainLatticeP50,
+            double rainLatticeP95
     ) {
         /**
          * T188. What the renderer actually spends on clouds: the march plus the
@@ -354,6 +359,7 @@ public final class StormT135PerformanceProfile {
                 ? CloudTemporalResolveRenderer.lastGpuMilliseconds() : 0.0F;
         float spatialUpscaleMs = CloudSpatialUpscaleRenderer.lastFrameUpscaled()
                 ? CloudSpatialUpscaleRenderer.lastGpuMilliseconds() : 0.0F;
+        float rainLatticeMs = VolumetricCloudRenderer.lastRainLatticeGpuMilliseconds();
         if (sampled < sampleTarget) {
             cloudMilliseconds[sampled] = cloudMs;
             frameMilliseconds[sampled] = frameMs;
@@ -365,6 +371,7 @@ public final class StormT135PerformanceProfile {
             rainPassMilliseconds[sampled] = Math.max(0.0F, rainPassMs);
             temporalResolveMilliseconds[sampled] = Math.max(0.0F, temporalResolveMs);
             spatialUpscaleMilliseconds[sampled] = Math.max(0.0F, spatialUpscaleMs);
+            rainLatticeMilliseconds[sampled] = Math.max(0.0F, rainLatticeMs);
             // A pending composite query records as zero rather than as a
             // fabricated cost. The percentile then understates it, which is the
             // safe direction for a term used to argue a cost floor.
@@ -390,6 +397,8 @@ public final class StormT135PerformanceProfile {
             Arrays.sort(temporalResolve);
             float[] spatialUpscale = Arrays.copyOf(spatialUpscaleMilliseconds, sampled);
             Arrays.sort(spatialUpscale);
+            float[] rainLattice = Arrays.copyOf(rainLatticeMilliseconds, sampled);
+            Arrays.sort(rainLattice);
             Arrays.sort(cloud);
             Arrays.sort(frame);
             Arrays.sort(composite);
@@ -430,7 +439,9 @@ public final class StormT135PerformanceProfile {
                     percentile(temporalResolve, 0.50D),
                     percentile(temporalResolve, 0.95D),
                     percentile(spatialUpscale, 0.50D),
-                    percentile(spatialUpscale, 0.95D)
+                    percentile(spatialUpscale, 0.95D),
+                    percentile(rainLattice, 0.50D),
+                    percentile(rainLattice, 0.95D)
             ));
             Cell recorded = results.get(results.size() - 1);
             ProjectAtmosphere.LOGGER.info(
@@ -448,6 +459,7 @@ public final class StormT135PerformanceProfile {
                             + " rainPassP50={} rainPassP95={}"
                             + " temporalResolveP50={} temporalResolveP95={}"
                             + " spatialUpscaleP50={} spatialUpscaleP95={}"
+                            + " rainLatticeP50={} rainLatticeP95={}"
                             + " cloudPlusFieldP50={}",
                     recorded.pose(), recorded.arm(), recorded.descriptors(),
                     recorded.mode(), recorded.raymarchSteps(),
@@ -467,6 +479,7 @@ public final class StormT135PerformanceProfile {
                     fmt(recorded.rainPassP50()), fmt(recorded.rainPassP95()),
                     fmt(recorded.temporalResolveP50()), fmt(recorded.temporalResolveP95()),
                     fmt(recorded.spatialUpscaleP50()), fmt(recorded.spatialUpscaleP95()),
+                    fmt(recorded.rainLatticeP50()), fmt(recorded.rainLatticeP95()),
                     fmt(recorded.cloudPlusFieldP50()));
         } else {
             ProjectAtmosphere.LOGGER.warn(

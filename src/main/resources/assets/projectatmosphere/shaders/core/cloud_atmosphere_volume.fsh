@@ -1341,6 +1341,17 @@ uniform vec2 PaSampleJitter;
 // resolve can composite the CURRENT frame's rain onto a history phase's body
 // exactly (rain is never reconstructed from history). 0 composites in-march.
 uniform int PaTemporalPhase;
+// T210. The rain pass's texel grid relative to this march's: 1 the same
+// grid (the rain texel of this fragment - production before T210); 2 the
+// lattice, twice the phase grid, and the split reads the texel of its own
+// lattice site (the phase's jitter picks the site, so the rain the body is
+// split against is the ray this phase marched).
+uniform int PaRainPassScale;
+// T210. 1 while the rain pass runs at the lattice behind a coarse pass: a
+// fragment whose 3x3 coarse neighbourhood (RainPassSampler, the coarse
+// result) holds no rain writes "no rain" and returns before the march's
+// setup, so the lattice pass pays only where rain can be.
+uniform int PaRainCoarseMask;
 
 bool paRayTraceActive() {
     return PaRayTraceMode != 0;
@@ -8287,6 +8298,32 @@ void main() {
     paT162FixedWorkMain();
     return;
 #endif
+#if defined(PA_RAIN_PASS) && !defined(PA_RAIN_MASK_OUTPUT)
+    if (PaRainCoarseMask != 0) {
+        // T210. The lattice rain pass behind the coarse pass: no rain in the
+        // 3x3 coarse texels around this fragment's block means no rain here.
+        ivec2 rpCoarseSize = textureSize(RainPassSampler, 0);
+        ivec2 rpCoarse = ivec2(gl_FragCoord.xy) / 2;
+        bool rpAnyRain = false;
+        for (int rpDy = -1; rpDy <= 1 && !rpAnyRain; rpDy++) {
+            for (int rpDx = -1; rpDx <= 1 && !rpAnyRain; rpDx++) {
+                ivec2 rpC = clamp(rpCoarse + ivec2(rpDx, rpDy), ivec2(0), rpCoarseSize - ivec2(1));
+                vec4 rpTexel = texelFetch(RainPassSampler, rpC, 0);
+                vec2 rpDepthTr = paRainPassUnpack(rpTexel.a);
+                // Visible rain only: a coarse ray with under half a percent of
+                // rain opacity and no radiance to speak of marks nothing (the
+                // first T210 launch masked on T_r < 0.9998 and the lattice pass
+                // cost as much as the unmasked one).
+                rpAnyRain = rpDepthTr.y < 0.995 || dot(rpTexel.rgb, vec3(1.0)) > 0.002;
+            }
+        }
+        if (!rpAnyRain) {
+            gl_FragDepth = 1.0;
+            fragColor = vec4(0.0, 0.0, 0.0, 4095.0);
+            return;
+        }
+    }
+#endif
     // Every fragment of a trace pass marches the traced ray, not its own. The
     // view sample is therefore the traced pixel's, and only the published
     // record varies across the fragment grid.
@@ -8879,7 +8916,14 @@ void main() {
 #ifdef PA_RAIN_SPLIT_COMPOSITE
     // T205. The split cloud program: the rain pass's result for this pixel,
     // composited at the rain's depth against the live transmittance below.
-    vec4 rainSplitIn = texelFetch(RainPassSampler, ivec2(gl_FragCoord.xy), 0);
+    ivec2 rainSplitCoord = ivec2(gl_FragCoord.xy);
+    if (PaRainPassScale == 2) {
+        // T210. The lattice site this phase's jittered ray passes through:
+        // a negative jitter is the lower pixel of the pair (T207's order).
+        rainSplitCoord = rainSplitCoord * 2
+            + ivec2(PaSampleJitter.x > 0.0 ? 1 : 0, PaSampleJitter.y > 0.0 ? 1 : 0);
+    }
+    vec4 rainSplitIn = texelFetch(RainPassSampler, rainSplitCoord, 0);
 #ifdef PA_RAIN_MASK_OUTPUT
     float rainSplitInMass = rainSplitIn.r;
     float rainSplitInRuns = floor(rainSplitIn.a / 4096.0);

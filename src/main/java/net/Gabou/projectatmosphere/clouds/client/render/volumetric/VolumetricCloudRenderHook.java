@@ -414,7 +414,7 @@ public final class VolumetricCloudRenderHook {
         if (VolumetricCloudRenderer.temporalPhaseActive()) {
             RenderTarget resolved = net.Gabou.projectatmosphere.clouds.client.render.field
                     .CloudTemporalResolveRenderer.resolve(
-                            VolumetricCloudRenderTargets.rainPassTargetOrNull(),
+                            VolumetricCloudRenderer.lastRainCompositeTarget(),
                             VolumetricCloudRenderer.lastInvProj(),
                             VolumetricCloudRenderer.lastInvViewRot(),
                             VolumetricCloudRenderer.lastViewProj(),

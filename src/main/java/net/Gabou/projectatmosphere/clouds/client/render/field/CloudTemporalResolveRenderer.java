@@ -102,6 +102,11 @@ public final class CloudTemporalResolveRenderer {
         shader.safeGetUniform("MaxRenderDistance").set(maxRenderDistance);
         shader.safeGetUniform("ResolveMode").set(VolumetricCloudDebugConfig.temporalMode());
         shader.safeGetUniform("DebugOutput").set(VolumetricCloudDebugConfig.temporalDebugOutput());
+        shader.safeGetUniform("CameraDensity").set(
+                net.Gabou.projectatmosphere.clouds.client.render.volumetric
+                        .CameraCloudDensityTracker.smoothedCameraDensity());
+        shader.safeGetUniform("RainPassLattice").set(
+                rainPassTarget != null && rainPassTarget.width == phase0.width * 2 ? 1 : 0);
         shader.apply();
         // The aux attachments, on the PA units beyond Minecraft's twelve.
         int program = shader.getId();

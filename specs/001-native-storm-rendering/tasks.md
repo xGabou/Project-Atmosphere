@@ -3550,6 +3550,59 @@ implementation, while visual polish remains independently active.
   `validation/performance-spatial-upscale.md` and `validation/t209-campaign/`. Next: the
   representation residuals T208 named - the rain pass at phase resolution, then the on-axis
   in-cloud parallax term. [SC-005, SC-006, SC-021]
+- [X] T210 [PERFORMANCE] [US3] Rain at the reconstructed lattice, and the along-ray temporal
+  guard - the two representation residuals T208 named. Answers two questions and banks neither.
+  **A. Is higher-resolution CURRENT-FRAME rain worth its cost?**
+  `VolumetricCloudDebugConfig.rainLatticeMode` / `PRODUCTION_RAIN_LATTICE_MODE`: 0 the phase-grid
+  rain pass replicated over the 2x2 temporal block (production), 1 one rain pass at the lattice
+  (960x540), 2 the coarse production pass then a lattice pass that early-outs where a 3x3 coarse
+  neighbourhood holds no VISIBLE rain (`T_r < 0.995 || rgb > 0.002`; the first launch's
+  `T_r < 0.9998` marked everything and saved nothing). Shader: `PaRainPassScale` (the split reads
+  the rain texel of its own lattice site, the phase's jitter picking the site), `PaRainCoarseMask`,
+  `RainPassLattice` on the resolve; `rainLatticeTarget` RGBA32F released with the rest; its own
+  clock `rainLatticeP50/P95`. Harness: `T210_IMAGE_ARMS` (native / no-rain / body references, prod,
+  lat1, lat2 and their body + repeat arms), `T210_RAIN_MASK` / `_RAIN_ONLY` / `_RAIN_REGION`,
+  `buildT210Report`, `ArmSet.RAIN`, markers `t210-rain-quality` / `-rain-heavy` / `-rain-motion`.
+  RESULT: **quality-positive, cost-limited, NOT productionized - `PRODUCTION_RAIN_LATTICE_MODE = 0`**
+  (the sandbox pins it). Mode 1 wins every rain metric at every fixture - rain-only SSIM +0.045 to
+  +0.081 (prod 0.80-0.85 -> 0.865-0.932), mask IoU +0.039 to +0.058, false rain -2 to -6 pts, thin
+  rain lost ~halved (11.7% -> 6.4% forced), onset -1 to -2 px - and is full-frame neutral
+  (+0.0001), but roughly doubles the rain pass: **+1.44 ms forced, +1.23/+1.25 ms SIDE**, +0.71/
+  +0.79 ms PVN. Mode 2 is **dominated on both axes**: the tightened mask repaired its quality
+  (IoU 0.706 -> 0.807, missed rain 19.5% -> 12.7%) but NOT its cost (1.830 -> 1.804 ms added),
+  because its coarse pass is itself a full production rain pass - the 28-47% the mask saves on the
+  lattice pass never pays for it - and it regresses full-frame SSIM by 0.011-0.017. Structural, not
+  a threshold, so tuning stopped there. Motion (rain-heavy route, native 1.0 vs prod vs lattice):
+  clean and neutral - ghost 0.00070 both, flicker 0.00208 both, disocclusion ghost 0.04102 vs
+  0.04116, bias flat at -0.0002 over 2200 frames; **rain stays current-frame, no history
+  accumulation**.
+  **B. Does a targeted along-ray guard fix the remaining on-axis near-field history failure?**
+  Resolve `CameraDensity` uniform, `CLASS_ALONGRAY = 10`, rule `CameraDensity > 0.01 AND
+  |dot(camDelta, rayDir)| >= 1 block AND (intervalAmbiguous OR alphaMin < 0.97)`; A/B on the T152
+  route as mode 1 (T208 + along-ray) against mode 6 (T208 alone) and mode 5 (T207 control).
+  RESULT: **REJECTED.** The arms are identical to six decimals wherever `CameraDensity == 0`
+  (delta 0.000000 over 1492 frames), so the comparison has no noise floor to hide in - and on the
+  reproduced episode (frames 1232-1236 and 1336-1358, peak ghost 0.2323, harder than T208's ~0.036)
+  mode 1 and mode 6 differ by **+-0.5% per frame with the peak unchanged** (0.23232 vs 0.23228),
+  the same 20 in-window outliers, and episode p95 marginally worse. Route ghost 0.00142 vs 0.00146.
+  It passes every do-no-harm criterion - flicker 0.00229 vs 0.00231, static acceptance 100.00%/
+  99.99% identical to the control, `alongRay = 0` statically at both poses (both sit outside the
+  medium), OUTSIDE/ENTRY exactly unchanged - and fails the only one that would justify shipping it.
+  What it does do is halve small-amplitude ghosting in quiet in-cloud frames (guard-live p95
+  0.00475 -> 0.00198); what it does not do is move the opening. The residual is a REPRESENTATION
+  error, not a history-acceptance one. Moved off production onto **resolve mode 6 as an opt-in
+  diagnostic** (`alongRayReject = ResolveMode == 6`), so production mode 1 is the T208 validity
+  exactly and `productionTemporalMode=1` still holds - the same disposition T209 gave the upscale
+  pass. Final production: SIDE **7.64 ms**, PVN **6.98 ms** (field 1.36/1.41, gate 0.12/0.12, rain
+  1.05/1.62, raw cloud 4.93/3.65, resolve 0.11/0.10, composite 0.08/0.08) - **<=10 ms YES**, 2.36
+  and 3.02 ms headroom; production rendering unchanged by T210. Seven campaigns on 20Sep2026 (three
+  natural static, one forced static, the along-ray A/B route, its class counters, the rain motion
+  route). Harness defect recorded not actioned: the SIDE `prod_r2` drift control scores an
+  end-of-pose rain field against a head-of-pose reference (false rain 461-1235%, termination error
+  reproducing at 683.69/684.16 px) because clouds are frozen in the fixture but precipitation is
+  not; the repeat should be captured adjacent to its original as `lat2_r2` is. campaignGate x2,
+  check build PASS. Evidence in `validation/performance-rain-lattice.md` and
+  `validation/t210-campaign/`. [SC-005, SC-006, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

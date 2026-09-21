@@ -859,19 +859,33 @@ final class StormT132AutoDriver {
              * composite reads the lattice directly), 0 the PA control, 1
              * EASU, 2 depth-guided. Part of the label and the key.
              */
-            int upscale) {
+            int upscale,
+            /**
+             * T210. The rain lattice mode the arm runs under
+             * (VolumetricCloudDebugConfig.rainLatticeMode): 0 the phase-grid
+             * rain pass, 1 the lattice pass alone, 2 the coarse pass then the
+             * masked lattice pass. Part of the label and the key.
+             */
+            int rainLattice) {
+        T166Arm(CoreCostDiagnosticProgram program, float resolutionScale,
+                StormOptimizationDiagnosticMode mode, int descriptorLimit, String tag,
+                int sampleFrames, int stormFieldXZ, int temporal, int upscale) {
+            this(program, resolutionScale, mode, descriptorLimit, tag, sampleFrames,
+                    stormFieldXZ, temporal, upscale, 0);
+        }
+
         T166Arm(CoreCostDiagnosticProgram program, float resolutionScale,
                 StormOptimizationDiagnosticMode mode, int descriptorLimit, String tag,
                 int sampleFrames, int stormFieldXZ, int temporal) {
             this(program, resolutionScale, mode, descriptorLimit, tag, sampleFrames,
-                    stormFieldXZ, temporal, -1);
+                    stormFieldXZ, temporal, -1, 0);
         }
 
         T166Arm(CoreCostDiagnosticProgram program, float resolutionScale,
                 StormOptimizationDiagnosticMode mode, int descriptorLimit, String tag,
                 int sampleFrames, int stormFieldXZ) {
             this(program, resolutionScale, mode, descriptorLimit, tag, sampleFrames,
-                    stormFieldXZ, 0, -1);
+                    stormFieldXZ, 0, -1, 0);
         }
 
         T166Arm(CoreCostDiagnosticProgram program) {
@@ -922,7 +936,9 @@ final class StormT132AutoDriver {
             // lattice is not FINAL.
             key = temporal != 0 ? key + "@t" + temporal : key;
             // T209. An upscaled arm is its own row.
-            return upscale >= 0 ? key + "@u" + upscale : key;
+            key = upscale >= 0 ? key + "@u" + upscale : key;
+            // T210. A lattice-rain arm is its own row.
+            return rainLattice > 0 ? key + "@l" + rainLattice : key;
         }
 
         /**
@@ -954,6 +970,9 @@ final class StormT132AutoDriver {
             }
             if (upscale >= 0) {
                 base = base + "@u" + upscale;
+            }
+            if (rainLattice > 0) {
+                base = base + "@l" + rainLattice;
             }
             return tag == null || tag.isEmpty() ? base : base + "#" + tag;
         }
@@ -1605,6 +1624,7 @@ final class StormT132AutoDriver {
                 : t206Run ? t206IsAnchor(arm)
                 : t207Run || t208Run ? t207IsAnchor(arm)
                 : t209Run ? t209IsAnchor(arm)
+                : t210Run ? t210IsAnchor(arm)
                 : arm.program() == CoreCostDiagnosticProgram.LEAN_FINAL;
     }
 
@@ -1926,7 +1946,7 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setFinalProgramOverride(
                             CoreCostDiagnosticProgram.LEAN_FINAL);
                     if (temporalRunRequested() || temporalCleanupRunRequested()
-                            || spatialUpscaleRunRequested()) {
+                            || spatialUpscaleRunRequested() || rainQualityRunRequested()) {
                         // T207. The probe walks the temporal targets too.
                         VolumetricCloudDebugConfig.setTemporalMode(1);
                     }
@@ -3540,12 +3560,12 @@ final class StormT132AutoDriver {
      */
     private static void reportT207Classes(String pose, String armLabel,
             StormReferenceImageComparison.Reference captured) {
-        long[] counts = new long[10];
+        long[] counts = new long[11];
         float[] pixels = captured.pixels();
         int total = captured.width() * captured.height();
         for (int i = 0; i < total; i++) {
             int cls = Math.round(pixels[i * 4]);
-            counts[Math.max(0, Math.min(9, cls))]++;
+            counts[Math.max(0, Math.min(10, cls))]++;
         }
         long history = total - counts[0];
         long candidates = history - counts[8];
@@ -3554,13 +3574,13 @@ final class StormT132AutoDriver {
                         + " candidates={} accepted={} acceptedPct={} offscreen={} offscreenPct={}"
                         + " age={} agePct={} coverage={} coveragePct={} disocclusion={}"
                         + " disocclusionPct={} depth={} depthPct={} colour={} colourPct={}"
-                        + " nearField={} nearFieldPct={} fallback={}",
+                        + " nearField={} nearFieldPct={} alongRay={} alongRayPct={} fallback={}",
                 pose, armLabel, total, counts[0], history, candidates,
                 counts[1], pct(counts[1], candidates), counts[2], pct(counts[2], candidates),
                 counts[3], pct(counts[3], candidates), counts[4], pct(counts[4], candidates),
                 counts[5], pct(counts[5], candidates), counts[6], pct(counts[6], candidates),
                 counts[7], pct(counts[7], candidates), counts[9], pct(counts[9], candidates),
-                counts[8]);
+                counts[10], pct(counts[10], candidates), counts[8]);
     }
 
     private static String pct(long part, long whole) {
@@ -3805,380 +3825,683 @@ final class StormT132AutoDriver {
         return buildTemporalReport("T208", "T208_TEMPORAL_DECISION", T208_POSES, T208_ARMS);
     }
 
-    // -----------------------------------------------------------------------
-    // T209. Spatial upscale evaluation: the 960x540 temporal lattice to the
-    // 1920x1080 display, against the NATIVE production render (FINAL at 1.0,
-    // one frame). Per pose: the native reference (with rain, without the rain
-    // pass, body alone), the lattice itself against the native reference
-    // box-downsampled to its size (what the representation already lost
-    // before any upscaler sees it), then each upscale method's layer -
-    // the PA bilinear control, EASU on the premultiplied field, the
-    // depth-guided Catmull-Rom - against native and, body-only, against the
-    // native body; rain-region metrics against the native rain mask; the
-    // edge-pixel straight-luma diagnostic (a bright fringe or dark halo at a
-    // transparent edge shows as a tail beyond the reference's). Timing:
-    // production (the lattice through the fused composite) anchors bracket
-    // each upscaled arm, whose pass has its own clock. Motion is T209M (the
-    // T152 route: native 1.0 as the reference, then the three layers).
-    // -----------------------------------------------------------------------
-
-    private static final Path T209_MARKER = Path.of("t209-spatial-upscale.txt");
-    private static final Path T209M_MARKER = Path.of("t209-spatial-motion.txt");
-
-    private static final String[] T209_POSES = {"SIDE", "PLAY_VIS_NEAR"};
-
-    private static final float T209_NATIVE_SCALE = 1.0F;
-    private static final int T209_UPSCALE_CONTROL = 0;
-    private static final int T209_UPSCALE_EASU = 1;
-    private static final int T209_UPSCALE_DEPTH = 2;
-
-    private static boolean t209Run;
-    private static boolean t209mRun;
-    private static boolean t209OriginalHistoryEnabled;
-
-    /**
-     * Production temporal 0.25 (the fused composite, no upscale layer) as the
-     * anchor around: the control layer, EASU twice, depth-guided twice, and
-     * the native reference render.
-     */
-    private static final T166Arm[] T209_ARMS = buildT209Arms();
-
-    private static T166Arm[] buildT209Arms() {
-        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
-        int anchor = 0;
-        arms.add(t209Arm(T207_PHASE_SCALE, 1, -1, String.format(Locale.ROOT, "a%02d", ++anchor)));
-        arms.add(t209Arm(T207_PHASE_SCALE, 1, T209_UPSCALE_CONTROL, "r1"));
-        arms.add(t209Arm(T207_PHASE_SCALE, 1, -1, String.format(Locale.ROOT, "a%02d", ++anchor)));
-        for (int repeat = 1; repeat <= 2; repeat++) {
-            arms.add(t209Arm(T207_PHASE_SCALE, 1, T209_UPSCALE_EASU, "r" + repeat));
-            arms.add(t209Arm(T207_PHASE_SCALE, 1, -1, String.format(Locale.ROOT, "a%02d", ++anchor)));
-        }
-        for (int repeat = 1; repeat <= 2; repeat++) {
-            arms.add(t209Arm(T207_PHASE_SCALE, 1, T209_UPSCALE_DEPTH, "r" + repeat));
-            arms.add(t209Arm(T207_PHASE_SCALE, 1, -1, String.format(Locale.ROOT, "a%02d", ++anchor)));
-        }
-        arms.add(t209Arm(T209_NATIVE_SCALE, 0, -1, "r1"));
-        arms.add(t209Arm(T207_PHASE_SCALE, 1, -1, String.format(Locale.ROOT, "a%02d", ++anchor)));
-        return arms.toArray(new T166Arm[0]);
-    }
-
-    private static T166Arm t209Arm(float scale, int temporal, int upscale, String tag) {
-        return new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL, scale,
-                StormOptimizationDiagnosticMode.NORMAL_PRODUCTION, -1, tag, 60, 0, temporal,
-                upscale);
-    }
-
-    private static T166Arm t209Arm() {
-        return T209_ARMS[Math.max(0, Math.min(T209_ARMS.length - 1, t141ArmIndex))];
-    }
-
-    /** True for a T209 anchor: production temporal at the phase scale, no upscale layer. */
-    private static boolean t209IsAnchor(T166Arm arm) {
-        return arm.temporal() == 1 && arm.upscale() < 0
-                && Math.abs(arm.resolutionScale() - T207_PHASE_SCALE) < 1.0e-6F;
-    }
-
-    private static final StormOptimizationDiagnosticMode[] T209_OPTIMIZATION_ARMS =
-            buildT209OptimizationArms();
-
-    private static StormOptimizationDiagnosticMode[] buildT209OptimizationArms() {
-        StormOptimizationDiagnosticMode[] modes =
-                new StormOptimizationDiagnosticMode[T209_ARMS.length];
-        for (int i = 0; i < T209_ARMS.length; i++) {
-            modes[i] = T209_ARMS[i].mode();
-        }
-        return modes;
-    }
-
-    /**
-     * T209. An image arm: scale, resolve mode, upscale method, the
-     * attribution switches, the capture kind (0 frame, 2 body only), the
-     * factor the REFERENCE is box-downsampled by before the comparison (1
-     * for equal sizes), and the stored captures it is judged against.
-     */
-    private record T209ImageArm(String label, float scale, int temporal, int upscale,
-            boolean rainDisabled, boolean deferredSplit, int debugOutput,
-            int referenceDownsample, String... against) {
-    }
-
-    private static final T209ImageArm[] T209_IMAGE_ARMS = {
-            // The native references, stored: with rain, the rain pass skipped,
-            // the body alone.
-            new T209ImageArm("native", T209_NATIVE_SCALE, 0, -1, false, false, 0, 1),
-            new T209ImageArm("native_norain", T209_NATIVE_SCALE, 0, -1, true, false, 0, 1),
-            new T209ImageArm("native_body", T209_NATIVE_SCALE, 0, -1, false, true, 0, 1),
-            // The lattice itself against native at its own size: the
-            // representation's loss before any upscaler.
-            new T209ImageArm("lattice", T207_PHASE_SCALE, 1, -1, false, false, 0, 2, "native"),
-            new T209ImageArm("lattice_body", T207_PHASE_SCALE, 1, -1, false, false, 2, 2, "native_body"),
-            // The three layers at the display size, full frame and body only.
-            new T209ImageArm("bilinear", T207_PHASE_SCALE, 1, T209_UPSCALE_CONTROL, false, false, 0, 1, "native"),
-            new T209ImageArm("bilinear_body", T207_PHASE_SCALE, 1, T209_UPSCALE_CONTROL, false, false, 2, 1, "native_body"),
-            new T209ImageArm("easu", T207_PHASE_SCALE, 1, T209_UPSCALE_EASU, false, false, 0, 1, "native"),
-            new T209ImageArm("easu_r2", T207_PHASE_SCALE, 1, T209_UPSCALE_EASU, false, false, 0, 1, "native", "easu"),
-            new T209ImageArm("easu_body", T207_PHASE_SCALE, 1, T209_UPSCALE_EASU, false, false, 2, 1, "native_body"),
-            new T209ImageArm("depth", T207_PHASE_SCALE, 1, T209_UPSCALE_DEPTH, false, false, 0, 1, "native"),
-            new T209ImageArm("depth_body", T207_PHASE_SCALE, 1, T209_UPSCALE_DEPTH, false, false, 2, 1, "native_body")
-    };
-
-    private static final CoreCostDiagnosticProgram[] T209_IMAGE_PROGRAMS =
-            buildT209ImagePrograms();
-
-    private static CoreCostDiagnosticProgram[] buildT209ImagePrograms() {
-        CoreCostDiagnosticProgram[] programs = new CoreCostDiagnosticProgram[T209_IMAGE_ARMS.length];
-        java.util.Arrays.fill(programs, CoreCostDiagnosticProgram.LEAN_FINAL);
-        return programs;
-    }
-
-    /** T209. The captures of the current pose, by arm label. */
-    private static final java.util.Map<String, StormReferenceImageComparison.Reference>
-            T209_CAPTURES = new java.util.HashMap<>();
-
-    private static boolean spatialUpscaleRunRequested() {
-        return Files.exists(T209_MARKER);
-    }
-
-    private static boolean spatialMotionRunRequested() {
-        return Files.exists(T209M_MARKER);
-    }
-
-    /**
-     * T209. A capture box-downsampled by an integer factor: each output
-     * pixel the mean of the factor x factor block (premultiplied RGBA, so
-     * the mean is the correct cover) - how the native frame would appear at
-     * the lattice's size.
-     */
-    private static StormReferenceImageComparison.Reference t209Downsample(
-            StormReferenceImageComparison.Reference source, int factor) {
-        if (factor <= 1) {
-            return source;
-        }
-        int width = source.width() / factor;
-        int height = source.height() / factor;
-        float[] out = new float[width * height * 4];
-        float[] in = source.pixels();
-        float norm = 1.0F / (factor * factor);
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                for (int c = 0; c < 4; c++) {
-                    float sum = 0.0F;
-                    for (int dy = 0; dy < factor; dy++) {
-                        for (int dx = 0; dx < factor; dx++) {
-                            sum += in[(((y * factor + dy) * source.width()) + (x * factor + dx)) * 4 + c];
-                        }
-                    }
-                    out[(y * width + x) * 4 + c] = sum * norm;
-                }
-            }
-        }
-        return new StormReferenceImageComparison.Reference(
-                source.view() + "@ds" + factor, width, height, source.historyBypassed(),
-                StormReferenceImageComparison.digest(out, width, height), out,
-                source.effectiveWorldTime(), source.liveWorldTime(), source.worldTimePinned(),
-                source.renderInputs(), source.cloudContent());
-    }
-
-    /**
-     * T209 Task 5. The straight-luma tail over the edge pixels (alpha in
-     * (0.002, 0.1]) of a capture: p99.9 and p0.1 of rgb-luma / alpha, and
-     * the count. A candidate whose p99.9 exceeds the reference's is putting
-     * brighter colour into transparent edges than the reference has (a
-     * fringe); a lower p0.1 is a dark halo.
-     */
-    private static String t209EdgeLuma(StormReferenceImageComparison.Reference image) {
-        float[] px = image.pixels();
-        int total = image.width() * image.height();
-        java.util.List<Float> luma = new java.util.ArrayList<>();
-        for (int i = 0; i < total; i++) {
-            float a = px[i * 4 + 3];
-            if (a > 0.002F && a <= 0.1F) {
-                float l = (0.2126F * px[i * 4] + 0.7152F * px[i * 4 + 1] + 0.0722F * px[i * 4 + 2]) / a;
-                luma.add(l);
-            }
-        }
-        if (luma.isEmpty()) {
-            return "edgePx=0";
-        }
-        java.util.Collections.sort(luma);
-        int n = luma.size();
-        return String.format(Locale.ROOT, "edgePx=%d edgeLumaP999=%.4f edgeLumaP50=%.4f edgeLumaP001=%.4f",
-                n, luma.get(Math.min(n - 1, (int) (0.999D * n))), luma.get(n / 2),
-                luma.get(Math.min(n - 1, (int) (0.001D * n))));
-    }
-
-    /**
-     * T209 Task 7. The rain-region metrics of a display-size arm: the mask is
-     * where the native frame with rain differs from the native frame without
-     * the rain pass; over it the mean absolute alpha error, the mean signed
-     * alpha error (positive = the arm thickens the rain), the share of the
-     * reference's thin rain (alpha 0.002-0.05) the arm loses below 0.002,
-     * the ring one pixel outside the mask where the arm adds more than 0.02
-     * alpha (a halo), and the vertical run count of the arm's rain per
-     * column against the reference's (below 1 = the arm breaks shafts).
-     */
-    private static String t209RainMetrics(StormReferenceImageComparison.Reference arm,
-            StormReferenceImageComparison.Reference ref,
-            StormReferenceImageComparison.Reference refNoRain) {
-        int w = ref.width();
-        int h = ref.height();
-        if (arm.width() != w || arm.height() != h || refNoRain.width() != w || refNoRain.height() != h) {
-            return "rain evaluated=false reason=size";
-        }
-        float[] a = arm.pixels();
-        float[] r = ref.pixels();
-        float[] q = refNoRain.pixels();
-        boolean[] mask = new boolean[w * h];
-        int rainPx = 0;
-        for (int i = 0; i < w * h; i++) {
-            boolean rain = false;
-            for (int c = 0; c < 4; c++) {
-                if (Math.abs(r[i * 4 + c] - q[i * 4 + c]) > 0.004F) {
-                    rain = true;
-                    break;
-                }
-            }
-            mask[i] = rain;
-            if (rain) {
-                rainPx++;
-            }
-        }
-        if (rainPx == 0) {
-            return "rainPx=0";
-        }
-        double absSum = 0.0D;
-        double signedSum = 0.0D;
-        int thin = 0;
-        int thinLost = 0;
-        int ring = 0;
-        int ringHalo = 0;
-        int runsRef = 0;
-        int runsArm = 0;
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int i = y * w + x;
-                float ra = r[i * 4 + 3];
-                float aa = a[i * 4 + 3];
-                if (mask[i]) {
-                    absSum += Math.abs(aa - ra);
-                    signedSum += aa - ra;
-                    if (ra > 0.002F && ra <= 0.05F) {
-                        thin++;
-                        if (aa < 0.002F) {
-                            thinLost++;
-                        }
-                    }
-                } else {
-                    boolean nearMask = (x > 0 && mask[i - 1]) || (x < w - 1 && mask[i + 1])
-                            || (y > 0 && mask[i - w]) || (y < h - 1 && mask[i + w]);
-                    if (nearMask) {
-                        ring++;
-                        if (aa - ra > 0.02F) {
-                            ringHalo++;
-                        }
-                    }
-                }
-            }
-        }
-        for (int x = 0; x < w; x++) {
-            boolean inRef = false;
-            boolean inArm = false;
-            for (int y = 0; y < h; y++) {
-                int i = y * w + x;
-                if (!mask[i]) {
-                    inRef = false;
-                    inArm = false;
-                    continue;
-                }
-                boolean refOn = r[i * 4 + 3] > 0.01F;
-                boolean armOn = a[i * 4 + 3] > 0.01F;
-                if (refOn && !inRef) {
-                    runsRef++;
-                }
-                if (armOn && !inArm) {
-                    runsArm++;
-                }
-                inRef = refOn;
-                inArm = armOn;
-            }
-        }
-        return String.format(Locale.ROOT,
-                "rainPx=%d rainPct=%.3f rainMeanAbsAlpha=%.5f rainSignedAlpha=%.5f thinRainPx=%d"
-                        + " thinRainLostPct=%.2f haloRingPx=%d haloPct=%.3f shaftRunsRef=%d"
-                        + " shaftRunsArm=%d shaftContinuity=%.4f",
-                rainPx, 100.0D * rainPx / (w * h), absSum / rainPx, signedSum / rainPx, thin,
-                thin == 0 ? 0.0D : 100.0D * thinLost / thin, ring,
-                ring == 0 ? 0.0D : 100.0D * ringHalo / ring, runsRef, runsArm,
-                runsArm == 0 ? 0.0D : (double) runsRef / runsArm);
-    }
-
-    /**
-     * T209. The bracketed blocks, then per pose one line per arm: the raw
-     * phase, the field, the gate, the rain pass, the resolve, the upscale
-     * pass (p50 / p95), the composite, the total, the anchors' total and
-     * the budget the total leaves against 8 and 10 ms; and the native
-     * reference's cloud and total.
-     */
-    private static String buildT209Report() {
-        StringBuilder out = new StringBuilder(buildBracketedPricingReport(
-                "T209", "T209_SPATIAL_UPSCALE_DECISION", T209_POSES, T209_ARMS,
-                "lean_final@t1@u1"));
-        for (String pose : T209_POSES) {
-            java.util.Map<String, java.util.List<double[]>> rows = new java.util.LinkedHashMap<>();
-            java.util.List<Double> anchorTotal = new java.util.ArrayList<>();
-            java.util.List<Double> anchorComposite = new java.util.ArrayList<>();
-            for (T166Arm arm : T209_ARMS) {
-                StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
-                if (cell == null || cell.cloudP50() <= 0.0D) {
-                    continue;
-                }
-                double field = Math.max(0.0D, cell.rainFieldP50());
-                double rain = Math.max(0.0D, cell.rainPassP50());
-                double resolve = Math.max(0.0D, cell.temporalResolveP50());
-                double upscale = Math.max(0.0D, cell.spatialUpscaleP50());
-                double composite = Math.max(0.0D, cell.compositeP50());
-                double total = cell.cloudP50() + field + rain + resolve + upscale + composite;
-                if (t209IsAnchor(arm)) {
-                    anchorTotal.add(total);
-                    anchorComposite.add(composite);
-                    continue;
-                }
-                rows.computeIfAbsent(arm.armKey() + "@r" + String.format(Locale.ROOT, "%.4f", arm.resolutionScale()),
-                        k -> new java.util.ArrayList<>())
-                        .add(new double[] {cell.cloudP50(), cell.cloudP95(), field,
-                                Math.max(0.0D, cell.rainGateP50()), rain, resolve, upscale,
-                                Math.max(0.0D, cell.spatialUpscaleP95()), composite, total});
-            }
-            T200Stat at = T200Stat.of(anchorTotal);
-            T200Stat ak = T200Stat.of(anchorComposite);
-            for (java.util.Map.Entry<String, java.util.List<double[]>> row : rows.entrySet()) {
-                double[] sum = new double[10];
-                double totalMin = Double.MAX_VALUE;
-                double totalMax = 0.0D;
-                for (double[] v : row.getValue()) {
-                    for (int i = 0; i < 10; i++) {
-                        sum[i] += v[i];
-                    }
-                    totalMin = Math.min(totalMin, v[9]);
-                    totalMax = Math.max(totalMax, v[9]);
-                }
-                int n = row.getValue().size();
-                out.append(String.format(Locale.ROOT,
-                        "%nT209_UPSCALE pose=%s arm=%s cells=%d rawPhaseMs=%.4f rawPhaseP95=%.4f"
-                                + " fieldMs=%.4f gateBuildMs=%.4f rainPassMs=%.4f resolveMs=%.4f"
-                                + " upscaleMs=%.4f upscaleP95=%.4f compositeMs=%.4f totalMs=%.4f"
-                                + " totalMin=%.4f totalMax=%.4f anchors=%d anchorTotalMs=%.4f"
-                                + " anchorCompositeMs=%.4f netUpscaleMs=%.4f deltaVsAnchorMs=%.4f"
-                                + " budgetTo8Ms=%.4f budgetTo10Ms=%.4f",
-                        pose, row.getKey(), n, sum[0] / n, sum[1] / n, sum[2] / n, sum[3] / n,
-                        sum[4] / n, sum[5] / n, sum[6] / n, sum[7] / n, sum[8] / n, sum[9] / n,
-                        totalMin, totalMax, at.n(), at.mean(), ak.mean(),
-                        sum[6] / n + sum[8] / n - ak.mean(), sum[9] / n - at.mean(),
-                        8.0D - sum[9] / n, 10.0D - sum[9] / n));
-            }
-        }
-        return out.toString();
-    }
-
+    // -----------------------------------------------------------------------
+    // T209. Spatial upscale evaluation: the 960x540 temporal lattice to the
+    // 1920x1080 display, against the NATIVE production render (FINAL at 1.0,
+    // one frame). Per pose: the native reference (with rain, without the rain
+    // pass, body alone), the lattice itself against the native reference
+    // box-downsampled to its size (what the representation already lost
+    // before any upscaler sees it), then each upscale method's layer -
+    // the PA bilinear control, EASU on the premultiplied field, the
+    // depth-guided Catmull-Rom - against native and, body-only, against the
+    // native body; rain-region metrics against the native rain mask; the
+    // edge-pixel straight-luma diagnostic (a bright fringe or dark halo at a
+    // transparent edge shows as a tail beyond the reference's). Timing:
+    // production (the lattice through the fused composite) anchors bracket
+    // each upscaled arm, whose pass has its own clock. Motion is T209M (the
+    // T152 route: native 1.0 as the reference, then the three layers).
+    // -----------------------------------------------------------------------
+
+    private static final Path T209_MARKER = Path.of("t209-spatial-upscale.txt");
+    private static final Path T209M_MARKER = Path.of("t209-spatial-motion.txt");
+
+    private static final String[] T209_POSES = {"SIDE", "PLAY_VIS_NEAR"};
+
+    private static final float T209_NATIVE_SCALE = 1.0F;
+    private static final int T209_UPSCALE_CONTROL = 0;
+    private static final int T209_UPSCALE_EASU = 1;
+    private static final int T209_UPSCALE_DEPTH = 2;
+
+    private static boolean t209Run;
+    private static boolean t209mRun;
+    private static boolean t209OriginalHistoryEnabled;
+
+    /**
+     * Production temporal 0.25 (the fused composite, no upscale layer) as the
+     * anchor around: the control layer, EASU twice, depth-guided twice, and
+     * the native reference render.
+     */
+    private static final T166Arm[] T209_ARMS = buildT209Arms();
+
+    private static T166Arm[] buildT209Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        arms.add(t209Arm(T207_PHASE_SCALE, 1, -1, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        arms.add(t209Arm(T207_PHASE_SCALE, 1, T209_UPSCALE_CONTROL, "r1"));
+        arms.add(t209Arm(T207_PHASE_SCALE, 1, -1, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        for (int repeat = 1; repeat <= 2; repeat++) {
+            arms.add(t209Arm(T207_PHASE_SCALE, 1, T209_UPSCALE_EASU, "r" + repeat));
+            arms.add(t209Arm(T207_PHASE_SCALE, 1, -1, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        }
+        for (int repeat = 1; repeat <= 2; repeat++) {
+            arms.add(t209Arm(T207_PHASE_SCALE, 1, T209_UPSCALE_DEPTH, "r" + repeat));
+            arms.add(t209Arm(T207_PHASE_SCALE, 1, -1, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        }
+        arms.add(t209Arm(T209_NATIVE_SCALE, 0, -1, "r1"));
+        arms.add(t209Arm(T207_PHASE_SCALE, 1, -1, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t209Arm(float scale, int temporal, int upscale, String tag) {
+        return new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL, scale,
+                StormOptimizationDiagnosticMode.NORMAL_PRODUCTION, -1, tag, 60, 0, temporal,
+                upscale);
+    }
+
+    private static T166Arm t209Arm() {
+        return T209_ARMS[Math.max(0, Math.min(T209_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    /** True for a T209 anchor: production temporal at the phase scale, no upscale layer. */
+    private static boolean t209IsAnchor(T166Arm arm) {
+        return arm.temporal() == 1 && arm.upscale() < 0
+                && Math.abs(arm.resolutionScale() - T207_PHASE_SCALE) < 1.0e-6F;
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T209_OPTIMIZATION_ARMS =
+            buildT209OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT209OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T209_ARMS.length];
+        for (int i = 0; i < T209_ARMS.length; i++) {
+            modes[i] = T209_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /**
+     * T209. An image arm: scale, resolve mode, upscale method, the
+     * attribution switches, the capture kind (0 frame, 2 body only), the
+     * factor the REFERENCE is box-downsampled by before the comparison (1
+     * for equal sizes), and the stored captures it is judged against.
+     */
+    private record T209ImageArm(String label, float scale, int temporal, int upscale,
+            boolean rainDisabled, boolean deferredSplit, int debugOutput,
+            int referenceDownsample, String... against) {
+    }
+
+    private static final T209ImageArm[] T209_IMAGE_ARMS = {
+            // The native references, stored: with rain, the rain pass skipped,
+            // the body alone.
+            new T209ImageArm("native", T209_NATIVE_SCALE, 0, -1, false, false, 0, 1),
+            new T209ImageArm("native_norain", T209_NATIVE_SCALE, 0, -1, true, false, 0, 1),
+            new T209ImageArm("native_body", T209_NATIVE_SCALE, 0, -1, false, true, 0, 1),
+            // The lattice itself against native at its own size: the
+            // representation's loss before any upscaler.
+            new T209ImageArm("lattice", T207_PHASE_SCALE, 1, -1, false, false, 0, 2, "native"),
+            new T209ImageArm("lattice_body", T207_PHASE_SCALE, 1, -1, false, false, 2, 2, "native_body"),
+            // The three layers at the display size, full frame and body only.
+            new T209ImageArm("bilinear", T207_PHASE_SCALE, 1, T209_UPSCALE_CONTROL, false, false, 0, 1, "native"),
+            new T209ImageArm("bilinear_body", T207_PHASE_SCALE, 1, T209_UPSCALE_CONTROL, false, false, 2, 1, "native_body"),
+            new T209ImageArm("easu", T207_PHASE_SCALE, 1, T209_UPSCALE_EASU, false, false, 0, 1, "native"),
+            new T209ImageArm("easu_r2", T207_PHASE_SCALE, 1, T209_UPSCALE_EASU, false, false, 0, 1, "native", "easu"),
+            new T209ImageArm("easu_body", T207_PHASE_SCALE, 1, T209_UPSCALE_EASU, false, false, 2, 1, "native_body"),
+            new T209ImageArm("depth", T207_PHASE_SCALE, 1, T209_UPSCALE_DEPTH, false, false, 0, 1, "native"),
+            new T209ImageArm("depth_body", T207_PHASE_SCALE, 1, T209_UPSCALE_DEPTH, false, false, 2, 1, "native_body")
+    };
+
+    private static final CoreCostDiagnosticProgram[] T209_IMAGE_PROGRAMS =
+            buildT209ImagePrograms();
+
+    private static CoreCostDiagnosticProgram[] buildT209ImagePrograms() {
+        CoreCostDiagnosticProgram[] programs = new CoreCostDiagnosticProgram[T209_IMAGE_ARMS.length];
+        java.util.Arrays.fill(programs, CoreCostDiagnosticProgram.LEAN_FINAL);
+        return programs;
+    }
+
+    /** T209. The captures of the current pose, by arm label. */
+    private static final java.util.Map<String, StormReferenceImageComparison.Reference>
+            T209_CAPTURES = new java.util.HashMap<>();
+
+    private static boolean spatialUpscaleRunRequested() {
+        return Files.exists(T209_MARKER);
+    }
+
+    private static boolean spatialMotionRunRequested() {
+        return Files.exists(T209M_MARKER);
+    }
+
+    /**
+     * T209. A capture box-downsampled by an integer factor: each output
+     * pixel the mean of the factor x factor block (premultiplied RGBA, so
+     * the mean is the correct cover) - how the native frame would appear at
+     * the lattice's size.
+     */
+    private static StormReferenceImageComparison.Reference t209Downsample(
+            StormReferenceImageComparison.Reference source, int factor) {
+        if (factor <= 1) {
+            return source;
+        }
+        int width = source.width() / factor;
+        int height = source.height() / factor;
+        float[] out = new float[width * height * 4];
+        float[] in = source.pixels();
+        float norm = 1.0F / (factor * factor);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                for (int c = 0; c < 4; c++) {
+                    float sum = 0.0F;
+                    for (int dy = 0; dy < factor; dy++) {
+                        for (int dx = 0; dx < factor; dx++) {
+                            sum += in[(((y * factor + dy) * source.width()) + (x * factor + dx)) * 4 + c];
+                        }
+                    }
+                    out[(y * width + x) * 4 + c] = sum * norm;
+                }
+            }
+        }
+        return new StormReferenceImageComparison.Reference(
+                source.view() + "@ds" + factor, width, height, source.historyBypassed(),
+                StormReferenceImageComparison.digest(out, width, height), out,
+                source.effectiveWorldTime(), source.liveWorldTime(), source.worldTimePinned(),
+                source.renderInputs(), source.cloudContent());
+    }
+
+    /**
+     * T209 Task 5. The straight-luma tail over the edge pixels (alpha in
+     * (0.002, 0.1]) of a capture: p99.9 and p0.1 of rgb-luma / alpha, and
+     * the count. A candidate whose p99.9 exceeds the reference's is putting
+     * brighter colour into transparent edges than the reference has (a
+     * fringe); a lower p0.1 is a dark halo.
+     */
+    private static String t209EdgeLuma(StormReferenceImageComparison.Reference image) {
+        float[] px = image.pixels();
+        int total = image.width() * image.height();
+        java.util.List<Float> luma = new java.util.ArrayList<>();
+        for (int i = 0; i < total; i++) {
+            float a = px[i * 4 + 3];
+            if (a > 0.002F && a <= 0.1F) {
+                float l = (0.2126F * px[i * 4] + 0.7152F * px[i * 4 + 1] + 0.0722F * px[i * 4 + 2]) / a;
+                luma.add(l);
+            }
+        }
+        if (luma.isEmpty()) {
+            return "edgePx=0";
+        }
+        java.util.Collections.sort(luma);
+        int n = luma.size();
+        return String.format(Locale.ROOT, "edgePx=%d edgeLumaP999=%.4f edgeLumaP50=%.4f edgeLumaP001=%.4f",
+                n, luma.get(Math.min(n - 1, (int) (0.999D * n))), luma.get(n / 2),
+                luma.get(Math.min(n - 1, (int) (0.001D * n))));
+    }
+
+    /**
+     * T209 Task 7. The rain-region metrics of a display-size arm: the mask is
+     * where the native frame with rain differs from the native frame without
+     * the rain pass; over it the mean absolute alpha error, the mean signed
+     * alpha error (positive = the arm thickens the rain), the share of the
+     * reference's thin rain (alpha 0.002-0.05) the arm loses below 0.002,
+     * the ring one pixel outside the mask where the arm adds more than 0.02
+     * alpha (a halo), and the vertical run count of the arm's rain per
+     * column against the reference's (below 1 = the arm breaks shafts).
+     */
+    private static String t209RainMetrics(StormReferenceImageComparison.Reference arm,
+            StormReferenceImageComparison.Reference ref,
+            StormReferenceImageComparison.Reference refNoRain) {
+        int w = ref.width();
+        int h = ref.height();
+        if (arm.width() != w || arm.height() != h || refNoRain.width() != w || refNoRain.height() != h) {
+            return "rain evaluated=false reason=size";
+        }
+        float[] a = arm.pixels();
+        float[] r = ref.pixels();
+        float[] q = refNoRain.pixels();
+        boolean[] mask = new boolean[w * h];
+        int rainPx = 0;
+        for (int i = 0; i < w * h; i++) {
+            boolean rain = false;
+            for (int c = 0; c < 4; c++) {
+                if (Math.abs(r[i * 4 + c] - q[i * 4 + c]) > 0.004F) {
+                    rain = true;
+                    break;
+                }
+            }
+            mask[i] = rain;
+            if (rain) {
+                rainPx++;
+            }
+        }
+        if (rainPx == 0) {
+            return "rainPx=0";
+        }
+        double absSum = 0.0D;
+        double signedSum = 0.0D;
+        int thin = 0;
+        int thinLost = 0;
+        int ring = 0;
+        int ringHalo = 0;
+        int runsRef = 0;
+        int runsArm = 0;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int i = y * w + x;
+                float ra = r[i * 4 + 3];
+                float aa = a[i * 4 + 3];
+                if (mask[i]) {
+                    absSum += Math.abs(aa - ra);
+                    signedSum += aa - ra;
+                    if (ra > 0.002F && ra <= 0.05F) {
+                        thin++;
+                        if (aa < 0.002F) {
+                            thinLost++;
+                        }
+                    }
+                } else {
+                    boolean nearMask = (x > 0 && mask[i - 1]) || (x < w - 1 && mask[i + 1])
+                            || (y > 0 && mask[i - w]) || (y < h - 1 && mask[i + w]);
+                    if (nearMask) {
+                        ring++;
+                        if (aa - ra > 0.02F) {
+                            ringHalo++;
+                        }
+                    }
+                }
+            }
+        }
+        for (int x = 0; x < w; x++) {
+            boolean inRef = false;
+            boolean inArm = false;
+            for (int y = 0; y < h; y++) {
+                int i = y * w + x;
+                if (!mask[i]) {
+                    inRef = false;
+                    inArm = false;
+                    continue;
+                }
+                boolean refOn = r[i * 4 + 3] > 0.01F;
+                boolean armOn = a[i * 4 + 3] > 0.01F;
+                if (refOn && !inRef) {
+                    runsRef++;
+                }
+                if (armOn && !inArm) {
+                    runsArm++;
+                }
+                inRef = refOn;
+                inArm = armOn;
+            }
+        }
+        return String.format(Locale.ROOT,
+                "rainPx=%d rainPct=%.3f rainMeanAbsAlpha=%.5f rainSignedAlpha=%.5f thinRainPx=%d"
+                        + " thinRainLostPct=%.2f haloRingPx=%d haloPct=%.3f shaftRunsRef=%d"
+                        + " shaftRunsArm=%d shaftContinuity=%.4f",
+                rainPx, 100.0D * rainPx / (w * h), absSum / rainPx, signedSum / rainPx, thin,
+                thin == 0 ? 0.0D : 100.0D * thinLost / thin, ring,
+                ring == 0 ? 0.0D : 100.0D * ringHalo / ring, runsRef, runsArm,
+                runsArm == 0 ? 0.0D : (double) runsRef / runsArm);
+    }
+
+    /**
+     * T209. The bracketed blocks, then per pose one line per arm: the raw
+     * phase, the field, the gate, the rain pass, the resolve, the upscale
+     * pass (p50 / p95), the composite, the total, the anchors' total and
+     * the budget the total leaves against 8 and 10 ms; and the native
+     * reference's cloud and total.
+     */
+    private static String buildT209Report() {
+        StringBuilder out = new StringBuilder(buildBracketedPricingReport(
+                "T209", "T209_SPATIAL_UPSCALE_DECISION", T209_POSES, T209_ARMS,
+                "lean_final@t1@u1"));
+        for (String pose : T209_POSES) {
+            java.util.Map<String, java.util.List<double[]>> rows = new java.util.LinkedHashMap<>();
+            java.util.List<Double> anchorTotal = new java.util.ArrayList<>();
+            java.util.List<Double> anchorComposite = new java.util.ArrayList<>();
+            for (T166Arm arm : T209_ARMS) {
+                StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
+                if (cell == null || cell.cloudP50() <= 0.0D) {
+                    continue;
+                }
+                double field = Math.max(0.0D, cell.rainFieldP50());
+                double rain = Math.max(0.0D, cell.rainPassP50());
+                double resolve = Math.max(0.0D, cell.temporalResolveP50());
+                double upscale = Math.max(0.0D, cell.spatialUpscaleP50());
+                double composite = Math.max(0.0D, cell.compositeP50());
+                double total = cell.cloudP50() + field + rain + resolve + upscale + composite;
+                if (t209IsAnchor(arm)) {
+                    anchorTotal.add(total);
+                    anchorComposite.add(composite);
+                    continue;
+                }
+                rows.computeIfAbsent(arm.armKey() + "@r" + String.format(Locale.ROOT, "%.4f", arm.resolutionScale()),
+                        k -> new java.util.ArrayList<>())
+                        .add(new double[] {cell.cloudP50(), cell.cloudP95(), field,
+                                Math.max(0.0D, cell.rainGateP50()), rain, resolve, upscale,
+                                Math.max(0.0D, cell.spatialUpscaleP95()), composite, total});
+            }
+            T200Stat at = T200Stat.of(anchorTotal);
+            T200Stat ak = T200Stat.of(anchorComposite);
+            for (java.util.Map.Entry<String, java.util.List<double[]>> row : rows.entrySet()) {
+                double[] sum = new double[10];
+                double totalMin = Double.MAX_VALUE;
+                double totalMax = 0.0D;
+                for (double[] v : row.getValue()) {
+                    for (int i = 0; i < 10; i++) {
+                        sum[i] += v[i];
+                    }
+                    totalMin = Math.min(totalMin, v[9]);
+                    totalMax = Math.max(totalMax, v[9]);
+                }
+                int n = row.getValue().size();
+                out.append(String.format(Locale.ROOT,
+                        "%nT209_UPSCALE pose=%s arm=%s cells=%d rawPhaseMs=%.4f rawPhaseP95=%.4f"
+                                + " fieldMs=%.4f gateBuildMs=%.4f rainPassMs=%.4f resolveMs=%.4f"
+                                + " upscaleMs=%.4f upscaleP95=%.4f compositeMs=%.4f totalMs=%.4f"
+                                + " totalMin=%.4f totalMax=%.4f anchors=%d anchorTotalMs=%.4f"
+                                + " anchorCompositeMs=%.4f netUpscaleMs=%.4f deltaVsAnchorMs=%.4f"
+                                + " budgetTo8Ms=%.4f budgetTo10Ms=%.4f",
+                        pose, row.getKey(), n, sum[0] / n, sum[1] / n, sum[2] / n, sum[3] / n,
+                        sum[4] / n, sum[5] / n, sum[6] / n, sum[7] / n, sum[8] / n, sum[9] / n,
+                        totalMin, totalMax, at.n(), at.mean(), ak.mean(),
+                        sum[6] / n + sum[8] / n - ak.mean(), sum[9] / n - at.mean(),
+                        8.0D - sum[9] / n, 10.0D - sum[9] / n));
+            }
+        }
+        return out.toString();
+    }
+
+    // -----------------------------------------------------------------------
+    // T210. Rain at the reconstructed lattice. Against the NATIVE render
+    // (FINAL at 1.0, 1920x1080; with the T188 rain-heavy forcing when the
+    // heavy marker is armed - identically on the reference and every arm):
+    // the production path (the phase-grid rain pass replicated over the 2x2
+    // block) and the two lattice modes (the pass at the lattice grid; the
+    // coarse pass then the masked lattice pass), each as the display-size
+    // layer through the PA control upscale (method 0 = production's
+    // composite), full-frame and body-only, plus the rain-region metrics
+    // against the native rain mask and a rain-only comparison built from
+    // the full and body captures. Timing: production anchors bracket the
+    // lattice arms, the lattice pass on its own clock. Motion is T210M (the
+    // T152 route, rain-heavy, native 1.0 against production and mode 2).
+    // -----------------------------------------------------------------------
+
+    private static final Path T210_MARKER = Path.of("t210-rain-quality.txt");
+    private static final Path T210H_MARKER = Path.of("t210-rain-heavy.txt");
+    private static final Path T210M_MARKER = Path.of("t210-rain-motion.txt");
+
+    private static final String[] T210_POSES = {"SIDE", "PLAY_VIS_NEAR"};
+    private static final String[] T210H_POSES = {"SIDE"};
+
+    private static boolean t210Run;
+    private static boolean t210HeavyRun;
+    private static boolean t210mRun;
+    private static boolean t210OriginalHistoryEnabled;
+
+    /** Production temporal (phase-grid rain) anchors around mode 1 once and mode 2 twice. */
+    private static final T166Arm[] T210_ARMS = buildT210Arms();
+
+    private static T166Arm[] buildT210Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        arms.add(t210Arm(0, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        arms.add(t210Arm(1, "r1"));
+        arms.add(t210Arm(0, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        for (int repeat = 1; repeat <= 2; repeat++) {
+            arms.add(t210Arm(2, "r" + repeat));
+            arms.add(t210Arm(0, String.format(Locale.ROOT, "a%02d", ++anchor)));
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t210Arm(int rainLattice, String tag) {
+        return new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL, T207_PHASE_SCALE,
+                StormOptimizationDiagnosticMode.NORMAL_PRODUCTION, -1, tag, 60, 0, 1, -1,
+                rainLattice);
+    }
+
+    private static T166Arm t210Arm() {
+        return T210_ARMS[Math.max(0, Math.min(T210_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static boolean t210IsAnchor(T166Arm arm) {
+        return arm.rainLattice() == 0 && arm.temporal() == 1 && arm.upscale() < 0;
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T210_OPTIMIZATION_ARMS =
+            buildT210OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT210OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T210_ARMS.length];
+        for (int i = 0; i < T210_ARMS.length; i++) {
+            modes[i] = T210_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /**
+     * T210. An image arm: the rain lattice mode, the attribution switches,
+     * the capture kind (0 frame, 2 body only) and the stored captures it is
+     * judged against. Every capture is 1920x1080: the references are the
+     * native render, the arms the lattice through the PA control layer.
+     */
+    private record T210ImageArm(String label, float scale, int temporal, int upscale,
+            int rainLattice, boolean rainDisabled, boolean deferredSplit, int debugOutput,
+            String... against) {
+    }
+
+    private static final T210ImageArm[] T210_IMAGE_ARMS = {
+            new T210ImageArm("native", T209_NATIVE_SCALE, 0, -1, 0, false, false, 0),
+            new T210ImageArm("native_norain", T209_NATIVE_SCALE, 0, -1, 0, true, false, 0),
+            new T210ImageArm("native_body", T209_NATIVE_SCALE, 0, -1, 0, false, true, 0),
+            new T210ImageArm("prod", T207_PHASE_SCALE, 1, 0, 0, false, false, 0, "native"),
+            new T210ImageArm("prod_body", T207_PHASE_SCALE, 1, 0, 0, false, false, 2, "native_body"),
+            new T210ImageArm("lat1", T207_PHASE_SCALE, 1, 0, 1, false, false, 0, "native"),
+            new T210ImageArm("lat1_body", T207_PHASE_SCALE, 1, 0, 1, false, false, 2, "native_body"),
+            new T210ImageArm("lat2", T207_PHASE_SCALE, 1, 0, 2, false, false, 0, "native"),
+            new T210ImageArm("lat2_r2", T207_PHASE_SCALE, 1, 0, 2, false, false, 0, "native", "lat2"),
+            new T210ImageArm("lat2_body", T207_PHASE_SCALE, 1, 0, 2, false, false, 2, "native_body"),
+            // The production arm again, last: the capture drift over the pose.
+            new T210ImageArm("prod_r2", T207_PHASE_SCALE, 1, 0, 0, false, false, 0, "native", "prod"),
+            new T210ImageArm("prod_r2_body", T207_PHASE_SCALE, 1, 0, 0, false, false, 2, "native_body", "prod_body")
+    };
+
+    private static final CoreCostDiagnosticProgram[] T210_IMAGE_PROGRAMS =
+            buildT210ImagePrograms();
+
+    private static CoreCostDiagnosticProgram[] buildT210ImagePrograms() {
+        CoreCostDiagnosticProgram[] programs = new CoreCostDiagnosticProgram[T210_IMAGE_ARMS.length];
+        java.util.Arrays.fill(programs, CoreCostDiagnosticProgram.LEAN_FINAL);
+        return programs;
+    }
+
+    private static final java.util.Map<String, StormReferenceImageComparison.Reference>
+            T210_CAPTURES = new java.util.HashMap<>();
+
+    private static boolean rainQualityRunRequested() {
+        return Files.exists(T210_MARKER) || Files.exists(T210H_MARKER);
+    }
+
+    private static boolean rainHeavyRunRequested() {
+        return Files.exists(T210H_MARKER);
+    }
+
+    private static boolean rainMotionRunRequested() {
+        return Files.exists(T210M_MARKER);
+    }
+
+    /**
+     * T210. The rain-only image of a capture: the absolute difference
+     * between the frame with rain and the same frame's body alone, per
+     * channel (premultiplied), so a rain-only comparison sees what the
+     * rain changed and nothing else.
+     */
+    private static StormReferenceImageComparison.Reference t210RainOnly(
+            StormReferenceImageComparison.Reference full,
+            StormReferenceImageComparison.Reference body) {
+        int w = full.width();
+        int h = full.height();
+        if (body.width() != w || body.height() != h) {
+            return null;
+        }
+        float[] a = full.pixels();
+        float[] b = body.pixels();
+        float[] out = new float[w * h * 4];
+        for (int i = 0; i < w * h * 4; i++) {
+            out[i] = Math.abs(a[i] - b[i]);
+        }
+        return new StormReferenceImageComparison.Reference(
+                full.view() + "@rainOnly", w, h, full.historyBypassed(),
+                StormReferenceImageComparison.digest(out, w, h), out,
+                full.effectiveWorldTime(), full.liveWorldTime(), full.worldTimePinned(),
+                full.renderInputs(), full.cloudContent());
+    }
+
+    /**
+     * T210. The rain mask of a capture pair (full minus body, any channel
+     * > 0.004) and the mask metrics of an arm against the reference: IoU,
+     * false rain (arm mask outside the reference's, as a share of the
+     * reference mask), missed rain (reference mask the arm lacks), and per
+     * column the onset (first masked row) and termination (last) error in
+     * pixels over the columns both mask.
+     */
+    private static String t210RainMask(StormReferenceImageComparison.Reference arm,
+            StormReferenceImageComparison.Reference armBody,
+            StormReferenceImageComparison.Reference ref,
+            StormReferenceImageComparison.Reference refBody) {
+        int w = ref.width();
+        int h = ref.height();
+        if (arm.width() != w || arm.height() != h || armBody.width() != w || refBody.width() != w) {
+            return "rainMask evaluated=false reason=size";
+        }
+        boolean[] mr = t210Mask(ref, refBody);
+        boolean[] ma = t210Mask(arm, armBody);
+        int inter = 0;
+        int union = 0;
+        int falseRain = 0;
+        int missed = 0;
+        int refCount = 0;
+        for (int i = 0; i < w * h; i++) {
+            if (mr[i]) {
+                refCount++;
+            }
+            if (mr[i] && ma[i]) {
+                inter++;
+            }
+            if (mr[i] || ma[i]) {
+                union++;
+            }
+            if (ma[i] && !mr[i]) {
+                falseRain++;
+            }
+            if (mr[i] && !ma[i]) {
+                missed++;
+            }
+        }
+        double onsetSum = 0.0D;
+        double termSum = 0.0D;
+        int columns = 0;
+        for (int x = 0; x < w; x++) {
+            int onR = -1;
+            int offR = -1;
+            int onA = -1;
+            int offA = -1;
+            for (int y = 0; y < h; y++) {
+                int i = y * w + x;
+                if (mr[i]) {
+                    if (onR < 0) {
+                        onR = y;
+                    }
+                    offR = y;
+                }
+                if (ma[i]) {
+                    if (onA < 0) {
+                        onA = y;
+                    }
+                    offA = y;
+                }
+            }
+            if (onR >= 0 && onA >= 0) {
+                onsetSum += Math.abs(onA - onR);
+                termSum += Math.abs(offA - offR);
+                columns++;
+            }
+        }
+        return String.format(Locale.ROOT,
+                "rainMaskRefPx=%d rainMaskArmPx=%d rainMaskIoU=%.4f falseRainPct=%.2f missedRainPct=%.2f"
+                        + " onsetErrPx=%.2f terminationErrPx=%.2f maskedColumns=%d",
+                refCount, inter + falseRain, union == 0 ? 1.0D : (double) inter / union,
+                refCount == 0 ? 0.0D : 100.0D * falseRain / refCount,
+                refCount == 0 ? 0.0D : 100.0D * missed / refCount,
+                columns == 0 ? 0.0D : onsetSum / columns, columns == 0 ? 0.0D : termSum / columns,
+                columns);
+    }
+
+    private static boolean[] t210Mask(StormReferenceImageComparison.Reference full,
+            StormReferenceImageComparison.Reference body) {
+        int n = full.width() * full.height();
+        float[] a = full.pixels();
+        float[] b = body.pixels();
+        boolean[] mask = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            for (int c = 0; c < 4; c++) {
+                if (Math.abs(a[i * 4 + c] - b[i * 4 + c]) > 0.004F) {
+                    mask[i] = true;
+                    break;
+                }
+            }
+        }
+        return mask;
+    }
+
+    /** T210. Per pose one line per lattice arm: the rain clocks and the total against the anchors'. */
+    private static String buildT210Report() {
+        String[] poses = t210HeavyRun ? T210H_POSES : T210_POSES;
+        StringBuilder out = new StringBuilder(buildBracketedPricingReport(
+                "T210", "T210_RAIN_LATTICE_DECISION", poses, T210_ARMS, "lean_final@t1@l2"));
+        for (String pose : poses) {
+            java.util.Map<String, java.util.List<double[]>> rows = new java.util.LinkedHashMap<>();
+            java.util.List<Double> anchorTotal = new java.util.ArrayList<>();
+            java.util.List<Double> anchorRain = new java.util.ArrayList<>();
+            for (T166Arm arm : T210_ARMS) {
+                StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
+                if (cell == null || cell.cloudP50() <= 0.0D) {
+                    continue;
+                }
+                double field = Math.max(0.0D, cell.rainFieldP50());
+                double rain = Math.max(0.0D, cell.rainPassP50());
+                double lattice = Math.max(0.0D, cell.rainLatticeP50());
+                double resolve = Math.max(0.0D, cell.temporalResolveP50());
+                double composite = Math.max(0.0D, cell.compositeP50());
+                double total = cell.cloudP50() + field + rain + lattice + resolve + composite;
+                if (t210IsAnchor(arm)) {
+                    anchorTotal.add(total);
+                    anchorRain.add(rain);
+                    continue;
+                }
+                rows.computeIfAbsent(arm.armKey(), k -> new java.util.ArrayList<>())
+                        .add(new double[] {cell.cloudP50(), field, rain, lattice,
+                                Math.max(0.0D, cell.rainLatticeP95()), resolve, composite, total});
+            }
+            T200Stat at = T200Stat.of(anchorTotal);
+            T200Stat ar = T200Stat.of(anchorRain);
+            for (java.util.Map.Entry<String, java.util.List<double[]>> row : rows.entrySet()) {
+                double[] sum = new double[8];
+                double totalMin = Double.MAX_VALUE;
+                double totalMax = 0.0D;
+                for (double[] v : row.getValue()) {
+                    for (int i = 0; i < 8; i++) {
+                        sum[i] += v[i];
+                    }
+                    totalMin = Math.min(totalMin, v[7]);
+                    totalMax = Math.max(totalMax, v[7]);
+                }
+                int n = row.getValue().size();
+                out.append(String.format(Locale.ROOT,
+                        "%nT210_RAIN pose=%s heavy=%b arm=%s cells=%d rawPhaseMs=%.4f fieldMs=%.4f"
+                                + " rainPassMs=%.4f rainLatticeMs=%.4f rainLatticeP95=%.4f rainTotalMs=%.4f"
+                                + " resolveMs=%.4f compositeMs=%.4f totalMs=%.4f totalMin=%.4f totalMax=%.4f"
+                                + " anchors=%d anchorRainMs=%.4f anchorTotalMs=%.4f rainDeltaMs=%.4f"
+                                + " deltaVsAnchorMs=%.4f budgetTo10Ms=%.4f",
+                        pose, t210HeavyRun, row.getKey(), n, sum[0] / n, sum[1] / n, sum[2] / n,
+                        sum[3] / n, sum[4] / n, (sum[2] + sum[3]) / n, sum[5] / n, sum[6] / n,
+                        sum[7] / n, totalMin, totalMax, at.n(), ar.mean(), at.mean(),
+                        (sum[2] + sum[3]) / n - ar.mean(), sum[7] / n - at.mean(),
+                        10.0D - sum[7] / n));
+            }
+        }
+        return out.toString();
+    }
+
     // -----------------------------------------------------------------------
     // T202B. After T202: the fresh FINAL baseline at 0.25 (Task 10) and the
     // rain segment test's ceiling on that FINAL (Task 11) - measurement
@@ -5479,7 +5802,7 @@ final class StormT132AutoDriver {
                 || t189Run || t190Run || t192Run || t193Run || t194Run
                 || t195Run || t196Run || t198Run || t199Run || t200Run
                 || t201Run || t202Run || t202bRun || t203Run || t204Run || t205Run
-                || t206Run || t207Run || t208Run || t209Run;
+                || t206Run || t207Run || t208Run || t209Run || t210Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -5737,7 +6060,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t209Run ? t209Arm()
+            T166Arm arm = t210Run ? t210Arm()
+                    : t209Run ? t209Arm()
                     : t208Run ? t208Arm()
                     : t207Run ? t207Arm()
                     : t206Run ? t206Arm()
@@ -5792,6 +6116,10 @@ final class StormT132AutoDriver {
             // T209. The arm's upscale method; every earlier campaign's arms
             // carry -1, the composite reading the lattice directly.
             VolumetricCloudDebugConfig.setSpatialUpscaleMethod(arm.upscale());
+            // T210. The arm's rain lattice mode; the rain-heavy forcing is
+            // campaign state, applied to every cell of a heavy run alike.
+            VolumetricCloudDebugConfig.setRainLatticeMode(arm.rainLattice());
+            VolumetricCloudDebugConfig.setRainHeavyForced(t210HeavyRun);
             // The oracle arms need their capture pass; everything else must
             // upload exactly the production mode its program bakes.
             VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(arm.mode());
@@ -5868,6 +6196,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t210Run) {
+            return t210Arm().label();
+        }
         if (t209Run) {
             return t209Arm().label();
         }
@@ -6022,6 +6353,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t210Run) {
+            return T210_OPTIMIZATION_ARMS;
+        }
         if (t209Run) {
             return T209_OPTIMIZATION_ARMS;
         }
@@ -6353,6 +6687,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t210Run) {
+            return t210HeavyRun ? T210H_POSES : T210_POSES;
+        }
         if (t209Run) {
             return T209_POSES;
         }
@@ -6731,6 +7068,7 @@ final class StormT132AutoDriver {
                     advance(movingCameraRunRequested() || temporalMotionRunRequested()
                             || temporalMotionGuardRunRequested()
                             || spatialMotionRunRequested()
+                            || rainMotionRunRequested()
                             ? Phase.T152_BEGIN
                             : (performanceRunRequested()
                                     ? Phase.T135_PREPARE : Phase.BEGIN_T098));
@@ -6771,7 +7109,13 @@ final class StormT132AutoDriver {
                 // T209M. Native 1.0 as the reference, then the three upscaled
                 // layers of the 0.25 lattice.
                 t209mRun = spatialMotionRunRequested();
-                String begun = StormT152MovingCameraFixture.begin(t209mRun
+                // T210M. Rain-heavy, native 1.0 against production and the
+                // masked lattice rain.
+                t210mRun = rainMotionRunRequested();
+                VolumetricCloudDebugConfig.setRainHeavyForced(t210mRun);
+                String begun = StormT152MovingCameraFixture.begin(t210mRun
+                        ? StormT152MovingCameraFixture.ArmSet.RAIN
+                        : t209mRun
                         ? StormT152MovingCameraFixture.ArmSet.UPSCALE
                         : t207mRun || t208mRun
                         ? StormT152MovingCameraFixture.ArmSet.TEMPORAL
@@ -6908,7 +7252,7 @@ final class StormT132AutoDriver {
                 // read directly (the first T206 run skipped the probe).
                 t199Lifecycle = t199Run || productionBaselineRunRequested()
                         || temporalRunRequested() || temporalCleanupRunRequested()
-                        || spatialUpscaleRunRequested()
+                        || spatialUpscaleRunRequested() || rainQualityRunRequested()
                         ? new T199LifecycleProbe() : null;
                 VolumetricCloudRenderer.resetStormFieldRebuildCounters();
                 t200Run = pixelScalingRunRequested();
@@ -6938,6 +7282,10 @@ final class StormT132AutoDriver {
                 t209Run = spatialUpscaleRunRequested();
                 t209OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 T209_CAPTURES.clear();
+                t210Run = rainQualityRunRequested();
+                t210HeavyRun = rainHeavyRunRequested();
+                t210OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                T210_CAPTURES.clear();
                 java.util.Arrays.fill(T202_AUDIT_CAPTURES, null);
                 // T188 Task 3 and Task 11. Counters come from the monolith, so
                 // the monolith has to be using the field for them to describe
@@ -7018,7 +7366,8 @@ final class StormT132AutoDriver {
                                 || t206Run
                                 || t207Run
                                 || t208Run
-                                || t209Run;
+                                || t209Run
+                                || t210Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -7042,7 +7391,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t209Run ? "T209_SPATIAL_UPSCALE"
+                            t210Run ? (t210HeavyRun ? "T210_RAIN_HEAVY" : "T210_RAIN_QUALITY")
+                                    : t209Run ? "T209_SPATIAL_UPSCALE"
                                     : t208Run ? "T208_TEMPORAL_CLEANUP"
                                     : t207Run ? "T207_TEMPORAL"
                                     : t206Run ? "T206_PRODUCTION_BASELINE"
@@ -7440,7 +7790,8 @@ final class StormT132AutoDriver {
                         || (t206Run && t206Arm().program().fixedWork())
                         || (t207Run && t207Arm().program().fixedWork())
                         || (t208Run && t208Arm().program().fixedWork())
-                        || (t209Run && t209Arm().program().fixedWork())) {
+                        || (t209Run && t209Arm().program().fixedWork())
+                        || (t210Run && t210Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -7511,7 +7862,7 @@ final class StormT132AutoDriver {
                         VolumetricCloudDebugConfig.setRainGateForcedOnMonolith(
                                 t203CounterPhase == 1);
                     }
-                    if (t204Run || t205Run || t206Run || t207Run || t208Run || t209Run) {
+                    if (t204Run || t205Run || t206Run || t207Run || t208Run || t209Run || t210Run) {
                         // Production's bits, the gate off: the shaft census
                         // describes the shipping renderer.
                         VolumetricCloudDebugConfig.setStormFieldForcedOnMonolith(
@@ -7565,7 +7916,7 @@ final class StormT132AutoDriver {
                                     ? T202_COUNTER_LABELS[t202CounterPhase]
                                     : t203Run
                                     ? T203_COUNTER_LABELS[t203CounterPhase]
-                                    : (t204Run || t205Run || t206Run || t207Run || t208Run || t209Run) ? "|final"
+                                    : (t204Run || t205Run || t206Run || t207Run || t208Run || t209Run || t210Run) ? "|final"
                                     : ""), line);
                     if (t199Run && t199CounterPhase == T199_COUNTER_BITS.length - 1) {
                         // T199. The production attribution is the share
@@ -7615,7 +7966,7 @@ final class StormT132AutoDriver {
                             VolumetricCloudDebugConfig.setRainGateForcedOnMonolith(false);
                             VolumetricCloudDebugConfig.resetStormFieldMonolithBits();
                         }
-                        if (t204Run || t205Run || t206Run || t207Run || t208Run || t209Run) {
+                        if (t204Run || t205Run || t206Run || t207Run || t208Run || t209Run || t210Run) {
                             VolumetricCloudDebugConfig.resetStormFieldMonolithBits();
                         }
                     }
@@ -7723,6 +8074,25 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
                     VolumetricCloudDebugConfig.setHistoryEnabled(
                             t202bOriginalHistoryEnabled);
+                }
+                if (t210Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT210Report());
+                    VolumetricCloudDebugConfig.resetStormFieldMonolithBits();
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setTemporalMode(
+                            VolumetricCloudDebugConfig.PRODUCTION_TEMPORAL_MODE);
+                    VolumetricCloudDebugConfig.setTemporalDebugOutput(0);
+                    VolumetricCloudDebugConfig.setRainDisabled(false);
+                    VolumetricCloudDebugConfig.setDeferredSplitForced(false);
+                    VolumetricCloudDebugConfig.setSpatialUpscaleMethod(
+                            VolumetricCloudDebugConfig.PRODUCTION_SPATIAL_UPSCALE);
+                    VolumetricCloudDebugConfig.setRainLatticeMode(
+                            VolumetricCloudDebugConfig.PRODUCTION_RAIN_LATTICE_MODE);
+                    VolumetricCloudDebugConfig.setRainHeavyForced(false);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(
+                            t210OriginalHistoryEnabled);
                 }
                 if (t209Run) {
                     ProjectAtmosphere.LOGGER.info(buildT209Report());
@@ -8816,6 +9186,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t210Run) {
+            return T210_IMAGE_PROGRAMS;
+        }
         if (t209Run) {
             return T209_IMAGE_PROGRAMS;
         }
@@ -8965,10 +9338,13 @@ final class StormT132AutoDriver {
             }
             // T207. The anchor is production at 0.50 - the lattice's exact
             // target - with no temporal; the arms follow at the phase scale.
-            if (t207Run || t208Run || t209Run) {
+            if (t207Run || t208Run || t209Run || t210Run) {
                 // T209. The anchor is the native render.
                 VolumetricCloudDebugConfig.setFixedResolutionScale(
-                        t209Run ? T209_NATIVE_SCALE : T207_REFERENCE_SCALE);
+                        t209Run || t210Run ? T209_NATIVE_SCALE : T207_REFERENCE_SCALE);
+                VolumetricCloudDebugConfig.setRainLatticeMode(0);
+                VolumetricCloudDebugConfig.setRainHeavyForced(t210HeavyRun);
+                T210_CAPTURES.clear();
                 VolumetricCloudDebugConfig.setTemporalMode(0);
                 VolumetricCloudDebugConfig.setTemporalDebugOutput(0);
                 VolumetricCloudDebugConfig.setRainDisabled(false);
@@ -9019,6 +9395,7 @@ final class StormT132AutoDriver {
                 : t207Run ? T207_IMAGE_ARMS[index].label()
                 : t208Run ? T208_IMAGE_ARMS[index].label()
                 : t209Run ? T209_IMAGE_ARMS[index].label()
+                : t210Run ? T210_IMAGE_ARMS[index].label()
                 : arm.serializedName();
         if ((t166ImageStep - 2) % 2 == 0) {
             VolumetricCloudDebugConfig.setFinalProgramOverride(arm);
@@ -9040,6 +9417,18 @@ final class StormT132AutoDriver {
                 VolumetricCloudDebugConfig.setTemporalDebugOutput(t208Arm.debugOutput());
                 VolumetricCloudDebugConfig.setRainDisabled(t208Arm.rainDisabled());
                 VolumetricCloudDebugConfig.setDeferredSplitForced(t208Arm.deferredSplit());
+                CloudTemporalPhaseState.invalidateAll();
+            }
+            if (t210Run) {
+                T210ImageArm t210Arm = T210_IMAGE_ARMS[index];
+                VolumetricCloudDebugConfig.setFixedResolutionScale(t210Arm.scale());
+                VolumetricCloudDebugConfig.setTemporalMode(t210Arm.temporal());
+                VolumetricCloudDebugConfig.setTemporalDebugOutput(t210Arm.debugOutput());
+                VolumetricCloudDebugConfig.setRainDisabled(t210Arm.rainDisabled());
+                VolumetricCloudDebugConfig.setDeferredSplitForced(t210Arm.deferredSplit());
+                VolumetricCloudDebugConfig.setSpatialUpscaleMethod(t210Arm.upscale());
+                VolumetricCloudDebugConfig.setRainLatticeMode(t210Arm.rainLattice());
+                VolumetricCloudDebugConfig.setRainHeavyForced(t210HeavyRun);
                 CloudTemporalPhaseState.invalidateAll();
             }
             if (t209Run) {
@@ -9084,6 +9473,64 @@ final class StormT132AutoDriver {
             t188RainMaskAnchor = captured;
             ProjectAtmosphere.LOGGER.info(
                     "T188_RAIN_MASK pose={} reference {}", pose, captured.format());
+        } else if (t210Run) {
+            // T210. Every capture is stored by label; a full-frame arm is
+            // judged against native with the rain-region metrics, the mask
+            // metrics (from its body capture, when stored) and a rain-only
+            // comparison; a body arm against the native body.
+            T210ImageArm t210Arm = T210_IMAGE_ARMS[index];
+            String expectedView = "t166_" + armLabel + "_" + pose;
+            if (!expectedView.equals(captured.view())) {
+                ProjectAtmosphere.LOGGER.warn(
+                        "T210_IMAGE pose={} arm={} evaluated=false reason=stale_capture view={}",
+                        pose, armLabel, captured.view());
+            } else {
+                T210_CAPTURES.put(armLabel, captured);
+                ProjectAtmosphere.LOGGER.info("T210_CAPTURE pose={} heavy={} arm={} {} {}",
+                        pose, t210HeavyRun, armLabel, t209EdgeLuma(captured), captured.format());
+                for (String againstLabel : t210Arm.against()) {
+                    StormReferenceImageComparison.Reference against = T210_CAPTURES.get(againstLabel);
+                    if (against == null) {
+                        ProjectAtmosphere.LOGGER.warn(
+                                "T210_IMAGE_AB pose={} arm={} against={} evaluated=false reason=missing",
+                                pose, armLabel, againstLabel);
+                        continue;
+                    }
+                    ProjectAtmosphere.LOGGER.info(
+                            "T210_IMAGE_AB pose={} heavy={} arm={} against={} {} {}",
+                            pose, t210HeavyRun, armLabel, againstLabel,
+                            StormReferenceImageComparison.compare(against, captured).format(),
+                            StormArmQualityMetrics.compare(against, captured).format());
+                    StormReferenceImageComparison.Reference noRain = T210_CAPTURES.get("native_norain");
+                    if ("native".equals(againstLabel) && noRain != null) {
+                        ProjectAtmosphere.LOGGER.info("T210_RAIN_REGION pose={} heavy={} arm={} {}",
+                                pose, t210HeavyRun, armLabel,
+                                t209RainMetrics(captured, against, noRain));
+                    }
+                }
+                // The body arm follows its full arm: once both are stored, the
+                // mask and rain-only comparisons against the native pair.
+                if (t210Arm.debugOutput() == 2 && armLabel.endsWith("_body")) {
+                    String fullLabel = armLabel.substring(0, armLabel.length() - "_body".length());
+                    StormReferenceImageComparison.Reference full = T210_CAPTURES.get(fullLabel);
+                    StormReferenceImageComparison.Reference nat = T210_CAPTURES.get("native");
+                    StormReferenceImageComparison.Reference natBody = T210_CAPTURES.get("native_body");
+                    if (full != null && nat != null && natBody != null) {
+                        ProjectAtmosphere.LOGGER.info("T210_RAIN_MASK pose={} heavy={} arm={} {}",
+                                pose, t210HeavyRun, fullLabel,
+                                t210RainMask(full, captured, nat, natBody));
+                        StormReferenceImageComparison.Reference armRain = t210RainOnly(full, captured);
+                        StormReferenceImageComparison.Reference refRain = t210RainOnly(nat, natBody);
+                        if (armRain != null && refRain != null) {
+                            ProjectAtmosphere.LOGGER.info(
+                                    "T210_RAIN_ONLY pose={} heavy={} arm={} {} {}",
+                                    pose, t210HeavyRun, fullLabel,
+                                    StormReferenceImageComparison.compare(refRain, armRain).format(),
+                                    StormArmQualityMetrics.compare(refRain, armRain).format());
+                        }
+                    }
+                }
+            }
         } else if (t209Run) {
             // T209. Every capture is stored by label; the arm names the
             // stored captures it is judged against, each box-downsampled by

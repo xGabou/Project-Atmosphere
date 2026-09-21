@@ -218,6 +218,31 @@ public final class VolumetricCloudRenderTargets {
         return rainPassTarget;
     }
 
+    /** T210. The lattice rain pass's target (mode 2: the fine pass behind the coarse one). */
+    private static RenderTarget rainLatticeTarget;
+
+    public static RenderTarget prepareRainLatticeTarget(int width, int height) {
+        if (rainLatticeTarget == null || rainLatticeTarget.width != width
+                || rainLatticeTarget.height != height) {
+            releaseRainLatticeTarget("resize");
+            rainLatticeTarget = createFloatMap(width, height, GL11.GL_NEAREST);
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T210_RAIN_LATTICE_ALLOC format=RGBA32F size={}x{} bytes={}",
+                    width, height, (long) width * height * 16L);
+        }
+        return rainLatticeTarget;
+    }
+
+    public static void releaseRainLatticeTarget(String reason) {
+        if (rainLatticeTarget != null) {
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "T210_RAIN_LATTICE_RELEASE reason={} size={}x{}", reason,
+                    rainLatticeTarget.width, rainLatticeTarget.height);
+            rainLatticeTarget.destroyBuffers();
+            rainLatticeTarget = null;
+        }
+    }
+
     /** T206. {@code "WxH"} of the resident rain-pass target, or {@code "none"}. */
     public static String rainPassTargetSize() {
         return rainPassTarget == null ? "none"
@@ -716,6 +741,7 @@ public final class VolumetricCloudRenderTargets {
         releaseTemporalTargets(reason);
         // T209. The upscale layer, on every release path with the rest.
         releaseSpatialUpscaleTarget(reason);
+        releaseRainLatticeTarget(reason);
         if (visibleVolumeOracleTarget != null) {
             visibleVolumeOracleTarget.destroyBuffers();
             visibleVolumeOracleTarget = null;
