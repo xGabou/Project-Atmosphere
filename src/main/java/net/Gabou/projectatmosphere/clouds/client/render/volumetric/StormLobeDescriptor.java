@@ -334,6 +334,28 @@ public record StormLobeDescriptor(
             Files.exists(Path.of("t212-edge-trace.txt"));
     private static int t212TraceBudget = 48;
 
+    /**
+     * T215. The lower-body geometry the density model needs: centre, vertical
+     * extent, radii, the descriptor's own density weight and its vertical
+     * development. Same marker gate and budget as the T212 trace - inert in
+     * production.
+     */
+    private static void t215TraceGeometry(int role, float centerX, float centerZ,
+            float baseY, float topY, float majorRadius, float minorRadius,
+            float densityWeight, float verticalDevelopment) {
+        if (!T212_EDGE_TRACE || t215TraceBudget <= 0) {
+            return;
+        }
+        t215TraceBudget--;
+        net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                "T215_GEOMETRY role={} centerX={} centerZ={} baseY={} topY={}"
+                        + " majorRadius={} minorRadius={} densityWeight={} verticalDevelopment={}",
+                role, centerX, centerZ, baseY, topY, majorRadius, minorRadius,
+                densityWeight, verticalDevelopment);
+    }
+
+    private static int t215TraceBudget = 48;
+
     private static void t212TraceEdgeWidth(int role, float majorRadius, float minorRadius,
             float edgeSoftness, float horizontal, float halfHeight, float verticalBound,
             float edgeWidth) {
@@ -383,6 +405,10 @@ public record StormLobeDescriptor(
         destination[offset + 12] = edgeWidth;
         t212TraceEdgeWidth(role, majorRadius, minorRadius, edgeSoftness,
                 horizontal, halfHeight, verticalBound, edgeWidth);
+        t215TraceGeometry(role, destination[offset + 0], destination[offset + 1],
+                destination[offset + 2], destination[offset + 3],
+                majorRadius, minorRadius, destination[offset + 10],
+                destination[offset + 18]);
 
         // The ownership ellipse's rotated extents, and the 1.85 widening and
         // unit floor the walk applies to them, transcribed together so the

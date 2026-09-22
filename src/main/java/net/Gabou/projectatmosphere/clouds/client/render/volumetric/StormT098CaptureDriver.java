@@ -480,7 +480,7 @@ public final class StormT098CaptureDriver {
         // an across-run before/after would compare two different storms.
         for (int arm = 0; arm <= 1; arm++) {
             String intent = "macro envelope "
-                    + (arm == 0 ? "38 blocks/sd (production)" : "89 blocks/sd (T214 at band cap)");
+                    + (arm == 0 ? "production" : "lower-body fade lift (T215)");
             built.add(new Shot("J" + arm + "_SIDE",
                     centreX + radius * 1.7D, midY, centreZ, intent,
                     VolumetricCloudRaymarchDebugView.FINAL, false, false, false,
@@ -570,6 +570,8 @@ public final class StormT098CaptureDriver {
         VolumetricCloudDebugConfig.setT098LegacyFinePromotion(false);
         VolumetricCloudDebugConfig.setMacroEnvelopeMode(
                 VolumetricCloudDebugConfig.PRODUCTION_MACRO_ENVELOPE_MODE);
+        VolumetricCloudDebugConfig.setLowerBodyMode(
+                VolumetricCloudDebugConfig.PRODUCTION_LOWER_BODY_MODE);
         VolumetricCloudDebugConfig.setT136ConstantLighting(false);
         CloudFieldVolumeRenderConfig.setCompositeDebugMode(CloudFieldCompositeDebugMode.FINAL);
         VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
@@ -636,10 +638,11 @@ public final class StormT098CaptureDriver {
                 // production. (The field is reused per defect; it carried the
                 // origin-jitter A/B before that was rejected under motion.)
                 if (shot.originJitter() >= 0) {
-                    // T214 amplitude arms: 0 = production (38 b/sd),
-                    // 1 = partial (55 b/sd).
-                    VolumetricCloudDebugConfig.setMacroEnvelopeMode(
-                            shot.originJitter() == 0 ? 3 : 5);
+                    // T215 arms: L0 production, L1 lower-body fade lift.
+                    // The anvil macro mode stays at production for both.
+                    VolumetricCloudDebugConfig.setMacroEnvelopeMode(3);
+                    VolumetricCloudDebugConfig.setLowerBodyMode(
+                            shot.originJitter() == 0 ? 0 : 1);
                 }
                 if (Float.isFinite(shot.resolutionScale())) {
                     // Held for the whole settle window. A scale change destroys

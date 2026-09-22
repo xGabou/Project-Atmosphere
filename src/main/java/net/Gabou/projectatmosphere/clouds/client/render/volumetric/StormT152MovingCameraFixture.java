@@ -233,8 +233,8 @@ final class StormT152MovingCameraFixture {
          * it moves whole chords - the question this route answers is whether
          * that displacement crawls once history is reprojected.
          */
-        MACRO_ENVELOPE_OFF("macro_envelope_off", false, 1, 0.25F, -1, 0, 0, 3),
-        MACRO_ENVELOPE_ON("macro_envelope_on", false, 1, 0.25F, -1, 0, 0, 5);
+        MACRO_ENVELOPE_OFF("lower_fill_off", false, 1, 0.25F, -1, 0, 0, 3, 0),
+        MACRO_ENVELOPE_ON("lower_fill_on", false, 1, 0.25F, -1, 0, 0, 3, 1);
 
         private final String label;
         private final boolean history;
@@ -248,6 +248,8 @@ final class StormT152MovingCameraFixture {
         private final int originJitter;
         /** T212. The macro-envelope modulation mode. */
         private final int macroEnvelope;
+        /** T215. The lower-body fade-lift mode. */
+        private final int lowerBody;
 
         Arm(String label, boolean history, int temporal, float resolutionScale) {
             this(label, history, temporal, resolutionScale, -1, 0);
@@ -269,6 +271,13 @@ final class StormT152MovingCameraFixture {
 
         Arm(String label, boolean history, int temporal, float resolutionScale, int upscale,
                 int rainLattice, int originJitter, int macroEnvelope) {
+            this(label, history, temporal, resolutionScale, upscale, rainLattice, originJitter,
+                    macroEnvelope, 0);
+        }
+
+        Arm(String label, boolean history, int temporal, float resolutionScale, int upscale,
+                int rainLattice, int originJitter, int macroEnvelope, int lowerBody) {
+            this.lowerBody = lowerBody;
             this.macroEnvelope = macroEnvelope;
             this.label = label;
             this.history = history;
@@ -354,6 +363,7 @@ final class StormT152MovingCameraFixture {
     private static int originalRainLatticeMode;
     private static int originalOriginJitterMode;
     private static int originalMacroEnvelopeMode;
+    private static int originalLowerBodyMode;
     private static boolean historyOverrideApplied;
     private static ArmSet armSet = ArmSet.HISTORY;
     private static boolean cameraModeApplied;
@@ -450,6 +460,7 @@ final class StormT152MovingCameraFixture {
         originalRainLatticeMode = VolumetricCloudDebugConfig.rainLatticeMode();
         originalOriginJitterMode = VolumetricCloudDebugConfig.originJitterMode();
         originalMacroEnvelopeMode = VolumetricCloudDebugConfig.macroEnvelopeMode();
+        originalLowerBodyMode = VolumetricCloudDebugConfig.lowerBodyMode();
         referenceGhostFrames = new byte[ROUTE_FRAMES][];
         arm = armSet.first();
         routeIndex = 0;
@@ -612,6 +623,7 @@ final class StormT152MovingCameraFixture {
             VolumetricCloudDebugConfig.setRainLatticeMode(arm.rainLattice);
             VolumetricCloudDebugConfig.setOriginJitterMode(arm.originJitter);
             VolumetricCloudDebugConfig.setMacroEnvelopeMode(arm.macroEnvelope);
+            VolumetricCloudDebugConfig.setLowerBodyMode(arm.lowerBody);
             VolumetricCloudRenderer.invalidateHistory();
         }
         historyOverrideApplied = true;
@@ -627,6 +639,7 @@ final class StormT152MovingCameraFixture {
                 VolumetricCloudDebugConfig.setRainLatticeMode(originalRainLatticeMode);
                 VolumetricCloudDebugConfig.setOriginJitterMode(originalOriginJitterMode);
                 VolumetricCloudDebugConfig.setMacroEnvelopeMode(originalMacroEnvelopeMode);
+                VolumetricCloudDebugConfig.setLowerBodyMode(originalLowerBodyMode);
                 VolumetricCloudDebugConfig.setRainHeavyForced(false);
             }
             historyOverrideApplied = false;

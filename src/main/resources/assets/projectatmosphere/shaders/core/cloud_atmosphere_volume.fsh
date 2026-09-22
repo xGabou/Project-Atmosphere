@@ -149,6 +149,14 @@ const float STORM_MACRO_BLOCKS_PER_SD = 38.0;
 // samples at the cap; 89 is the cap itself and clips ~32%.
 const float STORM_MACRO_BLOCKS_PARTIAL = 55.0;
 const float STORM_MACRO_BLOCKS_FULL = 89.0;
+// T215. The lower-body fade lift. `u` is the envelope falloff value
+// (coverage / strength, 1 at the core and 0 at the outer edge). The lift
+// `u + A*u*(1-u)` is a bump that vanishes at BOTH ends: it does nothing in
+// the solid core, nothing at the far fringe - so the outer silhouette is not
+// simply pushed outward - and is largest in mid-fade, which is exactly where
+// the measured occupancy collapses from 0.93 to 0.46.
+const float STORM_LOWER_FADE_LIFT = 0.50;
+const float STORM_LOWER_FADE_LIFT_SOFT = 0.28;
 // Cap fillet as a fraction of the lobe's smaller extent, bounded by the same
 // wavelength. Flat slabs and recognizable spheres are both rejected forms.
 const float STORM_CAP_ROUNDING_FRACTION = 0.35;
@@ -1397,6 +1405,9 @@ uniform int PaOriginJitterMode;
 // candidate). 2 is the same band weighted by the deck the T098 vertical clamp
 // attenuates (T213).
 uniform int PaMacroEnvelope;
+// T215. 1 lifts coverage through the middle of the lower body's envelope
+// fade, where the measured perforation is; 2 is the restrained variant.
+uniform int PaLowerBodyFill;
 
 bool paRayTraceActive() {
     return PaRayTraceMode != 0;
@@ -6495,6 +6506,21 @@ float shift = (deckWeight * blocksPerSd
                 } else {
                     cloud = saturate(cloud + macroGain
                         * STORM_MACRO_ENVELOPE_AMPLITUDE * clamp(macroSigned, -2.5, 2.5));
+                }
+            }
+            if (PaLowerBodyFill != 0 && cloud > 0.0) {
+                // T215. Localised to the lower body by the descriptor's own
+                // normalised height and faded out before the anvil deck
+                // weight begins at 0.55, so the T214 anvil result is
+                // untouched. Smooth, bounded, world-stable, no hard band.
+                float lowerWeight = 1.0 - smoothstep(0.35, 0.55, directStormHeight01);
+                if (lowerWeight > 0.0) {
+                    float envStrengthLow = max(directStormStrength, 1.0e-3);
+                    float uLow = clamp(cloud / envStrengthLow, 0.0, 1.0);
+                    float lift = PaLowerBodyFill == 2
+                        ? STORM_LOWER_FADE_LIFT_SOFT : STORM_LOWER_FADE_LIFT;
+                    float uLifted = uLow + lift * uLow * (1.0 - uLow);
+                    cloud = saturate(mix(cloud, uLifted * envStrengthLow, lowerWeight));
                 }
             }
             cloud = stormBody(

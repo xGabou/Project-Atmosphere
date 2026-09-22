@@ -271,6 +271,23 @@ public final class VolumetricCloudDebugConfig {
      * the density.
      */
     public static final int PRODUCTION_MACRO_ENVELOPE_MODE = 3;
+
+    /**
+     * T215. Lower-body fade reinforcement: 0 production, 1 on.
+     *
+     * <p>T215's attribution found the lower mass is solid in its core and
+     * perforates through the BASE lobe's envelope FADE - 141-145 blocks wide,
+     * the widest of any role, covering roughly half that lobe's projected
+     * area. Measured radial occupancy at SIDE falls 1.000 / 0.985 / 0.933 /
+     * 0.667 / 0.459 / 0.103 from centre to rim, with the break starting where
+     * the fade starts. Core fill is NOT the cause: `coverage*(1+fill)` is
+     * 1.397 at BASE against 1.396 at ANVIL, so the body-versus-noise response
+     * is the same function in both. This lifts coverage in the MIDDLE of the
+     * fade, where the speckle is, and leaves both the core and the far fringe
+     * alone so the silhouette is not simply inflated.
+     */
+    public static final int PRODUCTION_LOWER_BODY_MODE = 1;
+    private static volatile int lowerBodyMode = PRODUCTION_LOWER_BODY_MODE;
     private static volatile int macroEnvelopeMode = PRODUCTION_MACRO_ENVELOPE_MODE;
     /**
      * T210 harness. True raises MaxPrecipitation to 0.85 on every program
@@ -506,6 +523,14 @@ public final class VolumetricCloudDebugConfig {
         macroEnvelopeMode = Math.max(0, Math.min(5, mode));
     }
 
+    public static int lowerBodyMode() {
+        return lowerBodyMode;
+    }
+
+    public static void setLowerBodyMode(int mode) {
+        lowerBodyMode = Math.max(0, Math.min(2, mode));
+    }
+
     public static boolean rainHeavyForced() {
         return rainHeavyForced;
     }
@@ -642,6 +667,7 @@ public final class VolumetricCloudDebugConfig {
         rainLatticeMode = PRODUCTION_RAIN_LATTICE_MODE;
         originJitterMode = PRODUCTION_ORIGIN_JITTER_MODE;
         macroEnvelopeMode = PRODUCTION_MACRO_ENVELOPE_MODE;
+        lowerBodyMode = PRODUCTION_LOWER_BODY_MODE;
         rainHeavyForced = false;
         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
         sentinelHeightsEnabled = false;

@@ -3756,6 +3756,42 @@ implementation, while visual polish remains independently active.
   limit); secondary is widening the anvil band anisotropically (horizontal-only), now more
   attractive since displacement is nearly free temporally, but still judged against the T098 haze
   failure. [SC-005, SC-016, SC-021]
+- [X] T215 [QUALITY] [US1] Lower mass / tower structure: make the lower storm read as a coherent
+  convective mass with a real tower. **PARTIAL SUCCESS, banked: the perforation half is attributed
+  and fixed (`PRODUCTION_LOWER_BODY_MODE = 1`); the tower half is DISPROVED as a rendering problem.**
+  ATTRIBUTION FIRST (new `T215_GEOMETRY` descriptor trace, marker-gated): the real lobe set is
+  BASE x2 (y 136-599, R 448/403, strength 0.0786), CORE x2 (351-703, R 236-260), TOWER x2 (433-929,
+  R 166-197), ANVIL x4 (772-1000, R 422-434). Measured radial occupancy of the lower mass falls
+  1.000/0.985/0.933/**0.667**/0.459/0.103 centre-to-rim - **solid core, perforating outward, with
+  the break starting where the envelope FADE starts**. BASE carries the widest fade of any role,
+  **141-145 blocks on a 448 radius = ~53% of its projected area** (ANVIL ~37%, TOWER ~35%). RULED
+  OUT by measurement: core fill (`coverage*(1+fill)` = **1.397 BASE vs 1.396 ANVIL** - compensated
+  almost exactly), erosion at full coverage (`body = 0.284+0.716*baseField` vs a 0.22-0.283 bite),
+  and the structural-continuity fill (needs BASE+CORE+TOWER, but **below y=351 only BASE exists**).
+  CANDIDATE: lift the envelope falloff `u` by `u + 0.50*u*(1-u)` before `stormBody` - a bump that
+  **vanishes at both ends**, so it does nothing in the core or at the far fringe and is largest in
+  mid-fade where occupancy collapses; a gamma was rejected by calculation first (it lifts the far
+  fringe most, ~+14% area). Localised by `directStormHeight01` faded out at 0.55, exactly where
+  T213's anvil deck weight begins, so the two never overlap. RESULT: **hole area -21.7% SIDE /
+  -19.3% LATERAL, large holes 6->4 and 4->2**, occupancy +2.3%/+1.6%, vertical continuity
+  0.9881->0.9921, **ABOVE IoU 0.9999** (T214 anvil untouched), lighting unchanged (mean 135.97->
+  135.98, range 71.6->70.7 - no black wall), static probe **stiller** than production (max 4.67->
+  1.33 LATERAL), and **route flicker -1.0% with ZERO crawl** (perfectly-still frames 674 vs 674) -
+  filling holes removes the threshold-crossing pixels flicker counts. **HONEST LIMIT: components
+  (122->124, 95->95), largest-component fraction (0.798->0.802) and neck width (1->1, 8->8) are all
+  FLAT** - perforation and fragmentation are different defects and only the first is fixed. Cost
+  needed two samples: one suggested +0.37/+0.84 ms (the ">0.75 exceptional" band), but production
+  itself varies 0.36-0.44 ms between sessions, and the averaged delta is **~+0.25 ms** - top of
+  "easy acceptance"; **<=10 ms YES** (max 7.93). **TOWER DISPROVED AS A SHADER PROBLEM:** TOWER
+  lobes sit at y 433-929 with R 166-197 while BASE occupies 136-599 at R 448, so the lower half is
+  a lone BASE pancake **by construction** - no density or erosion term can render a tower the
+  descriptors do not place there, which is why the neck metric never moved for any candidate.
+  campaignGate x2, check build, morphology sandbox all PASS; no pinned constant touched. Evidence in
+  `validation/t215-lower-tower-structure.md` and `validation/t215-campaign/`. Next: **T216 the
+  convective column at DESCRIPTOR level** - why the role layout gives the lower half one wide BASE
+  lobe with TOWER starting only at y 433, i.e. no narrow tall high-density column below the deck;
+  fix at generation time, judged with the same paired-arm structure metrics plus storm-to-storm
+  diversity. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
