@@ -395,6 +395,14 @@ public final class StormT098CaptureDriver {
         // 4 INSIDE: within the body.
         built.add(new Shot("4_INSIDE", centreX + radius * 0.25D, baseY + height * 0.45D, centreZ,
                 "interior density variation"));
+        // T216. A THROUGH-BODY pose: inside the storm but near enough to the
+        // boundary that the view has real optical-depth variation. 4_INSIDE
+        // sits at 0.25 radius, buried in core material where visibility is
+        // ~15 blocks in every direction and a uniform wash is the physically
+        // correct result - which is not a useful test of interior structure.
+        built.add(new Shot("4B_THROUGH_BODY", centreX + radius * 0.82D,
+                baseY + height * 0.62D, centreZ,
+                "interior with meaningful optical depth, not buried in the core"));
         // 5 ABOVE: above, looking down.
         built.add(new Shot("5_ABOVE", centreX + radius * 0.6D,
                 topY + Math.max(120.0D, height * 0.45D), centreZ,

@@ -3792,6 +3792,42 @@ implementation, while visual polish remains independently active.
   lobe with TOWER starting only at y 433, i.e. no narrow tall high-density column below the deck;
   fix at generation time, judged with the same paired-arm structure metrics plus storm-to-storm
   diversity. [SC-005, SC-016, SC-021]
+- [X] T216 [QUALITY] [US1] Interior volume / lighting structure: make the cloud interior read as a
+  real 3D volume. **PREMISE DISPROVED; no shading or density change shipped.** ATTRIBUTION FIRST,
+  as required. The "flat interior" is true of exactly one capture pose and false of the renderer.
+  `4_INSIDE` measures localSD **0.105-0.197** with **0.00%/0.00%** dark/bright pockets - degenerate
+  - but through-body regions (silhouette mask eroded 12 px) of `2_SIDE`/`6_LATERAL` measure localSD
+  **8.33/8.91** with 11-14% in each pocket class, ~80x more structure from the same shader and
+  frame. CAUSE = hypothesis **C, transmittance saturation, and it is physically correct**: with
+  `densityMul` 1.45 / `extinctionScale` 0.115 and core post-erosion density 0.407, extinction is
+  **0.0679/block**, so 1/e depth is **14.7 blocks** and T=0.05 is 44 blocks; a camera at 0.25
+  radius inside a 448-radius BASE lobe has every ray terminate in ~15 blocks of homogeneous core,
+  where a uniform wash is the correct answer. RULED OUT: **A** (density sd ~0.23 about mean 0.63,
+  a 36% spread pre-erosion), **D** (the 4-tap inside light-march cap also applies to views scoring
+  8.9), **B/E** (that variance demonstrably reaches the image), and **F/CASE C by explicit negative
+  proof** - the temporal arm carries *more* fine detail than history-bypassed (**1.815 vs 1.599**,
+  pocket 15px vs 26px), so temporal architecture was NOT reopened. DECISIVE TEST was a re-pose, not
+  a re-shade: new permanent **`4B_THROUGH_BODY`** pose (0.82 R / 0.62 height, inside the storm but
+  with real optical-depth variation) measured in the SAME run as `4_INSIDE` - **localSD 0.197 ->
+  6.367 (32x), pockets 0.00/0.00 -> 5.80/6.75%, pocket scale ~10px, the finest of any view**, and
+  its macro:mid ratio is **4.8:1 vs `2_SIDE`'s 9.3:1** (from inside, the image is *less* dominated
+  by the big light ramp than from outside). Visually confirmed: billowing masses, dark creases, lit
+  crowns, clear depth ordering. **HONEST LIMIT - one real defect found and deliberately NOT fixed:**
+  the buried interior is too *dark* (mean 84.5 vs 132-187 exterior) because the march is
+  single-scattering and early-outs at optical depth 28, leaving it ambient-dominated; that is a
+  LEVEL defect, not a STRUCTURE defect, fixing it needs the lighting constants the brief forbids
+  touching first, and it would make the wash lighter without making it structured - so it does not
+  satisfy this task's success definition. Also noted, out of scope: stair-stepped puff edges in the
+  mid-field (march step size). Pre-dates the accepted morphology work (T211-era build measures the
+  same 0.100). **Entire diff is 8 lines in `StormT098CaptureDriver.java`; all six production
+  constants untouched, so T213/T214/T215 results are bit-identical** - no exterior collateral and
+  no performance delta to report, and the candidate/localization/paired-arm/lighting/static/motion/
+  performance subtasks are inapplicable rather than skipped, there being no candidate. campaignGate,
+  check build, morphology sandbox all PASS. Evidence in
+  `validation/t216-interior-volume-lighting.md` and `validation/t216-campaign/`. Next: **T217 the
+  deep-interior LIGHT LEVEL** - a depth-dependent multi-scatter/ambient term so a buried camera
+  reads as luminous fog rather than a dark room, attributed on its own terms and judged on the new
+  `4B_THROUGH_BODY` plus `4_INSIDE` pair. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
