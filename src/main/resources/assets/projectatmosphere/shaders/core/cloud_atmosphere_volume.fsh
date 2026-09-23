@@ -156,6 +156,22 @@ const float STORM_MACRO_BLOCKS_FULL = 89.0;
 // simply pushed outward - and is largest in mid-fade, which is exactly where
 // the measured occupancy collapses from 0.93 to 0.46.
 const float STORM_LOWER_FADE_LIFT = 0.50;
+// T217. Diffusion-limit indirect light. Measured attribution: at a buried
+// camera every existing term decays with optical depth (direct, all three
+// scatter octaves, and the ambient, which depth REDUCES), so the model
+// converges to an ambient floor of ~38/255 instead of the bounded glow a thick
+// scattering medium actually develops. These drive the only term that grows
+// with optical depth. The onset only suppresses thin material; it is NOT what
+// protects the exterior, because an anvil underside carries the highest optical
+// depth in the scene. The camera gate below does that.
+const float STORM_MS_OPTICAL_ONSET = 2.0;
+const float STORM_MS_RATE = 0.35;
+const float STORM_MS_STRENGTH = 0.46;
+const float STORM_MS_SUN_SHARE = 0.12;
+// The camera-embedding gate. Brackets the 0.08 `cameraInsideCloud` threshold so
+// the term ramps in over a real distance instead of snapping at a boolean.
+const float STORM_MS_CAMERA_GATE_LO = 0.05;
+const float STORM_MS_CAMERA_GATE_HI = 0.16;
 const float STORM_LOWER_FADE_LIFT_SOFT = 0.28;
 // Cap fillet as a fraction of the lobe's smaller extent, bounded by the same
 // wavelength. Flat slabs and recognizable spheres are both rejected forms.
@@ -1408,6 +1424,14 @@ uniform int PaMacroEnvelope;
 // T215. 1 lifts coverage through the middle of the lower body's envelope
 // fade, where the measured perforation is; 2 is the restrained variant.
 uniform int PaLowerBodyFill;
+
+// T217. Deep-interior lighting attribution and multiple-scattering arms.
+// 0 = production. 1/2/3 are ATTRIBUTION ONLY and are removed once the cause is
+// established: 1 zeroes every direct term so the frame shows the ambient
+// contribution alone, 2 zeroes ambient so it shows the direct contribution
+// alone, and 3 is the negative control that lets an inside camera's light cone
+// march its full tap budget instead of the 4-tap cap.
+uniform int PaDeepScatter;
 
 bool paRayTraceActive() {
     return PaRayTraceMode != 0;
@@ -7839,6 +7863,10 @@ vec3 evaluateLightingComponents(
     sunTerm *= mix(1.0, mix(0.70, 0.82, combinedStorm), undersideShade);
     sunTerm *= mix(1.0, 0.80, rainFraction);
     vec3 ambient = mix(AmbientBottom, AmbientTop, saturate(h01ForAmbient));
+    // T217 uses the sky energy BEFORE the storm/underside/retention darkening:
+    // multiple scattering delivers the sky the buried sample cannot see, and
+    // the retention factor below is precisely the term that removes it.
+    vec3 skyAmbient = ambient;
     ambient *= mix(1.0, 0.68, combinedStorm);
     ambient *= mix(1.0, mix(0.58, 0.74, combinedStorm), undersideShade);
     // Reuse the actual light-cone transmission so deep material loses ambient
@@ -7861,6 +7889,37 @@ vec3 evaluateLightingComponents(
         * edgeShell
         * mix(1.0, 0.26, combinedStorm)
         * (1.0 - rainFraction * 0.78);
+    if (PaDeepScatter != 0) {
+        // T217. Diffusion-limit indirect light - the only term in this model
+        // that GROWS with optical depth. Measured attribution: at a buried
+        // camera direct light is extinguished (transmittance 9.8e-4) and every
+        // remaining term decays with depth, including the ambient, which
+        // `ambientRetention` actively reduces, so the model converges to an
+        // ambient floor of ~38/255 instead of the bounded glow a thick
+        // scattering medium develops.
+        //
+        // The gate is CameraCloudDensity, NOT optical depth alone. An anvil
+        // underside carries the whole anvil slab above it along a near-vertical
+        // LightDir, so it has the HIGHEST light-cone optical depth in the scene -
+        // higher than a buried camera - and every optical-depth onset tried
+        // lifted the anvil 2.2-2.5x harder than the body, washing out the
+        // accepted T213/T214 silhouette. Camera embedding separates the two
+        // cases; the smoothstep (rather than the 0.08 boolean `cameraInsideCloud`
+        // already uses) keeps flying into cloud from popping.
+        //
+        // Radiance only: density, extinction and alpha are untouched.
+        float msFill = 1.0 - exp(
+            -max(opticalDepth - STORM_MS_OPTICAL_ONSET, 0.0) * STORM_MS_RATE
+        );
+        float camGate = smoothstep(
+            STORM_MS_CAMERA_GATE_LO, STORM_MS_CAMERA_GATE_HI, CameraCloudDensity
+        );
+        vec3 msSource = skyAmbient + LightColor * sunTint * STORM_MS_SUN_SHARE;
+        vec3 indirect = msSource * (STORM_MS_STRENGTH * msFill * camGate)
+            * mix(1.0, 0.78, combinedStorm)
+            * mix(1.0, 0.72, rainFraction);
+        ambient += indirect / 0.86;
+    }
     vec3 radiance = sunTerm + ambient * 0.86 + LightColor * sunTint * silver * 0.48;
 
     diagnosticDirectContribution = dot(

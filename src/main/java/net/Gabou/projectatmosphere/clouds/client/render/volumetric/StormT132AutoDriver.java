@@ -367,6 +367,7 @@ final class StormT132AutoDriver {
     private static boolean t211FixtureRequested;
     private static boolean t211mRun;
     private static boolean t212mRun;
+    private static boolean t217mRun;
     private static boolean restoreConfirmationAccepted;
     /**
      * The production configuration already has a debug/screenshot movement
@@ -458,6 +459,17 @@ final class StormT132AutoDriver {
     /** T212M. The macro-envelope candidate judged under motion. */
     private static boolean macroEnvelopeMotionRunRequested() {
         return Files.exists(T212M_MARKER);
+    }
+
+    private static final Path T217M_MARKER = Path.of("t217-deep-motion.txt");
+
+    /**
+     * T217M. The deep-interior indirect term judged under motion. It is the
+     * first candidate gated on CameraCloudDensity, so the route has to answer
+     * whether entering and leaving cloud pops the interior brightness.
+     */
+    private static boolean deepScatterMotionRunRequested() {
+        return Files.exists(T217M_MARKER);
     }
 
     /**
@@ -7120,6 +7132,7 @@ final class StormT132AutoDriver {
                             || rainMotionRunRequested()
                             || originJitterMotionRunRequested()
                             || macroEnvelopeMotionRunRequested()
+                            || deepScatterMotionRunRequested()
                             ? Phase.T152_BEGIN
                             : (performanceRunRequested()
                                     ? Phase.T135_PREPARE : Phase.BEGIN_T098));
@@ -7167,8 +7180,12 @@ final class StormT132AutoDriver {
                 t211mRun = originJitterMotionRunRequested();
                 // T212M. The macro-envelope candidate under motion.
                 t212mRun = macroEnvelopeMotionRunRequested();
+                // T217M. The deep-interior indirect term under motion.
+                t217mRun = deepScatterMotionRunRequested();
                 VolumetricCloudDebugConfig.setRainHeavyForced(t210mRun);
-                String begun = StormT152MovingCameraFixture.begin(t212mRun
+                String begun = StormT152MovingCameraFixture.begin(t217mRun
+                        ? StormT152MovingCameraFixture.ArmSet.DEEP_SCATTER
+                        : t212mRun
                         ? StormT152MovingCameraFixture.ArmSet.MACRO_ENVELOPE
                         : t211mRun
                         ? StormT152MovingCameraFixture.ArmSet.ORIGIN_JITTER

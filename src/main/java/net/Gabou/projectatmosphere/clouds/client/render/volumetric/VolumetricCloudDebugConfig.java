@@ -288,6 +288,12 @@ public final class VolumetricCloudDebugConfig {
      */
     public static final int PRODUCTION_LOWER_BODY_MODE = 1;
     private static volatile int lowerBodyMode = PRODUCTION_LOWER_BODY_MODE;
+    /**
+     * T217 deep-interior indirect light. 1 is production: a bounded
+     * multiple-scattering fill gated on camera embedding. 0 disables it.
+     */
+    public static final int PRODUCTION_DEEP_SCATTER_MODE = 1;
+    private static volatile int deepScatterMode = PRODUCTION_DEEP_SCATTER_MODE;
     private static volatile int macroEnvelopeMode = PRODUCTION_MACRO_ENVELOPE_MODE;
     /**
      * T210 harness. True raises MaxPrecipitation to 0.85 on every program
@@ -527,6 +533,14 @@ public final class VolumetricCloudDebugConfig {
         return lowerBodyMode;
     }
 
+    public static int deepScatterMode() {
+        return deepScatterMode;
+    }
+
+    public static void setDeepScatterMode(int mode) {
+        deepScatterMode = Math.max(0, Math.min(1, mode));
+    }
+
     public static void setLowerBodyMode(int mode) {
         lowerBodyMode = Math.max(0, Math.min(2, mode));
     }
@@ -668,6 +682,7 @@ public final class VolumetricCloudDebugConfig {
         originJitterMode = PRODUCTION_ORIGIN_JITTER_MODE;
         macroEnvelopeMode = PRODUCTION_MACRO_ENVELOPE_MODE;
         lowerBodyMode = PRODUCTION_LOWER_BODY_MODE;
+        deepScatterMode = PRODUCTION_DEEP_SCATTER_MODE;
         rainHeavyForced = false;
         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
         sentinelHeightsEnabled = false;

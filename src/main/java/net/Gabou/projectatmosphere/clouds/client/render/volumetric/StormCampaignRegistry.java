@@ -327,6 +327,14 @@ public final class StormCampaignRegistry {
             new Campaign("T209", "t209-spatial-upscale.txt",
                     "spatialUpscaleRunRequested", "t209Run",
                     "T209_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            // T217M. The T152 route judging the deep-interior indirect term under
+            // motion - the first candidate gated on CameraCloudDensity, so the
+            // route exists to catch brightness popping as the camera enters and
+            // leaves cloud. Above the sweeps: a PERFORMANCE_ONLY row must not be
+            // the registry's newest.
+            new Campaign("T217M", "t217-deep-motion.txt",
+                    "deepScatterMotionRunRequested", "t217mRun",
+                    null, Routing.PERFORMANCE_ONLY),
             // T212M. The T152 route judging the macro-envelope candidate under
             // motion. Above the sweeps, like T211M: a PERFORMANCE_ONLY row must
             // not be the registry's newest.

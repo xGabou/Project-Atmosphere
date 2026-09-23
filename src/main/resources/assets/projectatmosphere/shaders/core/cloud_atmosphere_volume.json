@@ -105,6 +105,7 @@
     { "name": "PaOriginJitterMode", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaMacroEnvelope", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaLowerBodyFill", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PaDeepScatter", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "DensityMul", "type": "float", "count": 1, "values": [ 1.0 ] },
     { "name": "CoverageMul", "type": "float", "count": 1, "values": [ 1.0 ] },
     { "name": "ExtinctionScale", "type": "float", "count": 1, "values": [ 0.09 ] },

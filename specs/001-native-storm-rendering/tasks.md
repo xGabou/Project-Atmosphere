@@ -3828,6 +3828,50 @@ implementation, while visual polish remains independently active.
   deep-interior LIGHT LEVEL** - a depth-dependent multi-scatter/ambient term so a buried camera
   reads as luminous fog rather than a dark room, attributed on its own terms and judged on the new
   `4B_THROUGH_BODY` plus `4_INSIDE` pair. [SC-005, SC-016, SC-021]
+- [X] T217 [QUALITY] [US1] Deep-interior brightness / multiple-scattering approximation: restore
+  plausible indirect light to optically thick interiors. **KEEP, `PRODUCTION_DEEP_SCATTER_MODE=1`.**
+  ATTRIBUTION FIRST, measured in the shader with term-zeroing arms (`PaDeepScatter` 1 ambient-only,
+  2 direct-only, 3 uncapped cone), additive within 2% once the tone curve is inverted
+  (`radiance = -ln(1-v/255)/1.30`): buried = **80.5% ambient / 20.5% direct**, through-body inverts
+  to **41.5% / 60.7%**. CAUSE = **E, no term in the model grows with optical depth**: direct decays,
+  all three Hillaire octaves decay, and the ambient is actively REDUCED by depth
+  (`ambient *= mix(ambientRetention, 1.0, directTransmission)`), so it converges to an ambient floor
+  of ~38/255 instead of the bounded diffusion glow a thick medium develops. **CASE C / early-out
+  DISPROVED twice over:** the uncapped-cone arm is **bit-identical** at `4_INSIDE`, and structurally
+  `lightMarchOpticalDepth` begins `if (cameraInsideCloud) return localDensity*18 +
+  forwardDensity*82` - a buried camera takes ONE probe and **never enters the march loop**, so the
+  tap cap, the 1.42 growth and the 28.0 early-out are all unreachable (that threshold needs ~413
+  blocks against a 102-block reach). **This corrects T216, which claimed the early-out fires.**
+  FIRST CANDIDATE REJECTED ON SIGHT: an optical-depth-localized indirect term brightened the buried
+  pose but **washed the anvil**, because an anvil underside carries the whole slab above it along a
+  near-vertical `LightDir` and therefore has the HIGHEST optical depth in the scene - every onset
+  (1.5/3/4/5) lifted the anvil **2.2-2.5x harder than the body**, a monotone trade with no clean
+  win. **Optical depth cannot separate "deeply buried" from "deeply shadowed" because they are the
+  same condition.** ACCEPTED CANDIDATE gates on camera embedding instead -
+  `smoothstep(0.05, 0.16, CameraCloudDensity)`, the discriminator the negative control had already
+  proved (THROUGH moved, INSIDE bit-identical) - with
+  `msFill = 1-exp(-max(od-2.0,0)*0.35)`, strength 0.46, sun share 0.12, radiance-only. RESULT:
+  `4_INSIDE` **87.23 -> 122.15 (+34.9)** while `4B_THROUGH_BODY` 154.19->154.19, SIDE 187.60->187.59,
+  LATERAL/NEAR_EDGE/ABOVE unchanged - **five of six views below quantization**, pockets 3.70/3.30 ->
+  3.70/3.29. TEMPORAL on the new **T217M** route (2200 frames/arm, `cameraDensity` to 0.83, **794
+  ENTRY frames**): route flicker **0.0023 -> 0.0023**, ENTRY flicker **0.0017 -> 0.0017** - **no
+  popping**, which is the specific risk a camera-state gate trades for. PERFORMANCE: matched-pose
+  deltas straddle zero (-0.069/-0.246/+0.070/+0.110 ms, mean -0.034) - below the measurement floor,
+  one `exp` + one `smoothstep` + multiply-adds, **no new fetches, loops or march branches**; the
+  route's own +0.638 ms was discarded as noise (n=6 spanning 3.2-10.2 ms). **HARNESS LESSONS: (a) a
+  motion campaign needs THREE edits** - registry row, ArmSet selection, AND the OR-chain gating
+  `Phase.T152_BEGIN`; missing the third produced `outcome=complete frames=45145` with **zero t152
+  lines**, a clean-looking run that measured nothing. **(b) Arms must be adjacent, not merely
+  in-run**: a production shot late in a ~120-shot set read **113.12** where the same pose read
+  **86.76** early, so the onset-bracket numbers were confounded and were re-run interleaved.
+  **(c) A silhouette mask eroded 12px inward EXCLUDES the anvil overhang** and reported -4% localSD
+  for a change that was obviously washing the anvil on sight. Program scope: the ten exploratory
+  modes are collapsed to one uniform and one branch in FINAL. No pinned constant touched; T213/T215
+  unchanged. campaignGate x8, check build, morphology sandbox all PASS. Evidence in
+  `validation/t217-deep-interior-lighting.md` and `validation/t217-campaign/`. Next: **T218** -
+  either accept that a buried view at 14.7-block visibility cannot show structure and move to the
+  **mid-field stair-stepped puff edges** (march step size, deferred from T216), or attribute
+  interior structure at depth first; do not build before attributing. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

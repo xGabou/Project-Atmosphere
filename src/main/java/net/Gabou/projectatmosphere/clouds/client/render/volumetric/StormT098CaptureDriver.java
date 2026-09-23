@@ -503,6 +503,59 @@ public final class StormT098CaptureDriver {
                     VolumetricCloudRaymarchDebugView.FINAL, false, false, false,
                     Float.NaN, true, arm));
         }
+        // T217 Task 6/7. Arms are INTERLEAVED per pose, not grouped per arm:
+        // a production shot late in a ~120-shot sequence measured 113.1 where two
+        // early production shots of the same pose measured 86.75/86.76, so arms
+        // compared across blocks are confounded by sequence position. Each pose
+        // captures the pair back to back.
+        built.add(new Shot("T217_L0_INSIDE", centreX + radius * 0.25D,
+                baseY + height * 0.45D, centreZ,
+                "L0 at INSIDE, captured adjacent to its pair",
+                VolumetricCloudRaymarchDebugView.FINAL, false, false, false, Float.NaN, false, 0));
+        built.add(new Shot("T217_ON_INSIDE", centreX + radius * 0.25D,
+                baseY + height * 0.45D, centreZ,
+                "C1 at INSIDE, captured adjacent to its pair",
+                VolumetricCloudRaymarchDebugView.FINAL, false, false, false, Float.NaN, false, 1));
+        built.add(new Shot("T217_L0_THROUGH", centreX + radius * 0.82D,
+                baseY + height * 0.62D, centreZ,
+                "L0 at THROUGH, captured adjacent to its pair",
+                VolumetricCloudRaymarchDebugView.FINAL, false, false, false, Float.NaN, false, 0));
+        built.add(new Shot("T217_ON_THROUGH", centreX + radius * 0.82D,
+                baseY + height * 0.62D, centreZ,
+                "C1 at THROUGH, captured adjacent to its pair",
+                VolumetricCloudRaymarchDebugView.FINAL, false, false, false, Float.NaN, false, 1));
+        built.add(new Shot("T217_L0_SIDE", centreX + radius * 1.7D,
+                midY, centreZ,
+                "L0 at SIDE, captured adjacent to its pair",
+                VolumetricCloudRaymarchDebugView.FINAL, false, false, false, Float.NaN, false, 0));
+        built.add(new Shot("T217_ON_SIDE", centreX + radius * 1.7D,
+                midY, centreZ,
+                "C1 at SIDE, captured adjacent to its pair",
+                VolumetricCloudRaymarchDebugView.FINAL, false, false, false, Float.NaN, false, 1));
+        built.add(new Shot("T217_L0_LATERAL", centreX + radius * 1.9D,
+                midY, centreZ,
+                "L0 at LATERAL, captured adjacent to its pair",
+                VolumetricCloudRaymarchDebugView.FINAL, false, false, false, Float.NaN, false, 0));
+        built.add(new Shot("T217_ON_LATERAL", centreX + radius * 1.9D,
+                midY, centreZ,
+                "C1 at LATERAL, captured adjacent to its pair",
+                VolumetricCloudRaymarchDebugView.FINAL, false, false, false, Float.NaN, false, 1));
+        built.add(new Shot("T217_L0_NEAREDGE", centreX + radius * 1.12D,
+                baseY + height * 0.55D, centreZ,
+                "L0 at NEAREDGE, captured adjacent to its pair",
+                VolumetricCloudRaymarchDebugView.FINAL, false, false, false, Float.NaN, false, 0));
+        built.add(new Shot("T217_ON_NEAREDGE", centreX + radius * 1.12D,
+                baseY + height * 0.55D, centreZ,
+                "C1 at NEAREDGE, captured adjacent to its pair",
+                VolumetricCloudRaymarchDebugView.FINAL, false, false, false, Float.NaN, false, 1));
+        built.add(new Shot("T217_L0_ABOVE", centreX + radius * 0.6D,
+                baseY + height * 1.35D, centreZ,
+                "L0 at ABOVE, captured adjacent to its pair",
+                VolumetricCloudRaymarchDebugView.FINAL, false, false, false, Float.NaN, false, 0));
+        built.add(new Shot("T217_ON_ABOVE", centreX + radius * 0.6D,
+                baseY + height * 1.35D, centreZ,
+                "C1 at ABOVE, captured adjacent to its pair",
+                VolumetricCloudRaymarchDebugView.FINAL, false, false, false, Float.NaN, false, 1));
         built.add(new Shot("8_NEAR_EDGE", centreX + radius * 1.12D, baseY + height * 0.55D, centreZ,
                 "fine detail octaves at the outer boundary"));
         return List.copyOf(built);
@@ -646,11 +699,9 @@ public final class StormT098CaptureDriver {
                 // production. (The field is reused per defect; it carried the
                 // origin-jitter A/B before that was rejected under motion.)
                 if (shot.originJitter() >= 0) {
-                    // T215 arms: L0 production, L1 lower-body fade lift.
-                    // The anvil macro mode stays at production for both.
                     VolumetricCloudDebugConfig.setMacroEnvelopeMode(3);
-                    VolumetricCloudDebugConfig.setLowerBodyMode(
-                            shot.originJitter() == 0 ? 0 : 1);
+                    VolumetricCloudDebugConfig.setLowerBodyMode(1);
+                    VolumetricCloudDebugConfig.setDeepScatterMode(shot.originJitter());
                 }
                 if (Float.isFinite(shot.resolutionScale())) {
                     // Held for the whole settle window. A scale change destroys

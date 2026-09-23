@@ -742,6 +742,8 @@ public final class VolumetricCloudRenderer {
                 VolumetricCloudDebugConfig.macroEnvelopeMode());
         shader.safeGetUniform("PaLowerBodyFill").set(
                 VolumetricCloudDebugConfig.lowerBodyMode());
+        shader.safeGetUniform("PaDeepScatter").set(
+                VolumetricCloudDebugConfig.deepScatterMode());
         float uploadedMaxRenderDistance = Math.max(300.0F, maxRenderDistance);
         lastMaxRenderDistance = uploadedMaxRenderDistance;
         boolean uploadedUseSceneDepth = sceneRayLimitEnabled && safeSceneDepth.valid();

@@ -234,7 +234,17 @@ final class StormT152MovingCameraFixture {
          * that displacement crawls once history is reprojected.
          */
         MACRO_ENVELOPE_OFF("lower_fill_off", false, 1, 0.25F, -1, 0, 0, 3, 0),
-        MACRO_ENVELOPE_ON("lower_fill_on", false, 1, 0.25F, -1, 0, 0, 3, 1);
+        MACRO_ENVELOPE_ON("lower_fill_on", false, 1, 0.25F, -1, 0, 0, 3, 1),
+        /**
+         * T217M: the deep-interior indirect term under motion. It is gated on
+         * CameraCloudDensity, so unlike every earlier candidate its strength
+         * depends on where the CAMERA is, not only on what the ray hits. The
+         * question this route answers is whether flying into and out of cloud
+         * pops the interior brightness; the gate is a smoothstep over
+         * 0.05-0.16 precisely so it cannot.
+         */
+        DEEP_SCATTER_OFF("deep_scatter_off", false, 1, 0.25F, -1, 0, 0, 3, 1, 0),
+        DEEP_SCATTER_ON("deep_scatter_on", false, 1, 0.25F, -1, 0, 0, 3, 1, 1);
 
         private final String label;
         private final boolean history;
@@ -250,6 +260,8 @@ final class StormT152MovingCameraFixture {
         private final int macroEnvelope;
         /** T215. The lower-body fade-lift mode. */
         private final int lowerBody;
+        /** T217. The deep-interior indirect-light mode. */
+        private final int deepScatter;
 
         Arm(String label, boolean history, int temporal, float resolutionScale) {
             this(label, history, temporal, resolutionScale, -1, 0);
@@ -277,6 +289,14 @@ final class StormT152MovingCameraFixture {
 
         Arm(String label, boolean history, int temporal, float resolutionScale, int upscale,
                 int rainLattice, int originJitter, int macroEnvelope, int lowerBody) {
+            this(label, history, temporal, resolutionScale, upscale, rainLattice, originJitter,
+                    macroEnvelope, lowerBody, 0);
+        }
+
+        Arm(String label, boolean history, int temporal, float resolutionScale, int upscale,
+                int rainLattice, int originJitter, int macroEnvelope, int lowerBody,
+                int deepScatter) {
+            this.deepScatter = deepScatter;
             this.lowerBody = lowerBody;
             this.macroEnvelope = macroEnvelope;
             this.label = label;
@@ -311,7 +331,9 @@ final class StormT152MovingCameraFixture {
         /** T211M: the production 0.50 reference, then the two ray-origin phases. */
         ORIGIN_JITTER(Arm.PRODUCTION_050, Arm.ORIGIN_JITTER_FINE, Arm.ORIGIN_JITTER_COARSE),
         /** T212M: the production 0.50 reference, then macro envelope off and on. */
-        MACRO_ENVELOPE(Arm.PRODUCTION_050, Arm.MACRO_ENVELOPE_OFF, Arm.MACRO_ENVELOPE_ON);
+        MACRO_ENVELOPE(Arm.PRODUCTION_050, Arm.MACRO_ENVELOPE_OFF, Arm.MACRO_ENVELOPE_ON),
+        /** T217M: the production reference, then the indirect term off and on. */
+        DEEP_SCATTER(Arm.PRODUCTION_050, Arm.DEEP_SCATTER_OFF, Arm.DEEP_SCATTER_ON);
 
         private final Arm[] arms;
 
@@ -624,6 +646,7 @@ final class StormT152MovingCameraFixture {
             VolumetricCloudDebugConfig.setOriginJitterMode(arm.originJitter);
             VolumetricCloudDebugConfig.setMacroEnvelopeMode(arm.macroEnvelope);
             VolumetricCloudDebugConfig.setLowerBodyMode(arm.lowerBody);
+            VolumetricCloudDebugConfig.setDeepScatterMode(arm.deepScatter);
             VolumetricCloudRenderer.invalidateHistory();
         }
         historyOverrideApplied = true;
@@ -640,6 +663,7 @@ final class StormT152MovingCameraFixture {
                 VolumetricCloudDebugConfig.setOriginJitterMode(originalOriginJitterMode);
                 VolumetricCloudDebugConfig.setMacroEnvelopeMode(originalMacroEnvelopeMode);
                 VolumetricCloudDebugConfig.setLowerBodyMode(originalLowerBodyMode);
+                VolumetricCloudDebugConfig.setDeepScatterMode(0);
                 VolumetricCloudDebugConfig.setRainHeavyForced(false);
             }
             historyOverrideApplied = false;
