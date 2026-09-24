@@ -879,6 +879,21 @@ public final class StormT098CaptureDriver {
                             ? 0 : VolumetricCloudRenderTargets.currentCloudTarget().height,
                     fmt(VolumetricCloudRenderer.lastResolutionScale()),
                     target.toAbsolutePath());
+            // T220. The composite's actual source is the temporal lattice at
+            // TWICE the phase size, not the phase target; recording only the
+            // phase target is what let T219 under-count the samples an edge is
+            // drawn from by a factor of two.
+            ProjectAtmosphere.LOGGER.info(
+                    "T220_CAPTURE_LATTICE shot={} phaseTarget={} resolvedLattice={}",
+                    shot.name() + suffix,
+                    VolumetricCloudRenderTargets.currentCloudTarget() == null ? "none"
+                            : VolumetricCloudRenderTargets.currentCloudTarget().width + "x"
+                                    + VolumetricCloudRenderTargets.currentCloudTarget().height,
+                    VolumetricCloudRenderTargets.temporalResolvedTargetOrNull() == null ? "none"
+                            : VolumetricCloudRenderTargets.temporalResolvedTargetOrNull().width
+                                    + "x"
+                                    + VolumetricCloudRenderTargets
+                                            .temporalResolvedTargetOrNull().height);
             // A capture set whose storm decayed records a stormless sky under
             // the same file names as a valid arm, which is worse than a missing
             // frame. Every grab carries its descriptor count, and the first

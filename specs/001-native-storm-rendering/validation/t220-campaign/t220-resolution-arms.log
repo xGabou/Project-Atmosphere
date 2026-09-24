@@ -1,0 +1,120 @@
+[13:02:21] [Render thread/INFO] [projectatmosphere/]: T207_PHASES_ALLOC phases=4 format=RGBA16F+depth+RGBA16Faux size=641x360 bytes=18460800
+[13:02:21] [Render thread/INFO] [projectatmosphere/]: T207_RESOLVED_ALLOC format=RGBA16F+depth size=1282x720 bytes=11076480
+[13:03:37] [Render thread/INFO] [projectatmosphere/]: T098_CAPTURE_BEGIN group=7c34c912-7e59-45be-a02b-b5093fecfce3 fingerprint=4f42af3cf309d00e baseY=136.00000 topY=1000.45471 horizontalRadius=659.47041 descriptors=10 shots=56 output=C:\Users\matga\Downloads\Project-Atmosphere\run\screenshots\t098\7c34c912
+[13:03:37] [Render thread/INFO] [projectatmosphere/]: T207_PHASES_ALLOC phases=4 format=RGBA16F+depth+RGBA16Faux size=1200x675 bytes=64800000
+[13:03:37] [Render thread/INFO] [projectatmosphere/]: T207_RESOLVED_ALLOC format=RGBA16F+depth size=2400x1350 bytes=38880000
+[13:03:47] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=1_FAR phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:03:54] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=2_SIDE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:04:01] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=3_UNDER phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:04:08] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=4_INSIDE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:04:15] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=4B_THROUGH_BODY phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:04:23] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=5_ABOVE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:04:30] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=6_LATERAL_A phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:04:37] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=7_LATERAL_B phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:04:44] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=9_LADDER_120 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:04:51] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=9_LADDER_130 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:04:58] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=9_LADDER_140 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:05:05] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=9_LADDER_150 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:05:12] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=9_LADDER_160 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:05:19] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=9_LADDER_180 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:05:27] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=A_SIDE_CURRENT_ONLY phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:05:37] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=B_SIDE_HISTORY_ONLY phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:05:44] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=C_SIDE_HISTORY_REJECTION phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:05:51] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=D_SIDE_LEGACY_HIT_DEPTH phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:05:58] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=E_FAR_LEGACY_HIT_DEPTH phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:06:06] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=F_SIDE_CORRECTED phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:06:13] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=G_FAR_CORRECTED phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:06:20] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=P_SIDE_LEGACY_PROMOTION phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:06:27] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=P_SIDE_CORRECTED_PROMOTION phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:06:34] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=P_FAR_LEGACY_PROMOTION phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:06:41] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=P_FAR_CORRECTED_PROMOTION phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:06:49] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=P_ABOVE_LEGACY_PROMOTION phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:06:56] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=P_ABOVE_CORRECTED_PROMOTION phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:03] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=P_BELOW_LEGACY_PROMOTION phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:10] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=P_BELOW_CORRECTED_PROMOTION phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:17] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_SIDE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:18] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_SIDE_T8 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:18] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_SIDE_ALPHA phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:18] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_SIDE_DEPTH phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:18] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_SIDE_ALIGNMENT phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:20] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_SIDE_ARM phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:20] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_SIDE_ARM_T8 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:27] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_LATERAL phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:27] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_LATERAL_T8 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:27] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_LATERAL_ALPHA phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:27] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_LATERAL_DEPTH phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:28] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_LATERAL_ALIGNMENT phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:28] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_LATERAL_ARM phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:29] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_LATERAL_ARM_T8 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:35] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_ABOVE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:36] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_ABOVE_T8 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:36] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_ABOVE_ALPHA phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:36] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_ABOVE_DEPTH phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:36] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_ABOVE_ALIGNMENT phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:37] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_ABOVE_ARM phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:37] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J0_ABOVE_ARM_T8 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:44] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_SIDE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:44] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_SIDE_T8 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:45] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_SIDE_ALPHA phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:45] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_SIDE_DEPTH phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:45] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_SIDE_ALIGNMENT phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:46] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_SIDE_ARM phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:46] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_SIDE_ARM_T8 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:53] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_LATERAL phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:53] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_LATERAL_T8 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:53] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_LATERAL_ALPHA phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:54] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_LATERAL_DEPTH phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:54] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_LATERAL_ALIGNMENT phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:54] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_LATERAL_ARM phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:07:55] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_LATERAL_ARM_T8 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:02] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_ABOVE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:02] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_ABOVE_T8 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:02] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_ABOVE_ALPHA phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:02] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_ABOVE_DEPTH phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:02] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_ABOVE_ALIGNMENT phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:03] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_ABOVE_ARM phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:03] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=J1_ABOVE_ARM_T8 phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:10] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T217_L0_INSIDE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:17] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T217_ON_INSIDE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:25] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T217_L0_THROUGH phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:32] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T217_ON_THROUGH phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:39] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T217_L0_SIDE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:46] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T217_ON_SIDE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:08:53] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T217_L0_LATERAL phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:09:00] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T217_ON_LATERAL phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:09:07] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T217_L0_NEAREDGE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:09:14] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T217_ON_NEAREDGE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:09:21] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T217_L0_ABOVE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:09:28] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T217_ON_ABOVE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:09:35] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T220_R0_SIDE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:09:35] [Render thread/INFO] [projectatmosphere/]: T098_CAPTURE_CONTROLS shot=T220_R0_SIDE stepScale=1.0 diagnosticStepBudget=0 legacyHitDepth=false legacyFinePromotion=false gpuMs=29.68371 deepScatter=1 cameraCloudDensity=0.00000
+[13:09:35] [Render thread/INFO] [projectatmosphere/]: T207_PHASES_ALLOC phases=4 format=RGBA16F+depth+RGBA16Faux size=1600x900 bytes=115200000
+[13:09:35] [Render thread/INFO] [projectatmosphere/]: T207_RESOLVED_ALLOC format=RGBA16F+depth size=3200x1800 bytes=69120000
+[13:09:43] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T220_R1_SIDE phaseTarget=1600x900 resolvedLattice=3200x1800
+[13:09:43] [Render thread/INFO] [projectatmosphere/]: T098_CAPTURE_CONTROLS shot=T220_R1_SIDE stepScale=1.0 diagnosticStepBudget=0 legacyHitDepth=false legacyFinePromotion=false gpuMs=52.96947 deepScatter=1 cameraCloudDensity=0.00000
+[13:09:43] [Render thread/INFO] [projectatmosphere/]: T207_PHASES_ALLOC phases=4 format=RGBA16F+depth+RGBA16Faux size=800x450 bytes=28800000
+[13:09:43] [Render thread/INFO] [projectatmosphere/]: T207_RESOLVED_ALLOC format=RGBA16F+depth size=1600x900 bytes=17280000
+[13:09:50] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T220_R2_SIDE phaseTarget=800x450 resolvedLattice=1600x900
+[13:09:50] [Render thread/INFO] [projectatmosphere/]: T098_CAPTURE_CONTROLS shot=T220_R2_SIDE stepScale=1.0 diagnosticStepBudget=0 legacyHitDepth=false legacyFinePromotion=false gpuMs=15.23814 deepScatter=1 cameraCloudDensity=0.00000
+[13:09:50] [Render thread/INFO] [projectatmosphere/]: T207_PHASES_ALLOC phases=4 format=RGBA16F+depth+RGBA16Faux size=1200x675 bytes=64800000
+[13:09:50] [Render thread/INFO] [projectatmosphere/]: T207_RESOLVED_ALLOC format=RGBA16F+depth size=2400x1350 bytes=38880000
+[13:09:57] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T220_R0B_SIDE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:09:57] [Render thread/INFO] [projectatmosphere/]: T098_CAPTURE_CONTROLS shot=T220_R0B_SIDE stepScale=1.0 diagnosticStepBudget=0 legacyHitDepth=false legacyFinePromotion=false gpuMs=34.51290 deepScatter=1 cameraCloudDensity=0.00000
+[13:10:04] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T220_R0_NEAREDGE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:10:04] [Render thread/INFO] [projectatmosphere/]: T098_CAPTURE_CONTROLS shot=T220_R0_NEAREDGE stepScale=1.0 diagnosticStepBudget=0 legacyHitDepth=false legacyFinePromotion=false gpuMs=48.82125 deepScatter=1 cameraCloudDensity=0.00000
+[13:10:04] [Render thread/INFO] [projectatmosphere/]: T207_PHASES_ALLOC phases=4 format=RGBA16F+depth+RGBA16Faux size=1600x900 bytes=115200000
+[13:10:04] [Render thread/INFO] [projectatmosphere/]: T207_RESOLVED_ALLOC format=RGBA16F+depth size=3200x1800 bytes=69120000
+[13:10:11] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T220_R1_NEAREDGE phaseTarget=1600x900 resolvedLattice=3200x1800
+[13:10:11] [Render thread/INFO] [projectatmosphere/]: T098_CAPTURE_CONTROLS shot=T220_R1_NEAREDGE stepScale=1.0 diagnosticStepBudget=0 legacyHitDepth=false legacyFinePromotion=false gpuMs=86.60889 deepScatter=1 cameraCloudDensity=0.00000
+[13:10:11] [Render thread/INFO] [projectatmosphere/]: T207_PHASES_ALLOC phases=4 format=RGBA16F+depth+RGBA16Faux size=800x450 bytes=28800000
+[13:10:11] [Render thread/INFO] [projectatmosphere/]: T207_RESOLVED_ALLOC format=RGBA16F+depth size=1600x900 bytes=17280000
+[13:10:18] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T220_R2_NEAREDGE phaseTarget=800x450 resolvedLattice=1600x900
+[13:10:18] [Render thread/INFO] [projectatmosphere/]: T098_CAPTURE_CONTROLS shot=T220_R2_NEAREDGE stepScale=1.0 diagnosticStepBudget=0 legacyHitDepth=false legacyFinePromotion=false gpuMs=25.82630 deepScatter=1 cameraCloudDensity=0.00000
+[13:10:18] [Render thread/INFO] [projectatmosphere/]: T207_PHASES_ALLOC phases=4 format=RGBA16F+depth+RGBA16Faux size=1200x675 bytes=64800000
+[13:10:18] [Render thread/INFO] [projectatmosphere/]: T207_RESOLVED_ALLOC format=RGBA16F+depth size=2400x1350 bytes=38880000
+[13:10:25] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=T220_R0B_NEAREDGE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:10:25] [Render thread/INFO] [projectatmosphere/]: T098_CAPTURE_CONTROLS shot=T220_R0B_NEAREDGE stepScale=1.0 diagnosticStepBudget=0 legacyHitDepth=false legacyFinePromotion=false gpuMs=49.00249 deepScatter=1 cameraCloudDensity=0.00000
+[13:10:32] [Render thread/INFO] [projectatmosphere/]: T220_CAPTURE_LATTICE shot=8_NEAR_EDGE phaseTarget=1200x675 resolvedLattice=2400x1350
+[13:10:33] [Render thread/INFO] [projectatmosphere/]: T098_CAPTURE_COMPLETE group=7c34c912-7e59-45be-a02b-b5093fecfce3 shots=56 output=C:\Users\matga\Downloads\Project-Atmosphere\run\screenshots\t098\7c34c912
+[13:10:33] [Render thread/INFO] [projectatmosphere/]: T207_PHASES_ALLOC phases=4 format=RGBA16F+depth+RGBA16Faux size=400x225 bytes=7200000
+[13:10:33] [Render thread/INFO] [projectatmosphere/]: T207_RESOLVED_ALLOC format=RGBA16F+depth size=800x450 bytes=4320000

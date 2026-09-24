@@ -10,6 +10,36 @@ pixels the cloud layer has to draw it with: **at mid-field the edge occupies 1.5
 pixels, below the two it needs to be representable at all.** The defect is spatial resolution, not
 sampling along the ray, and no amount of extra march work can reach it.
 
+> ## CORRECTION, issued by T220
+>
+> **The DISPROVE decision below stands. One quantity in it does not.**
+>
+> This report counted the pixels an edge is drawn with against the **per-frame
+> phase target** (1200x675). That is not what the composite reads. The T207
+> temporal resolve builds its lattice at **twice the phase size** - the four
+> quarter-pixel phases place one ray at each of the 2x2 lattice sites - so the
+> composite's source in these captures was **2400x1350**, which is 1.5x the
+> 1600x900 frame, not 0.75x it.
+>
+> Every "width (native px)" figure below is therefore **half the correct sample
+> count**. The edge spans **3.0-3.4 lattice samples at mid-field and 7.5 at
+> NEAR_EDGE**, not 1.50-1.69 and 3.75. It was never below the two samples an
+> edge needs, and the sentence "below the two it needs to be representable at
+> all" is withdrawn, together with the fourth bullet of item 42 and the next
+> target named in item 44.
+>
+> T220 then tested the premise directly and it failed: doubling the internal
+> scale to 1.0 (phase 1600x900, lattice 3200x1800) leaves the edge transition
+> width at **5.00 px at NEAR_EDGE in every arm** and moves SIDE by one
+> measurement bin, while two captures of the *same* configuration differ by more
+> than the resolution change does. See
+> `t220-adaptive-edge-resolution.md`. The residual cause is **re-opened, not
+> resolution**.
+>
+> What is unaffected: the stride convergence, the budget-matched arms, the
+> temporal off/on comparison and the composite period-4 test - that is, every
+> measurement that produced the DISPROVE.
+
 ## RECOVERY
 
 1. Starting HEAD: `20dd6f4` (T218, "the buried interior is visibility-limited, not
@@ -59,7 +89,7 @@ explain why it would survive the jitter.
 9. Edge gradient / transition width, measured as the 10-90% rise of the sky-minus-cloud scalar
    **along the local edge normal** so a diagonal edge is not credited with extra width:
 
-| view | distance factor | tangent dist | width (frame px) | blocks/px | **width (blocks)** | **width (native px)** |
+| view | distance factor | tangent dist | width (frame px) | blocks/px | **width (blocks)** | ~~width (native px)~~ (see CORRECTION) |
 |---|---|---|---|---|---|---|
 | NEAR_EDGE | 1.12 | 338 | 5.00 | 0.459 | 2.29 | **3.75** |
 | L120 | 1.20 | 444 | 4.25 | 0.603 | 2.56 | 3.19 |
@@ -73,9 +103,12 @@ explain why it would survive the jitter.
 
 **The boundary is constant in world units (2.29-3.31 blocks, mean 2.83) and shrinks as 1/distance
 in pixels.** That is the signature of a world-space length scale, which rules out every purely
-screen-space cause at the start. The last column is the one the decision rests on: expressed in
-the pixels of the layer that actually draws it, the edge falls from 3.75 px near to **1.50-1.69 px
-at mid-field**.
+screen-space cause at the start. That part stands and is what the DISPROVE rests on.
+
+**The last column is wrong** - it divides by the per-frame phase target rather than the temporal
+lattice the composite actually reads, which is twice its size. The correct sample counts are
+double these (7.5 at NEAR_EDGE, 3.0-3.4 at mid-field), and no conclusion may be drawn from this
+column. See the CORRECTION at the top.
 
 ## ATTRIBUTION
 
@@ -296,40 +329,30 @@ times**. Only matched-pose deltas within this run are meaningful, as T217 and T2
       halving the stride at a matched iteration budget leaves the transition width and the
       one-pixel-step fraction flat, while costing +26 to +52 ms. Production is also not
       truncating: raising the cap three-fold moves 1.00% of pixels by more than one level.
-    - **What is left is resolution.** The boundary is a genuine world-space band of 2.29-3.31
-      blocks (mean 2.83), constant across a 2.4x distance range. Expressed in the pixels of the
-      layer that draws it - 1200x675, the 0.75 internal scale - that band falls from **3.75 px at
-      1.12 R to 1.50-1.69 px at 1.7-1.9 R**. Below two samples an edge cannot be represented
-      without aliasing, and mid-field is precisely where the projection crosses that line. That is
-      why the defect is reported at mid-field and not near, and why it is invariant to everything
-      done along the ray.
+    - ~~**What is left is resolution.**~~ **WITHDRAWN by T220.** This bullet divided the band
+      by the per-frame phase target instead of the temporal lattice, undercounting the samples an
+      edge is drawn from by a factor of two, and the premise it stated was then tested and failed:
+      doubling the internal scale changes the edge by less than two captures of the same
+      configuration differ from each other. The residual cause is re-opened. See
+      `t220-adaptive-edge-resolution.md`.
 
-    The march is doing its job correctly and the answer it produces is then sampled too coarsely
-    to show. Spending more samples along the ray refines a quantity that was already converged.
+    What survives is the negative result and it is unambiguous: the march is converged, the
+    temporal resolve is not the actor, the composite is not point-sampling, and spending more
+    samples along the ray refines a quantity that was already converged. What the residual IS
+    remains to be attributed.
 
 43. Production constant/change: **none.** `PRODUCTION_EDGE_STEP_MODE = 0`; no pinned constant,
     no morphology, no density, no extinction, no temporal or composite path was touched. The
     shipped shader differs from `20dd6f4` only by comments recording what was measured.
 
-44. **Exact next visual target: the cloud layer's internal resolution at mid-field, judged as an
-    edge-representation problem rather than an upscaling one.** The measurement that matters is
-    already in hand - the edge occupies 1.5-1.7 native pixels where it looks worst - so the
-    question for the next task is which of these actually buys representable edges, priced against
-    the <=10 ms budget:
-
-    - raising the internal scale only where the projected edge falls below ~2 native pixels,
-      rather than globally;
-    - an edge-aware composite that reconstructs sub-pixel coverage from the layer's own alpha
-      gradient, which is information the current bilinear path discards;
-    - accepting it, on the evidence that the band is physically correct and the artefact is a
-      display-resolution limit.
-
-    **T209 is the prior and must be read first:** it measured the spatial upscale methods and
-    banked bilinear, rejecting EASU and bicubic both statically and in motion, with
-    `PRODUCTION_SPATIAL_UPSCALE = -1`. T219 does not reopen that decision - it identifies a
-    different quantity (how many native pixels the edge spans before any upscale runs) and that
-    is what the next task should attribute. Do not start by changing the upscale filter; T209
-    already measured that lever.
+44. ~~**Exact next visual target: the cloud layer's internal resolution at mid-field.**~~
+    **SUPERSEDED by T220, which measured it and found nothing.** Internal resolution is not the
+    lever: the lattice was already 1.5x the frame at production and 2x at the 1.0 arm, and the
+    edge did not move. The next target is named in `t220-adaptive-edge-resolution.md`, which also
+    records a methodological correction that applies retroactively to this report - the staircase
+    run-length and one-pixel-step statistics used here measure a level-set contour's **slope**,
+    not aliasing, and a perfectly antialiased edge produces the same numbers. Only the transition
+    WIDTH is diagnostic, and by that measure these edges are resolved.
 
 
 ## VALIDATION

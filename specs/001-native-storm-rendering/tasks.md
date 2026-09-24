@@ -3968,6 +3968,53 @@ implementation, while visual polish remains independently active.
   `PRODUCTION_SPATIAL_UPSCALE = -1`, so do NOT start by changing the upscale filter - T219
   identifies a different quantity (native pixels per edge before any upscale runs).
   [SC-005, SC-016, SC-021]
+- [X] T220 [QUALITY] [US1] Adaptive edge representation / internal resolution: can mid-field edges
+  be given enough native samples without full-res cloud rendering? **CASE C - the question does
+  not apply. Nothing productionized; production byte-identical to `4c2f92d`. T219's residual
+  diagnosis is CORRECTED IN PLACE and the residual cause is RE-OPENED.** **T219 COUNTED THE WRONG
+  GRID.** `CloudTemporalResolveRenderer` allocates the resolve target at `phase0.width*2,
+  phase0.height*2` - the four quarter-pixel phases place one ray per 2x2 lattice site - and the
+  composite reads THAT, not the phase target. Logged this run: production phase **1200x675 ->
+  lattice 2400x1350** against a 1600x900 frame, i.e. **1.50x the frame**; the 1.0 arm gives
+  3200x1800 (**2.00x**); even the 0.50 arm gives 1600x900 (**1.00x**). **The composite is
+  minifying or one-to-one in every arm and the layer was never short of samples.** T219's
+  "1.50-1.69 native px per edge" is half the true count - the edge spans **3.0-3.4 lattice samples
+  at mid-field, 7.5 at NEAR_EDGE**. UPPER BOUND TESTED AND NULL: four arms adjacent, R0B repeating
+  production as the control. NEAR_EDGE median transition is **5.00 px in every arm** (w10 5.00,
+  w90 6.75, hard-edge 1.7%->1.6%); SIDE moves one measurement bin 2.75->2.25 px. **The control
+  settles it: two captures of the IDENTICAL configuration differ by 0.363 mean / 6.07% of pixels
+  >1 8-bit at SIDE, while doubling the resolution differs by 0.115 / 1.87% - three times
+  SMALLER than the harness's own repeat.** Body mean moves <=0.02 8-bit everywhere; the 6x crops
+  are indistinguishable. Cost +23.3 ms (SIDE) / +37.8 ms (NEAR_EDGE) at the capture pin, and T209's
+  shipping-scale full-native is 51.1 ms cloud against 7.47 ms production - but cost was never the
+  reason; **it does not work**. Also: the "<2 px under-resolved" fraction goes UP with resolution
+  (40.3%->48.3% at SIDE) because R1 renders a NARROWER transition - the criterion counts sharpness
+  as a defect, while the world-block column converges toward the physical ~2.8 blocks from above
+  (3.38->2.77) and is already there at NEAR_EDGE (2.26 in all three arms). **SECOND CORRECTION,
+  RETROACTIVE: the staircase run-length and step-height metrics measure CONTOUR SLOPE, NOT
+  ALIASING.** On a synthetic perfectly-antialiased edge, step==1 is **100%** and run length is
+  exactly `1/slope`, **independent of ramp width** (a 1-px and a 5-px ramp give identical 2.86).
+  The "terracing signal" in T219 was an instrument artefact; only transition WIDTH is diagnostic,
+  and by it these edges are resolved. **Four stages are now cleared by measurement** - march
+  stride/cap, temporal resolve, composite filter, internal resolution - **and the residual is
+  UNATTRIBUTED**; the complaint has not yet been reduced to a measured quantity. T209 read in full
+  first, and its binding constraint recorded: the native silhouette is a SOFT density falloff, so
+  an edge-adaptive kernel that steepens it moves AWAY from native - **sharpening is the wrong
+  direction**, which rules out that whole family. `performance-internal-resolution.md` had already
+  measured the resampling beat AND rejected the composite-side fix (`CoverageAlphaReconstruction`
+  changes 0.0000-0.0033% of pixels); not reopened. HARNESS: at 0.75 the frame is **not
+  deterministic at the one-level scale between identical arms** (each rebuilds targets and
+  re-converges four phases from a different parity) - any future edge A/B needs a
+  same-configuration repeat or it will read that as signal. Kept in the tree: one log line,
+  `T220_CAPTURE_LATTICE`, recording phase target AND resolved lattice with every capture - the
+  line that would have prevented this. campaignGate x2, check build, morphology sandbox all PASS.
+  Evidence in `validation/t220-adaptive-edge-resolution.md` and `validation/t220-campaign/`.
+  Next: **define the defect against a supersampled reference before attributing anything further**
+  - render one pose large, box-filter to frame size, and measure production against it as a
+  difference image rather than a contour statistic; and look at the SURFACE, not the silhouette
+  (the crops show the puff mass reading as flat-shaded polygonal cells whose boundaries the
+  silhouette follows - if that is the complaint it is lobe/union geometry or Worley cellularity,
+  i.e. morphology or lighting, not sampling). [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
