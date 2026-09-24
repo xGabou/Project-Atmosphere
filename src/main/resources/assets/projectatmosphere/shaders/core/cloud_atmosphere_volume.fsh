@@ -1391,6 +1391,8 @@ uniform int PaLegacyFinePromotion;
 // where alpha has saturated and view 1 is therefore blank. Monolith only.
 // T222 adds the density COMPOSITION STAGES of the sample itself: 4 pre-erosion
 // body, 5 post-erosion body, 6 macro coverage envelope (see paSigPos).
+// T223 adds the base field: 7 B0 (as the density uses it) and 8 B1, one
+// coarser version - an emulated mip-2 fetch (see paBaseMip2Field).
 uniform int PaDiagnosticLightingMode;
 uniform int PaRayTraceMode;
 uniform vec2 PaRayTraceNdc;
@@ -1482,6 +1484,13 @@ vec3 paSigPos = vec3(1.0e30);
 float paSigCoverage = -1.0;
 float paSigBody = -1.0;
 float paSigEroded = -1.0;
+// T223. The base field as the density uses it (B0) and ONE coarser version of
+// it (B1) at the same sample, recorded with the same position. B1 is what a
+// mip-2 fetch of the base texture would deliver: the raw texel channels
+// averaged over a 12.5-block box (4 texels, the finest Worley period), then the
+// production carrier math and remap - the only low-pass that can be one fetch.
+float paSigB0 = -1.0;
+float paSigB1 = -1.0;
 
 float paCdAfterErosion = 0.0;
 float paCdAfterMaterial = 0.0;
@@ -2805,6 +2814,26 @@ float stormBody(
 // Normalizes the high-biased Perlin-Worley carrier onto its measured range.
 float stormBaseField(float carrier) {
     return smoothstep(STORM_CARRIER_P05, STORM_CARRIER_P95, carrier);
+}
+
+// T223 diagnostic only. The base texture has NO mip chain (GL_LINEAR, level 0
+// only), so a coarser level cannot be fetched; this emulates mip 2. Each tap is
+// already a trilinear read over one texel, so eight taps at +/- one texel
+// around the sample plus the centre cover a 4-texel (12.5-block) box. The RAW
+// channels are averaged first and the carrier math and remap applied after,
+// exactly as a shader reading a real mip level would.
+float paBaseMip2Field(vec3 coord, float texel) {
+    vec4 sum = texture(BaseNoiseSampler, coord, 0.0);
+    for (int k = 0; k < 8; k++) {
+        vec3 dir = vec3(
+            (k & 1) != 0 ? 1.0 : -1.0,
+            (k & 2) != 0 ? 1.0 : -1.0,
+            (k & 4) != 0 ? 1.0 : -1.0);
+        sum += texture(BaseNoiseSampler, coord + dir * texel, 0.0);
+    }
+    vec4 n = sum / 9.0;
+    float lowFbm = n.g * 0.625 + n.b * 0.25 + n.a * 0.125;
+    return stormBaseField(saturate(remap(n.r, -(1.0 - lowFbm), 1.0, 0.0, 1.0)));
 }
 
 bool stormDescriptorIsValid(int descriptorIndex) {
@@ -6580,6 +6609,16 @@ float shift = (deckWeight * blocksPerSd
                 paSigBody = cloud;
                 paSigEroded = cloud;
                 paSigPos = p;
+                if (PaDiagnosticLightingMode >= 7) {
+                    // T223. The same domain the body fetch used, so B0 is the
+                    // production base field exactly; a world offset of d
+                    // blocks is d * scale in texture units (orthonormal
+                    // rotation; the slow warp is constant over 25 blocks).
+                    vec3 paB0Coord = baseNoiseDomain(samplePos, baseNoiseScale);
+                    paSigB0 = stormBaseField(baseCarrier);
+                    // One texel of the 128^3 texture over a 1/scale tile.
+                    paSigB1 = paBaseMip2Field(paB0Coord, 1.0 / 128.0);
+                }
             }
             if (paTraceCapture) {
                 paCdAfterStormBody = cloud;
@@ -8019,7 +8058,7 @@ vec3 sampleLighting(
         bool cameraStartsInsideSlab,
         bool cameraInsideCloud,
         out float diagnosticLightOpticalDepth) {
-    if (PaDiagnosticLightingMode >= 4 && PaDiagnosticLightingMode <= 6) {
+    if (PaDiagnosticLightingMode >= 4 && PaDiagnosticLightingMode <= 8) {
         // Valid only when the stages were written at THIS point - the light
         // cone overwrites them, so position is the proof of ownership.
         bool paSigValid = distance(paSigPos, p) < 0.01;
@@ -8031,7 +8070,9 @@ vec3 sampleLighting(
             return vec3(1.0, 0.0, 1.0);
         }
         float stage = PaDiagnosticLightingMode == 4 ? paSigBody
-            : PaDiagnosticLightingMode == 5 ? paSigEroded : paSigCoverage;
+            : PaDiagnosticLightingMode == 5 ? paSigEroded
+            : PaDiagnosticLightingMode == 6 ? paSigCoverage
+            : PaDiagnosticLightingMode == 7 ? paSigB0 : paSigB1;
         return vec3(saturate(stage));
     }
     if (PaDiagnosticLightingMode == 1) {

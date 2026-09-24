@@ -4087,6 +4087,33 @@ implementation, while visual polish remains independently active.
   **a LOW-PASSED base field** - a mip-biased fetch of the base carrier (one texture fetch, not a
   density evaluation) - attributed on its own billow-to-vein ratio BEFORE any candidate uses it; or
   T223, the camera-altitude light reach. [SC-005, SC-016, SC-021]
+- [X] T223 [QUALITY] [US1] Smoothed base-noise form signal: can a cheap low-pass / coarser-LOD
+  sample of the base-noise texture separate large billows from the vein network? **Signal FAILS -
+  density-derived shadow-form lighting CLOSED. No candidate, no production change.** FOUND FIRST:
+  **the base (and detail) noise textures have NO mip chain** - `GL_LINEAR`, level 0 only - so a
+  coarser level cannot be fetched and **every `mipBias` on them in production is inert** (the light
+  cone's per-tap `i*0.6`, and T218's "LOD 1.2" forward probe, all read level 0). Mipmapping the
+  shared texture would switch all of that on across production, so it was not done. ONE coarser
+  version, as required: an **emulated mip-2 fetch** (raw channels averaged over a 12.5-block box,
+  then the production carrier math and remap - the only low-pass that could be one fetch). Same
+  samples, **0 mismatches**, fixture `2575e7d1`, all four poses valid, dome and lower mass split.
+  Vein correlation with production B0 -> B1: dome **+0.083->+0.102, +0.109->+0.129,
+  +0.002->-0.001, +0.329->+0.332**; lower mass -0.029->-0.011, +0.392->+0.408, +0.131->+0.137,
+  +0.425->+0.432 - **not lower anywhere**. Form retained (within 0.01). Billow:vein only
+  **1.04-1.17x**. Features ~1 block broader. **B1's ridge map sits on B0's at 0.93-0.98 - the same
+  vein topology, blurred**, and so at 1:1. MECHANISM: the base field is `smoothstep(0.7128, 0.8451,
+  carrier)`, a 0.13-wide threshold on a ~109-block carrier; **the veins are that threshold's
+  iso-contours, not a frequency band** - a 12.5-block average barely moves the carrier (low band
+  0.1274 -> 0.1264), so the contours stay and the smoothstep redraws them thin (fine band -10%). Any
+  signal read through that smoothstep carries the veins; any not read through it is not the dome's
+  form (T222: macro envelope). **T221-T223: three signals, one mechanism - stop this line.** Kept:
+  views 7 (B0) and 8 (B1) on `PaDiagnosticLightingMode`, writes gated behind mode >= 7, production
+  never runs them; driver byte-identical to `99bc732`. campaignGate x3, check build, morphology
+  sandbox PASS. Evidence in `validation/t223-smoothed-base-shadow-form.md` and
+  `validation/t223-campaign/`. Next: **T224, the camera-altitude light reach** (4 taps / 102 blocks
+  inside the layer vs 6 / 240 below) - price it first; the cap exists for cost. If the dome's
+  flatness is revisited later, the lever is the shadowed lighting model itself, not a
+  density-derived modulation of it. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
