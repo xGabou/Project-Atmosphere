@@ -728,7 +728,11 @@ final class StormT152MovingCameraFixture {
                 VolumetricCloudDebugConfig.setOriginJitterMode(originalOriginJitterMode);
                 VolumetricCloudDebugConfig.setMacroEnvelopeMode(originalMacroEnvelopeMode);
                 VolumetricCloudDebugConfig.setLowerBodyMode(originalLowerBodyMode);
-                VolumetricCloudDebugConfig.setDeepScatterMode(0);
+                // The production value, not zero: deep scatter has shipped at
+                // 1 since T217, and restoring 0 left any later frame in the
+                // same session rendering without it (found in T221).
+                VolumetricCloudDebugConfig.setDeepScatterMode(
+                        VolumetricCloudDebugConfig.PRODUCTION_DEEP_SCATTER_MODE);
                 VolumetricCloudDebugConfig.setRainHeavyForced(false);
             }
             historyOverrideApplied = false;

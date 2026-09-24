@@ -913,14 +913,21 @@ public final class StormT098CaptureDriver {
             ProjectAtmosphere.LOGGER.info(
                     "T098_CAPTURE_CONTROLS shot={} stepScale={} diagnosticStepBudget={}"
                             + " legacyHitDepth={} legacyFinePromotion={} gpuMs={}"
-                            + " deepScatter={} cameraCloudDensity={}",
+                            + " deepScatter={} cameraCloudDensity={}"
+                            + " lightingMode={} fieldBits={} leanFinal={}",
                     shot.name(), VolumetricCloudRenderer.governorStepScale(),
                     VolumetricCloudRenderer.diagnosticStepBudget(),
                     VolumetricCloudDebugConfig.t098LegacyHitDepth(),
                     VolumetricCloudDebugConfig.t098LegacyFinePromotion(),
                     fmt(VolumetricCloudRenderer.lastGpuMilliseconds()),
                     VolumetricCloudDebugConfig.deepScatterMode(),
-                    fmt(CameraCloudDensityTracker.smoothedCameraDensity()));
+                    fmt(CameraCloudDensityTracker.smoothedCameraDensity()),
+                    VolumetricCloudDebugConfig.diagnosticLightingMode(),
+                    VolumetricCloudDebugConfig.stormFieldForcedOnMonolith(),
+                    VolumetricCloudRenderer.diagnosticStepBudget() == 0
+                            && VolumetricCloudDebugConfig.diagnosticLightingMode() == 0
+                            && VolumetricCloudDebugConfig.stormFieldForcedOnMonolith()
+                                    == StormFieldGeometry.PRODUCTION_CONSUMER_BITS);
             ProjectAtmosphere.LOGGER.info("T098_CAPTURE_DENSITY shot={} {}",
                     shot.name(),
                     StormDensityCalibrationReport.describe(shot.x(), shot.y(), shot.z()));

@@ -4015,6 +4015,50 @@ implementation, while visual polish remains independently active.
   (the crops show the puff mass reading as flat-shaded polygonal cells whose boundaries the
   silhouette follows - if that is the complaint it is lobe/union geometry or Worley cellularity,
   i.e. morphology or lighting, not sampling). [SC-005, SC-016, SC-021]
+- [X] T221 [QUALITY] [US1] Puff cell / structural shading attribution: what creates the flat /
+  cellular puff look? **Attribution CASE B - LIGHTING, not shape; the one candidate REJECTED; no
+  production change.** Reference = the same storm at internal scale 1.0 (lattice exactly 2x the
+  frame, so the composite is a 2x2 box downsample): production matches it to silhouette IoU
+  0.9994-0.9995, body |d| 0.12-0.14, gradient corr 0.98-0.99, identical cell statistics - **the
+  cells are in the supersampled reference too**. Metrics calibrated on synthetic images first:
+  flat fraction and gradient sparsity separate smooth from cellular (smooth 11.9%/0.394, Voronoi
+  91.2%/1.000); **edge coherence FAILED calibration and was dropped**; an 8-bit smooth field at the
+  real gradient scale scores 57%/0.48 against production's 80-84%/0.97-0.99, so the plateau-and-
+  ridge structure is real. PRIMARY SPLIT: shape-only (constant radiance) is uniformly flat and the
+  ALPHA view saturated - **no cells in coverage**; a new LIGHT-PATH-ONLY view carries the same
+  network and production's ridge map matches it at **0.90-0.98**. Split at the neck, TWO regimes:
+  the **dome** sits at light-path od **6.7-7.9** (median), where every term is constant - **the
+  shadow floor**, 59-91% flat - while a new LOCAL-DENSITY view shows the density under it still
+  varying (3-8% flat): the shape is there, shadowed ambient discards it. The **lower mass** is lit
+  (od **0.64-0.88**), on the steep part of the response, and its veins are the light path's own
+  structure. Excluded by paired arms: **shared field** (field-off light changes cell stats not at
+  all - flat 83.1 vs 83.7%, sparsity 0.985 vs 0.988 - its effect is LOW-frequency, SIDE-dome RMS
+  8.55 with no power at the 12.6x21.8 px node spacing); **light-tap spacing** (first tap 3.5 instead
+  of 14 blocks, double taps, matched reach: sparsity -0.02 to -0.035, vein score 0.316 vs 0.314);
+  **local density** (ridge corr production vs density view 0.04-0.63); **detail/erosion on the light
+  taps** (turned off: veins stay, corr 0.97-0.99, score 0.340->0.379). By elimination the lower-mass
+  veins are the base field / envelope sampled sunward - elimination, not direct isolation. **FOUND:
+  the in-slab light-cone cap (4 taps, 102-block reach) applies whenever the CAMERA is vertically in
+  the slab, so every capture pose ran it - and the lower mass is lit under a ~400-block anvil with
+  an overhead sun because 102 blocks never reaches it; a gameplay camera below the slab runs 6
+  taps / 240 blocks. Self-shadowing depends on camera altitude.** STRUCTURE is a separate defect
+  (shape, not lighting): lower mass one coherent body (largest component 98-99.8%), neck 0.33-0.55
+  of its width at the low views. CANDIDATE, the one the attribution supports: a mean-preserving
+  **shadow form term** - ambient modulated +/-20% by local density, weighted by 1 - direct
+  transmission, no fetch, on FINAL. It broke the dome plateau (flat 62->33%, 89->58%, 59->27%) and
+  gave real billowing - **and imported the local density's erosion veins** (dome lower-third vein
+  score +16% SIDE, **+35%** NEAR_EDGE, visible at 1:1): the same defect class moved. **REJECTED on
+  stills, so no motion run**; T221M was wired and removed with it. Kept: two new attribution views on
+  T136's `PaDiagnosticLightingMode` (2 light path only, 3 local density), now an integer mode;
+  `lightingMode`/`fieldBits`/`leanFinal` on every CONTROLS line; and a **harness bug fix** - T152
+  restored deep scatter to 0 at route end though production has been 1 since T217. Removed:
+  `PaLightRefine`, `PaShadowForm`, the arm plumbing, T221M; the light cone is byte-identical to
+  `042ab1b`. campaignGate x6, check build, morphology sandbox PASS. Evidence in
+  `validation/t221-puff-cell-attribution.md` and `validation/t221-campaign/`. Next: **the same
+  shadow form term fed by the UN-ERODED body density** (billows, not veins) - `cloudDensity` exposes
+  the pre-erosion body, no extra fetch - judged on vein score and dome flatness together, then on
+  motion. Behind it, separately: the camera-altitude-dependent light reach, and a base-vs-lobe
+  isolation of the lower-mass veins. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

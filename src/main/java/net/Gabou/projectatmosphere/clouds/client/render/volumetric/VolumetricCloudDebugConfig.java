@@ -29,6 +29,12 @@ public final class VolumetricCloudDebugConfig {
      */
     private static volatile boolean t136ConstantLighting;
     /**
+     * T221 lighting attribution views. 0 production; 1 constant radiance
+     * (shape only); 2 light-path transmittance only; 3 local density.
+     * Diagnostic; routes to the monolith. T136's boolean still forces 1.
+     */
+    private static volatile int diagnosticLightingMode;
+    /**
      * T161 A/B arm. Null lets the renderer pick the program automatically: the
      * lean FINAL build whenever the frame's uploads match its baked-in
      * constants, and the diagnostic monolith otherwise. A non-null value pins
@@ -341,6 +347,15 @@ public final class VolumetricCloudDebugConfig {
 
     public static void setT136ConstantLighting(boolean enabled) {
         t136ConstantLighting = enabled;
+    }
+
+    /** The value uploaded as PaDiagnosticLightingMode. */
+    public static int diagnosticLightingMode() {
+        return t136ConstantLighting ? 1 : diagnosticLightingMode;
+    }
+
+    public static void setDiagnosticLightingMode(int mode) {
+        diagnosticLightingMode = Math.max(0, Math.min(3, mode));
     }
 
     public static boolean t098LegacyFinePromotion() {

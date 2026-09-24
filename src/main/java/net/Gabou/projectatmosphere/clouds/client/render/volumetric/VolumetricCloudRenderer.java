@@ -796,7 +796,7 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("PaLegacyFinePromotion").set(
                 VolumetricCloudDebugConfig.t098LegacyFinePromotion() ? 1 : 0);
         shader.safeGetUniform("PaDiagnosticLightingMode").set(
-                VolumetricCloudDebugConfig.t136ConstantLighting() ? 1 : 0);
+                VolumetricCloudDebugConfig.diagnosticLightingMode());
         shader.safeGetUniform("PaRayTraceMode").set(StormProductionRayTrace.shaderMode());
         shader.safeGetUniform("PaRayTraceNdc").set(
                 StormProductionRayTrace.ndcX(), StormProductionRayTrace.ndcY()
@@ -1280,7 +1280,7 @@ public final class VolumetricCloudRenderer {
                 && !StormMaterialRuntimeTrace.active()
                 && !VolumetricCloudDebugConfig.t098LegacyHitDepth()
                 && !VolumetricCloudDebugConfig.t098LegacyFinePromotion()
-                && !VolumetricCloudDebugConfig.t136ConstantLighting()
+                && VolumetricCloudDebugConfig.diagnosticLightingMode() == 0
                 // T199. The field rows of leanFinalConstants: consumer bits
                 // 11 and the audit selectors 0 (the grid, 256, has no runtime
                 // state since T199h). A campaign that moves the monolith off

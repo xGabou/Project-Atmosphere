@@ -1383,6 +1383,12 @@ uniform int PaLegacyFinePromotion;
 // T136 cost-attribution arm only. 1 replaces the whole lighting evaluation,
 // including its light-cone march, with a constant radiance, so the difference
 // in cloud GPU time is the lighting share. Zero in production.
+// T221 added two attribution VIEWS, kept because they decided T221: 2 is the
+// LIGHT-PATH-ONLY view - the production light cone runs exactly as shipped
+// (field lookups included) and its transmittance is written as grey with no
+// phase, scatter, ambient or tone curve - and 3 is the LOCAL-DENSITY view,
+// each sample's own density as grey, which shows the shape inside regions
+// where alpha has saturated and view 1 is therefore blank. Monolith only.
 uniform int PaDiagnosticLightingMode;
 uniform int PaRayTraceMode;
 uniform vec2 PaRayTraceNdc;
@@ -7990,6 +7996,26 @@ vec3 sampleLighting(
         // A plausible mid-grey so the march still integrates a real colour.
         diagnosticLightOpticalDepth = 0.0;
         return vec3(0.62, 0.66, 0.74);
+    }
+    if (PaDiagnosticLightingMode == 3) {
+        // T221 local-density view.
+        diagnosticLightOpticalDepth = 0.0;
+        return vec3(saturate(localDensity / (0.80 * max(DensityMul, 0.001))));
+    }
+    if (PaDiagnosticLightingMode == 2) {
+        // T221 light-path-only view. The optical depth is the production one,
+        // taken through the production call, so any structure the light cone
+        // carries is carried here and nothing else is.
+        float pathDepth = rainFraction > 0.05
+            ? localDensity * 8.0 * ExtinctionScale
+            : lightMarchOpticalDepth(
+                p,
+                localDensity,
+                cameraStartsInsideSlab,
+                cameraInsideCloud
+            ) * ExtinctionScale;
+        diagnosticLightOpticalDepth = pathDepth;
+        return vec3(exp(-0.5 * pathDepth));
     }
     // Fine rain streaks do not need a full cloud light cone. Avoid paying the
     // multi-sample self-shadow march for every precipitation step.
