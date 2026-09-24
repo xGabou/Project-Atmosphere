@@ -1,0 +1,50 @@
+=== T219 mid-field edge quantization ===
+fixture: 10 descriptors, noise=true, extinction=0.1150 densityMul=1.450 fineStep=2.50 coarseStep=7.50
+
+SIDE pose: centre=(-2.4,-2.2) baseY=224.0 topY=524.0 radius=166.0 -> camera=(279.8,374.0,-2.2)
+
+--- STEP A: alpha band width vs march step ---
+A fan of rays sweeps across the silhouette; for each stride the 10-90% rise of accumulated alpha is measured in world blocks at the
+tangent point, then converted to capture pixels. 'phase' means a uniform random origin offset over one stride, which is what production's
+blue-noise jitter does. If the band collapses with the stride the cause is the march; if it converges, the cause is the field.
+stride blocks|origin phase|band blocks|band px|alpha at edge+1 block|rays
+7.500|no|5.484|17.702|0.950|4316
+2.500|no|4.920|15.882|0.949|4316
+1.250|no|4.963|16.022|0.949|4316
+0.625|no|4.954|15.991|0.949|4316
+0.250|no|4.956|15.998|0.949|4316
+0.050|no|4.956|15.998|0.949|4316
+-- the same strides with a per-ray origin phase --
+7.500|yes|4.898|15.811|0.949|4316
+2.500|yes|4.965|16.025|0.949|4316
+1.250|yes|4.954|15.992|0.949|4316
+0.625|yes|4.957|16.000|0.949|4316
+0.250|yes|4.956|15.999|0.949|4316
+
+--- STEP B: the density field's own feather ---
+Density sampled straight outward along the radius at mid height. This is the field, with no ray integration at all, so it is the
+length scale any correct renderer must reproduce.
+quantity|blocks
+peak density on this radius|0.4346
+10%-90% density rise|34.650
+zero to first material|0.050
+blocks per capture pixel at this pose|0.3098
+10%-90% density rise in pixels|111.849
+
+--- STEP C: the grazing-chord floor ---
+Even a perfectly sharp density boundary produces a soft silhouette, because the chord through a convex body grows as sqrt(depth) at the
+tangent. This is that floor for the measured body radius, and it is the width no sampling change can go below.
+hard-sphere 10%-90% alpha band|0.475 blocks|1.533 px
+  (R=166.0, sigma=0.09171/block, tangent distance 228.2)
+
+--- STEP D: band vs camera distance ---
+The captured frames show the boundary band constant in WORLD blocks and shrinking as 1/distance in PIXELS. If this model reproduces that
+trend it is describing the same boundary the renderer draws, which is what licenses the STEP A conclusion.
+distance factor|tangent dist|blocks per px|band blocks (2.5 stride)|band px|band blocks (0.05 ref)|band px
+1.12|83.7|0.1137|6.109|53.749|6.146|54.073
+1.20|110.1|0.1495|6.138|41.063|6.109|40.867
+1.40|162.6|0.2208|5.505|24.935|5.594|25.336
+1.70|228.2|0.3098|4.920|15.882|4.956|15.998
+1.90|268.2|0.3641|4.861|13.352|4.877|13.398
+
+=== T219 sandbox complete ===

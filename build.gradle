@@ -1908,6 +1908,15 @@ tasks.register('stormT160UpperEnvelopeSandbox', JavaExec) {
     workingDir = project.rootDir
 }
 
+tasks.register('stormT219EdgeQuantizationSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T219: separates march-step quantization from the density fields own feather at a mid-field puff edge. Diagnostic only.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormT219EdgeQuantizationSandbox'
+    workingDir = project.rootDir
+}
+
 tasks.register('stormT218InteriorStructureSandbox', JavaExec) {
     group = 'project atmosphere'
     description = 'T218: measures buried-interior density structure by spatial scale, what survives transmittance weighting, and the inside light estimator against 4/8/full sampling. Diagnostic only.'

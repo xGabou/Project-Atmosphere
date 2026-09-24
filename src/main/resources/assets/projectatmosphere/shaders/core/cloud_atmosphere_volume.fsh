@@ -8975,6 +8975,14 @@ void main() {
     // whiteout cost, but give every exterior view a quality-scaled world-space
     // surface step.
     float legacyFineStep = max(baseStep * 0.5, 2.0);
+    // T219 measured this stride rather than changing it. The cloud/sky boundary
+    // it produces is already converged: marching 50x finer (0.05 blocks against
+    // this 2.5) moves the 10-90% alpha band by 0.7%, at every distance on the
+    // ladder, and halving it in the renderer at a matched iteration budget
+    // leaves the edge transition width and the one-pixel-step fraction flat for
+    // +26 to +52 ms. The mid-field staircase is not march quantization - the
+    // boundary is a real ~2.8-block band that lands on 1.5-1.7 pixels of the
+    // 1200x675 cloud layer, which is below what an edge needs to be drawn.
     float exteriorFineStep = clamp(ExteriorFineStep, 2.5, 8.0);
     float fineStep = cameraInsideCloud ? legacyFineStep : exteriorFineStep;
     float coarseStep = max(baseStep * 1.5, fineStep * 3.0);

@@ -3922,6 +3922,52 @@ implementation, while visual polish remains independently active.
   that defect lives where `4B` lives, 36x the mid-band contrast and 265 resolvable pockets, which
   is the regime where a rendering change can still reach the frame. The interior is closed.
   [SC-005, SC-016, SC-021]
+- [X] T219 [QUALITY] [US1] Mid-field puff-edge terracing: are the stair-stepped edges ray-march /
+  threshold quantization? **DISPROVE (CASE C). Nothing productionized; `PaEdgeStep` removed and
+  the production stride is byte-identical to `20dd6f4`.** The boundary is not quantized, it is
+  **under-resolved**. THE DEFECT, measured on the T218 capture set's distance ladder with the
+  10-90% rise taken along the local edge NORMAL: transition width **5.00 px at 1.12 R falling to
+  2.00-2.25 px at 1.7-1.9 R**, which in world units is **constant at 2.29-3.31 blocks (mean
+  2.83)** - a world-space length scale, so every purely screen-space cause is out at the start.
+  The decisive column is the same band in the pixels of the layer that DRAWS it (1200x675, the
+  0.75 internal scale): **3.75 px near, 1.50-1.69 px at mid-field.** Below two samples an edge
+  cannot be represented without aliasing, and mid-field is exactly where the projection crosses
+  that line - which is why the defect is reported there and nowhere else. ATTRIBUTION, three
+  stages, all cleared. **Composite:** a nearest-neighbour 4/3 upscale would leave a period-4
+  duplicate signature; restricted to edge pixels it is **0.300/0.293/0.299/0.288** for `x mod 4` -
+  flat. **Temporal:** history off vs on moves the body mean **+0.008 8-bit** with every edge
+  statistic within measurement resolution, so the staircase is already in the single-frame march.
+  **March stride:** offline (`stormT219EdgeQuantizationSandbox`, the production density path, no
+  GPU) the 10-90% alpha band is **4.920 blocks at production's 2.5 stride against 4.956 at a
+  0.05-block reference - 0.7% apart** - and holds within 0.7% at every distance on the ladder
+  while falling as 1/d in pixels; a perfectly hard sphere would give 0.475 blocks, so the ~5 is
+  the density envelope's own falloff, not a geometric floor. In the renderer, halving the stride
+  at a MATCHED iteration budget leaves NEAR_EDGE's median transition at **5.00 px in all five
+  arms** and SIDE's run-length and one-pixel-step fraction flat (5.04 -> 5.30, 76% -> 73%), while
+  `localSD` and gradient energy fall slightly - the refined arms are marginally SMOOTHER, never
+  crisper - for **+26.3 ms (SIDE) / +52.4 ms (NEAR_EDGE)**, 35-70x past the reject threshold.
+  Production is also **not truncating**: raising the iteration cap three-fold changes 1.00% of
+  SIDE pixels by more than one 8-bit level. Also recorded: the ray origin is phased per pixel by a
+  **full fine stride** (`originJitterMode == 0` returns `fineStep`), so lattice quantization is
+  dither rather than a coherent terrace, and a boundary is never crossed on the coarse stride -
+  the fine-lattice empty-span scan forces promotion first. **HARNESS LESSON: the first attribution
+  arm was INVALID and looked like a strong result.** Quartering the stride without raising the cap
+  exhausts the 128 iterations (a quarter-stride ray reaches 80 blocks in fine mode against a
+  ~1340-block system), so the frame **lost material** - body mean **+9.97 / +24.25 8-bit**, edges
+  apparently "softening" 1.75 -> 5.00 px - which is truncation dissolving the cloud, not
+  convergence. It was caught by looking at the frame (the lower mass had broken into fragments,
+  the anvil had lost its underside) rather than the table. **Any stride or budget arm needs a
+  budget-matched control**; mode 1 is that control and E1 -> E2 is the stride effect alone. Kept
+  in the tree: the sandbox and its Gradle task. No pinned constant touched; T213/T215/T217
+  unchanged; the shipped shader differs only by comments. campaignGate x4, check build, morphology
+  sandbox all PASS. Evidence in `validation/t219-midfield-puff-edge-terracing.md` and
+  `validation/t219-campaign/`. Next: **the cloud layer's internal resolution at mid-field, as an
+  edge-representation problem** - either raise internal scale only where the projected edge falls
+  below ~2 native pixels, or reconstruct sub-pixel coverage from the layer's own alpha gradient in
+  the composite, or accept it. **Read T209 first**: it banked bilinear and rejected EASU/bicubic,
+  `PRODUCTION_SPATIAL_UPSCALE = -1`, so do NOT start by changing the upscale filter - T219
+  identifies a different quantity (native pixels per edge before any upscale runs).
+  [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
