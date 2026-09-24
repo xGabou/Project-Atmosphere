@@ -897,12 +897,15 @@ public final class StormT098CaptureDriver {
             // frame, taken from the same camera position as the shot.
             ProjectAtmosphere.LOGGER.info(
                     "T098_CAPTURE_CONTROLS shot={} stepScale={} diagnosticStepBudget={}"
-                            + " legacyHitDepth={} legacyFinePromotion={} gpuMs={}",
+                            + " legacyHitDepth={} legacyFinePromotion={} gpuMs={}"
+                            + " deepScatter={} cameraCloudDensity={}",
                     shot.name(), VolumetricCloudRenderer.governorStepScale(),
                     VolumetricCloudRenderer.diagnosticStepBudget(),
                     VolumetricCloudDebugConfig.t098LegacyHitDepth(),
                     VolumetricCloudDebugConfig.t098LegacyFinePromotion(),
-                    fmt(VolumetricCloudRenderer.lastGpuMilliseconds()));
+                    fmt(VolumetricCloudRenderer.lastGpuMilliseconds()),
+                    VolumetricCloudDebugConfig.deepScatterMode(),
+                    fmt(CameraCloudDensityTracker.smoothedCameraDensity()));
             ProjectAtmosphere.LOGGER.info("T098_CAPTURE_DENSITY shot={} {}",
                     shot.name(),
                     StormDensityCalibrationReport.describe(shot.x(), shot.y(), shot.z()));

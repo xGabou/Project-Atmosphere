@@ -1425,12 +1425,9 @@ uniform int PaMacroEnvelope;
 // fade, where the measured perforation is; 2 is the restrained variant.
 uniform int PaLowerBodyFill;
 
-// T217. Deep-interior lighting attribution and multiple-scattering arms.
-// 0 = production. 1/2/3 are ATTRIBUTION ONLY and are removed once the cause is
-// established: 1 zeroes every direct term so the frame shows the ambient
-// contribution alone, 2 zeroes ambient so it shows the direct contribution
-// alone, and 3 is the negative control that lets an inside camera's light cone
-// march its full tap budget instead of the 4-tap cap.
+// T217. The deep-interior indirect term that ships. 1 is production, 0 turns it
+// off for the paired comparison. The ten exploratory modes the investigation
+// used did not survive into FINAL; this is the accepted term and its off arm.
 uniform int PaDeepScatter;
 
 bool paRayTraceActive() {
@@ -7386,6 +7383,14 @@ float lightMarchOpticalDepth(
         paArmLightingSample = false;
 #endif
         paDensityConsumer = 0;
+        // T218 measured this estimator rather than replacing it. It is a poor
+        // estimator of its own quantity - od SD 12.65 against a true 7.93,
+        // correlation 0.41 - because the 82%-weighted probe sits 28 blocks
+        // up-sun, where the density autocorrelation along LightDir is -0.20.
+        // It is deliberately left alone: at a buried camera d(8bit)/d(od) is
+        // -0.065, an 800-fold collapse from od 0.5, so a perfect optical depth
+        // is worth 0.01 of one 8-bit level here, and the 4- and 8-tap arms that
+        // deliver it cost 24-62 ms and measurably REDUCE local contrast.
         return localDensity * 18.0 + forwardDensity * 82.0;
     }
     int steps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);

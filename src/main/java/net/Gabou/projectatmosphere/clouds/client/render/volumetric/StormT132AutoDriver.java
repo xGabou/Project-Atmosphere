@@ -368,6 +368,7 @@ final class StormT132AutoDriver {
     private static boolean t211mRun;
     private static boolean t212mRun;
     private static boolean t217mRun;
+    private static boolean t218mRun;
     private static boolean restoreConfirmationAccepted;
     /**
      * The production configuration already has a debug/screenshot movement
@@ -470,6 +471,18 @@ final class StormT132AutoDriver {
      */
     private static boolean deepScatterMotionRunRequested() {
         return Files.exists(T217M_MARKER);
+    }
+
+    private static final Path T218M_MARKER = Path.of("t218-gate-motion.txt");
+
+    /**
+     * T218M. The gate-edge stress route. T217 validated its camera-density gate
+     * on a route that enters cloud once, with a metric that reads alpha only -
+     * and a radiance-only term cannot move alpha. This crosses the gate band
+     * repeatedly and judges it on luminance.
+     */
+    private static boolean gateEdgeMotionRunRequested() {
+        return Files.exists(T218M_MARKER);
     }
 
     /**
@@ -7133,6 +7146,7 @@ final class StormT132AutoDriver {
                             || originJitterMotionRunRequested()
                             || macroEnvelopeMotionRunRequested()
                             || deepScatterMotionRunRequested()
+                            || gateEdgeMotionRunRequested()
                             ? Phase.T152_BEGIN
                             : (performanceRunRequested()
                                     ? Phase.T135_PREPARE : Phase.BEGIN_T098));
@@ -7182,8 +7196,12 @@ final class StormT132AutoDriver {
                 t212mRun = macroEnvelopeMotionRunRequested();
                 // T217M. The deep-interior indirect term under motion.
                 t217mRun = deepScatterMotionRunRequested();
+                // T218M. The same arms on the gate-edge route.
+                t218mRun = gateEdgeMotionRunRequested();
                 VolumetricCloudDebugConfig.setRainHeavyForced(t210mRun);
-                String begun = StormT152MovingCameraFixture.begin(t217mRun
+                String begun = StormT152MovingCameraFixture.begin(t218mRun
+                        ? StormT152MovingCameraFixture.ArmSet.DEEP_SCATTER_GATE
+                        : t217mRun
                         ? StormT152MovingCameraFixture.ArmSet.DEEP_SCATTER
                         : t212mRun
                         ? StormT152MovingCameraFixture.ArmSet.MACRO_ENVELOPE

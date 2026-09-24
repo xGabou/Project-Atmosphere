@@ -3872,6 +3872,56 @@ implementation, while visual polish remains independently active.
   either accept that a buried view at 14.7-block visibility cannot show structure and move to the
   **mid-field stair-stepped puff edges** (march step size, deferred from T216), or attribute
   interior structure at depth first; do not build before attributing. [SC-005, SC-016, SC-021]
+- [X] T218 [QUALITY] [US1] Buried-interior structure / diffusion limit: does a deeply buried view
+  carry visible structure at all? **DISPROVE (CASE B). Nothing productionized;
+  `PaInsideStructure` removed from the tree.** The premise is not merely unsupported, it is
+  **backwards**. NEGATIVE CONTROL, four arms captured adjacent at `4_INSIDE` (camera density
+  0.70003) with the T217 term on throughout: 2 taps (production) localSD **0.2856**, 4 taps
+  0.2791, 8 taps 0.2826, 8 taps at FULL detail 0.2539 - **every arm smoother than production**,
+  mid-band contrast down **31-32%**, **pocket fraction 0.00% and zero pockets in all four**,
+  autocorrelation length 12px -> 4px (less organised, not more). Mean moves <=0.33 8-bit.
+  **Sampling is not the missing piece.** ATTRIBUTION (new `stormT218InteriorStructureSandbox`, the
+  production density path, no GPU): the two-sample estimator does NOT average the neighbourhood
+  away, it **injects** variation - od SD **12.65 vs a true 7.93**, correlation **0.41**, RMS error
+  11.9, because its 82%-weighted probe sits 28 blocks up-sun where the density autocorrelation
+  along `LightDir` is **-0.20** (zero crossing ~20, trough -0.40 at 40). Irrelevant, because
+  **`d(8bit)/d(od)` is -0.065 at the buried pose against -51.9 at od 0.5, an 800-fold collapse** -
+  a perfect optical depth is worth **0.01 of one 8-bit level** there. MECHANISM, three compounding
+  measurements: (a) the field's SD is 0.250 but the base carrier carrying 99% of it has a
+  **109-block feature size**, so inside one attenuation length only **0.071** exists (8% of the
+  variance); (b) **1/e visibility is 10.6 blocks, not the 14.7 T216/T217 quote** (that used a point
+  density 0.407; the ray-averaged value is 0.567), and the transmittance-weighted ray integral
+  retains **11.1%** of point SD at `4_INSIDE` against **36.6%** at `4B_THROUGH_BODY` - the 3.3x
+  retention gap behind their 18x local-contrast gap; (c) the lighting has stopped responding, with
+  the entire 8-bit budget across the full density span at that depth being **2.71 levels**.
+  DOMINANT VISIBLE SCALE **3.47 blocks at 2.87% relative contrast** (angular decorrelation 23.3 deg
+  at 8.51-block effective depth) - sub-5-block noise, the band the task names as the one not to
+  add; `4B` by contrast stays coherent past the whole measurement window at 11.66%. A visible term
+  would need **14.7x** the physical density->luminance response to reach localSD 2.0, which is
+  amplification, not a fix. COST: the arms are **+24.4 / +53.8 / +61.7 ms at `4_INSIDE`** (2.4-4.5x
+  the frame) for a measured LOSS of contrast; zero elsewhere - `CameraCloudDensity` is **0.00000**
+  at all six other poses, so the arms are unreachable there and S0-vs-S3 gives the harness floor
+  (|d mean| <= 0.029). **HARNESS DEFECT FOUND AND FIXED: T152's `flicker`/`dMean`/`dMax` read the
+  cloud target's ALPHA channel only, and the T217 term adds radiance only - so T217's motion
+  validation was identical BY CONSTRUCTION and could not have seen a brightness pop.** Added
+  straight-luminance metrics (`dLumaMean`/`dLumaMax`/`lumaPop`/`dLuma2Mean`/`dLuma2Max`,
+  un-premultiplied, covered-in-all-frames) and a new **T218M** `GATE_EDGE` route: 14 radial
+  oscillations, **26-28 gate crossings per arm**, max per-frame `cameraDensity` step **0.111-0.178**
+  which equals or exceeds the whole 0.05-0.16 band width. **The T217 gate does NOT pop:** below the
+  gate the off/on `dLumaMean` delta is **-0.00001** (localization proving itself), and above it the
+  term monotonically REDUCES frame-to-frame luminance change (-0.0015 -> -0.0300 with depth); at
+  crossing frames 0.04318 -> 0.03816 (lower edge) and 0.04275 -> 0.02869 (upper), second difference
+  0.07607 -> 0.06795 and 0.07035 -> 0.05431, and the crossing/route excess ratio is **lower** with
+  the gate on (1.766 -> 1.644). Also corrected: **`4B_THROUGH_BODY` is not a camera-inside-cloud
+  pose** (`CameraCloudDensity` 0.00000), and a static gate-band pose cannot be picked by radius
+  fraction - the band must be swept. Kept in the tree: the sandbox, the luminance metrics, the
+  T218M route, and `cameraCloudDensity`/`deepScatter` on every capture's CONTROLS line. No pinned
+  constant touched; T213/T215/T217 unchanged. campaignGate x4, check build, morphology sandbox all
+  PASS. Evidence in `validation/t218-buried-interior-structure.md` and `validation/t218-campaign/`.
+  Next: **the mid-field stair-stepped puff edges** (primary march step size, deferred from T216) -
+  that defect lives where `4B` lives, 36x the mid-band contrast and 265 resolvable pockets, which
+  is the regime where a rendering change can still reach the frame. The interior is closed.
+  [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

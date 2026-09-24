@@ -1,0 +1,133 @@
+Note: SpongePowered MIXIN Annotation Processor Version=0.8.5 (MixinGradle Version=0.7.38)
+Note: Supported obfuscation types: ObfuscationServiceMCP supports [notch] ObfuscationServiceFG3 supports [searge]
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\mixin\compat\auroras\AuroraRendererMixin.java:16: warning: Mixin target auroras.util.AuroraRenderer is public and should be specified in value
+@Mixin(targets = "auroras.util.AuroraRenderer", remap = false)
+^
+Note: Loading searge mappings from C:\Users\matga\Downloads\Project-Atmosphere\build\createMcpToSrg\output.tsrg
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\mixin\compat\rainbows\RainbowsRendererParticleMixin.java:15: warning: Mixin target rainbows.util.RainbowsRendererParticle is public and should be specified in value
+@Mixin(targets = "rainbows.util.RainbowsRendererParticle", remap = false)
+^
+Note: Writing refmap to C:\Users\matga\Downloads\Project-Atmosphere\build\tmp\compileJava\compileJava-refmap.json
+Note: Writing refmap to C:\Users\matga\Downloads\Project-Atmosphere\build\tmp\compileJava\compileJava-refmap.json
+Note: Writing searge composite mappings to C:\Users\matga\Downloads\Project-Atmosphere\build\tmp\compileJava\compileJava-mappings.tsrg
+Note: Writing refmap to C:\Users\matga\Downloads\Project-Atmosphere\build\tmp\compileJava\compileJava-refmap.json
+Note: Writing refmap to C:\Users\matga\Downloads\Project-Atmosphere\build\tmp\compileJava\compileJava-refmap.json
+Note: Writing searge composite mappings to C:\Users\matga\Downloads\Project-Atmosphere\build\tmp\compileJava\compileJava-mappings.tsrg
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\modules\temperature\config\BiomeTempConfig.java:55: warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+            new ResourceLocation("minecraft:plains");
+            ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\api\common\cloud\region\TornadoDescriptor.java:183: warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+                ? new ResourceLocation(tag.getString(KEY_CONTROLLER)) : null;
+                  ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\ProjectAtmosphere.java:67: warning: [removal] get() in FMLJavaModLoadingContext has been deprecated and marked for removal
+        FMLJavaModLoadingContext context = FMLJavaModLoadingContext.get();
+                                                                   ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\clouds\state\CloudRegionState.java:469: warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+        ResourceLocation dimensionLocation = new ResourceLocation(dimensionId);
+                                             ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\clouds\state\CloudClusterState.java:627: warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+        ResourceLocation dimensionLocation = new ResourceLocation(dimensionId);
+                                             ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\seasons\SeasonSnapshot.java:34: warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+        return new SeasonSnapshot(new ResourceLocation("projectatmosphere", "neutral"),
+                                  ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\modules\seasonaltrees\integration\DynamicTreesDormancyHelper.java:255: warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+        LeavesProperties bare = LeavesProperties.REGISTRY.getOptional(new ResourceLocation("dynamictrees", "bare")).orElse(null);
+                                                                      ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\registry\ClientBootstrap.java:26: warning: [removal] get() in FMLJavaModLoadingContext has been deprecated and marked for removal
+        FMLJavaModLoadingContext context = FMLJavaModLoadingContext.get();
+                                                                   ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\seasons\EclipticSeasonsSeasonDelegate.java:59: warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+                new ResourceLocation("eclipticseasons", "season"),
+                ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\seasons\SeasonProviderRegistry.java:28: warning: [removal] ResourceLocation(String) in ResourceLocation has been deprecated and marked for removal
+        ResourceLocation prevId = previous == null ? null : new ResourceLocation(previous.id());
+                                                            ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\seasons\SeasonProviderRegistry.java:55: warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+        private static final ResourceLocation ID = new ResourceLocation("projectatmosphere", "neutral");
+                                                   ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\seasons\SeasonTimeHelper.java:103: warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+        private static final ResourceLocation ID = new ResourceLocation("projectatmosphere", "neutral");
+                                                   ^
+C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\seasons\SereneSeasonsSeasonDelegate.java:48: warning: [removal] ResourceLocation(String,String) in ResourceLocation has been deprecated and marked for removal
+        return new SeasonSnapshot(new ResourceLocation("sereneseasons", "season"),
+                                  ^
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: C:\Users\matga\Downloads\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\mixin\MultiRegionCloudMeshGeneratorMixin.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+15 warnings
+=== T218 buried-interior structure / diffusion limit ===
+fixture: 10 descriptors, noise=true, extinctionScale=0.1150 densityMul=1.450
+
+4_INSIDE: centre=(-2.4,-2.2) baseY=224.0 topY=524.0 radius=164.0 -> p=(38.6,359.0,-2.2)
+  coverage=0.9725 strength=0.9725 density=0.6817
+
+4B_THROUGH_BODY: centre=(-2.4,-2.2) baseY=224.0 topY=524.0 radius=164.0 -> p=(132.1,410.0,-2.2)
+  coverage=0.7847 strength=0.7847 density=0.4072
+
+--- STEP A: attenuation length at each interior pose ---
+pose|mean density over 60 blocks|sigma per block|1/e blocks|95% blocks|blocks to alpha 0.99
+4_INSIDE|0.5671|0.09457|10.57|31.72|48.70
+4B_THROUGH_BODY|0.3263|0.05442|18.38|55.13|84.63
+
+--- STEP B: density SD inside a window, by band ---
+Bands isolate one noise input by holding the other at its window-centre value, so each column is that input's own contribution.
+window blocks|sd total|sd base band|sd detail band|detail share of banded variance|samples
+5|0.03715|0.03443|0.01355|13.4%|12288
+10|0.07081|0.06638|0.02190|9.8%|12288
+15|0.09767|0.09296|0.02711|7.8%|12288
+30|0.14836|0.14629|0.03177|4.5%|12288
+60|0.19347|0.19126|0.05943|8.8%|12252
+120|0.24029|0.23723|0.11155|18.1%|11739
+240|0.24961|0.24774|0.13152|22.0%|9986
+
+--- STEP C: transmittance-weighted visible contrast ---
+Each ray sees sum(T_i * (1-exp(-sigma_i ds)) * d_i) / sum(weights). The spread of that across rays is the ceiling on image contrast
+for any shading term that reads local density.
+pose|band|point SD|visible mean|visible SD|visible SD / point SD|effective depth blocks
+4_INSIDE|FULL|0.29423|0.68902|0.03265|0.1110|8.82
+4_INSIDE|BASE_ONLY|0.28756|0.67266|0.02733|0.0950|9.04
+4_INSIDE|DETAIL_ONLY|0.03152|0.69621|0.01464|0.4644|8.58
+4B_THROUGH_BODY|FULL|0.23788|0.42689|0.08710|0.3662|16.23
+4B_THROUGH_BODY|BASE_ONLY|0.22874|0.40304|0.08920|0.3900|18.03
+4B_THROUGH_BODY|DETAIL_ONLY|0.21298|0.43199|0.01445|0.0679|13.87
+
+--- STEP D: the inside light estimator, 2 vs 4 vs 8 vs full ---
+Production is od = d(p)*18 + d(p + L*28)*82, one local sample and one detached probe. N-sample arms are trapezoid quadrature over the same
+100-block nominal path. 'full' is a 1-block-step integral over that path. Sample set: points a buried view ray actually shades, drawn along
+rays from the pose and kept while transmittance is still above 0.05.
+shaded sample set: 2000 points
+sunElev|estimator|od mean|od SD|od SD/mean|corr vs full|RMS err vs full|s0 mean density|s0 ball SD|s1 mean density|s1 ball SD
+20|full (100 taps)|41.313|6.744|0.1632|1.0000|0.000||
+20|2 (production)|51.830|11.432|0.2206|0.2844|15.586|0.6547|0.03220|0.4907|0.04695
+20|4 (diagnostic)|41.604|6.833|0.1642|0.8771|3.380||
+20|8 (diagnostic)|41.265|6.627|0.1606|0.9912|0.895||
+45|full (100 taps)|52.021|7.929|0.1524|1.0000|0.000||
+45|2 (production)|51.412|12.653|0.2461|0.4103|11.875|0.6547|0.03220|0.4829|0.04645
+45|4 (diagnostic)|51.307|8.530|0.1663|0.9326|3.160||
+45|8 (diagnostic)|51.856|7.941|0.1531|0.9923|1.000||
+70|full (100 taps)|67.748|6.792|0.1003|1.0000|0.000||
+70|2 (production)|63.758|11.278|0.1769|0.8131|8.042|0.6547|0.03220|0.6311|0.04101
+70|4 (diagnostic)|66.876|6.913|0.1034|0.9312|2.690||
+70|8 (diagnostic)|67.662|6.744|0.0997|0.9954|0.654||
+
+separation blocks|density autocorrelation along the light direction
+2|0.9723
+4|0.9022
+8|0.6824
+14|0.3353
+20|0.0921
+28|-0.2007
+40|-0.3958
+60|0.0594
+100|0.0795
+
+--- STEP E: angular structure of the visible field ---
+A square patch of directions is traced like a camera frustum. The autocorrelation of visible density across that patch gives the angular
+scale of the structure; multiplying by the effective depth converts it to the world-space scale a viewer would read.
+pose|visible mean|visible SD|relative SD|effective depth|1/e angular lag (deg)|world scale (blocks)
+4_INSIDE|0.71184|0.02046|0.0287|8.51|23.333|3.47
+4B_THROUGH_BODY|0.43931|0.05123|0.1166|16.66|NaN|NaN
+
+=== T218 sandbox complete ===

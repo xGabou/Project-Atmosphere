@@ -157,6 +157,14 @@ final class StormT152MovingCameraFixture {
 
     /** Alpha at or above this counts as resolved cloud. */
     private static final float COVERED = 0.5F;
+    /**
+     * T218. Per-frame straight-luminance change that counts as a pop, in the
+     * cloud layer's own 0-1 units. One 8-bit level is 1/255 = 0.0039, so this
+     * is about two and a half levels - large enough that quantization and
+     * reconstruction noise do not register, small enough that a real
+     * brightness step would.
+     */
+    private static final double LUMA_POP_THRESHOLD = 0.010D;
 
     /** Partial-alpha band bounds for the soft-edge fraction. */
     private static final float EDGE_LOW = 0.02F;
@@ -315,6 +323,22 @@ final class StormT152MovingCameraFixture {
     }
 
     /**
+     * The camera path a run flies.
+     *
+     * <p>{@link #BEZIER} is the shipped T152 route: one approach, one entry,
+     * one interior pass, one exit. {@link #GATE_EDGE} instead oscillates
+     * radially across the body boundary many times, so a camera-state gate is
+     * crossed repeatedly rather than once. Both are reparameterised the same
+     * way - constant angular step against the nearest surface - so the
+     * per-frame screen motion is comparable and the difference between them is
+     * the number of boundary crossings, not the speed of one.
+     */
+    private enum RouteShape { BEZIER, GATE_EDGE }
+
+    /** How many radial oscillations the gate-edge route makes over the route. */
+    private static final double GATE_EDGE_CYCLES = 14.0D;
+
+    /**
      * Which arms a run drives: T152's history pair, or the temporal set
      * (T207M / T208M: production 0.50, then the 0.25 lattice under the
      * shipping validity and under the no-guard control). The first arm is
@@ -333,12 +357,35 @@ final class StormT152MovingCameraFixture {
         /** T212M: the production 0.50 reference, then macro envelope off and on. */
         MACRO_ENVELOPE(Arm.PRODUCTION_050, Arm.MACRO_ENVELOPE_OFF, Arm.MACRO_ENVELOPE_ON),
         /** T217M: the production reference, then the indirect term off and on. */
-        DEEP_SCATTER(Arm.PRODUCTION_050, Arm.DEEP_SCATTER_OFF, Arm.DEEP_SCATTER_ON);
+        DEEP_SCATTER(Arm.PRODUCTION_050, Arm.DEEP_SCATTER_OFF, Arm.DEEP_SCATTER_ON),
+        /**
+         * T218M: the same three arms on the GATE-EDGE route.
+         *
+         * <p>T217 validated its CameraCloudDensity gate on a route that enters
+         * cloud once. It also validated it with a metric that reads the cloud
+         * target's ALPHA channel - and the T217 term adds radiance only, so
+         * that metric was identical by construction and could not have seen a
+         * brightness pop. This set fixes both halves: a route that crosses the
+         * gate band repeatedly, and the luminance metrics added alongside the
+         * alpha ones.
+         */
+        DEEP_SCATTER_GATE(RouteShape.GATE_EDGE,
+                Arm.PRODUCTION_050, Arm.DEEP_SCATTER_OFF, Arm.DEEP_SCATTER_ON);
 
         private final Arm[] arms;
+        private final RouteShape shape;
 
         ArmSet(Arm... arms) {
+            this(RouteShape.BEZIER, arms);
+        }
+
+        ArmSet(RouteShape shape, Arm... arms) {
+            this.shape = shape;
             this.arms = arms;
+        }
+
+        RouteShape shape() {
+            return shape;
         }
 
         Arm first() {
@@ -394,6 +441,21 @@ final class StormT152MovingCameraFixture {
     private static float[] alpha = new float[0];
     private static float[] previousAlpha = new float[0];
     private static boolean previousAlphaValid;
+    /**
+     * T218. Straight (un-premultiplied) luminance of the cloud layer, for the
+     * current frame and the two before it.
+     *
+     * <p>Every metric beside these reads the target's ALPHA channel. A term
+     * that adds radiance only - which is what T217 shipped - cannot move alpha,
+     * so the alpha metrics report it as identical whether or not it pops. These
+     * read the colour instead. They are un-premultiplied and restricted to
+     * pixels covered in all the frames a difference spans, so a disocclusion
+     * cannot masquerade as a brightness pop.
+     */
+    private static float[] luma = new float[0];
+    private static float[] previousLuma = new float[0];
+    private static float[] previousLuma2 = new float[0];
+    private static int lumaHistory;
     private static int alphaWidth;
     private static int alphaHeight;
 
@@ -489,6 +551,7 @@ final class StormT152MovingCameraFixture {
         settleFrames = 0;
         stallFrames = 0;
         previousAlphaValid = false;
+        lumaHistory = 0;
         previousCameraValid = false;
         state = State.SETTLE;
 
@@ -566,6 +629,7 @@ final class StormT152MovingCameraFixture {
             if (++settleFrames >= SETTLE_FRAMES) {
                 state = State.RUN;
                 previousAlphaValid = false;
+                lumaHistory = 0;
                 previousCameraValid = false;
                 java.util.Arrays.fill(lastFlipDirection, (byte) 0);
             }
@@ -608,6 +672,7 @@ final class StormT152MovingCameraFixture {
             routeIndex = 0;
             settleFrames = 0;
             previousAlphaValid = false;
+            lumaHistory = 0;
             previousCameraValid = false;
             state = State.SETTLE;
             applyArmHistory();
@@ -785,6 +850,9 @@ final class StormT152MovingCameraFixture {
      * exit and a re-entry-shaped view of the flank in the same route.
      */
     private static Vec3 routePoint(double t) {
+        if (armSet.shape() == RouteShape.GATE_EDGE) {
+            return gateEdgePoint(t);
+        }
         double u = 1.0D - t;
         double b0 = u * u * u;
         double b1 = 3.0D * u * u * t;
@@ -815,6 +883,17 @@ final class StormT152MovingCameraFixture {
 
     /** Analytic tangent, so the heading is continuous across the whole route. */
     private static Vec3 routeTangent(double t) {
+        if (armSet.shape() == RouteShape.GATE_EDGE) {
+            // Central difference. The analytic tangent of the oscillating path
+            // is dominated by the radial term and points almost straight at or
+            // away from the axis, which would spin the heading; a difference
+            // over a finite span gives the direction of travel the camera
+            // actually has over a frame.
+            double h = 1.0D / 512.0D;
+            Vec3 ahead = gateEdgePoint(Math.min(1.0D, t + h));
+            Vec3 behind = gateEdgePoint(Math.max(0.0D, t - h));
+            return ahead.subtract(behind);
+        }
         double u = 1.0D - t;
         double d0 = 3.0D * u * u;
         double d1 = 6.0D * u * t;
@@ -840,6 +919,25 @@ final class StormT152MovingCameraFixture {
                 d0 * (x1 - x0) + d1 * (x2 - x1) + d2 * (x3 - x2),
                 d0 * (y1 - y0) + d1 * (y2 - y1) + d2 * (y3 - y2),
                 d0 * (z1 - z0) + d1 * (z2 - z1) + d2 * (z3 - z2));
+    }
+
+    /**
+     * T218M. A slow orbit whose radius sweeps in and out across the body
+     * boundary {@value #GATE_EDGE_CYCLES} times, so the camera enters and
+     * leaves cloud repeatedly instead of once. The radius spans 0.50 to 1.34
+     * of the fixture radius, which brackets the shell where
+     * {@code CameraCloudDensity} passes through the T217 gate's 0.05-0.16
+     * band; the orbit keeps the storm in frame throughout.
+     */
+    private static Vec3 gateEdgePoint(double t) {
+        double orbit = t * Math.PI * 2.0D * 0.75D;
+        double sweep = Math.sin(t * Math.PI * 2.0D * GATE_EDGE_CYCLES);
+        double r = radius * (0.92D + 0.42D * sweep);
+        double y = midY + height * 0.08D * Math.sin(t * Math.PI * 2.0D * 3.0D);
+        return new Vec3(
+                centerX + Math.cos(orbit) * r,
+                y,
+                centerZ + Math.sin(orbit) * r);
     }
 
     /**
@@ -905,6 +1003,10 @@ final class StormT152MovingCameraFixture {
             previousAlpha = new float[pixels];
             lastFlipDirection = new byte[pixels];
             previousAlphaValid = false;
+            luma = new float[pixels];
+            previousLuma = new float[pixels];
+            previousLuma2 = new float[pixels];
+            lumaHistory = 0;
         }
         alphaWidth = width;
         alphaHeight = height2;
@@ -915,7 +1017,16 @@ final class StormT152MovingCameraFixture {
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, target.getColorTextureId());
             GL11.glGetTexImage(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, GL11.GL_FLOAT, readbackBuffer);
             for (int index = 0; index < pixels; index++) {
-                alpha[index] = readbackBuffer.get(index * 4 + 3);
+                float a = readbackBuffer.get(index * 4 + 3);
+                alpha[index] = a;
+                // The cloud layer is premultiplied (T209), so the material's
+                // own brightness is rgb / alpha. Below the covered threshold
+                // the division is meaningless and the pixel is excluded from
+                // every luminance statistic anyway.
+                float inverse = a > 1.0E-3F ? 1.0F / a : 0.0F;
+                luma[index] = (readbackBuffer.get(index * 4) * 0.2126F
+                        + readbackBuffer.get(index * 4 + 1) * 0.7152F
+                        + readbackBuffer.get(index * 4 + 2) * 0.0722F) * inverse;
             }
             return true;
         } catch (RuntimeException exception) {
@@ -1019,7 +1130,44 @@ final class StormT152MovingCameraFixture {
             ghost = compareAgainstReference();
         }
 
-        StringBuilder line = new StringBuilder(384);
+        // T218 luminance metrics. Covered-in-all-frames only, so an alpha
+        // change cannot be read as a brightness change.
+        long lumaCovered = 0L;
+        double lumaSum = 0.0D;
+        long dCovered = 0L;
+        double dLumaSum = 0.0D;
+        double dLumaMax = 0.0D;
+        long lumaPop = 0L;
+        long d2Covered = 0L;
+        double d2Sum = 0.0D;
+        double d2Max = 0.0D;
+        for (int index = 0; index < pixels; index++) {
+            if (alpha[index] < COVERED) {
+                continue;
+            }
+            lumaCovered++;
+            lumaSum += luma[index];
+            if (lumaHistory >= 1 && previousAlpha[index] >= COVERED) {
+                double d = Math.abs(luma[index] - previousLuma[index]);
+                dCovered++;
+                dLumaSum += d;
+                dLumaMax = Math.max(dLumaMax, d);
+                if (d > LUMA_POP_THRESHOLD) {
+                    lumaPop++;
+                }
+                if (lumaHistory >= 2) {
+                    // Second difference: a smooth ramp reads near zero here, a
+                    // kink in the gate's response does not.
+                    double d2 = Math.abs(luma[index]
+                            - 2.0D * previousLuma[index] + previousLuma2[index]);
+                    d2Covered++;
+                    d2Sum += d2;
+                    d2Max = Math.max(d2Max, d2);
+                }
+            }
+        }
+
+        StringBuilder line = new StringBuilder(512);
         line.append("T152_FRAME arm=").append(arm.label())
                 .append(" frame=").append(routeIndex)
                 .append(" t=").append(fmt(t))
@@ -1049,6 +1197,22 @@ final class StormT152MovingCameraFixture {
         } else {
             line.append(" dMean=none dMax=none flipOn=none flipOff=none flicker=none");
         }
+        line.append(" lumaCovered=").append(fmt(pixels > 0 ? (double) lumaCovered / pixels : 0.0D))
+                .append(" lumaMean=")
+                .append(fmt(lumaCovered > 0 ? lumaSum / lumaCovered : 0.0D));
+        if (dCovered > 0) {
+            line.append(" dLumaMean=").append(fmt(dLumaSum / dCovered))
+                    .append(" dLumaMax=").append(fmt(dLumaMax))
+                    .append(" lumaPop=").append(fmt((double) lumaPop / dCovered));
+        } else {
+            line.append(" dLumaMean=none dLumaMax=none lumaPop=none");
+        }
+        if (d2Covered > 0) {
+            line.append(" dLuma2Mean=").append(fmt(d2Sum / d2Covered))
+                    .append(" dLuma2Max=").append(fmt(d2Max));
+        } else {
+            line.append(" dLuma2Mean=none dLuma2Max=none");
+        }
         line.append(" colRunsMean=").append(fmt(columns.runsMean()))
                 .append(" colRunsMax=").append(columns.runsMax())
                 .append(" reEntryMean=").append(fmt(columns.reEntryMean()))
@@ -1061,6 +1225,11 @@ final class StormT152MovingCameraFixture {
         previousAlpha = alpha;
         alpha = swap;
         previousAlphaValid = true;
+        float[] lumaSwap = previousLuma2;
+        previousLuma2 = previousLuma;
+        previousLuma = luma;
+        luma = lumaSwap;
+        lumaHistory = Math.min(lumaHistory + 1, 2);
         status = "t152_running arm=" + arm.label() + " frame=" + routeIndex;
     }
 

@@ -335,6 +335,14 @@ public final class StormCampaignRegistry {
             new Campaign("T217M", "t217-deep-motion.txt",
                     "deepScatterMotionRunRequested", "t217mRun",
                     null, Routing.PERFORMANCE_ONLY),
+            // T218M. The gate-edge stress route: the same three arms as T217M
+            // on a path that crosses the camera-density gate band repeatedly
+            // instead of once, judged with the luminance metrics T152 gained
+            // for this task. T217's gate was validated on one entry with an
+            // alpha-only metric, which a radiance-only term cannot move.
+            new Campaign("T218M", "t218-gate-motion.txt",
+                    "gateEdgeMotionRunRequested", "t218mRun",
+                    null, Routing.PERFORMANCE_ONLY),
             // T212M. The T152 route judging the macro-envelope candidate under
             // motion. Above the sweeps, like T211M: a PERFORMANCE_ONLY row must
             // not be the registry's newest.
