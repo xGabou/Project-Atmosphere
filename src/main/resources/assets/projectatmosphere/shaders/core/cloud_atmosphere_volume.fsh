@@ -1389,6 +1389,8 @@ uniform int PaLegacyFinePromotion;
 // phase, scatter, ambient or tone curve - and 3 is the LOCAL-DENSITY view,
 // each sample's own density as grey, which shows the shape inside regions
 // where alpha has saturated and view 1 is therefore blank. Monolith only.
+// T222 adds the density COMPOSITION STAGES of the sample itself: 4 pre-erosion
+// body, 5 post-erosion body, 6 macro coverage envelope (see paSigPos).
 uniform int PaDiagnosticLightingMode;
 uniform int PaRayTraceMode;
 uniform vec2 PaRayTraceNdc;
@@ -1467,6 +1469,20 @@ float paCdMacroShape = 0.0;
 float paCdEnvelopeCoverage = 0.0;
 float paCdAfterEnvelope = 0.0;
 float paCdAfterStormBody = 0.0;
+// T222. The descriptor-owned storm density's composition stages at the most
+// recent sample that reached them, written together in ONE cloudDensity call
+// with the position they belong to, so they can never be torn across calls:
+// the macro coverage envelope (T213/T215 terms included), the PRE-EROSION body
+// (stormBody of that envelope and the base field) and the POST-EROSION body
+// (before the height material factor and DensityMul, which are smooth
+// multipliers). Light taps overwrite them, which is why every reader checks
+// the position first. Written only while a stage view (4-6) is selected, so
+// production never runs these writes.
+vec3 paSigPos = vec3(1.0e30);
+float paSigCoverage = -1.0;
+float paSigBody = -1.0;
+float paSigEroded = -1.0;
+
 float paCdAfterErosion = 0.0;
 float paCdAfterMaterial = 0.0;
 float paCdFamilyScale = 0.0;
@@ -6550,12 +6566,21 @@ float shift = (deckWeight * blocksPerSd
                     cloud = saturate(mix(cloud, uLifted * envStrengthLow, lowerWeight));
                 }
             }
+            bool paSigRecord = PaDiagnosticLightingMode >= 4;
+            if (paSigRecord) {
+                paSigCoverage = cloud;
+            }
             cloud = stormBody(
                 cloud,
                 directStormStrength,
                 stormBaseField(baseCarrier),
                 embeddedConvectiveOverlap
             );
+            if (paSigRecord) {
+                paSigBody = cloud;
+                paSigEroded = cloud;
+                paSigPos = p;
+            }
             if (paTraceCapture) {
                 paCdAfterStormBody = cloud;
                 paCdAfterErosion = cloud;
@@ -6671,6 +6696,9 @@ float shift = (deckWeight * blocksPerSd
                 // magnitude rather than by a gate: CORE_FILL is derived so the
                 // weakest core sample still outruns the deepest erosion bite.
                 cloud = max(cloud - (1.0 - detailFbm) * STORM_EROSION, 0.0);
+                if (PaDiagnosticLightingMode >= 4) {
+                    paSigEroded = cloud;
+                }
             } else if (profileId == 6) {
                 cloud = max(cloud - (1.0 - detailFbm) * erosion, 0.0);
             } else {
@@ -7991,6 +8019,21 @@ vec3 sampleLighting(
         bool cameraStartsInsideSlab,
         bool cameraInsideCloud,
         out float diagnosticLightOpticalDepth) {
+    if (PaDiagnosticLightingMode >= 4 && PaDiagnosticLightingMode <= 6) {
+        // Valid only when the stages were written at THIS point - the light
+        // cone overwrites them, so position is the proof of ownership.
+        bool paSigValid = distance(paSigPos, p) < 0.01;
+        // T222 composition-stage views: 4 pre-erosion body, 5 post-erosion
+        // body, 6 macro coverage envelope. Magenta marks a sample whose stages
+        // could not be matched to it, so any leakage is countable in the image.
+        diagnosticLightOpticalDepth = 0.0;
+        if (!paSigValid) {
+            return vec3(1.0, 0.0, 1.0);
+        }
+        float stage = PaDiagnosticLightingMode == 4 ? paSigBody
+            : PaDiagnosticLightingMode == 5 ? paSigEroded : paSigCoverage;
+        return vec3(saturate(stage));
+    }
     if (PaDiagnosticLightingMode == 1) {
         // T136 attribution arm: no light cone, no scatter chain, no tone curve.
         // A plausible mid-grey so the march still integrates a real colour.

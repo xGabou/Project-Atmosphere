@@ -4059,6 +4059,34 @@ implementation, while visual polish remains independently active.
   the pre-erosion body, no extra fetch - judged on vein score and dome flatness together, then on
   motion. Behind it, separately: the camera-altitude-dependent light reach, and a base-vs-lobe
   isolation of the lower-mass veins. [SC-005, SC-016, SC-021]
+- [X] T222 [QUALITY] [US1] Pre-erosion shadow form: can shadowed lighting use pre-erosion form
+  to show large billows without importing the vein network? **CASE C - DISPROVED. No candidate
+  (the brief conditions Task 4 on Task 1 confirming the hypothesis), no motion run, no production
+  change.** Direct isolation, as T221 could only infer: new composition-stage views 4 pre-erosion
+  body, 5 post-erosion body, 6 macro envelope, recorded with their POSITION in one `cloudDensity`
+  call so the light cone cannot tear them - measured leakage **0.0%**. Split at the neck, fixture
+  `37c75cd2`, SIDE/LOWSIDE/LATERAL (NEAR_EDGE lost to fixture decay, excluded, not salvaged).
+  Pre-erosion vs production's lower-mass veins **+0.197/+0.772/+0.227**; post-erosion
+  **+0.202/+0.811/+0.218** - indistinguishable. Each stage's OWN billow-to-vein ratio in the dome:
+  pre-erosion **3.85/2.87/2.31**, post-erosion 3.78/2.84/2.30, T221's rejected local density
+  3.79/2.83/2.22 - **within 0.1 at every pose**, same fine-band share of variance. Erosion moves
+  the MEAN by ~0.22 and the SD by <0.002: its SD contribution is 0.44 x 0.074 = 0.033 against ~0.15
+  of stage variation. **The veins are in the BASE FIELD, and "pre-erosion" still contains it** -
+  T221's elimination was right, the inference "pre-erosion = large-scale only" was not.
+  Pre-erosion does carry the dome's form (billow corr with production **-0.30** at all three poses:
+  denser renders darker), but so do post-erosion (-0.18/-0.19) and local density (-0.21/-0.24);
+  the one vein-free stage, the macro envelope, does NOT (+0.04/+0.11/-0.01). **No density stage is
+  both form-bearing and vein-free.** Measured centring for any future candidate recorded (dome
+  pre-erosion mean 0.687-0.730, SD 0.148-0.160, p95 at saturation 0.97-0.99). Baselines reproduce
+  T221's split on a fourth storm (dome flat 45-71%, lower-mass vein 0.25-0.41). Kept: views 4-6
+  with their stage globals, the stage WRITES gated behind `PaDiagnosticLightingMode >= 4` so
+  production never runs them; the capture driver is byte-identical to `aa61733`. Branch note: the
+  brief named `quality/t221-lighting-cells`, which does not exist; continued on
+  `quality/t217-deep-interior-lighting`. campaignGate x3, check build, morphology sandbox PASS.
+  Evidence in `validation/t222-pre-erosion-shadow-form.md` and `validation/t222-campaign/`. Next:
+  **a LOW-PASSED base field** - a mip-biased fetch of the base carrier (one texture fetch, not a
+  density evaluation) - attributed on its own billow-to-vein ratio BEFORE any candidate uses it; or
+  T223, the camera-altitude light reach. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
