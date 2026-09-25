@@ -8097,6 +8097,22 @@ vec3 sampleLighting(
         diagnosticLightOpticalDepth = 0.0;
         return vec3(saturate(localDensity / (0.80 * max(DensityMul, 0.001))));
     }
+    if (PaDiagnosticLightingMode == 9) {
+        // T228. The light-path optical depth, log-encoded over 0-64 so the
+        // deep body stays measurable: value = log(1 + od) / log(65). Mode 2's
+        // exp(-od/2) saturates in 8 bits at od 8.31, which hid every anvil
+        // underside. Decode: od = exp(value * log(65)) - 1.
+        float pathDepth = rainFraction > 0.05
+            ? localDensity * 8.0 * ExtinctionScale
+            : lightMarchOpticalDepth(
+                p,
+                localDensity,
+                cameraStartsInsideSlab,
+                cameraInsideCloud
+            ) * ExtinctionScale;
+        diagnosticLightOpticalDepth = pathDepth;
+        return vec3(saturate(log(1.0 + pathDepth) / log(65.0)));
+    }
     if (PaDiagnosticLightingMode == 2) {
         // T221 light-path-only view. The optical depth is the production one,
         // taken through the production call, so any structure the light cone

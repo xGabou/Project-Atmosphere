@@ -4196,6 +4196,26 @@ implementation, while visual polish remains independently active.
   log-encoded od view and the sun axis. No production change; T226 parked on
   `quality/t226-local-precipitation`. Evidence in `validation/t227-visual-consistency.md` and
   `validation/t227-campaign/`. [SC-005, SC-016, SC-021]
+- [X] T228 [QUALITY] [US1] Dual-scale light-depth response: keep the near transfer, add a slow
+  body scale to od ~40. **CASE B - REJECTED for production; mechanism measured.** New instrument:
+  diagnostic lighting mode 9 = log-od view (od 0-64; mode 2 saturated at 8.31). Production transfer
+  (exact port, logged uniforms): 8-bit slope -45 / -6.3 / -1.75 / -0.31 / -0.004 levels per od at
+  od 0 / 4 / 8 / 16 / 40 - the whole 16-40 range spans < 2 levels. BAD views hold 33-76% of
+  visible cloud past od 8 (nothing past 40) at retention 0.02-0.12. Candidate (ambient only):
+  `*= 1 + smoothstep(3,6,od)*0.7*(g(18) - g(od))`, `g = log(1+od)/log(41)`, constants from a
+  baseline storm, shape chosen analytically to stay MONOTONIC (the amplitude-1 draft brightened
+  od 3.5-5) and mean-neutral on that storm's deep pixels; judged on a second storm. Result: deep
+  retention x2-3 (16-40: 0.02-0.04 -> 0.06-0.09); anvil FLANK flat area halves or vanishes
+  (LATERAL 0.43 -> 0.02, LOWSIDE 0.53 -> 0.21); lit skin bit-identical below od 3; ABOVE lc -2%
+  (T227 single-scale -20%); mean +0.2..+4.3; cost below noise (SIDE -0.015, PVN +0.075 ms). BUT
+  the anvil UNDERSIDES stay flat (NEAREDGE 0.96 -> 0.79, THROUGH 0.75 -> 0.72) because their od
+  field is SMOOTH (local spread 1.3-3.9 vs 5.7-11 on flanks - every underside path crosses the same
+  anvil), so no function of light-path od can give them form; route luma instability +4-8%.
+  Low sun deepens side views (median od 12 -> 16). The camera-height cap the brief mentions was
+  already removed in T224. No production change; mode 9 kept. Evidence in
+  `validation/t228-dual-scale-light-depth.md` and `validation/t228-campaign/`. Next: **T229
+  skylight visibility from depth below the storm surface** (`paLastStormUnionDistance`, no taps),
+  alone and with the T228 curve. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
