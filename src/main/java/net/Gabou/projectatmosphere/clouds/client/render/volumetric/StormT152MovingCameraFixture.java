@@ -1181,6 +1181,11 @@ final class StormT152MovingCameraFixture {
                 .append(" stepBlocks=").append(fmt(step))
                 .append(" surfScale=").append(fmt(surfaceScale(t)))
                 .append(" cameraDensity=").append(fmt(inputs.cameraCloudDensity()))
+                // T224. The ray volume's floor (SlabBaseY less the precipitation
+                // padding): a camera between it and the slab top starts inside.
+                .append(" rayFloorY=").append(fmt(VolumetricCloudRenderer.lastRayVolumeFloorY()))
+                .append(" slabBaseY=").append(fmt(VolumetricCloudRenderer.lastSlabBaseY()))
+                .append(" maxPrecip=").append(fmt(VolumetricCloudRenderer.lastMaxPrecipitation()))
                 .append(" res=").append(width).append('x').append(height2)
                 .append(" coverage=").append(fmt((double) covered / pixels))
                 .append(" edgeFraction=").append(fmt((double) edge / pixels));

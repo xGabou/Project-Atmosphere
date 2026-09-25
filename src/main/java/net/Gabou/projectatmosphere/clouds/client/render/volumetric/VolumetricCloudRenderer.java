@@ -96,6 +96,10 @@ public final class VolumetricCloudRenderer {
     private static volatile float lastHistoryConfidence;
     private static volatile float lastResolutionScale = 1.0F;
     private static volatile long lastShaderFrameIndex = -1L;
+    /** T224. The ray volume's floor, slab base and precipitation of the last draw. */
+    private static volatile float lastRayVolumeFloorY = Float.NaN;
+    private static volatile float lastSlabBaseY = Float.NaN;
+    private static volatile float lastMaxPrecipitation = Float.NaN;
     private static volatile LastDrawInputs lastDrawInputs = LastDrawInputs.EMPTY;
     private static boolean denseCameraResolution;
     private static int fragmentTextureUnits = -1;
@@ -129,6 +133,24 @@ public final class VolumetricCloudRenderer {
 
     public static float lastGpuMilliseconds() {
         return lastGpuMilliseconds;
+    }
+
+    /**
+     * T224. The floor of the ray volume: SlabBaseY less the precipitation ray
+     * padding. A camera between it and SlabTopY starts inside
+     * (cameraStartsInsideSlab), which still gates the in-cloud light probe and
+     * the od-28 cone early-out; it no longer shortens the light cone.
+     */
+    public static float lastRayVolumeFloorY() {
+        return lastRayVolumeFloorY;
+    }
+
+    public static float lastSlabBaseY() {
+        return lastSlabBaseY;
+    }
+
+    public static float lastMaxPrecipitation() {
+        return lastMaxPrecipitation;
     }
 
     /**
@@ -665,6 +687,14 @@ public final class VolumetricCloudRenderer {
             paMaxPrecipitation = Math.max(paMaxPrecipitation, 0.85F);
         }
         shader.safeGetUniform("MaxPrecipitation").set(paMaxPrecipitation);
+        // T224. Where the shader's cameraStartsInsideSlab turns on: the ray
+        // volume's floor, SlabBaseY lowered by precipitationRayPadding(). Not
+        // modelled: the shader lowers it further when funnels are present.
+        float paPaddingEdge = Math.max(0.0F, Math.min(1.0F, (paMaxPrecipitation - 0.02F) / 0.83F));
+        lastRayVolumeFloorY = weather.slabBaseY()
+                - 180.0F * paPaddingEdge * paPaddingEdge * (3.0F - 2.0F * paPaddingEdge);
+        lastSlabBaseY = weather.slabBaseY();
+        lastMaxPrecipitation = paMaxPrecipitation;
         shader.safeGetUniform("PuffLobeCount").set(PuffLobeSpatialIndex.lobeCount());
         // T162 scaling arm: a positive cap tells the shader about fewer
         // descriptors than are resident. Diagnostic only; the default is no cap.

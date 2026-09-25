@@ -4114,6 +4114,38 @@ implementation, while visual polish remains independently active.
   inside the layer vs 6 / 240 below) - price it first; the cap exists for cost. If the dome's
   flatness is revisited later, the lever is the shadowed lighting model itself, not a
   density-derived modulation of it. [SC-005, SC-016, SC-021]
+- [X] T224 [QUALITY] [US1] Camera-height shadow range pricing: what do the 4-tap / 102-block cone
+  (camera "inside the band") and the 6-tap / 240-block cone (below it) cost in image and GPU time?
+  **CASE A - the cap is REMOVED; every camera marches the full cone.** RULE, read from `main()`:
+  `cameraStartsInsideSlab = t0 <= 1` against the RAY VOLUME `[SlabBaseY - precipitationRayPadding(),
+  SlabTopY]`, where padding = `mix(0, 180, smoothstep(0.02, 0.85, MaxPrecipitation))`, the
+  maximum over every cell in the weather map. Taps 14/33.9/62.1/102.2 vs +159.1/240.0; spread,
+  field reads and detail taps identical; no role dependence. **In the measured storm (precip
+  0.43-0.46) the floor was y = 33-43, below sea level: every above-ground camera below the anvil
+  top was in band, so the 240-block cone never ran at gameplay height while it rained.** The switch
+  fires at the floor (dry weather: the cloud base) or when rain anywhere moves the floor past the
+  camera. ZERO-PARALLAX pairs (P0 vs R1 at one pose; the switch is frame-uniform, so R1 is the
+  below-band render): whole cloud -3.2..-3.5 levels, 28-43% of cloud pixels > 0.010 luma
+  (~100x the repeat floor). That is the one-frame pop at a crossing. Dome -1.4..-3.9 levels, contrast
+  slightly down. Ground-level lower mass unchanged (od 0.63 -> 0.63, beyond 240 b). **The neck/tower
+  under the anvil goes from sunlit to shadowed**: SIDE neck -5.9 (41.6% > 2 levels), through-body
+  -12.5 (57%). In dense cloud (in-cloud probe) and out of band: exact no-op. Motion: slab-top sweep
+  (16 crossings, the only above-ground crossing here) shows no pop (offset 0.000, nothing up-sun);
+  the standard route is STEADIER with full reach (dLumaMean -16%, lumaPop -18%, dLuma2 -13%, jumps
+  43 -> 35, alpha flicker equal). Cost at production scale 0.25, ten-shot ABBA: **PVN +0.04 +- 0.15,
+  SIDE -0.17 +- 0.22 ms** (0.75 pin +0.73 / +0.60); whole renderer post-bank 9.35 / 8.82 ms vs a
+  capped control 9.70 / 8.95 -> **<= 10 YES**, but both ~1.7 ms above the T215 class in today's
+  heavier storms (field build 1.7-2.0 vs 1.4) - thin margin, independent of T224. Smooth-range
+  candidate not built (the cost isn't there to justify it). PRODUCTION: cap deleted in
+  `lightMarchOpticalDepth` and its three diagnostic mirrors; view 7 keeps it as "former"; od-28
+  early-out and in-cloud probe untouched. `PaLightReach`, its config, the T224M campaign and the
+  reach arms removed; driver restored to HEAD. KEPT instrument: `rayFloorY= slabBaseY= maxPrecip=` on
+  every `T152_FRAME`, backed by `VolumetricCloudRenderer.lastRayVolumeFloorY()` and related getters.
+  campaignGate, check build, morphology sandbox PASS. Evidence in
+  `validation/t224-camera-height-shadow-range.md` and `validation/t224-campaign/`. Next: **T225, the
+  global-precipitation coupling of the ray volume** (a distant cell's rain moves every ray's
+  t0/t1, the early-out and the in-cloud probe gate; measure with a static camera and a
+  MaxPrecipitation ramp). [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

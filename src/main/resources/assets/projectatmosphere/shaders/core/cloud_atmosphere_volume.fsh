@@ -7466,10 +7466,14 @@ float lightMarchOpticalDepth(
         // deliver it cost 24-62 ms and measurably REDUCE local contrast.
         return localDensity * 18.0 + forwardDensity * 82.0;
     }
+    // T224. Every camera marches the full LightSteps cone (6 taps, 240 blocks
+    // at ULTRA). The former 4-tap / 102-block cap for a camera inside the ray
+    // volume is gone: that volume reaches up to 180 blocks below the slab with
+    // precipitation, so the cap covered almost every gameplay camera, left the
+    // tower lit under the anvil overhang, and switched the whole frame by
+    // ~3.3 levels when the camera - or MaxPrecipitation - crossed its floor.
+    // Priced below the 0.25-scale noise floor (PVN +0.04, SIDE -0.17 ms).
     int steps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);
-    if (cameraStartsInsideSlab) {
-        steps = min(steps, 4);
-    }
 #ifdef PA_ARM_LIGHT_STEPS
     // PM idea C: fewer light-march taps. Two is the floor the graded T149 path
     // already treats as the minimum that keeps a light direction.
@@ -7678,10 +7682,8 @@ float lightMarchOpticalDepth(
 vec2 lightMarchOpticalDepthEndpointMidpoint(
         vec3 p,
         bool cameraStartsInsideSlab) {
+    // Mirrors production: no camera-height cap since T224.
     int steps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);
-    if (cameraStartsInsideSlab) {
-        steps = min(steps, 4);
-    }
     float endpointOpticalDepth = 0.0;
     float midpointOpticalDepth = 0.0;
     float stepLength = 14.0;
@@ -7783,10 +7785,8 @@ vec2 lightMarchOpticalDepthCappedFull(
 vec2 lightMarchOpticalDepthRefinedPair(
         vec3 p,
         bool cameraStartsInsideSlab) {
+    // Mirrors production: no camera-height cap since T224.
     int steps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);
-    if (cameraStartsInsideSlab) {
-        steps = min(steps, 4);
-    }
     float plusOpticalDepth = 0.0;
     float minusOpticalDepth = 0.0;
     float stepLength = 14.0;
@@ -7854,10 +7854,8 @@ vec2 lightMarchOpticalDepthRefinedPair(
 float lightMarchOpticalDepthWithoutDetail(
         vec3 p,
         bool cameraStartsInsideSlab) {
+    // Mirrors production: no camera-height cap since T224.
     int steps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);
-    if (cameraStartsInsideSlab) {
-        steps = min(steps, 4);
-    }
     float opticalDepth = 0.0;
     float stepLength = 14.0;
     vec3 pos = p;
@@ -10724,8 +10722,8 @@ void main() {
                 }
             } else if (DebugView == 7) {
                 // A camera can start inside the global slab while remaining in
-                // clear air beside a compact PUFF. Compare the exact production
-                // cap against all quality-profile taps without changing the
+                // clear air beside a compact PUFF. Compare the former (pre-T224)
+                // 4-tap cap against all quality-profile taps without changing the
                 // primary density, alpha, phase, material or integration.
                 if (rainFraction > 0.05
                         || cameraInsideCloud

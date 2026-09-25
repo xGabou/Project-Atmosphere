@@ -1,0 +1,31 @@
+[21:46:11] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN armed by C:\Users\matga\Downloads\Project-Atmosphere\run\t132-autorun.txt
+[21:46:11] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA_BEGIN source=pa-t132-autogen-source restored=pa-t132-autogen-restored template=C:\Users\matga\Downloads\Project-Atmosphere\run\t132-fixtures\pristine-current
+[21:46:11] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA world seed overridden by marker: 5510001
+[21:46:40] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA create_requested world=pa-t132-autogen-source
+[21:46:42] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA source_entered world=pa-t132-autogen-source player=10.50, 107.00, 5.50
+[21:46:42] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA source_halt_requested
+[21:46:45] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA source_cleanly_unloaded
+[21:46:46] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA snapshot valid path=C:\Users\matga\Downloads\Project-Atmosphere\run\t132-fixtures\pristine-current dataVersion=3465 sessionLockExcluded=true
+[21:46:46] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA restore valid path=C:\Users\matga\Downloads\Project-Atmosphere\run\saves\pa-t132-autogen-restored dataVersion=3465 sessionLockExcluded=true
+[21:46:46] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA restore_load_requested world=pa-t132-autogen-restored snapshotDataVersion=3465
+[21:46:46] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRA accepting normal current-registry confirmation screen=net.minecraft.client.gui.screens.ConfirmScreen
+[21:46:50] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_INFRASTRUCTURE_VALID source=pa-t132-autogen-source restored=pa-t132-autogen-restored restoredEntry=10.50, 107.00, 5.50 autoQuickPlay=true
+[21:47:10] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL cloudMovementFrozen=true priorValue=true restoredOnExit=true
+[21:47:10] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL daylightCycleFrozen=true dayTime=6000 restoredOnExit=true
+[21:47:10] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL fixedResolutionScale=0.75000 priorValue=adaptive restoredOnExit=true
+[21:47:10] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL raymarchQuality=ULTRA(96/6) priorValue=ULTRA restoredOnExit=true
+[21:47:10] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN spawn requested at 10.50,107.00,5.50
+[21:47:10] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN descriptors adopted lobeCount=10 after 3 frames
+[21:48:25] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN storm mature: topologyGeneration=160 stable for 900 frames
+[21:48:25] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL fixedResolutionScaleRestored=adaptive
+[21:48:25] [Render thread/INFO] [projectatmosphere/]: T208_TEMPORAL_CLEANUP_BEGIN poses=2 arms=13 mode=ULTRA steps=96 resolutionScale=NaN target=1920x1080
+[21:48:26] [Render thread/INFO] [projectatmosphere/]: T153_POSE_FIXTURE pose=SIDE group=ed71b394-511b-47f3-8848-9f5e7601978b fingerprint=382b4ac0cf783c0f
+[21:49:00] [Render thread/INFO] [projectatmosphere/]: T153_POSE_FIXTURE pose=PLAY_VIS_NEAR group=ed71b394-511b-47f3-8848-9f5e7601978b fingerprint=382b4ac0cf783c0f
+[21:49:29] [Render thread/INFO] [projectatmosphere/]: T208_TEMPORAL_DECISION
+T208_TEMPORAL pose=SIDE phaseScale=0.2500 cells=3 rawPhaseMs=6.6905 rawPhaseP95=6.9571 fieldMs=1.7029 gateBuildMs=0.1215 rainPassMs=1.1206 resolveMs=0.1065 resolveP95=0.1106 reconstructionMs=0.0328 validationMs=0.0737 compositeMs=0.0819 totalMs=9.7024 totalMin=9.6727 totalMax=9.7188 anchors=7 anchorCloudMs=6.6630 anchorCompositeMs=0.0816 anchorTotalMs=9.5606 overheadMs=0.1418 reference050CloudMs=18.6184 reference050TotalMs=22.8045 budgetTo8Ms=-1.7024 budgetTo10Ms=0.2976 resolveMode2Ms=NaN resolveMode5Ms=0.1065
+T208_TEMPORAL pose=PLAY_VIS_NEAR phaseScale=0.2500 cells=3 rawPhaseMs=5.3593 rawPhaseP95=5.6252 fieldMs=1.7691 gateBuildMs=0.1219 rainPassMs=1.6326 resolveMs=0.1055 resolveP95=0.1085 reconstructionMs=0.0317 validationMs=0.0737 compositeMs=0.0802 totalMs=8.9467 totalMin=8.8719 totalMax=9.0624 anchors=7 anchorCloudMs=5.3994 anchorCompositeMs=0.0778 anchorTotalMs=8.9277 overheadMs=0.0190 reference050CloudMs=14.0882 reference050TotalMs=18.9256 budgetTo8Ms=-0.9467 budgetTo10Ms=1.0533 resolveMode2Ms=NaN resolveMode5Ms=0.1055
+[21:49:29] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL cloudMovementFreezeRestored=true
+[21:49:29] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL daylightCycleRestored=true
+[21:49:29] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL raymarchQualityRestored=ULTRA
+[21:49:29] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FINISHED outcome=program_arm_complete frames=3242
+[21:49:30] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_EXIT stopping the client, armed by C:\Users\matga\Downloads\Project-Atmosphere\run\t132-autorun-exit.txt
