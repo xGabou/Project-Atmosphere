@@ -1417,6 +1417,20 @@ public final class StormVolumetricGeometrySandbox {
                         && driver.contains("? CoreCostDiagnosticProgram.T206_MONOLITHIC_REF"),
                 "the T206 campaign does not anchor on the monolithic reference");
 
+        // T225. A ray the rain pass rejects before its march (it misses the
+        // ray volume, terrain stands in front of it, or the pretest refuses
+        // it) must write "no rain" - rgb 0, packed (depth 0, T_r 1) = 4095. A
+        // literal 0 decodes as T_r = 0 and the resolve composites it as an
+        // opaque black layer: the lower half of the frame for any camera below
+        // the ray volume (dry weather under the cloud base), the sky above it.
+        String volume = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        int emptyRayReturns = volume.split("fragColor = PA_EMPTY_RAY_OUTPUT;", -1).length - 1;
+        require(volume.contains("#if defined(PA_RAIN_PASS) && !defined(PA_RAIN_MASK_OUTPUT)\n"
+                        + "const vec4 PA_EMPTY_RAY_OUTPUT = vec4(0.0, 0.0, 0.0, 4095.0);")
+                        && emptyRayReturns == 3,
+                "the rain pass's early-rejected rays no longer write the no-rain sentinel ("
+                        + emptyRayReturns + " of 3 returns)");
         for (String[] program : programs) {
             compileFragmentShader(resolveMojImports(program[1]), program[0]);
         }
@@ -1425,7 +1439,7 @@ public final class StormVolumetricGeometrySandbox {
                 + "|finalDefines=split|rainPassGate=baked|jsonMatchesGlsl=true"
                 + "|rendererSetUniformsDeclared=" + undeclared.isEmpty()
                 + "|rainPassUnit=" + CloudTextureUnitContract.RAIN_PASS_UNIT
-                + "|targetReleased=true");
+                + "|targetReleased=true|rainEmptyRaySentinel=4095");
     }
 
     /** The {@code name} values of one array of a Minecraft shader JSON. */

@@ -4146,6 +4146,38 @@ implementation, while visual polish remains independently active.
   global-precipitation coupling of the ray volume** (a distant cell's rain moves every ray's
   t0/t1, the early-out and the in-cloud probe gate; measure with a static camera and a
   MaxPrecipitation ramp). [SC-005, SC-016, SC-021]
+- [X] T225 [QUALITY] [US1] Rain-driven ray-volume / lighting-gate stability: can the GLOBAL rain
+  scalar change the render at a stationary camera through ray-volume or lighting classification?
+  **YES - CASE A, fixed.** NEW HARNESS `T225M` (`t225-rain-ramp.txt`): a STATIONARY route (four fixed
+  cameras: under the dry floor, PLAY_VIS_NEAR, near edge, through body) with a `MaxPrecipitation`
+  override ramped 0 -> 0.9 -> 0 under each (the shader sees only that scalar, so it IS the remote-rain
+  case); arms hold_body (noise floor), ramp_body (rain pass off), ramp_full. **Pre-fix, ramp_full
+  jumped +95 luma levels and +0.38 alpha in ONE frame at both below-floor poses** - when the floor
+  passed ~1.5 b above the camera. MECHANISM: the rain pass shares the cloud march's setup; a ray it
+  rejects before marching (misses the ray volume, or terrain first) wrote `vec4(0)`, which the rain
+  texel decodes as T_r = 0 at depth 0, and the T207 resolve composites it into every pixel ->
+  **the whole lower half of the frame black for ANY camera below the ray volume - i.e. every camera
+  under the cloud base in DRY weather - and a black sky above the slab top** (captures: 43.8% /
+  38.1% near-black). Rain hid it by dropping the floor under the ground. FIX: those three returns
+  write `PA_EMPTY_RAY_OUTPUT` = the "no rain" sentinel 4095 in the rain pass (0 elsewhere), as the
+  T210 coarse mask already did; zero cost; post-fix max one-frame luma 0.06, alpha 0.0001, dry P1 =
+  its body-only twin, sky restored, rain still scales. Sandbox invariant (`rainEmptyRaySentinel=4095`)
+  fails with one return reverted. EVERYTHING ELSE IS CONTINUOUS: ray entry through the floor
+  crossing ~0.02 levels/frame, lumaPop 0; od-28 early-out invisible (exp(-28)); **in-cloud gate
+  cannot be switched by rain** (CameraCloudDensity is cell-body math with no rain term; bodies lie
+  above the base; padding only lowers the floor) - never fired, lightPath cone throughout.
+  Fixed-entry arm (padding pinned) does NOT remove the body's continuous darkening; the
+  local-rainFraction arm DOES (6.0 -> 0.01 levels at P2): the march's `rainFraction =
+  0.25 + 0.75 max(morphology.a, MaxPrecipitation)` darkens non-puff below-base cloud by the GLOBAL
+  max (up to 6-8 levels, no pop). **DEFERRED:** for descriptor storms morphology.a = 0 (absent
+  from the raster), so ALL of a storm's own rain darkening - and its shaft intensity (line 5603) -
+  comes from the global max; local-only would delete a real effect. Kept instruments: the override,
+  the ramp route/arms, frame-line geometry fields, `CloudWeatherMapRenderer.lastCells()`.
+  Attribution arms removed, driver restored to HEAD. Standard route no regression. campaignGate,
+  check build, morphology sandbox PASS. Evidence in `validation/t225-rain-driven-ray-volume.md` and
+  `validation/t225-campaign/`. Next: **T226, per-descriptor precipitation** (a descriptor texel
+  channel), then rainFraction and descriptor shaft intensity read it; validate with the T225M
+  ramp. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

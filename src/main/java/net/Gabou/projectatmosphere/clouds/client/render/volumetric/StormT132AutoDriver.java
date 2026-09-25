@@ -369,6 +369,7 @@ final class StormT132AutoDriver {
     private static boolean t212mRun;
     private static boolean t217mRun;
     private static boolean t218mRun;
+    private static boolean t225mRun;
     private static boolean restoreConfirmationAccepted;
     /**
      * The production configuration already has a debug/screenshot movement
@@ -483,6 +484,13 @@ final class StormT132AutoDriver {
      */
     private static boolean gateEdgeMotionRunRequested() {
         return Files.exists(T218M_MARKER);
+    }
+
+    private static final Path T225M_MARKER = Path.of("t225-rain-ramp.txt");
+
+    /** T225M. The stationary rain ramp. */
+    private static boolean rainRampRunRequested() {
+        return Files.exists(T225M_MARKER);
     }
 
     /**
@@ -7147,6 +7155,7 @@ final class StormT132AutoDriver {
                             || macroEnvelopeMotionRunRequested()
                             || deepScatterMotionRunRequested()
                             || gateEdgeMotionRunRequested()
+                            || rainRampRunRequested()
                             ? Phase.T152_BEGIN
                             : (performanceRunRequested()
                                     ? Phase.T135_PREPARE : Phase.BEGIN_T098));
@@ -7198,8 +7207,12 @@ final class StormT132AutoDriver {
                 t217mRun = deepScatterMotionRunRequested();
                 // T218M. The same arms on the gate-edge route.
                 t218mRun = gateEdgeMotionRunRequested();
+                // T225M. The stationary rain ramp.
+                t225mRun = rainRampRunRequested();
                 VolumetricCloudDebugConfig.setRainHeavyForced(t210mRun);
-                String begun = StormT152MovingCameraFixture.begin(t218mRun
+                String begun = StormT152MovingCameraFixture.begin(t225mRun
+                        ? StormT152MovingCameraFixture.ArmSet.RAIN_RAMP
+                        : t218mRun
                         ? StormT152MovingCameraFixture.ArmSet.DEEP_SCATTER_GATE
                         : t217mRun
                         ? StormT152MovingCameraFixture.ArmSet.DEEP_SCATTER

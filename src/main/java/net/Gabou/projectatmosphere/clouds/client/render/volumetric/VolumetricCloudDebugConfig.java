@@ -508,6 +508,22 @@ public final class VolumetricCloudDebugConfig {
         return rainDisabled;
     }
 
+    /**
+     * T225. Replaces the uploaded MaxPrecipitation (the frame-wide maximum)
+     * when finite, for every program. The stationary rain ramp drives it; the
+     * shader sees only this scalar, so it reproduces a remote cell raising the
+     * global maximum while the local storm's cells stay as they are. NaN = off.
+     */
+    private static volatile float precipitationOverride = Float.NaN;
+
+    public static float precipitationOverride() {
+        return precipitationOverride;
+    }
+
+    public static void setPrecipitationOverride(float value) {
+        precipitationOverride = value;
+    }
+
     public static void setRainDisabled(boolean disabled) {
         rainDisabled = disabled;
     }
@@ -699,6 +715,7 @@ public final class VolumetricCloudDebugConfig {
         lowerBodyMode = PRODUCTION_LOWER_BODY_MODE;
         deepScatterMode = PRODUCTION_DEEP_SCATTER_MODE;
         rainHeavyForced = false;
+        precipitationOverride = Float.NaN;
         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
         sentinelHeightsEnabled = false;
         fullResolutionEnabled = false;

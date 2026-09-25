@@ -99,6 +99,9 @@ public final class VolumetricCloudRenderer {
     /** T224. The ray volume's floor, slab base and precipitation of the last draw. */
     private static volatile float lastRayVolumeFloorY = Float.NaN;
     private static volatile float lastSlabBaseY = Float.NaN;
+    private static volatile float lastSlabTopY = Float.NaN;
+    /** T225. The weather map's own maximum, before any diagnostic override. */
+    private static volatile float lastNaturalMaxPrecipitation = Float.NaN;
     private static volatile float lastMaxPrecipitation = Float.NaN;
     private static volatile LastDrawInputs lastDrawInputs = LastDrawInputs.EMPTY;
     private static boolean denseCameraResolution;
@@ -147,6 +150,14 @@ public final class VolumetricCloudRenderer {
 
     public static float lastSlabBaseY() {
         return lastSlabBaseY;
+    }
+
+    public static float lastSlabTopY() {
+        return lastSlabTopY;
+    }
+
+    public static float lastNaturalMaxPrecipitation() {
+        return lastNaturalMaxPrecipitation;
     }
 
     public static float lastMaxPrecipitation() {
@@ -686,6 +697,12 @@ public final class VolumetricCloudRenderer {
         if (program.rainMaskCapture() || VolumetricCloudDebugConfig.rainHeavyForced()) {
             paMaxPrecipitation = Math.max(paMaxPrecipitation, 0.85F);
         }
+        lastNaturalMaxPrecipitation = weather.maxPrecipitation();
+        float paPrecipitationOverride = VolumetricCloudDebugConfig.precipitationOverride();
+        if (Float.isFinite(paPrecipitationOverride)) {
+            // T225. The stationary rain ramp. Diagnostic only; NaN in production.
+            paMaxPrecipitation = paPrecipitationOverride;
+        }
         shader.safeGetUniform("MaxPrecipitation").set(paMaxPrecipitation);
         // T224. Where the shader's cameraStartsInsideSlab turns on: the ray
         // volume's floor, SlabBaseY lowered by precipitationRayPadding(). Not
@@ -694,6 +711,7 @@ public final class VolumetricCloudRenderer {
         lastRayVolumeFloorY = weather.slabBaseY()
                 - 180.0F * paPaddingEdge * paPaddingEdge * (3.0F - 2.0F * paPaddingEdge);
         lastSlabBaseY = weather.slabBaseY();
+        lastSlabTopY = weather.slabTopY();
         lastMaxPrecipitation = paMaxPrecipitation;
         shader.safeGetUniform("PuffLobeCount").set(PuffLobeSpatialIndex.lobeCount());
         // T162 scaling arm: a positive cap tells the shader about fewer

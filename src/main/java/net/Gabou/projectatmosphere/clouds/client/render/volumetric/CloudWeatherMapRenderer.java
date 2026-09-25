@@ -29,6 +29,12 @@ public final class CloudWeatherMapRenderer {
     private static final VolumetricRenderCell[] rasterCells = new VolumetricRenderCell[MAX_CELLS];
 
     private static double lastOriginX;
+    /** T225. The render cells of the last weather-map update. */
+    private static volatile List<VolumetricRenderCell> lastCells = List.of();
+
+    public static List<VolumetricRenderCell> lastCells() {
+        return lastCells;
+    }
     private static double lastOriginZ;
     private static long lastInputSignature = Long.MIN_VALUE;
     private static long lastDomainSignature = Long.MIN_VALUE;
@@ -242,6 +248,9 @@ public final class CloudWeatherMapRenderer {
         float slabTop = -Float.MAX_VALUE;
         float maxPrecipitation = 0.0F;
         int count = 0;
+        // T225. The cells behind this frame's maximum, for the local-versus-
+        // global precipitation log.
+        lastCells = cells;
         for (VolumetricRenderCell cell : cells) {
             if (cell == null || count >= MAX_CELLS) {
                 break;

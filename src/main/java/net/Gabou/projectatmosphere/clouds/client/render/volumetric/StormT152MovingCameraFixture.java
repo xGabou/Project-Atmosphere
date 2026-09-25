@@ -252,7 +252,18 @@ final class StormT152MovingCameraFixture {
          * 0.05-0.16 precisely so it cannot.
          */
         DEEP_SCATTER_OFF("deep_scatter_off", false, 1, 0.25F, -1, 0, 0, 3, 1, 0),
-        DEEP_SCATTER_ON("deep_scatter_on", false, 1, 0.25F, -1, 0, 0, 3, 1, 1);
+        DEEP_SCATTER_ON("deep_scatter_on", false, 1, 0.25F, -1, 0, 0, 3, 1, 1),
+        /**
+         * T225: the stationary rain ramp. All three are the production
+         * configuration; they differ only in the MaxPrecipitation override and
+         * in whether the rain pass draws. HOLD_BODY holds the scalar fixed with
+         * no rain pass (the stationary noise floor); RAMP_BODY ramps it with no
+         * rain pass (the cloud body's response alone: ray volume, early-out,
+         * below-base shading); RAMP_FULL ramps it with rain drawn.
+         */
+        HOLD_BODY("hold_body", false, 1, 0.25F, -1, 0, 0, 3, 1, 1),
+        RAMP_BODY("ramp_body", false, 1, 0.25F, -1, 0, 0, 3, 1, 1),
+        RAMP_FULL("ramp_full", false, 1, 0.25F, -1, 0, 0, 3, 1, 1);
 
         private final String label;
         private final boolean history;
@@ -333,7 +344,18 @@ final class StormT152MovingCameraFixture {
      * per-frame screen motion is comparable and the difference between them is
      * the number of boundary crossings, not the speed of one.
      */
-    private enum RouteShape { BEZIER, GATE_EDGE }
+    private enum RouteShape { BEZIER, GATE_EDGE, STATIONARY }
+
+    /**
+     * T225. The stationary route: four fixed cameras, each held for a quarter
+     * of the route while MaxPrecipitation ramps 0 -> peak -> 0 under it.
+     */
+    private static final int STATIONARY_POSES = 4;
+    private static final int STATIONARY_SETTLE = 40;
+    private static final float RAMP_PEAK = 0.90F;
+    /** The HOLD arm's fixed value: the measured storm's own level (T224). */
+    private static final float RAMP_HOLD = 0.45F;
+    private static final String[] STATIONARY_NAMES = {"P0_FLOOR", "P1_PVN", "P2_EDGE", "P3_THROUGH"};
 
     /** How many radial oscillations the gate-edge route makes over the route. */
     private static final double GATE_EDGE_CYCLES = 14.0D;
@@ -370,7 +392,9 @@ final class StormT152MovingCameraFixture {
          * alpha ones.
          */
         DEEP_SCATTER_GATE(RouteShape.GATE_EDGE,
-                Arm.PRODUCTION_050, Arm.DEEP_SCATTER_OFF, Arm.DEEP_SCATTER_ON);
+                Arm.PRODUCTION_050, Arm.DEEP_SCATTER_OFF, Arm.DEEP_SCATTER_ON),
+        /** T225: the stationary rain ramp; the hold arm is the reference. */
+        RAIN_RAMP(RouteShape.STATIONARY, Arm.HOLD_BODY, Arm.RAMP_BODY, Arm.RAMP_FULL);
 
         private final Arm[] arms;
         private final RouteShape shape;
@@ -712,6 +736,9 @@ final class StormT152MovingCameraFixture {
             VolumetricCloudDebugConfig.setMacroEnvelopeMode(arm.macroEnvelope);
             VolumetricCloudDebugConfig.setLowerBodyMode(arm.lowerBody);
             VolumetricCloudDebugConfig.setDeepScatterMode(arm.deepScatter);
+            // T225. The body arms draw no rain pass.
+            VolumetricCloudDebugConfig.setRainDisabled(
+                    arm == Arm.HOLD_BODY || arm == Arm.RAMP_BODY);
             VolumetricCloudRenderer.invalidateHistory();
         }
         historyOverrideApplied = true;
@@ -734,6 +761,8 @@ final class StormT152MovingCameraFixture {
                 VolumetricCloudDebugConfig.setDeepScatterMode(
                         VolumetricCloudDebugConfig.PRODUCTION_DEEP_SCATTER_MODE);
                 VolumetricCloudDebugConfig.setRainHeavyForced(false);
+                VolumetricCloudDebugConfig.setRainDisabled(false);
+                VolumetricCloudDebugConfig.setPrecipitationOverride(Float.NaN);
             }
             historyOverrideApplied = false;
         }
@@ -765,6 +794,12 @@ final class StormT152MovingCameraFixture {
      */
     private static void buildRouteParameterisation() {
         routeT = new double[ROUTE_FRAMES];
+        if (armSet.shape() == RouteShape.STATIONARY) {
+            for (int index = 0; index < ROUTE_FRAMES; index++) {
+                routeT[index] = (index + 0.5D) / ROUTE_FRAMES;
+            }
+            return;
+        }
         double[] lengths = new double[REPARAMETERIZE_STEPS];
         double[] scales = new double[REPARAMETERIZE_STEPS];
         double budget = 0.0D;
@@ -857,6 +892,9 @@ final class StormT152MovingCameraFixture {
         if (armSet.shape() == RouteShape.GATE_EDGE) {
             return gateEdgePoint(t);
         }
+        if (armSet.shape() == RouteShape.STATIONARY) {
+            return stationaryPoint(stationaryPose(t));
+        }
         double u = 1.0D - t;
         double b0 = u * u * u;
         double b1 = 3.0D * u * u * t;
@@ -887,6 +925,11 @@ final class StormT152MovingCameraFixture {
 
     /** Analytic tangent, so the heading is continuous across the whole route. */
     private static Vec3 routeTangent(double t) {
+        if (armSet.shape() == RouteShape.STATIONARY) {
+            // Every pose looks at the storm centre and never turns.
+            Vec3 point = stationaryPoint(stationaryPose(t));
+            return new Vec3(centerX - point.x, midY - point.y, centerZ - point.z);
+        }
         if (armSet.shape() == RouteShape.GATE_EDGE) {
             // Central difference. The analytic tangent of the oscillating path
             // is dominated by the radial term and points almost straight at or
@@ -933,6 +976,51 @@ final class StormT152MovingCameraFixture {
      * {@code CameraCloudDensity} passes through the T217 gate's 0.05-0.16
      * band; the orbit keeps the storm in frame throughout.
      */
+    private static int stationaryPose(double t) {
+        return Math.max(0, Math.min(STATIONARY_POSES - 1, (int) Math.floor(t * STATIONARY_POSES)));
+    }
+
+    /**
+     * T225 poses. P0 sits two blocks under the dry-weather ray-volume floor
+     * (the slab base), so the ramp carries the floor across it early; P1 is
+     * PLAY_VIS_NEAR; P2 is the near-edge pose; P3 the through-body pose.
+     */
+    private static Vec3 stationaryPoint(int pose) {
+        double baseY = midY - height * 0.5D;
+        double slabBase = Double.isFinite(VolumetricCloudRenderer.lastSlabBaseY())
+                ? VolumetricCloudRenderer.lastSlabBaseY() : baseY;
+        return switch (pose) {
+            case 0 -> new Vec3(centerX + radius * 1.6D, slabBase - 2.0D, centerZ);
+            case 1 -> new Vec3(centerX + radius * 1.6D, 120.0D, centerZ);
+            case 2 -> new Vec3(centerX + radius * 1.12D, baseY + height * 0.55D, centerZ);
+            default -> new Vec3(centerX + radius * 0.82D, baseY + height * 0.62D, centerZ);
+        };
+    }
+
+    /**
+     * T225. The override for a frame: 0 through the settle, then a linear
+     * triangle 0 -> {@value #RAMP_PEAK} -> 0 over the rest of the pose.
+     */
+    static float rampPrecipitation(int index) {
+        int span = ROUTE_FRAMES / STATIONARY_POSES;
+        int local = Math.floorMod(index, span) - STATIONARY_SETTLE;
+        int ramp = span - STATIONARY_SETTLE;
+        if (local <= 0) {
+            return 0.0F;
+        }
+        double phase = (double) local / ramp;
+        double tri = phase < 0.5D ? phase * 2.0D : (1.0D - phase) * 2.0D;
+        return (float) (RAMP_PEAK * Math.max(0.0D, tri));
+    }
+
+    private static void applyStationaryRain(int index) {
+        if (armSet != ArmSet.RAIN_RAMP) {
+            return;
+        }
+        VolumetricCloudDebugConfig.setPrecipitationOverride(
+                arm == Arm.HOLD_BODY ? RAMP_HOLD : rampPrecipitation(index));
+    }
+
     private static Vec3 gateEdgePoint(double t) {
         double orbit = t * Math.PI * 2.0D * 0.75D;
         double sweep = Math.sin(t * Math.PI * 2.0D * GATE_EDGE_CYCLES);
@@ -950,6 +1038,18 @@ final class StormT152MovingCameraFixture {
      * camera never stops or turns at a boundary.
      */
     private static String segment(Vec3 point) {
+        if (armSet.shape() == RouteShape.STATIONARY) {
+            int best = 0;
+            double bestDistance = Double.MAX_VALUE;
+            for (int pose = 0; pose < STATIONARY_POSES; pose++) {
+                double distance = stationaryPoint(pose).distanceToSqr(point);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    best = pose;
+                }
+            }
+            return STATIONARY_NAMES[best];
+        }
         double horizontal = Math.hypot(point.x - centerX, point.z - centerZ);
         double normalized = horizontal / radius;
         if (normalized > 2.0D) {
@@ -962,6 +1062,55 @@ final class StormT152MovingCameraFixture {
             return "ENTRY";
         }
         return "INTERIOR";
+    }
+
+    /**
+     * T225. The shader's rain-dependent geometry, replicated for the camera
+     * and its centre ray: the padding, whether the camera starts inside the
+     * ray volume, the in-cloud gate (inside AND CameraCloudDensity > 0.08),
+     * the lighting path it selects, the centre ray's t0/t1, and the local
+     * (fixture storm) against global (every cell) precipitation.
+     */
+    private static String t225Geometry(Vec3 point, Vec3 direction, float cameraDensity) {
+        double base = VolumetricCloudRenderer.lastSlabBaseY();
+        double top = VolumetricCloudRenderer.lastSlabTopY();
+        double floor = VolumetricCloudRenderer.lastRayVolumeFloorY();
+        double padding = base - floor;
+        Vec3 ray = direction.normalize();
+        double t0;
+        double t1;
+        if (Math.abs(ray.y) < 1.0E-4D) {
+            boolean inside = point.y >= floor && point.y <= top;
+            t0 = inside ? 0.0D : -1.0D;
+            t1 = inside ? Double.POSITIVE_INFINITY : -1.0D;
+        } else {
+            double ta = (floor - point.y) / ray.y;
+            double tb = (top - point.y) / ray.y;
+            t0 = Math.max(Math.min(ta, tb), 0.0D);
+            t1 = Math.max(ta, tb);
+        }
+        boolean inVolume = t0 <= 1.0D;
+        boolean inCloud = inVolume && cameraDensity > 0.08F;
+        float local = 0.0F;
+        float remote = 0.0F;
+        for (VolumetricRenderCell cell : CloudWeatherMapRenderer.lastCells()) {
+            if (cell == null) {
+                continue;
+            }
+            if (fixtureGroupId.equals(String.valueOf(cell.morphologyGroupId()))) {
+                local = Math.max(local, cell.precipitationIntensity());
+            } else {
+                remote = Math.max(remote, cell.precipitationIntensity());
+            }
+        }
+        return " padding=" + fmt(padding)
+                + " inRayVolume=" + (inVolume ? 1 : 0)
+                + " inCloudGate=" + (inCloud ? 1 : 0)
+                + " lightPath=" + (inCloud ? "probe" : "cone")
+                + " t0=" + fmt(t0) + " t1=" + fmt(t1)
+                + " override=" + fmt(VolumetricCloudDebugConfig.precipitationOverride())
+                + " naturalMax=" + fmt(VolumetricCloudRenderer.lastNaturalMaxPrecipitation())
+                + " localPrecip=" + fmt(local) + " remotePrecip=" + fmt(remote);
     }
 
     private static void placeCamera(LocalPlayer player, int index) {
@@ -980,6 +1129,7 @@ final class StormT152MovingCameraFixture {
             ProjectAtmosphere.LOGGER.info(
                     "T152_CAMERA_MODE gamemode=spectator restoredByDriver=true");
         }
+        applyStationaryRain(index);
         player.setDeltaMovement(Vec3.ZERO);
         player.moveTo(point.x, point.y, point.z, yaw, pitch);
         // moveTo alone leaves the previous position where it was, so the frame
@@ -1060,12 +1210,14 @@ final class StormT152MovingCameraFixture {
         long flipOn = 0L;
         long flipOff = 0L;
         long flicker = 0L;
+        double alphaSum = 0.0D;
 
         for (int y = 0; y < height2; y++) {
             int row = y * width;
             for (int x = 0; x < width; x++) {
                 int index = row + x;
                 float value = alpha[index];
+                alphaSum += value;
                 boolean isCovered = value >= COVERED;
                 if (isCovered) {
                     covered++;
@@ -1186,6 +1338,8 @@ final class StormT152MovingCameraFixture {
                 .append(" rayFloorY=").append(fmt(VolumetricCloudRenderer.lastRayVolumeFloorY()))
                 .append(" slabBaseY=").append(fmt(VolumetricCloudRenderer.lastSlabBaseY()))
                 .append(" maxPrecip=").append(fmt(VolumetricCloudRenderer.lastMaxPrecipitation()))
+                .append(t225Geometry(point, routeTangent(t), inputs.cameraCloudDensity()))
+                .append(" alphaMean=").append(fmt(pixels > 0 ? alphaSum / pixels : 0.0D))
                 .append(" res=").append(width).append('x').append(height2)
                 .append(" coverage=").append(fmt((double) covered / pixels))
                 .append(" edgeFraction=").append(fmt((double) edge / pixels));

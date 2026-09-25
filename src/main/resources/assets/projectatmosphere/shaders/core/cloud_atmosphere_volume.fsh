@@ -1180,6 +1180,19 @@ bool paWorkloadCaptureActive() {
  * rain's mass-weighted depth as a fraction of the render distance and its
  * total transmittance (or, in mask mode, the run count).
  */
+// T225. What a ray rejected before the march writes. In the rain pass the
+// output is a rain texel, whose "no rain" is rgb 0 with packed (depth 0,
+// T_r 1) = 4095, as the T210 coarse mask already writes. A literal 0 decodes
+// as T_r = 0: an opaque black rain layer at depth 0, which the T207 resolve
+// composites into every pixel it covers - the whole lower half of the frame
+// for a camera below the ray volume (dry weather below the cloud base) and
+// the sky for one above it. The cloud program and the rain mask keep 0.
+#if defined(PA_RAIN_PASS) && !defined(PA_RAIN_MASK_OUTPUT)
+const vec4 PA_EMPTY_RAY_OUTPUT = vec4(0.0, 0.0, 0.0, 4095.0);
+#else
+const vec4 PA_EMPTY_RAY_OUTPUT = vec4(0.0);
+#endif
+
 float paRainPassPack(float a01, float b01) {
     float aQ = floor(clamp(a01, 0.0, 1.0) * 4095.0 + 0.5);
     float bQ = floor(clamp(b01, 0.0, 1.0) * 4095.0 + 0.5);
@@ -8953,7 +8966,7 @@ void main() {
             return;
         }
         gl_FragDepth = 1.0;
-        fragColor = vec4(0.0);
+        fragColor = PA_EMPTY_RAY_OUTPUT;
         return;
     }
 
@@ -8968,7 +8981,7 @@ void main() {
             return;
         }
         gl_FragDepth = 1.0;
-        fragColor = vec4(0.0);
+        fragColor = PA_EMPTY_RAY_OUTPUT;
         return;
     }
 
@@ -9045,7 +9058,7 @@ void main() {
             return;
         }
         gl_FragDepth = 1.0;
-        fragColor = vec4(0.0);
+        fragColor = PA_EMPTY_RAY_OUTPUT;
         return;
     }
 

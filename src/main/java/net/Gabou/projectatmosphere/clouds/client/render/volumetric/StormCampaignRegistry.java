@@ -343,6 +343,11 @@ public final class StormCampaignRegistry {
             new Campaign("T218M", "t218-gate-motion.txt",
                     "gateEdgeMotionRunRequested", "t218mRun",
                     null, Routing.PERFORMANCE_ONLY),
+            // T225M. The stationary rain ramp: four fixed cameras while the
+            // global MaxPrecipitation ramps under them.
+            new Campaign("T225M", "t225-rain-ramp.txt",
+                    "rainRampRunRequested", "t225mRun",
+                    null, Routing.PERFORMANCE_ONLY),
             // T212M. The T152 route judging the macro-envelope candidate under
             // motion. Above the sweeps, like T211M: a PERFORMANCE_ONLY row must
             // not be the registry's newest.
