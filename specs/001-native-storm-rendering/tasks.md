@@ -4178,6 +4178,24 @@ implementation, while visual polish remains independently active.
   `validation/t225-campaign/`. Next: **T226, per-descriptor precipitation** (a descriptor texel
   channel), then rainFraction and descriptor shaft intensity read it; validate with the T225M
   ramp. [SC-005, SC-016, SC-021]
+- [X] T227 [QUALITY] [US1] Why production clouds have no stable middle ground: a same-run GOOD/BAD
+  matrix over three storm realizations, eight poses, FINAL + light-path / density / pre-erosion /
+  envelope views at identical pixels, and a sun-elevation axis (every earlier capture ran at frozen
+  noon). **DOMINANT VARIABLE: the fraction of visible cloud inside the lighting transfer's narrow
+  responsive od band (1-4); cause C (transfer) via D (storm scale x transfer depth) and E (view /
+  sun).** Past od 4 the ambient is a constant (`mix(retention, 1, exp(-od))`), the octaves are
+  ~0 and deep scatter is camera-gated off, so the shadow regime keeps **6-15%** of the density
+  field's local structure (band 57-96%, lit 20-40%) while holding **60-80%** of visible cloud
+  (band 1-12%). Density structure is equal in shadow and lit cloud (not B), descriptors barely vary
+  (not A). Spearman vs label (23 cases): form-band fraction **+0.79**, shadow area -0.72, screen
+  -0.64, lit density contrast +0.19. Causal: same storm/camera, only the sun moved -> band
+  0.09 -> 0.22 and the view went GOOD. Pre-check (single `exp(-od k)`, k 0.25/0.12): plateau
+  down at moderate shadow (SIDE 0.48 -> 0.28), no reach into the deep undersides, lit-top contrast
+  down -> **next = T228 two-scale shadow transfer** (keep exp(-od) for the skin; add a log-od /
+  thickness-normalized body term over od ~4-40, mean-preserving), judged on this matrix with a
+  log-encoded od view and the sun axis. No production change; T226 parked on
+  `quality/t226-local-precipitation`. Evidence in `validation/t227-visual-consistency.md` and
+  `validation/t227-campaign/`. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
