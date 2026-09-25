@@ -1025,6 +1025,13 @@ int paStormFieldRefineFallback = 0;
 float paLastStormMinSoftness = 1.0e9;
 float paLastStormMaxSoftness = 0.0;
 float paLastStormUnionDistance = 1.0e9;
+// T229. paLastStormUnionDistance as it stood right after the SHADED sample's
+// own density evaluation in the primary march. The union walk runs for every
+// density call (refinement, probes), so the raw global belongs to whichever
+// ran last; this copy is written only at the primary sample. Signed blocks
+// to the storm's macro envelope (before base noise and erosion): negative
+// inside, 0 on the surface, 1e9 where no storm group owns the sample.
+float paShadeUnionDistance = 1.0e9;
 // T202. The walk's minimum descriptor clearance at the node - the value the
 // refinement reads at a ray point - published so the build can floor it over
 // the dual cell. 1e9 when the node's tile carries no candidate.
@@ -8097,6 +8104,16 @@ vec3 sampleLighting(
         diagnosticLightOpticalDepth = 0.0;
         return vec3(saturate(localDensity / (0.80 * max(DensityMul, 0.001))));
     }
+    if (PaDiagnosticLightingMode == 10) {
+        // T229. Surface depth at the shaded sample: v = (-d + 150) / 600, so
+        // 150 blocks outside the macro envelope is 0, its surface 0.25 and
+        // 450 blocks inside 1. Magenta where no storm group owns the sample.
+        diagnosticLightOpticalDepth = 0.0;
+        if (paShadeUnionDistance > 1.0e8) {
+            return vec3(1.0, 0.0, 1.0);
+        }
+        return vec3(saturate((-paShadeUnionDistance + 150.0) / 600.0));
+    }
     if (PaDiagnosticLightingMode == 9) {
         // T228. The light-path optical depth, log-encoded over 0-64 so the
         // deep body stays measurable: value = log(1 + od) / log(65). Mode 2's
@@ -10139,6 +10156,7 @@ void main() {
         }
         if ((PaStormFieldEnabled & 16) == 0 || !paPrimaryCovered) {
             bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
+            paShadeUnionDistance = paLastStormUnionDistance;
         }
 #endif
 #ifdef PA_PRIMARY_AUDIT

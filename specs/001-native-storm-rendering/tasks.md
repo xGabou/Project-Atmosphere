@@ -4216,6 +4216,22 @@ implementation, while visual polish remains independently active.
   `validation/t228-dual-scale-light-depth.md` and `validation/t228-campaign/`. Next: **T229
   skylight visibility from depth below the storm surface** (`paLastStormUnionDistance`, no taps),
   alone and with the T228 curve. [SC-005, SC-016, SC-021]
+- [X] T229 [QUALITY] [US1] Underside sky-visibility from surface depth: does distance below the
+  storm's own macro surface carry the underside form sun-path od cannot? **CASE B - DISPROVEN for
+  the underside; no lighting term built.** Semantics verified: `paLastStormUnionDistance` = smooth-
+  unioned signed blocks to the descriptor macro envelope (pre-noise/erosion; negative inside, 0 on
+  the surface, 1e9 unowned), but overwritten by every union walk - so T229 captures
+  `paShadeUnionDistance` right after the primary sample's own density call; new instrument mode 10
+  (surface depth at the shaded sample). Signal: low-frequency, least veiny of od/depth/density,
+  form-correlated (+0.36..+0.65) - but on the deep underside the shaded samples sit in the
+  envelope's thin soft shell (THROUGH depth p10-p90 -75..-6 blocks) and its local spread is 2.8
+  blocks vs 16-28 on flanks: the underside's macro surface is SMOOTH. Energy-bounded analytic best
+  case (no view shift > ~3.6 levels): THROUGH +0.1-0.3 levels local contrast, NEAREDGE +0.5-1.3
+  (T228 already +0.57) - cannot beat T228, so the brief's stop applies. Mechanism: undersides lack
+  macro relief; no lighting input can show it. Mode 10 kept (dead code in FINAL). Evidence in
+  `validation/t229-surface-depth-skylight.md` and `validation/t229-campaign/`. Next: **T230
+  anvil-underside macro relief (morphology)** - the underside counterpart of T213's deck
+  displacement - then re-judge the T228 curve on it. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
