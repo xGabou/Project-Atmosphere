@@ -4248,6 +4248,24 @@ implementation, while visual polish remains independently active.
   and `validation/t230-campaign/`. Next: **T231 relief-coupled underside shading** (ambient
   follows the same zero-mean macro field that shapes the underside, in shadow, arithmetic only),
   paired with the T230 relief. [SC-005, SC-016, SC-021]
+- [X] T231 [QUALITY] [US1] Lower-anvil relief shading. **KEEP (CASE A) - production now ships T230's
+  lower-anvil relief + this shading** (`PRODUCTION_LOWER_DECK_RELIEF_MODE = 1`, `PRODUCTION_RELIEF_SHADE
+  = 0.12`, live uniforms, sandbox-pinned incl. the sign). Term: `ambient *= 1 - 0.12 * macroSigned *
+  lowerWeight * smoothstep(2,5,od)` - the SAME centred macro field that displaces the underside
+  (T213 basis, already fetched: arithmetic only), shadow-only, lower-anvil window only. Sign verified
+  analytically (positive shift recedes the underside into a hollow -> darker) and at the NEAREDGE
+  underside edge (alpha growth vs signal -0.40); new mode 13 = macro signal at the shaded sample
+  (region SD 0.38-0.98, local means -0.5..+0.4). Lower-anvil flat fraction M0 / T230-only / M2:
+  NEAREDGE 0.98/0.98/0.86, LOWSIDE 0.82/0.82/0.51, SIDE 0.89/0.88/0.54, LATERAL 0.70/0.73/0.26;
+  contrast x2; low sun holds; shading-relief coherence +0.75..+0.95; lower-mass veins unchanged;
+  frame means within 1.4. THROUGH only 1.00 -> 0.97 (its view holds < one ~400-block macro cell).
+  Motion +1.9% luma / +2.6% flicker, no pumping; cost ~0.1 ms (the relief's added volume). T228 on
+  top (CASE D) pushes further but brings back +9.4% motion - not banked. **STANDING RISK: whole
+  renderer 11.96 ms at SIDE post-bank vs 11.86 ms with the bank reverted (same harness) - production
+  itself is over 10 ms in this heavier storm; T231 costs nothing measurable.** Evidence in
+  `validation/t231-lower-anvil-form-lighting.md` and `validation/t231-campaign/`. Next: **T232
+  restore the <= 10 ms budget in heavy realizations** (attribute the raw-phase growth, 6.1 -> 8.8 ms
+  at SIDE), then T233 the THROUGH-scale underside octave. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

@@ -355,7 +355,7 @@ public final class VolumetricCloudDebugConfig {
     }
 
     public static void setDiagnosticLightingMode(int mode) {
-        diagnosticLightingMode = Math.max(0, Math.min(12, mode));
+        diagnosticLightingMode = Math.max(0, Math.min(13, mode));
     }
 
     public static boolean t098LegacyFinePromotion() {
@@ -506,6 +506,33 @@ public final class VolumetricCloudDebugConfig {
 
     public static boolean rainDisabled() {
         return rainDisabled;
+    }
+
+    /**
+     * T231, production. The lower-anvil macro relief (T230's mirror of T213's
+     * deck window) and the form shading that makes it visible: shadowed
+     * ambient x (1 - strength x macroSigned x lowerWeight x shadow). Sagging
+     * lobes lighter, hollows darker; no density or alpha effect of its own.
+     */
+    public static final int PRODUCTION_LOWER_DECK_RELIEF_MODE = 1;
+    public static final float PRODUCTION_RELIEF_SHADE = 0.12F;
+    private static volatile int lowerDeckReliefMode = PRODUCTION_LOWER_DECK_RELIEF_MODE;
+    private static volatile float reliefShadeStrength = PRODUCTION_RELIEF_SHADE;
+
+    public static int lowerDeckReliefMode() {
+        return lowerDeckReliefMode;
+    }
+
+    public static void setLowerDeckReliefMode(int mode) {
+        lowerDeckReliefMode = Math.max(0, Math.min(1, mode));
+    }
+
+    public static float reliefShadeStrength() {
+        return reliefShadeStrength;
+    }
+
+    public static void setReliefShadeStrength(float strength) {
+        reliefShadeStrength = Math.max(0.0F, strength);
     }
 
     /**
@@ -716,6 +743,8 @@ public final class VolumetricCloudDebugConfig {
         deepScatterMode = PRODUCTION_DEEP_SCATTER_MODE;
         rainHeavyForced = false;
         precipitationOverride = Float.NaN;
+        lowerDeckReliefMode = PRODUCTION_LOWER_DECK_RELIEF_MODE;
+        reliefShadeStrength = PRODUCTION_RELIEF_SHADE;
         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
         sentinelHeightsEnabled = false;
         fullResolutionEnabled = false;

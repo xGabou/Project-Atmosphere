@@ -1039,6 +1039,11 @@ float paLastMacroShiftBlocks = 0.0;
 float paLastLowerDeckWeight = 0.0;
 float paShadeMacroShift = 0.0;
 float paShadeLowerWeight = 0.0;
+// T231. The centred macro signal stage 5 fetched at the last cloudDensity
+// call (0 where it fetched none: outside the envelope transition band), and
+// its copy at the shaded sample.
+float paLastMacroSigned = 0.0;
+float paShadeMacroSigned = 0.0;
 // T202. The walk's minimum descriptor clearance at the node - the value the
 // refinement reads at a ray point - published so the build can floor it over
 // the dual cell. 1e9 when the node's tile carries no candidate.
@@ -1421,6 +1426,12 @@ uniform int PaLegacyFinePromotion;
 // T223 adds the base field: 7 B0 (as the density uses it) and 8 B1, one
 // coarser version - an emulated mip-2 fetch (see paBaseMip2Field).
 uniform int PaDiagnosticLightingMode;
+// T231 (production 1 / 0.12). PaLowerDeckRelief 1: T230's lower-anvil macro
+// displacement (the mirror of T213's deck window, stormLowerDeckWeight).
+// PaReliefShade: the lower-anvil form shading, per macro sd, that lets that
+// relief show - the shadowed lighting has no other term that reads shape.
+uniform int PaLowerDeckRelief;
+uniform float PaReliefShade;
 uniform int PaRayTraceMode;
 uniform vec2 PaRayTraceNdc;
 uniform vec2 PaRayTraceFragCoord;
@@ -3782,6 +3793,9 @@ float directStormFinalDensity(
         // envelope from the one the body renders.
         float deckWeight = smoothstep(0.55, 0.72, dominantHeight01)
             * (1.0 - smoothstep(0.93, 1.0, dominantHeight01));
+        if (PaLowerDeckRelief != 0) {
+            deckWeight += stormLowerDeckWeight(dominantHeight01, activeRoleMask);
+        }
         if (PaMacroEnvelope >= 3) {
             float envStrength = max(envelopeStrength, 1.0e-3);
             float u = clamp(coverage / envStrength, 0.0, 1.0);
@@ -6567,6 +6581,7 @@ float cloudDensity(
             // artifact-absence check.
             bool embeddedConvectiveOverlap = (directStormActiveRoleMask & 7) == 7;
             paLastMacroShiftBlocks = 0.0;
+            paLastMacroSigned = 0.0;
             paLastLowerDeckWeight = stormLowerDeckWeight(
                 directStormHeight01, directStormActiveRoleMask);
             if (PaMacroEnvelope != 0 && cloud > 0.12 && cloud < 0.98) {
@@ -6588,6 +6603,7 @@ float cloudDensity(
                     BaseNoiseSampler, stormMacroEnvelopeDomain(samplePos), 0.0).g;
                 float macroSigned = (macroOctave - STORM_MACRO_OCTAVE_MEAN)
                     / STORM_MACRO_OCTAVE_SD;
+                paLastMacroSigned = clamp(macroSigned, -2.5, 2.5);
                 // T213. Weight the displacement by the deck the vertical clamp
                 // attenuates. The weight is a smooth, bounded, world-stable
                 // function of the storm's own normalised height - no screen
@@ -6602,6 +6618,9 @@ float cloudDensity(
                 float deckHeight = directStormHeight01;
                 float deckWeight = smoothstep(0.55, 0.72, deckHeight)
                     * (1.0 - smoothstep(0.93, 1.0, deckHeight));
+                if (PaLowerDeckRelief != 0) {
+                    deckWeight += paLastLowerDeckWeight;
+                }
                 float macroGain = PaMacroEnvelope == 1
                     ? 1.0
                     : mix(1.0, STORM_MACRO_DECK_GAIN, deckWeight);
@@ -7998,6 +8017,17 @@ vec3 evaluateLightingComponents(
     // prevents thick or night-time clouds from collapsing to black.
     float ambientRetention = mix(0.74, 0.58, materialDarkness);
     ambient *= mix(ambientRetention, 1.0, directTransmission);
+    if (PaReliefShade > 0.0) {
+        // T231. The lower anvil's form, from the SAME centred macro field that
+        // displaces it (T230): a positive signal moves the surface inward -
+        // on the underside, up into a hollow - and a negative one lets it sag.
+        // Sagging lobes lighter, hollows darker: -signal. Only in shadow (the
+        // lit skin is left alone), only inside the lower-deck window, and
+        // zero wherever stage 5 made no macro fetch. Zero-mean in the field's
+        // own calibrated statistics; no density, no alpha.
+        float reliefShadow = smoothstep(2.0, 5.0, opticalDepth);
+        ambient *= 1.0 - PaReliefShade * paShadeMacroSigned * paShadeLowerWeight * reliefShadow;
+    }
     ambient *= mix(1.0, 0.68, rainFraction);
 
     // Silver lining is restricted to an optically thin shell looking toward
@@ -8132,7 +8162,7 @@ vec3 sampleLighting(
         diagnosticLightOpticalDepth = 0.0;
         return vec3(saturate(localDensity / (0.80 * max(DensityMul, 0.001))));
     }
-    if (PaDiagnosticLightingMode == 11 || PaDiagnosticLightingMode == 12) {
+    if (PaDiagnosticLightingMode >= 11 && PaDiagnosticLightingMode <= 13) {
         // T230. 11: the DISPLACED surface depth, -(d + macro shift), same
         // encoding as mode 10 - T229's view is the union before the stage-5
         // macro displacement, so it cannot see relief. 12: the lower-deck
@@ -8143,6 +8173,12 @@ vec3 sampleLighting(
         }
         if (PaDiagnosticLightingMode == 12) {
             return vec3(saturate(paShadeLowerWeight));
+        }
+        if (PaDiagnosticLightingMode == 13) {
+            // T231. The centred macro signal at the shaded sample, ±2.5 sd
+            // mapped to 0..1 (0.5 = the field mean); 0.5 also where stage 5
+            // made no fetch. Only meaningful with mode 12's weight > 0.
+            return vec3(saturate(0.5 + paShadeMacroSigned / 5.0));
         }
         return vec3(saturate((-(paShadeUnionDistance + paShadeMacroShift) + 150.0) / 600.0));
     }
@@ -10201,6 +10237,7 @@ void main() {
             paShadeUnionDistance = paLastStormUnionDistance;
             paShadeMacroShift = paLastMacroShiftBlocks;
             paShadeLowerWeight = paLastLowerDeckWeight;
+            paShadeMacroSigned = paLastMacroSigned;
         }
 #endif
 #ifdef PA_PRIMARY_AUDIT

@@ -47,6 +47,7 @@ public final class StormVolumetricGeometrySandbox {
         timed("validateCoherentStormMorphology", StormVolumetricGeometrySandbox::validateCoherentStormMorphology);
         timed("validateGroupSelectionAndCandidatePacking", StormVolumetricGeometrySandbox::validateGroupSelectionAndCandidatePacking);
         timed("validateDirtyAndAdoptionContracts", StormVolumetricGeometrySandbox::validateDirtyAndAdoptionContracts);
+        timed("validateT231LowerAnvilForm", StormVolumetricGeometrySandbox::validateT231LowerAnvilForm);
         timed("validateCoalescingAndSaturationContracts", StormVolumetricGeometrySandbox::validateCoalescingAndSaturationContracts);
         timed("StormPerformanceSuite.selfCheckStateMachine", StormPerformanceSuite::selfCheckStateMachine);
         timed("validateT132AuthoritativeControlSeparation", StormVolumetricGeometrySandbox::validateT132AuthoritativeControlSeparation);
@@ -9123,6 +9124,33 @@ public final class StormVolumetricGeometrySandbox {
                         && function.contains("stormGroupSegmentMayIntersect")
                         && !function.contains("descriptorIndex < MAX_STORM_LOBES"),
                 "ray segment intersection scans every descriptor instead of bounded per-group geometry");
+    }
+
+    /**
+     * T231. The lower-anvil relief and its form shading ship together: the
+     * relief alone is invisible (T230), and the shading without the relief
+     * would paint form the geometry does not have. Pin both production values,
+     * the mirror window (anvil active, base not, 1 at the lobes' base fading
+     * by h 0.30 - disjoint from T213's 0.55-0.93 deck window) and the SIGN of
+     * the shading (a positive macro shift recedes the underside into a hollow,
+     * which must read darker).
+     */
+    private static void validateT231LowerAnvilForm() {
+        require(VolumetricCloudDebugConfig.PRODUCTION_LOWER_DECK_RELIEF_MODE == 1
+                        && VolumetricCloudDebugConfig.PRODUCTION_RELIEF_SHADE == 0.12F,
+                "the T231 lower-anvil relief / form shading is no longer production");
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        require(shader.contains("return anvil && !base ? 1.0 - smoothstep(0.12, 0.30, height01) : 0.0;"),
+                "the lower-deck window changed: it must stay anvil-only, base-free and below h 0.30");
+        require(shader.contains("ambient *= 1.0 - PaReliefShade * paShadeMacroSigned * paShadeLowerWeight * reliefShadow;"),
+                "the lower-anvil form shading changed sign or inputs");
+        String json = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.json");
+        require(json.contains("\"name\": \"PaLowerDeckRelief\", \"type\": \"int\", \"count\": 1, \"values\": [ 1 ]")
+                        && json.contains("\"name\": \"PaReliefShade\", \"type\": \"float\", \"count\": 1, \"values\": [ 0.12 ]"),
+                "the shader JSON defaults no longer match the T231 production values");
+        System.out.println("T231_LOWER_ANVIL_FORM relief=1|shade=0.12|window=anvil&!base,h<0.30|sign=hollowDarker");
     }
 
     private static VolumetricRenderCell unrelatedLodCell(double x) {

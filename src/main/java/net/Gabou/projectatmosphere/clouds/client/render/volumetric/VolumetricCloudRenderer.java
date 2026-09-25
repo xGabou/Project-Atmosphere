@@ -704,6 +704,8 @@ public final class VolumetricCloudRenderer {
             paMaxPrecipitation = paPrecipitationOverride;
         }
         shader.safeGetUniform("MaxPrecipitation").set(paMaxPrecipitation);
+        shader.safeGetUniform("PaLowerDeckRelief").set(VolumetricCloudDebugConfig.lowerDeckReliefMode());
+        shader.safeGetUniform("PaReliefShade").set(VolumetricCloudDebugConfig.reliefShadeStrength());
         // T224. Where the shader's cameraStartsInsideSlab turns on: the ray
         // volume's floor, SlabBaseY lowered by precipitationRayPadding(). Not
         // modelled: the shader lowers it further when funnels are present.
