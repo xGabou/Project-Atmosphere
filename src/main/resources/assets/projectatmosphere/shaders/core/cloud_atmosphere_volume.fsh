@@ -1032,6 +1032,13 @@ float paLastStormUnionDistance = 1.0e9;
 // to the storm's macro envelope (before base noise and erosion): negative
 // inside, 0 on the surface, 1e9 where no storm group owns the sample.
 float paShadeUnionDistance = 1.0e9;
+// T230. The block-space macro shift the primary density applied to the
+// envelope at the last cloudDensity call (0 outside the transition band), the
+// lower-deck weight there, and their copies at the SHADED sample.
+float paLastMacroShiftBlocks = 0.0;
+float paLastLowerDeckWeight = 0.0;
+float paShadeMacroShift = 0.0;
+float paShadeLowerWeight = 0.0;
 // T202. The walk's minimum descriptor clearance at the node - the value the
 // refinement reads at a ray point - published so the build can floor it over
 // the dual cell. 1e9 when the node's tile carries no candidate.
@@ -1796,6 +1803,22 @@ vec3 baseNoiseDomain(vec3 worldPos, float scale) {
 // enough to move a 450-block anvil at harmonics 3-8, which is where its
 // silhouette reads as an ellipse. The constant offset decorrelates it from
 // the body noise so the two do not carve the same features.
+/**
+ * T230 (instrument; the relief arm was rejected). Where the anvil's LOWER
+ * surface is - diagnostic mode 12 shows it. T213's deck window weights the
+ * displacement by each lobe's own normalised height (0.55-0.93), so it covers
+ * the upper part of the anvil lobes and is exactly zero at their bottom - the
+ * underside. This is the mirror window, 1 at the anvil lobes' base fading by
+ * 0.30, and only where an ANVIL lobe is active and no BASE lobe is (so the
+ * storm's own bottom, where base lobes also sit at h ~ 0, is untouched). The
+ * two windows never overlap (0.30 < 0.55), so no point is displaced twice.
+ */
+float stormLowerDeckWeight(float height01, int roleMask) {
+    bool anvil = (roleMask & 8) != 0;
+    bool base = (roleMask & 1) != 0;
+    return anvil && !base ? 1.0 - smoothstep(0.12, 0.30, height01) : 0.0;
+}
+
 vec3 stormMacroEnvelopeDomain(vec3 worldPos) {
     vec3 rotated = vec3(
         dot(worldPos, vec3(0.8138, 0.2962, -0.5000)),
@@ -6543,6 +6566,9 @@ float cloudDensity(
             // what produced a smooth balloon that passed every
             // artifact-absence check.
             bool embeddedConvectiveOverlap = (directStormActiveRoleMask & 7) == 7;
+            paLastMacroShiftBlocks = 0.0;
+            paLastLowerDeckWeight = stormLowerDeckWeight(
+                directStormHeight01, directStormActiveRoleMask);
             if (PaMacroEnvelope != 0 && cloud > 0.12 && cloud < 0.98) {
                 // T212. The macro band the body noise does not have. `cloud`
                 // is still the coverage envelope here, so shifting it moves
@@ -6592,6 +6618,8 @@ float cloudDensity(
     : STORM_MACRO_BLOCKS_PER_SD;
 float shift = (deckWeight * blocksPerSd
                         * clamp(macroSigned, -2.5, 2.5)) / (2.0 * bandWidth);
+                    paLastMacroShiftBlocks = deckWeight * blocksPerSd
+                        * clamp(macroSigned, -2.5, 2.5);
                     float tShifted = clamp(tParam + shift, 0.0, 1.0);
                     float ssShifted = tShifted * tShifted * (3.0 - 2.0 * tShifted);
                     cloud = saturate((1.0 - ssShifted) * envStrength);
@@ -8103,6 +8131,20 @@ vec3 sampleLighting(
         // T221 local-density view.
         diagnosticLightOpticalDepth = 0.0;
         return vec3(saturate(localDensity / (0.80 * max(DensityMul, 0.001))));
+    }
+    if (PaDiagnosticLightingMode == 11 || PaDiagnosticLightingMode == 12) {
+        // T230. 11: the DISPLACED surface depth, -(d + macro shift), same
+        // encoding as mode 10 - T229's view is the union before the stage-5
+        // macro displacement, so it cannot see relief. 12: the lower-deck
+        // weight (where the T230 term would act). Magenta where unowned.
+        diagnosticLightOpticalDepth = 0.0;
+        if (paShadeUnionDistance > 1.0e8) {
+            return vec3(1.0, 0.0, 1.0);
+        }
+        if (PaDiagnosticLightingMode == 12) {
+            return vec3(saturate(paShadeLowerWeight));
+        }
+        return vec3(saturate((-(paShadeUnionDistance + paShadeMacroShift) + 150.0) / 600.0));
     }
     if (PaDiagnosticLightingMode == 10) {
         // T229. Surface depth at the shaded sample: v = (-d + 150) / 600, so
@@ -10157,6 +10199,8 @@ void main() {
         if ((PaStormFieldEnabled & 16) == 0 || !paPrimaryCovered) {
             bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
             paShadeUnionDistance = paLastStormUnionDistance;
+            paShadeMacroShift = paLastMacroShiftBlocks;
+            paShadeLowerWeight = paLastLowerDeckWeight;
         }
 #endif
 #ifdef PA_PRIMARY_AUDIT

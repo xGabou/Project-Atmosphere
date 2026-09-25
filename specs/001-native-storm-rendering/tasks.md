@@ -4232,6 +4232,22 @@ implementation, while visual polish remains independently active.
   `validation/t229-surface-depth-skylight.md` and `validation/t229-campaign/`. Next: **T230
   anvil-underside macro relief (morphology)** - the underside counterpart of T213's deck
   displacement - then re-judge the T228 curve on it. [SC-005, SC-016, SC-021]
+- [X] T230 [QUALITY] [US1] Lower-anvil macro relief. **REJECTED (CASE B, shape not banked).**
+  ATTRIBUTED: T213's deck displacement is weighted on each lobe's OWN normalised height
+  (0.55-0.93), exactly zero at the anvil lobes' base - the underside was the one anvil surface
+  never displaced (T229's mode 10 read the union before stage 5, so it could not show this; new
+  mode 11 = displaced surface depth, mode 12 = lower-deck weight). Candidate: the mirror window
+  (`1 - smoothstep(0.12, 0.30, h)`, anvil active and base not), same macro signal and 38 b/sd, at
+  both stage-5 sites. Geometry works: relief -26..+16 blocks at the ~400-block scale, THROUGH
+  displaced-depth local spread 1.74 -> 2.87, broad-band only, collateral nil (IoU 0.985-1.000,
+  lower-mass veins unchanged, ABOVE identical). FINAL barely moves (THROUGH flat 1.00 -> 0.98) and
+  the underside sun od does not change (local spread 1.35 -> 1.49), so the T228 re-test was not
+  rendered. MECHANISM: this lighting has NO shape-sensitive term for shadowed surfaces (sun od
+  through the anvil above, height-only ambient, no normal/occlusion) - relief is invisible
+  without one. Modes 11/12 kept (dead in FINAL). Evidence in `validation/t230-lower-anvil-relief.md`
+  and `validation/t230-campaign/`. Next: **T231 relief-coupled underside shading** (ambient
+  follows the same zero-mean macro field that shapes the underside, in shadow, arithmetic only),
+  paired with the T230 relief. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
