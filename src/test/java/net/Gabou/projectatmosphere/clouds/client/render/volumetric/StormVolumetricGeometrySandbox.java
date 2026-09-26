@@ -1250,13 +1250,12 @@ public final class StormVolumetricGeometrySandbox {
 
         // FINAL's specialization.
         String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
-        for (String define : new String[] {"PA_PRECIPITATION_ABSENT",
+        for (String define : new String[] {"PA_PRECIPITATION_ABSENT", "PA_ARM_DESC_PRECOMPUTE",
                 "PA_ARM_NO_RAIN_SEGMENT", "PA_RAIN_SPLIT_COMPOSITE"}) {
             require(finalSource.contains("#define " + define + " 1"),
                     "FINAL does not define " + define);
         }
-        // T234: the descriptor precompute left FINAL (motion stability).
-        for (String define : new String[] {"PA_ARM_DESC_PRECOMPUTE", "PA_RAIN_PASS", "PA_RAIN_PASS_FINE",
+        for (String define : new String[] {"PA_RAIN_PASS", "PA_RAIN_PASS_FINE",
                 "PA_RAIN_MASK_OUTPUT", "PA_T140_ORACLE", "PA_LIGHT_AUDIT", "PA_PRIMARY_AUDIT"}) {
             require(!finalSource.contains("#define " + define),
                     "FINAL defines " + define);
@@ -1309,13 +1308,8 @@ public final class StormVolumetricGeometrySandbox {
         String finalBody = finalSource.substring(finalSource.indexOf("#version 150"));
         String referenceBody = referenceSource.substring(referenceSource.indexOf("#version 150"));
         require(finalBody.replace("#define PA_ARM_NO_RAIN_SEGMENT 1\n", "")
-                        .replace("#define PA_RAIN_SPLIT_COMPOSITE 1\n", "")
-                        // T234: FINAL dropped the descriptor precompute; this
-                        // historical anchor (other controls are byte-identical
-                        // to it) keeps it.
-                        .equals(referenceBody.replace("#define PA_ARM_DESC_PRECOMPUTE 1\n", "")),
-                "t206_monolithic_ref is not FINAL minus the two split defines"
-                        + " (and the precompute FINAL dropped in T234)");
+                        .replace("#define PA_RAIN_SPLIT_COMPOSITE 1\n", "").equals(referenceBody),
+                "t206_monolithic_ref is not FINAL minus the two split defines");
 
         // The JSON of each production program matches its GLSL.
         String monolithJson = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
@@ -8567,16 +8561,20 @@ public final class StormVolumetricGeometrySandbox {
         String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
         String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
 
-        // T234 inverts T174 back: FINAL must NOT define it. The precomputed
-        // values are right (1 ulp from the derivation), but without the
-        // derivation in the loop the driver compiles the walk into a program
-        // that is measurably less stable under motion - alpha flicker 2.5x
-        // the monolith's OUTSIDE, 1.3x at ENTRY/APPROACH - while any program
-        // that keeps it, whichever value it uses, matches the monolith
-        // exactly. The hoist is now worth ~0.15 ms, not T173's 13%.
-        require(!finalSource.contains("#define PA_ARM_DESC_PRECOMPUTE 1"),
-                "FINAL defines PA_ARM_DESC_PRECOMPUTE again; T234 measured that program"
-                        + " flickering 2.5x the monolith under motion (outside the storm)");
+        // T174 productionized the precompute, so this assertion is inverted
+        // from T172's: FINAL must now DEFINE it. T172 proved the substitution
+        // bit-identical and T173 measured it at 1.133x on the binding pose, so
+        // the shipped program is expected to consume the precomputed fields -
+        // and a FINAL that quietly stopped would be a silent 13% regression at
+        // SIDE that nothing else would catch.
+        // T234 removed it on a motion comparison that was confounded (only
+        // FINAL runs the T207 temporal reconstruction, so the variants it was
+        // compared with were non-temporal); T235 measured FINAL with and
+        // without it on the temporal path - identical motion - and put it back.
+        require(finalSource.contains("#define PA_ARM_DESC_PRECOMPUTE 1"),
+                "FINAL no longer defines PA_ARM_DESC_PRECOMPUTE; the shipped march would"
+                        + " go back to deriving edge width and the ownership radii once"
+                        + " per descriptor per density sample");
         // The isolated halves stay diagnostic: FINAL takes the combined define,
         // never one side of it, or the two paths could disagree.
         for (String define : new String[] {
