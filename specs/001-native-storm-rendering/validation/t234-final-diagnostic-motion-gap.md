@@ -6,7 +6,7 @@ shader (the monolith), and up to ~2.5× OUTSIDE, when both represent the same pr
 **The answer: one compile-time switch, T172's descriptor precompute (`PA_ARM_DESC_PRECOMPUTE`).
 FIX KEPT (CASE B), at +0.45 ms at SIDE.**
 
-> **T235 correction (26 Sep 2026): this attribution is WRONG and the fix is reverted.** Only
+> **T235 correction (26 Sep 2026): this attribution is WRONG.** Only
 > `LEAN_FINAL` runs the T207 temporal reconstruction (`normalProductionOutput()`), so the monolith
 > and every bridge program below rendered **non-temporally** whatever the route arm requested.
 > The bridges did not match the monolith because of code shape. They matched because none of
@@ -17,8 +17,9 @@ FIX KEPT (CASE B), at +0.45 ms at SIDE.**
 > cheaper. With temporal off, current FINAL matches the monolith (OUTSIDE 1.037×).
 >
 > **The FINAL/diagnostic gap is temporal reconstruction on versus off** - an intended
-> architecture difference. The precompute is restored; see `t235-precompute-recovery.md`. The
-> measurements below stand; only their interpretation (items 29-32, 36-37) does not.
+> architecture difference. Restoring the precompute is recommended (SIDE ~1.1 ms cheaper, identical
+> motion) but not applied, pending a decision; see `t235-precompute-recovery.md`. The measurements
+> below stand; only their interpretation (items 29-32, 36-37) does not.
 
 - **The mechanism is code shape, not values.**
   - The precompute replaces two per-descriptor derivations in the storm walk (edge width and

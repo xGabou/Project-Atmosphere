@@ -4,8 +4,14 @@
 keeping the shipped shader's motion stability, preferably with a small code-shape fragment that
 keeps the "stabilising" compile - not by simply restoring the precompute.
 
-**The result: the premise was false, so the precompute is restored. SIDE 10.04 -> 8.90 ms, PVN
-9.25 -> 8.14 ms (paired ABAB), with motion identical to the current shipped shader.**
+**The result: the premise was false - but per the goal's fallback, production stays as T234
+left it, and restoring the precompute is a recommendation awaiting a decision.**
+
+- **No code-shape fragment exists to find**, because the precompute never affected motion.
+- **The restore itself was measured:** SIDE 10.04 -> 8.90 ms, PVN 9.25 -> 8.14 ms (paired ABAB),
+  with motion identical to the current shipped shader.
+- **It was briefly committed** (`f292aa00`) and then reverted, because the goal said not to
+  restore the precompute and to keep T234 if no smaller fragment worked.
 
 - **T234's attribution was confounded.** The T207 temporal reconstruction runs only for
   `LEAN_FINAL`: `VolumetricCloudRenderer` requires `program.normalProductionOutput()`, which is
@@ -19,8 +25,9 @@ keeps the "stabilising" compile - not by simply restoring the precompute.
 - **Consequences:**
   - There is no code-shape fragment to find: the precompute never affected motion.
   - Restoring it does not bring flicker back.
-  - The goal's acceptance criteria - motion at the current level, SIDE ≤ 9.5 ms, no PVN
-    regression, no driver instability - are all met by the restore.
+  - The restore would meet every acceptance criterion of the goal: motion at the current level,
+    SIDE ≤ 9.5 ms, no PVN regression, no driver instability.
+  - It is still not applied, because the goal ruled it out explicitly.
 
 ## 1. What T234 compared (the confound)
 
@@ -83,14 +90,17 @@ read 2.34× - regardless of the precompute.
 - **No driver instability.** The restored program is byte-identical in NV assembly to the one
   measured on the route (6,775 instructions, 121 temporaries).
 
-## 4. Production change
+## 4. Production change: none (T234 kept), and the recommendation
 
-- **The define.** `PA_ARM_DESC_PRECOMPUTE` is back in `leanFinalDefines` (the pre-T234 list),
-  with a note on why.
-- **The sandbox:**
-  - the pins return to the pre-T234 state (FINAL must define the precompute; the T206 reference
-    comparison is exact again);
-  - the T172 pin records the T234/T235 history.
+- **What stays.** FINAL stays as T234 left it: no precompute, NV assembly byte-identical to
+  T234's.
+- **What changed:** only T234's comments in `build.gradle` and the T172 sandbox pin, which stated
+  the disproven motion reason. They now point here.
+- **Recommendation:** put `PA_ARM_DESC_PRECOMPUTE` back in `leanFinalDefines`. It is the exact
+  program measured in section 2 and timed in section 3, recovering ~1.1 ms at SIDE and PVN with
+  motion identical to the current shipped shader.
+- **Applying it** is one define plus the pre-T234 sandbox pins (`git show f292aa00` has the
+  complete change).
 - **Kept from T234:** the T152 route's per-frame `stepScale` / `gpuMs` fields.
 - **Temporary harness removed:** the T235 campaign, variant programs, route arms and the
   `normalProductionOutput` override.

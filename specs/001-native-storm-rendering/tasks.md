@@ -4315,17 +4315,17 @@ implementation, while visual polish remains independently active.
   Next: **T235 recover ~0.45 ms at SIDE without the precompute's code shape** (judged ABAB and on the
   route against the monolith). [SC-005, SC-016, SC-021]
   **Corrected by T235: the attribution was confounded (only FINAL runs the T207 temporal lattice, so
-  the monolith and every bridge were non-temporal); the precompute has no motion effect and is restored.**
-- [X] T235 [PERF] [US1] Recover T234's SIDE cost. **The premise was false; `PA_ARM_DESC_PRECOMPUTE`
-  restored.** `VolumetricCloudRenderer` enables the T207 phase lattice only for
+  the monolith and every bridge were non-temporal); the precompute has no motion effect - restore recommended.**
+- [X] T235 [PERF] [US1] Recover T234's SIDE cost. **The premise was false; T234 kept per the goal's
+  fallback, restoring `PA_ARM_DESC_PRECOMPUTE` recommended (briefly committed as f292aa00, reverted).** `VolumetricCloudRenderer` enables the T207 phase lattice only for
   `program.normalProductionOutput()` (FINAL + T140 oracles), so a route arm's `temporal` field was inert
   for the monolith and every campaign variant: T234's "stable" programs were simply non-temporal. One
   route, one storm: FINAL with the precompute put on the temporal path = FINAL without it (OUTSIDE 1.005x,
   ENTRY 0.999x, repeat floor 1.06x); FINAL with temporal off = the monolith (OUTSIDE 1.037x, ENTRY 1.000x).
   The FINAL/diagnostic gap is the temporal lattice itself (intended architecture). Paired ABAB vs T234:
   SIDE 10.04 -> 8.90 ms, PVN 9.25 -> 8.14 ms (this session's storm heavier than T234's); program
-  byte-identical to the one measured on the route. Sandbox pins back to pre-T234 (+ the history note);
-  T152 stepScale/gpuMs instrument kept. Evidence in `validation/t235-precompute-recovery.md` and
+  byte-identical to the one measured on the route. Production unchanged from T234 (comments corrected);
+  the restore is one define + the pre-T234 pins, awaiting a decision. Evidence in `validation/t235-precompute-recovery.md` and
   `validation/t235-campaign/`. Harness rule: motion comparisons with FINAL need the other program on the
   temporal path (add it to `normalProductionOutput()`), never the monolith. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
