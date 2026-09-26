@@ -20,6 +20,12 @@ convective storm?
 - **The lever that matches the defect is the storm layout itself** (`CloudletLayout.stormLayout`,
   CPU). That is the next task.
 
+> **T237 correction.** Fixture and world storms (PA_CLUSTER) do not use
+> `CloudletLayout.stormLayout`: `addFieldCloudletCells` skips PA_CLUSTER regions. Their template is
+> the server spawner, `CloudMorphologyGenerators.stormCell` / `stormLobeSpec`, and the descriptor
+> roles are its member stages. T237 redesigned that template and rejected it (downwind axis gained,
+> along-wind mushroom kept by the lobe primitives); see `t237-storm-template-layout.md`.
+
 ## RECOVERY
 
 1. **Starting HEAD:** `20cb8dcd` (T235). **2. Branch:** `quality/t217-deep-interior-lighting` (not

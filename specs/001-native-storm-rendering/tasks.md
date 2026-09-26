@@ -4344,6 +4344,16 @@ implementation, while visual polish remains independently active.
   layout** (`CloudletLayout.stormLayout`: anvil lobes downwind of the tower, a column-scale TOWER pair
   bridging base to anvil, a flatter BASE), judged with the T236 neutral/role/metric harness on 3 storms.
   [SC-005, SC-016, SC-021]
+- [X] T237 [QUALITY] [US1] Storm template layout redesign. **REJECTED - no production change;
+  see `validation/t237-storm-template-layout.md`.** The fixture storm template is
+  `CloudMorphologyGenerators.stormCell`/`stormLobeSpec` (T236's `CloudletLayout.stormLayout` is not
+  used by PA_CLUSTER storms). V1 (flat two-lobe base, column-scale tower 0.04-0.86 T, four varied
+  anvil lobes 0.15-1.35 G downwind) and its one revision V2 (lower, thinner, broader deck), judged by
+  same-storm ABBA relayout on 3 storms: cross-wind the storm gains a downwind axis (mirror IoU
+  0.84 -> 0.50, right/left anvil area 1.1 -> 2.6-3.8, visible tower 0 -> ~50% of height), but from
+  downwind/below it stays cap-over-ball - each anvil lobe is a flared cap and the wide tower lobe a
+  tapered dome. Next: **T238 lobe primitives on the T237 layout** (slab anvil, column tower,
+  re-derived T127/T133 bands). [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
