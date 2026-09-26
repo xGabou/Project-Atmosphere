@@ -4287,6 +4287,19 @@ implementation, while visual polish remains independently active.
   `validation/t232-heavy-storm-budget.md` and `validation/t232-campaign/`. Next: **T233 the
   THROUGH-scale underside octave**, costed build-vs-build against the 9.3 ms SIDE baseline.
   [SC-005, SC-016, SC-021]
+- [X] T233 [QUALITY] [US1] THROUGH-scale underside octave. **REJECTED (CASE C) - no production change.**
+  Candidate: the base texture's B channel (Worley period 16 -> 200-block cells vs G's 400; baked-volume
+  correlation with G 0.001; same fetch) as a second lower-anvil octave, relief 19 b/sd + matched shading
+  folded into T231's one packed form (no new density output; packing widened to 10 bits). THROUGH signal
+  SD 0.37 -> 0.68 but one gradient across the view and anti-correlated with G there (-0.40), so the
+  shaded form rises only 0.372 -> 0.393; THROUGH flat 0.98 -> 0.99, contrast 0.36 -> 0.34, and at
+  THROUGH the relief's own response opposes the shading (form energy 2.65 -> 3.09 relief, 2.35 with
+  shading). Meanwhile LOWSIDE 0.51 -> 0.45 and SIDE 0.56 -> 0.45 get busier. THROUGH is view-geometry
+  limited (grazing, compressed band), not only field-scale limited. Kept: mode 15 (B-channel signal);
+  lean FINAL NV assembly byte-identical to T232's, so no cost. Motion and build-vs-build timing not run
+  (gated on a static pass). Evidence in `validation/t233-through-underside-octave.md` and
+  `validation/t233-campaign/`. Next: **T234 the lean-vs-monolith motion gap** (lean flickers 12-15%
+  more on the T152 route, equally on HEAD and T232). [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

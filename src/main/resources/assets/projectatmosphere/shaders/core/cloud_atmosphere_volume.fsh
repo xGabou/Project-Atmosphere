@@ -155,6 +155,11 @@ const float STORM_MACRO_BLOCKS_PER_SD = 38.0;
 // samples at the cap; 89 is the cap itself and clips ~32%.
 const float STORM_MACRO_BLOCKS_PARTIAL = 55.0;
 const float STORM_MACRO_BLOCKS_FULL = 89.0;
+// T233 (instrument). The base texture's B channel: Worley FBM at period 16
+// over the 3200-block tile - 200-block cells, half of G's 400, decorrelated
+// from G (0.001 over the baked volume). Measured statistics, for mode 15.
+const float STORM_UNDER_OCTAVE_MEAN = 0.4795;
+const float STORM_UNDER_OCTAVE_SD = 0.1182;
 // T215. The lower-body fade lift. `u` is the envelope falloff value
 // (coverage / strength, 1 at the core and 0 at the outer edge). The lift
 // `u + A*u*(1-u)` is a bump that vanishes at BOTH ends: it does nothing in
@@ -1050,6 +1055,10 @@ float paShadeLowerWeight = 0.0;
 // its copy at the shaded sample.
 float paLastMacroSigned = 0.0;
 float paShadeMacroSigned = 0.0;
+// T233. The B-channel (200-block) macro signal at the last stage-5 fetch and
+// its copy at the shaded sample; mode 15 only, dead in FINAL.
+float paLastUnderSigned = 0.0;
+float paShadeUnderSigned = 0.0;
 // T232. T231's relief form at the SHADED sample, returned by the primary
 // sample's cloudDensityImpl (never through a global written inside it).
 float paShadeReliefForm = 0.0;
@@ -6599,6 +6608,7 @@ float cloudDensityImpl(
             bool embeddedConvectiveOverlap = (directStormActiveRoleMask & 7) == 7;
             paLastMacroShiftBlocks = 0.0;
             paLastMacroSigned = 0.0;
+            paLastUnderSigned = 0.0;
             paLastLowerDeckWeight = stormLowerDeckWeight(
                 directStormHeight01, directStormActiveRoleMask);
             if (PaMacroEnvelope != 0 && cloud > 0.12 && cloud < 0.98) {
@@ -6616,11 +6626,14 @@ float cloudDensityImpl(
                 // worth only ~8 blocks of boundary travel, and a slight
                 // negative bias that just shrank the storm. One sd now moves
                 // coverage by STORM_MACRO_ENVELOPE_AMPLITUDE.
-                float macroOctave = texture(
-                    BaseNoiseSampler, stormMacroEnvelopeDomain(samplePos), 0.0).g;
+                vec2 macroOctaves = texture(
+                    BaseNoiseSampler, stormMacroEnvelopeDomain(samplePos), 0.0).gb;
+                float macroOctave = macroOctaves.x;
                 float macroSigned = (macroOctave - STORM_MACRO_OCTAVE_MEAN)
                     / STORM_MACRO_OCTAVE_SD;
                 paLastMacroSigned = clamp(macroSigned, -2.5, 2.5);
+                paLastUnderSigned = clamp((macroOctaves.y - STORM_UNDER_OCTAVE_MEAN)
+                    / STORM_UNDER_OCTAVE_SD, -2.5, 2.5);
                 // T213. Weight the displacement by the deck the vertical clamp
                 // attenuates. The weight is a smooth, bounded, world-stable
                 // function of the storm's own normalised height - no screen
@@ -8229,7 +8242,8 @@ vec3 sampleLighting(
         diagnosticLightOpticalDepth = 0.0;
         return vec3(saturate(localDensity / (0.80 * max(DensityMul, 0.001))));
     }
-    if (PaDiagnosticLightingMode >= 11 && PaDiagnosticLightingMode <= 13) {
+    if ((PaDiagnosticLightingMode >= 11 && PaDiagnosticLightingMode <= 13)
+            || PaDiagnosticLightingMode == 15) {
         // T230. 11: the DISPLACED surface depth, -(d + macro shift), same
         // encoding as mode 10 - T229's view is the union before the stage-5
         // macro displacement, so it cannot see relief. 12: the lower-deck
@@ -8246,6 +8260,11 @@ vec3 sampleLighting(
             // mapped to 0..1 (0.5 = the field mean); 0.5 also where stage 5
             // made no fetch. Only meaningful with mode 12's weight > 0.
             return vec3(saturate(0.5 + paShadeMacroSigned / 5.0));
+        }
+        if (PaDiagnosticLightingMode == 15) {
+            // T233. The B-channel (200-block) macro signal at the shaded
+            // sample, same encoding as mode 13.
+            return vec3(saturate(0.5 + paShadeUnderSigned / 5.0));
         }
         return vec3(saturate((-(paShadeUnionDistance + paShadeMacroShift) + 150.0) / 600.0));
     }
@@ -10318,6 +10337,7 @@ void main() {
             paShadeMacroShift = paLastMacroShiftBlocks;
             paShadeLowerWeight = paLastLowerDeckWeight;
             paShadeMacroSigned = paLastMacroSigned;
+            paShadeUnderSigned = paLastUnderSigned;
         }
 #endif
 #ifdef PA_PRIMARY_AUDIT

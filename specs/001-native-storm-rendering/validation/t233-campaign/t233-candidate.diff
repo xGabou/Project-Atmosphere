@@ -1,0 +1,381 @@
+diff --git a/PAchangelog.md b/PAchangelog.md
+index fa8966ca..c5dae95a 100644
+--- a/PAchangelog.md
++++ b/PAchangelog.md
+@@ -1,6 +1,7 @@
+ # Project Atmosphere 0.9.4
+ ## Shader Crash Fix
+ * Fixed a startup crash where one of the mod's shader programs failed to compile on stricter GPU drivers, which aborted mod loading.
++* Fixed a biome config issue
+ ---
+ # Project Atmosphere 0.9.3.1
+ ## Compat with Project Landscape
+diff --git a/build.gradle b/build.gradle
+index d4c9a6cb..29f91955 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -299,6 +299,8 @@ def leanFinalConstants = [
+         // can see). Any other value is an arm and takes the monolith.
+         'uniform int PaLowerDeckRelief;'           : 'const int PaLowerDeckRelief = 1;',
+         'uniform float PaReliefShade;'             : 'const float PaReliefShade = 0.12;',
++        // T233. The lower-anvil second octave, baked at its production value.
++        'uniform int PaUnderOctave;'               : 'const int PaUnderOctave = 0;',
+         'uniform int PaRayTraceMode;'              : 'const int PaRayTraceMode = 0;',
+         'uniform vec2 PaRayTraceNdc;'              : 'const vec2 PaRayTraceNdc = vec2(0.0);',
+         'uniform vec2 PaRayTraceFragCoord;'        : 'const vec2 PaRayTraceFragCoord = vec2(0.0);',
+diff --git a/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormT098CaptureDriver.java b/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormT098CaptureDriver.java
+index cc73ca57..b4881318 100644
+--- a/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormT098CaptureDriver.java
++++ b/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormT098CaptureDriver.java
+@@ -382,6 +382,28 @@ public final class StormT098CaptureDriver {
+         double height = Math.max(1.0D, topY - baseY);
+ 
+         List<Shot> built = new ArrayList<>();
++        // T233 TEMP. Second-octave arms on ONE storm, all on the monolith:
++        // W weight (12), M1 primary signal (13), M2 second-octave signal (15),
++        // then F1 relief only, F2 relief + shading, F0 production last (the
++        // F arms with ALPHA). Arm code 200 + index in the originJitter field.
++        String[] t233Poses = {"THROUGH", "NEAREDGE", "LOWSIDE", "SIDE", "LATERAL", "ABOVE"};
++        double[][] t233At = {
++                {centreX + radius * 0.82D, baseY + height * 0.62D, centreZ},
++                {centreX + radius * 1.12D, baseY + height * 0.55D, centreZ},
++                {centreX + radius * 1.45D, baseY + height * 0.10D, centreZ},
++                {centreX + radius * 1.7D, midY, centreZ},
++                {centreX, midY, centreZ + radius * 1.9D},
++                {centreX + radius * 0.6D, baseY + height * 1.45D, centreZ}};
++        String[] t233Arms = {"W", "M1", "M2", "F1", "F2", "F0"};
++        for (int pose = 0; pose < t233Poses.length; pose++) {
++            for (int arm = 0; arm < t233Arms.length; arm++) {
++                built.add(new Shot("T233_" + t233Arms[arm] + "_" + t233Poses[pose],
++                        t233At[pose][0], t233At[pose][1], t233At[pose][2],
++                        "T233 arm " + t233Arms[arm] + " at " + t233Poses[pose],
++                        VolumetricCloudRaymarchDebugView.FINAL, false, false, false,
++                        Float.NaN, arm >= 3, 200 + arm));
++            }
++        }
+         // 1 FAR: whole silhouette in frame.
+         built.add(new Shot("1_FAR", centreX + radius * 2.6D, midY, centreZ,
+                 "whole storm silhouette: base, towers, anvil"));
+@@ -634,6 +656,10 @@ public final class StormT098CaptureDriver {
+         VolumetricCloudDebugConfig.setLowerBodyMode(
+                 VolumetricCloudDebugConfig.PRODUCTION_LOWER_BODY_MODE);
+         VolumetricCloudDebugConfig.setT136ConstantLighting(false);
++        VolumetricCloudDebugConfig.setUnderOctaveMode( // T233 TEMP
++                VolumetricCloudDebugConfig.PRODUCTION_UNDER_OCTAVE_MODE);
++        VolumetricCloudDebugConfig.setDiagnosticLightingMode(0); // T233 TEMP
++        VolumetricCloudDebugConfig.setFinalProgramOverride(null); // T233 TEMP
+         CloudFieldVolumeRenderConfig.setCompositeDebugMode(CloudFieldCompositeDebugMode.FINAL);
+         VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
+                 StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
+@@ -698,7 +724,16 @@ public final class StormT098CaptureDriver {
+                 // window so the captured frame really is that arm's. -1 leaves
+                 // production. (The field is reused per defect; it carried the
+                 // origin-jitter A/B before that was rejected under motion.)
+-                if (shot.originJitter() >= 0) {
++                if (shot.originJitter() >= 200) { // T233 TEMP
++                    int t233Arm = shot.originJitter() - 200;
++                    VolumetricCloudDebugConfig.setUnderOctaveMode(
++                            t233Arm == 3 ? 1 : t233Arm == 4 ? 2 : 0);
++                    VolumetricCloudDebugConfig.setDiagnosticLightingMode(
++                            t233Arm == 0 ? 12 : t233Arm == 1 ? 13 : t233Arm == 2 ? 15 : 0);
++                    VolumetricCloudDebugConfig.setFinalProgramOverride(
++                            CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH);
++                } else if (shot.originJitter() >= 0) {
++                    VolumetricCloudDebugConfig.setFinalProgramOverride(null); // T233 TEMP
+                     VolumetricCloudDebugConfig.setMacroEnvelopeMode(3);
+                     VolumetricCloudDebugConfig.setLowerBodyMode(1);
+                     VolumetricCloudDebugConfig.setDeepScatterMode(shot.originJitter());
+diff --git a/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudDebugConfig.java b/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudDebugConfig.java
+index 27320368..207d6095 100644
+--- a/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudDebugConfig.java
++++ b/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudDebugConfig.java
+@@ -355,7 +355,7 @@ public final class VolumetricCloudDebugConfig {
+     }
+ 
+     public static void setDiagnosticLightingMode(int mode) {
+-        diagnosticLightingMode = Math.max(0, Math.min(14, mode));
++        diagnosticLightingMode = Math.max(0, Math.min(15, mode));
+     }
+ 
+     public static boolean t098LegacyFinePromotion() {
+@@ -535,6 +535,22 @@ public final class VolumetricCloudDebugConfig {
+         reliefShadeStrength = Math.max(0.0F, strength);
+     }
+ 
++    /**
++     * T233. The lower anvil's second macro octave (the base texture's B
++     * channel, 200-block cells): 0 off, 1 relief only, 2 relief plus its
++     * matched form shading, folded into T231's one packed form.
++     */
++    public static final int PRODUCTION_UNDER_OCTAVE_MODE = 0;
++    private static volatile int underOctaveMode = PRODUCTION_UNDER_OCTAVE_MODE;
++
++    public static int underOctaveMode() {
++        return underOctaveMode;
++    }
++
++    public static void setUnderOctaveMode(int mode) {
++        underOctaveMode = Math.max(0, Math.min(2, mode));
++    }
++
+     /**
+      * T225. Replaces the uploaded MaxPrecipitation (the frame-wide maximum)
+      * when finite, for every program. The stationary rain ramp drives it; the
+@@ -745,6 +761,7 @@ public final class VolumetricCloudDebugConfig {
+         precipitationOverride = Float.NaN;
+         lowerDeckReliefMode = PRODUCTION_LOWER_DECK_RELIEF_MODE;
+         reliefShadeStrength = PRODUCTION_RELIEF_SHADE;
++        underOctaveMode = PRODUCTION_UNDER_OCTAVE_MODE;
+         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
+         sentinelHeightsEnabled = false;
+         fullResolutionEnabled = false;
+diff --git a/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java b/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java
+index 574467e7..aae48486 100644
+--- a/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java
++++ b/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java
+@@ -706,6 +706,7 @@ public final class VolumetricCloudRenderer {
+         shader.safeGetUniform("MaxPrecipitation").set(paMaxPrecipitation);
+         shader.safeGetUniform("PaLowerDeckRelief").set(VolumetricCloudDebugConfig.lowerDeckReliefMode());
+         shader.safeGetUniform("PaReliefShade").set(VolumetricCloudDebugConfig.reliefShadeStrength());
++        shader.safeGetUniform("PaUnderOctave").set(VolumetricCloudDebugConfig.underOctaveMode());
+         // T224. Where the shader's cameraStartsInsideSlab turns on: the ray
+         // volume's floor, SlabBaseY lowered by precipitationRayPadding(). Not
+         // modelled: the shader lowers it further when funnels are present.
+@@ -1337,6 +1338,8 @@ public final class VolumetricCloudRenderer {
+                         == VolumetricCloudDebugConfig.PRODUCTION_LOWER_DECK_RELIEF_MODE
+                 && VolumetricCloudDebugConfig.reliefShadeStrength()
+                         == VolumetricCloudDebugConfig.PRODUCTION_RELIEF_SHADE
++                && VolumetricCloudDebugConfig.underOctaveMode()
++                        == VolumetricCloudDebugConfig.PRODUCTION_UNDER_OCTAVE_MODE
+                 // T199. The field rows of leanFinalConstants: consumer bits
+                 // 11 and the audit selectors 0 (the grid, 256, has no runtime
+                 // state since T199h). A campaign that moves the monolith off
+diff --git a/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh b/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh
+index bc609f82..3f76dfaa 100644
+--- a/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh
++++ b/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh
+@@ -155,6 +155,15 @@ const float STORM_MACRO_BLOCKS_PER_SD = 38.0;
+ // samples at the cap; 89 is the cap itself and clips ~32%.
+ const float STORM_MACRO_BLOCKS_PARTIAL = 55.0;
+ const float STORM_MACRO_BLOCKS_FULL = 89.0;
++// T233. The lower anvil's second macro octave: the base texture's B channel,
++// Worley FBM at period 16 over the 3200-block tile - 200-block cells, half of
++// G's 400 - decorrelated from G (0.001 over the baked volume) and returned by
++// the SAME fetch. Centred and scaled on its measured statistics, like G. Its
++// relief is half the primary's, and the shading follows it in the same ratio.
++const float STORM_UNDER_OCTAVE_MEAN = 0.4795;
++const float STORM_UNDER_OCTAVE_SD = 0.1182;
++const float STORM_UNDER_OCTAVE_BLOCKS = 19.0;
++const float STORM_UNDER_OCTAVE_SHADE = STORM_UNDER_OCTAVE_BLOCKS / STORM_MACRO_BLOCKS_PER_SD;
+ // T215. The lower-body fade lift. `u` is the envelope falloff value
+ // (coverage / strength, 1 at the core and 0 at the outer edge). The lift
+ // `u + A*u*(1-u)` is a bump that vanishes at BOTH ends: it does nothing in
+@@ -1050,6 +1059,10 @@ float paShadeLowerWeight = 0.0;
+ // its copy at the shaded sample.
+ float paLastMacroSigned = 0.0;
+ float paShadeMacroSigned = 0.0;
++// T233. The second-octave signal at the last stage-5 fetch and its copy at the
++// shaded sample (mode 15 only; dead in FINAL).
++float paLastUnderSigned = 0.0;
++float paShadeUnderSigned = 0.0;
+ // T232. T231's relief form at the SHADED sample, returned by the primary
+ // sample's cloudDensityImpl (never through a global written inside it).
+ float paShadeReliefForm = 0.0;
+@@ -1441,6 +1454,9 @@ uniform int PaDiagnosticLightingMode;
+ // relief show - the shadowed lighting has no other term that reads shape.
+ uniform int PaLowerDeckRelief;
+ uniform float PaReliefShade;
++// T233. The lower-anvil second octave: 0 off, 1 relief only, 2 relief + its
++// matched form shading.
++uniform int PaUnderOctave;
+ uniform int PaRayTraceMode;
+ uniform vec2 PaRayTraceNdc;
+ uniform vec2 PaRayTraceFragCoord;
+@@ -3791,10 +3807,13 @@ float directStormFinalDensity(
+         // silhouette gains coherent protrusions and recesses that survive the
+         // limb chord's path integration. Skipped in the saturated interior,
+         // where it cannot change what is visible.
+-        float macroOctave = texture(
+-            BaseNoiseSampler, stormMacroEnvelopeDomain(samplePos), 0.0).g;
++        vec2 macroOctaves = texture(
++            BaseNoiseSampler, stormMacroEnvelopeDomain(samplePos), 0.0).gb;
++        float macroOctave = macroOctaves.x;
+         float macroSigned = (macroOctave - STORM_MACRO_OCTAVE_MEAN)
+             / STORM_MACRO_OCTAVE_SD;
++        float underSigned = clamp((macroOctaves.y - STORM_UNDER_OCTAVE_MEAN)
++            / STORM_UNDER_OCTAVE_SD, -2.5, 2.5);
+         // T213. The same deck weight AND the same channel as the primary
+         // march, so the gate's rain support keeps agreeing with the visible
+         // body. Mode 3 must displace in block space here too: applying the
+@@ -3802,9 +3821,14 @@ float directStormFinalDensity(
+         // envelope from the one the body renders.
+         float deckWeight = smoothstep(0.55, 0.72, dominantHeight01)
+             * (1.0 - smoothstep(0.93, 1.0, dominantHeight01));
++        float lowerDeckWeight = stormLowerDeckWeight(dominantHeight01, activeRoleMask);
+         if (PaLowerDeckRelief != 0) {
+-            deckWeight += stormLowerDeckWeight(dominantHeight01, activeRoleMask);
++            deckWeight += lowerDeckWeight;
+         }
++        // T233. The second octave's relief, in the lower-anvil window only.
++        float underShiftBlocks = PaUnderOctave >= 1
++            ? lowerDeckWeight * STORM_UNDER_OCTAVE_BLOCKS * underSigned
++            : 0.0;
+         if (PaMacroEnvelope >= 3) {
+             float envStrength = max(envelopeStrength, 1.0e-3);
+             float u = clamp(coverage / envStrength, 0.0, 1.0);
+@@ -3815,7 +3839,7 @@ float directStormFinalDensity(
+     : PaMacroEnvelope == 5 ? STORM_MACRO_BLOCKS_FULL
+     : STORM_MACRO_BLOCKS_PER_SD;
+ float shift = (deckWeight * blocksPerSd
+-                * clamp(macroSigned, -2.5, 2.5)) / (2.0 * bandWidth);
++                * clamp(macroSigned, -2.5, 2.5) + underShiftBlocks) / (2.0 * bandWidth);
+             float tShifted = clamp(tParam + shift, 0.0, 1.0);
+             float ssShifted = tShifted * tShifted * (3.0 - 2.0 * tShifted);
+             coverage = saturate((1.0 - ssShifted) * envStrength);
+@@ -6599,6 +6623,7 @@ float cloudDensityImpl(
+             bool embeddedConvectiveOverlap = (directStormActiveRoleMask & 7) == 7;
+             paLastMacroShiftBlocks = 0.0;
+             paLastMacroSigned = 0.0;
++            paLastUnderSigned = 0.0;
+             paLastLowerDeckWeight = stormLowerDeckWeight(
+                 directStormHeight01, directStormActiveRoleMask);
+             if (PaMacroEnvelope != 0 && cloud > 0.12 && cloud < 0.98) {
+@@ -6616,11 +6641,14 @@ float cloudDensityImpl(
+                 // worth only ~8 blocks of boundary travel, and a slight
+                 // negative bias that just shrank the storm. One sd now moves
+                 // coverage by STORM_MACRO_ENVELOPE_AMPLITUDE.
+-                float macroOctave = texture(
+-                    BaseNoiseSampler, stormMacroEnvelopeDomain(samplePos), 0.0).g;
++                vec2 macroOctaves = texture(
++                    BaseNoiseSampler, stormMacroEnvelopeDomain(samplePos), 0.0).gb;
++                float macroOctave = macroOctaves.x;
+                 float macroSigned = (macroOctave - STORM_MACRO_OCTAVE_MEAN)
+                     / STORM_MACRO_OCTAVE_SD;
+                 paLastMacroSigned = clamp(macroSigned, -2.5, 2.5);
++                paLastUnderSigned = clamp((macroOctaves.y - STORM_UNDER_OCTAVE_MEAN)
++                    / STORM_UNDER_OCTAVE_SD, -2.5, 2.5);
+                 // T213. Weight the displacement by the deck the vertical clamp
+                 // attenuates. The weight is a smooth, bounded, world-stable
+                 // function of the storm's own normalised height - no screen
+@@ -6638,7 +6666,13 @@ float cloudDensityImpl(
+                 if (PaLowerDeckRelief != 0) {
+                     deckWeight += paLastLowerDeckWeight;
+                 }
+-                reliefForm = paLastMacroSigned * paLastLowerDeckWeight;
++                // T233. ONE form for both octaves, combined before it leaves
++                // this function (T232: a second output would cost ~2.4 ms).
++                reliefForm = paLastLowerDeckWeight * (paLastMacroSigned
++                    + (PaUnderOctave >= 2 ? STORM_UNDER_OCTAVE_SHADE * paLastUnderSigned : 0.0));
++                float underShiftBlocks = PaUnderOctave >= 1
++                    ? paLastLowerDeckWeight * STORM_UNDER_OCTAVE_BLOCKS * paLastUnderSigned
++                    : 0.0;
+                 float macroGain = PaMacroEnvelope == 1
+                     ? 1.0
+                     : mix(1.0, STORM_MACRO_DECK_GAIN, deckWeight);
+@@ -6654,9 +6688,9 @@ float cloudDensityImpl(
+     : PaMacroEnvelope == 5 ? STORM_MACRO_BLOCKS_FULL
+     : STORM_MACRO_BLOCKS_PER_SD;
+ float shift = (deckWeight * blocksPerSd
+-                        * clamp(macroSigned, -2.5, 2.5)) / (2.0 * bandWidth);
++                        * clamp(macroSigned, -2.5, 2.5) + underShiftBlocks) / (2.0 * bandWidth);
+                     paLastMacroShiftBlocks = deckWeight * blocksPerSd
+-                        * clamp(macroSigned, -2.5, 2.5);
++                        * clamp(macroSigned, -2.5, 2.5) + underShiftBlocks;
+                     float tShifted = clamp(tParam + shift, 0.0, 1.0);
+                     float ssShifted = tShifted * tShifted * (3.0 - 2.0 * tShifted);
+                     cloud = saturate((1.0 - ssShifted) * envStrength);
+@@ -7980,8 +8014,9 @@ float lightMarchOpticalDepthWithoutDetail(
+     return opticalDepth;
+ }
+ 
+-// T232. T231's relief form rides in the primary density's 8 lowest mantissa
+-// bits (a relative change below 2^-15), because the density is live across
++// T232. T231's relief form rides in the primary density's 10 lowest mantissa
++// bits (a relative change below 2^-13; T233 widened 8 -> 10 bits so the two-
++// octave form, up to +-3.75, keeps a 1/272 step), because the density is live across
+ // every call between the primary sample and its lighting anyway. Carried as a
+ // value of its own - a global, an out parameter, packed in the height or in
+ // localStorm - it cost 2.4 ms at SIDE build-vs-build: the driver pays for any
+@@ -7992,8 +8027,8 @@ float paPackDensityForm(float density, float form) {
+     if (density <= 0.0) {
+         return density;
+     }
+-    uint q = uint(clamp(round(form * 50.8), -127.0, 127.0) + 128.0);
+-    return uintBitsToFloat((floatBitsToUint(density) & 0xFFFFFF00u) | q);
++    uint q = uint(clamp(round(form * 136.0), -511.0, 511.0) + 512.0);
++    return uintBitsToFloat((floatBitsToUint(density) & 0xFFFFFC00u) | q);
+ #else
+     return density;
+ #endif
+@@ -8004,7 +8039,7 @@ float paUnpackDensityForm(float density) {
+     if (density <= 0.0) {
+         return 0.0;
+     }
+-    return (float(floatBitsToUint(density) & 0xFFu) - 128.0) / 50.8;
++    return (float(floatBitsToUint(density) & 0x3FFu) - 512.0) / 136.0;
+ #else
+     return paShadeReliefForm;
+ #endif
+@@ -8229,7 +8264,8 @@ vec3 sampleLighting(
+         diagnosticLightOpticalDepth = 0.0;
+         return vec3(saturate(localDensity / (0.80 * max(DensityMul, 0.001))));
+     }
+-    if (PaDiagnosticLightingMode >= 11 && PaDiagnosticLightingMode <= 13) {
++    if ((PaDiagnosticLightingMode >= 11 && PaDiagnosticLightingMode <= 13)
++            || PaDiagnosticLightingMode == 15) {
+         // T230. 11: the DISPLACED surface depth, -(d + macro shift), same
+         // encoding as mode 10 - T229's view is the union before the stage-5
+         // macro displacement, so it cannot see relief. 12: the lower-deck
+@@ -8247,12 +8283,17 @@ vec3 sampleLighting(
+             // made no fetch. Only meaningful with mode 12's weight > 0.
+             return vec3(saturate(0.5 + paShadeMacroSigned / 5.0));
+         }
++        if (PaDiagnosticLightingMode == 15) {
++            // T233. The second-octave signal at the shaded sample, same
++            // encoding as mode 13.
++            return vec3(saturate(0.5 + paShadeUnderSigned / 5.0));
++        }
+         return vec3(saturate((-(paShadeUnionDistance + paShadeMacroShift) + 150.0) / 600.0));
+     }
+     if (PaDiagnosticLightingMode == 14) {
+         // T232. Decode check for the density-packed relief form: red is the
+-        // error against the form cloudDensityImpl returned (x25, so 1/101.6
+-        // quantisation reads <= 0.25), green marks a non-zero form, blue a
++        // error against the form cloudDensityImpl returned (x25, so the 1/272
++        // quantisation reads <= 0.09), green marks a non-zero form, blue a
+         // primary sample that carries one.
+         diagnosticLightOpticalDepth = 0.0;
+         bool paPacked = localStorm >= 2.0;
+@@ -10318,6 +10359,7 @@ void main() {
+             paShadeMacroShift = paLastMacroShiftBlocks;
+             paShadeLowerWeight = paLastLowerDeckWeight;
+             paShadeMacroSigned = paLastMacroSigned;
++            paShadeUnderSigned = paLastUnderSigned;
+         }
+ #endif
+ #ifdef PA_PRIMARY_AUDIT
+diff --git a/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.json b/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.json
+index 6cde235a..ff23eceb 100644
+--- a/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.json
++++ b/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.json
+@@ -108,6 +108,7 @@
+     { "name": "PaDeepScatter", "type": "int", "count": 1, "values": [ 0 ] },
+     { "name": "PaLowerDeckRelief", "type": "int", "count": 1, "values": [ 1 ] },
+     { "name": "PaReliefShade", "type": "float", "count": 1, "values": [ 0.12 ] },
++    { "name": "PaUnderOctave", "type": "int", "count": 1, "values": [ 0 ] },
+     { "name": "DensityMul", "type": "float", "count": 1, "values": [ 1.0 ] },
+     { "name": "CoverageMul", "type": "float", "count": 1, "values": [ 1.0 ] },
+     { "name": "ExtinctionScale", "type": "float", "count": 1, "values": [ 0.09 ] },
+diff --git a/src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java b/src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java
+index 663c300e..0884ef69 100644
+--- a/src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java
++++ b/src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java
+@@ -9144,7 +9144,7 @@ public final class StormVolumetricGeometrySandbox {
+         require(shader.contains("return anvil && !base ? 1.0 - smoothstep(0.12, 0.30, height01) : 0.0;"),
+                 "the lower-deck window changed: it must stay anvil-only, base-free and below h 0.30");
+         require(shader.contains("ambient *= 1.0 - PaReliefShade * reliefForm * reliefShadow;")
+-                        && shader.contains("reliefForm = paLastMacroSigned * paLastLowerDeckWeight;")
++                        && shader.contains("reliefForm = paLastLowerDeckWeight * (paLastMacroSigned")
+                         && shader.contains("p, 0.0, DetailQuality > 0, nearCamera, false, paShadeReliefForm);")
+                         && !shader.contains("paLastReliefForm")
+                         && shader.contains("float density = paPackDensityForm(bodyDensity + rainDensity, paShadeReliefForm);")
