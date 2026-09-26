@@ -1,0 +1,10 @@
+T215_GEOMETRY role=0 centerX=-1.2001324 centerZ=20.152344 baseY=152.6253 topY=600.2253 majorRadius=470.6155 minorRadius=423.55396 verticalDevelopment=0.9510948
+T215_GEOMETRY role=0 centerX=1.0 centerZ=6.0 baseY=136.0 topY=583.6 majorRadius=470.63687 minorRadius=423.57318 verticalDevelopment=0.95105165
+T215_GEOMETRY role=1 centerX=-20.325941 centerZ=7.720496 baseY=349.11975 topY=629.91974 majorRadius=254.26395 minorRadius=228.83754 verticalDevelopment=1.0
+T215_GEOMETRY role=1 centerX=-5.8764973 centerZ=-0.88913506 baseY=404.96948 topY=701.36945 majorRadius=244.63193 minorRadius=220.16873 verticalDevelopment=1.0
+T215_GEOMETRY role=2 centerX=1.3864288 centerZ=20.74741 baseY=436.5015 topY=803.1015 majorRadius=194.1379 minorRadius=159.19307 verticalDevelopment=1.0
+T215_GEOMETRY role=2 centerX=31.798498 centerZ=21.403894 baseY=592.2805 topY=927.6805 majorRadius=167.69052 minorRadius=137.50623 verticalDevelopment=1.0
+T215_GEOMETRY role=3 centerX=-81.791534 centerZ=9.127765 baseY=770.2489 topY=980.8489 majorRadius=451.24756 minorRadius=261.72357 verticalDevelopment=0.9
+T215_GEOMETRY role=3 centerX=111.79939 centerZ=-52.172104 baseY=782.631 topY=993.23096 majorRadius=423.08688 minorRadius=245.39038 verticalDevelopment=0.9
+T215_GEOMETRY role=3 centerX=12.995536 centerZ=71.981926 baseY=778.37103 topY=988.971 majorRadius=447.6098 minorRadius=259.61368 verticalDevelopment=0.9
+T215_GEOMETRY role=3 centerX=211.19269 centerZ=1.9203653 baseY=790.21234 topY=1000.8123 majorRadius=435.88022 minorRadius=252.81052 verticalDevelopment=0.9

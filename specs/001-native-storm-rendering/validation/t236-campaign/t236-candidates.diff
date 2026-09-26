@@ -1,0 +1,163 @@
+diff --git a/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh b/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh
+index 63ab07b6..09674440 100644
+--- a/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh
++++ b/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh
+@@ -1059,6 +1059,13 @@ float paShadeMacroSigned = 0.0;
+ // its copy at the shaded sample; mode 15 only, dead in FINAL.
+ float paLastUnderSigned = 0.0;
+ float paShadeUnderSigned = 0.0;
++// T236. The storm role mask (base 1, core 2, tower 4, anvil 8) and the
++// dominant descriptor height at the last storm density call, and their
++// copies at the shaded sample (modes 17 / 18 only; dead in FINAL).
++float paLastRoleMask = 0.0;
++float paLastDescHeight = -1.0;
++float paShadeRoleMask = 0.0;
++float paShadeDescHeight = -1.0;
+ // T232. T231's relief form at the SHADED sample, returned by the primary
+ // sample's cloudDensityImpl (never through a global written inside it).
+ float paShadeReliefForm = 0.0;
+@@ -1450,6 +1457,8 @@ uniform int PaDiagnosticLightingMode;
+ // relief show - the shadowed lighting has no other term that reads shape.
+ uniform int PaLowerDeckRelief;
+ uniform float PaReliefShade;
++// T236. Morphology-only candidate switch; 0 is the production shape.
++uniform int PaShapeCandidate;
+ uniform int PaRayTraceMode;
+ uniform vec2 PaRayTraceNdc;
+ uniform vec2 PaRayTraceFragCoord;
+@@ -2164,8 +2173,24 @@ void stormRoleProfile(
+         // Keep this mirrored with StormLobeEvaluator.
+         profileRadius = mix(1.25, 0.60, height01)
+             + 0.18 * pow(sin(PI * height01), 0.65);
++        if (PaShapeCandidate == 1 || PaShapeCandidate == 2 || PaShapeCandidate == 3) {
++            // T236 candidate. The updraft column WIDENS with height into the
++            // anvil instead of tapering under it: 1/3 = root 1.10 -> top 1.70,
++            // 2 = restrained 1.00 -> 1.45.
++            float paRoot = PaShapeCandidate == 2 ? 1.00 : 1.10;
++            float paTop = PaShapeCandidate == 2 ? 1.45 : 1.70;
++            profileRadius = mix(paRoot, paTop, smoothstep(0.15, 1.0, height01))
++                + 0.12 * pow(sin(PI * height01), 0.65);
++        }
+         verticalShape = smoothstep(0.0, 0.28, height01)
+             * (1.0 - smoothstep(0.72, 1.0, height01));
++        if (PaShapeCandidate == 3 || PaShapeCandidate == 4) {
++            // T236 candidate. The column keeps its coverage through its height
++            // (10% end fades instead of 28%), so the two tower members overlap
++            // at full strength across the base-to-anvil band.
++            verticalShape = smoothstep(0.0, 0.10, height01)
++                * (1.0 - smoothstep(0.90, 1.0, height01));
++        }
+         shearProgress = pow(height01, 1.6);
+     } else {
+         // Broaden the anvil's root and canopy for a tower-fed upper deck;
+@@ -2229,6 +2254,11 @@ void stormRoleRadialProfileRange(int role, out float profileMin, out float profi
+         // mix(1.25, 0.60, h) + 0.18 * sin(PI h)^0.65
+         profileMin = 0.60;
+         profileMax = 1.43;
++        if (PaShapeCandidate >= 1 && PaShapeCandidate <= 3) {
++            // T236 candidate towers reach 1.70 (+ the 0.12 bulge), bounded
++            // conservatively.
++            profileMax = 1.85;
++        }
+     } else {
+         // mix(0.70, 2.10, smoothstep) + 0.08 * sin(PI h)^0.55 - 0.10 * smoothstep
+         profileMin = 0.70;
+@@ -2349,6 +2379,15 @@ float directStormLobeDistanceFromData(
+     stormRoleProfile(height01, role, profileRadius, verticalShape, shearProgress);
+ 
+     vec2 local = p.xz - positionHeight.xy - shearMedia.xy * shearProgress;
++    if (role == 3 && PaShapeCandidate == 10) {
++        // T236 candidate S10. The anvil grows DOWNWIND: each canopy lobe's
++        // centre moves downwind by a quarter of its along-wind radius while
++        // that radius shrinks to 0.75, so its downwind edge stays exactly
++        // where production puts it (inside every CPU bound) and its upwind
++        // edge retracts to half - a whole smooth ellipse, no crease or cut.
++        float paAlong = max(radiusRotation.x * profileRadius, 1.0) * 0.25;
++        local -= vec2(radiusRotation.w, radiusRotation.z) * paAlong;
++    }
+     vec2 oriented = vec2(
+         local.x * radiusRotation.w + local.y * radiusRotation.z,
+         -local.x * radiusRotation.z + local.y * radiusRotation.w
+@@ -2359,6 +2398,24 @@ float directStormLobeDistanceFromData(
+     // from FAR/BELow views instead of a thin directional ribbon.
+     if (role == 3) {
+         radii.y *= 1.56;
++        if (PaShapeCandidate == 5 || PaShapeCandidate == 6 || PaShapeCandidate == 8) {
++            // T236 candidate. The anvil grows DOWNWIND: its along-wind radius
++            // shrinks on the upwind side (oriented.x < 0; the shear vector
++            // points along +x) so the canopy's upwind edge stays near the
++            // updraft. Continuous at x = 0; never wider than production.
++            radii.x *= oriented.x < 0.0 ? (PaShapeCandidate == 5 ? 0.50 : 0.70) : 1.0;
++        }
++        if (PaShapeCandidate == 10) {
++            radii.x *= 0.75;
++        }
++        if (PaShapeCandidate == 9) {
++            // T236 candidate S9. The same downwind growth, smooth in
++            // direction: the along-wind radius runs from 0.55 straight upwind
++            // to 1.0 downwind with the cosine of the bearing, an egg-shaped
++            // canopy rather than a half-plane cut. Never wider than production.
++            float paBearing = oriented.x / max(length(oriented), 1.0e-3);
++            radii.x *= mix(0.55, 1.0, smoothstep(-0.7, 0.7, paBearing));
++        }
+     }
+     if (paStormFieldBuildNode) {
+         // T196. The field build's Lipschitz bounds for this lobe: the wall
+@@ -2404,6 +2461,16 @@ float directStormLobeDistanceFromData(
+ 
+     float wallDistance = (radial - 1.0) * effectiveRadius;
+     float capDistance = abs(p.y - centerY) - halfHeight;
++    if (role == 3 && (PaShapeCandidate == 7 || PaShapeCandidate == 8)) {
++        // T236 candidate. A real anvil is a wedge, not a wall: flat top,
++        // underside sloping up toward thin edges. The lobe's bottom rises
++        // with the radial fraction of its full canopy (the profile's 2.10
++        // maximum), to 75% of its thickness at the rim. Only removes volume.
++        vec2 paCanopy = max(radiusRotation.xy * vec2(1.0, 1.56) * 2.10, vec2(1.0));
++        float paRim = smoothstep(0.30, 1.0, length(oriented / paCanopy));
++        float paBottom = roleBaseY + height * 0.75 * paRim;
++        capDistance = max(paBottom - p.y, p.y - roleTopY);
++    }
+     float rounding = min(
+         min(effectiveRadius, halfHeight) * STORM_CAP_ROUNDING_FRACTION,
+         STORM_MIN_EDGE_BLOCKS
+@@ -6606,6 +6673,8 @@ float cloudDensityImpl(
+             // what produced a smooth balloon that passed every
+             // artifact-absence check.
+             bool embeddedConvectiveOverlap = (directStormActiveRoleMask & 7) == 7;
++            paLastRoleMask = float(directStormActiveRoleMask);
++            paLastDescHeight = directStormHeight01;
+             paLastMacroShiftBlocks = 0.0;
+             paLastMacroSigned = 0.0;
+             paLastUnderSigned = 0.0;
+@@ -8268,6 +8337,20 @@ vec3 sampleLighting(
+         }
+         return vec3(saturate((-(paShadeUnionDistance + paShadeMacroShift) + 150.0) / 600.0));
+     }
++    if (PaDiagnosticLightingMode == 17 || PaDiagnosticLightingMode == 18) {
++        // T236. Shape attribution at the shaded sample. 17: the active storm
++        // roles - anvil red, tower green, core blue, base adds grey; black
++        // where no storm role owns the sample. 18: the dominant descriptor's
++        // normalised height (0 black .. 1 white), magenta where none.
++        diagnosticLightOpticalDepth = 0.0;
++        int paRoles = int(paShadeRoleMask + 0.5);
++        if (PaDiagnosticLightingMode == 18) {
++            return paShadeDescHeight < 0.0 ? vec3(1.0, 0.0, 1.0) : vec3(saturate(paShadeDescHeight));
++        }
++        vec3 paRoleColour = vec3((paRoles & 8) != 0 ? 1.0 : 0.0,
++            (paRoles & 4) != 0 ? 1.0 : 0.0, (paRoles & 2) != 0 ? 1.0 : 0.0);
++        return (paRoles & 1) != 0 ? mix(paRoleColour, vec3(0.8), 0.5) : paRoleColour;
++    }
+     if (PaDiagnosticLightingMode == 14) {
+         // T232. Decode check for the density-packed relief form: red is the
+         // error against the form cloudDensityImpl returned (x25, so 1/101.6
+@@ -10338,6 +10421,10 @@ void main() {
+             paShadeLowerWeight = paLastLowerDeckWeight;
+             paShadeMacroSigned = paLastMacroSigned;
+             paShadeUnderSigned = paLastUnderSigned;
++            paShadeRoleMask = paLastRoleMask;
++            paShadeDescHeight = paLastDescHeight;
++            paLastRoleMask = 0.0;
++            paLastDescHeight = -1.0;
+         }
+ #endif
+ #ifdef PA_PRIMARY_AUDIT

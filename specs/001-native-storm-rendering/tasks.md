@@ -4329,6 +4329,21 @@ implementation, while visual polish remains independently active.
   combined/owner defines. Evidence in `validation/t235-precompute-recovery.md` and
   `validation/t235-campaign/`. Harness rule: compare FINAL variants under motion only on the temporal
   path; the monolith is never a motion reference for FINAL. [SC-005, SC-016, SC-021]
+- [X] T236 [QUALITY] [US1] Cloud shape redesign, morphology first. **REJECTED - no production change;
+  the defect is found and attributed.** Under constant lighting (diagnostic mode 1) every storm is a
+  MUSHROOM: a broad domed anvil cap 3-7x the neck width (neck/anvil 0.15-0.30), near mirror-symmetric
+  (IoU 0.75-0.88), an ellipse from above (fit error 0.04-0.08); a short thin neck; a round foamy base ball.
+  New mode 17 (storm role at the shaded sample) + descriptor trace: the cap is 100% ANVIL - four lobes
+  centred +-100-200 blocks AROUND the tower with ~900-block canopies; the neck is the TOWER showing only in
+  the gap between the BASE top (y 600) and the anvil bottom (758); the ball is ONE 460-block BASE lobe.
+  Six shader-side lobe candidates (tower widening S1/S2, upwind anvil cut S5/S6, anvil wedge S7/S8, smooth
+  upwind shrink S9, downwind shift+shrink S10) on 1-3 storms: all but S5 change <= 5% of the silhouette
+  (the other lobes' union absorbs them); S5 changes 12-27% but tears the anvil edge into fragments.
+  Lever = the storm template layout itself. Kept: modes 17/18 (FINAL NV assembly byte-identical). Evidence
+  in `validation/t236-cloud-shape-redesign.md` and `validation/t236-campaign/`. Next: **T237 storm template
+  layout** (`CloudletLayout.stormLayout`: anvil lobes downwind of the tower, a column-scale TOWER pair
+  bridging base to anvil, a flatter BASE), judged with the T236 neutral/role/metric harness on 3 storms.
+  [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

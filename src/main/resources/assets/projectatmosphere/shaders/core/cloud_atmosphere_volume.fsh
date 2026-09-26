@@ -1059,6 +1059,13 @@ float paShadeMacroSigned = 0.0;
 // its copy at the shaded sample; mode 15 only, dead in FINAL.
 float paLastUnderSigned = 0.0;
 float paShadeUnderSigned = 0.0;
+// T236. The storm role mask (base 1, core 2, tower 4, anvil 8) and the
+// dominant descriptor height at the last storm density call, and their
+// copies at the shaded sample (modes 17 / 18 only; dead in FINAL).
+float paLastRoleMask = 0.0;
+float paLastDescHeight = -1.0;
+float paShadeRoleMask = 0.0;
+float paShadeDescHeight = -1.0;
 // T232. T231's relief form at the SHADED sample, returned by the primary
 // sample's cloudDensityImpl (never through a global written inside it).
 float paShadeReliefForm = 0.0;
@@ -6606,6 +6613,8 @@ float cloudDensityImpl(
             // what produced a smooth balloon that passed every
             // artifact-absence check.
             bool embeddedConvectiveOverlap = (directStormActiveRoleMask & 7) == 7;
+            paLastRoleMask = float(directStormActiveRoleMask);
+            paLastDescHeight = directStormHeight01;
             paLastMacroShiftBlocks = 0.0;
             paLastMacroSigned = 0.0;
             paLastUnderSigned = 0.0;
@@ -8267,6 +8276,20 @@ vec3 sampleLighting(
             return vec3(saturate(0.5 + paShadeUnderSigned / 5.0));
         }
         return vec3(saturate((-(paShadeUnionDistance + paShadeMacroShift) + 150.0) / 600.0));
+    }
+    if (PaDiagnosticLightingMode == 17 || PaDiagnosticLightingMode == 18) {
+        // T236. Shape attribution at the shaded sample. 17: the active storm
+        // roles - anvil red, tower green, core blue, base adds grey; black
+        // where no storm role owns the sample. 18: the dominant descriptor's
+        // normalised height (0 black .. 1 white), magenta where none.
+        diagnosticLightOpticalDepth = 0.0;
+        int paRoles = int(paShadeRoleMask + 0.5);
+        if (PaDiagnosticLightingMode == 18) {
+            return paShadeDescHeight < 0.0 ? vec3(1.0, 0.0, 1.0) : vec3(saturate(paShadeDescHeight));
+        }
+        vec3 paRoleColour = vec3((paRoles & 8) != 0 ? 1.0 : 0.0,
+            (paRoles & 4) != 0 ? 1.0 : 0.0, (paRoles & 2) != 0 ? 1.0 : 0.0);
+        return (paRoles & 1) != 0 ? mix(paRoleColour, vec3(0.8), 0.5) : paRoleColour;
     }
     if (PaDiagnosticLightingMode == 14) {
         // T232. Decode check for the density-packed relief form: red is the
@@ -10338,6 +10361,10 @@ void main() {
             paShadeLowerWeight = paLastLowerDeckWeight;
             paShadeMacroSigned = paLastMacroSigned;
             paShadeUnderSigned = paLastUnderSigned;
+            paShadeRoleMask = paLastRoleMask;
+            paShadeDescHeight = paLastDescHeight;
+            paLastRoleMask = 0.0;
+            paLastDescHeight = -1.0;
         }
 #endif
 #ifdef PA_PRIMARY_AUDIT
