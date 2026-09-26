@@ -4266,6 +4266,27 @@ implementation, while visual polish remains independently active.
   `validation/t231-lower-anvil-form-lighting.md` and `validation/t231-campaign/`. Next: **T232
   restore the <= 10 ms budget in heavy realizations** (attribute the raw-phase growth, 6.1 -> 8.8 ms
   at SIDE), then T233 the THROUGH-scale underside octave. [SC-005, SC-016, SC-021]
+  **Corrected by T232: the "costs nothing" control toggled uniforms inside one build; build-vs-build
+  T231 cost +2.9 ms at SIDE (fixed in T232).**
+- [X] T232 [PERF] [US1] Heavy-storm march budget recovery. **KEEP (CASE A) - the "heavy storm" was
+  T231's code, not the weather.** Workload is flat across builds (SIDE primary steps 4.3-4.5 M,
+  coverage 0.42-0.48 as storm noise); per-step cost 1.43 -> 1.95-2.01 ns exactly at the T231 commit
+  (T224 source 9.05, T230 9.21, T231 12.16 ms, one session, clocks pinned). Build ladder: live-uniform
+  branches 0.7 ms (baked as lean constants); the rest (~2.4 ms) is carrying the per-sample relief form
+  out of the primary `cloudDensity` subroutine - same cost as a global, a product, an out parameter,
+  packed in localStorm or in the height; free as a constant (arm D) or re-fetched in the lighting
+  (arm J). NV assembly identical between fast and slow programs (121 temps, 73 CALs), so it is back-end
+  register allocation. Fix: `cloudDensityImpl(..., out reliefForm)` and the form packed into the primary
+  density's 8 low mantissa bits (`GL_ARB_shader_bit_encoding`, guarded; plain path otherwise), flagged
+  by `localStorm + 4`; `leanFinalEligible` now requires production relief/shade; mode 14 decode check.
+  Paired ABAB: SIDE 11.76 -> 9.33 ms (-2.44), PVN 10.20 -> 8.43 (-1.78), raw p95 SIDE 8.9-9.4 -> 6.7-7.2.
+  Image = T231 (decode error <= 0.015 form = 0.2% ambient; lower-anvil flat NEAREDGE 0.96->0.84,
+  LOWSIDE 0.80->0.36, SIDE 0.87->0.41, LATERAL 0.73->0.20 shade off->on, as T231); motion shade on/off
+  +1.1% dLuma2, flicker 1.000 (HEAD +1.9%). Pre-existing lean-vs-monolith motion gap recorded (equal on
+  HEAD). Rule: cost is measured build-vs-build, never by toggling uniforms in one build. Evidence in
+  `validation/t232-heavy-storm-budget.md` and `validation/t232-campaign/`. Next: **T233 the
+  THROUGH-scale underside octave**, costed build-vs-build against the 9.3 ms SIDE baseline.
+  [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

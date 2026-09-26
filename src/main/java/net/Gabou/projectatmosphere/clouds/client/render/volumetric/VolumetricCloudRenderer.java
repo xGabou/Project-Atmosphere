@@ -1331,6 +1331,12 @@ public final class VolumetricCloudRenderer {
                 && !VolumetricCloudDebugConfig.t098LegacyHitDepth()
                 && !VolumetricCloudDebugConfig.t098LegacyFinePromotion()
                 && VolumetricCloudDebugConfig.diagnosticLightingMode() == 0
+                // T232. FINAL bakes T231's relief and shade; any other value
+                // is an arm and takes the monolith, where they are live.
+                && VolumetricCloudDebugConfig.lowerDeckReliefMode()
+                        == VolumetricCloudDebugConfig.PRODUCTION_LOWER_DECK_RELIEF_MODE
+                && VolumetricCloudDebugConfig.reliefShadeStrength()
+                        == VolumetricCloudDebugConfig.PRODUCTION_RELIEF_SHADE
                 // T199. The field rows of leanFinalConstants: consumer bits
                 // 11 and the audit selectors 0 (the grid, 256, has no runtime
                 // state since T199h). A campaign that moves the monolith off

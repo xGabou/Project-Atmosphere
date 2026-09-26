@@ -1,4 +1,10 @@
 #version 150
+// T232. Bit casts carry T231's relief form inside the primary density; a
+// driver without them keeps the plain (slower, identical-looking) path.
+#if defined(GL_ARB_shader_bit_encoding)
+#extension GL_ARB_shader_bit_encoding : enable
+#define PA_BIT_ENCODING 1
+#endif
 
 #moj_import <projectatmosphere:cloud_storm_tower_union.glsl>
 #moj_import <projectatmosphere:cloud_ray_origin_jitter.glsl>
@@ -1044,6 +1050,9 @@ float paShadeLowerWeight = 0.0;
 // its copy at the shaded sample.
 float paLastMacroSigned = 0.0;
 float paShadeMacroSigned = 0.0;
+// T232. T231's relief form at the SHADED sample, returned by the primary
+// sample's cloudDensityImpl (never through a global written inside it).
+float paShadeReliefForm = 0.0;
 // T202. The walk's minimum descriptor clearance at the node - the value the
 // refinement reads at a ray point - published so the build can floor it over
 // the dual cell. 1e9 when the node's tile carries no candidate.
@@ -6136,12 +6145,20 @@ float paProjectedFeaturePixels(vec3 p, float worldSize) {
     return worldSize * projectionScale * targetHeight / (2.0 * distanceToSample);
 }
 
-float cloudDensity(
+// T232. The density body. `reliefForm` returns T231's lower-anvil relief form
+// (macro signal x lower-deck weight at stage 5, 0 wherever stage 5 made no
+// macro fetch) to the one caller that shades with it, the primary sample,
+// which folds it into the density at once (paPackDensityForm). Returning it
+// alone does not make it cheap - held as its own value until the lighting it
+// still cost 2.4 ms at SIDE; the packing is what removes that.
+float cloudDensityImpl(
         vec3 p,
         float mipBias,
         bool useDetail,
         bool nearCamera,
-        bool includePrecipitation) {
+        bool includePrecipitation,
+        out float reliefForm) {
+    reliefForm = 0.0;
     if (paWorkloadCaptureActive()) {
         paCloudDensityCalls++;
     }
@@ -6621,6 +6638,7 @@ float cloudDensity(
                 if (PaLowerDeckRelief != 0) {
                     deckWeight += paLastLowerDeckWeight;
                 }
+                reliefForm = paLastMacroSigned * paLastLowerDeckWeight;
                 float macroGain = PaMacroEnvelope == 1
                     ? 1.0
                     : mix(1.0, STORM_MACRO_DECK_GAIN, deckWeight);
@@ -6918,6 +6936,17 @@ float shift = (deckWeight * blocksPerSd
         density = density + funnelDensity - density * funnelDensity * 0.5;
     }
     return max(density, 0.0);
+}
+
+float cloudDensity(
+        vec3 p,
+        float mipBias,
+        bool useDetail,
+        bool nearCamera,
+        bool includePrecipitation) {
+    float ignoredReliefForm;
+    return cloudDensityImpl(
+        p, mipBias, useDetail, nearCamera, includePrecipitation, ignoredReliefForm);
 }
 
 // ---------------------------------------------------------------------------
@@ -7951,6 +7980,36 @@ float lightMarchOpticalDepthWithoutDetail(
     return opticalDepth;
 }
 
+// T232. T231's relief form rides in the primary density's 8 lowest mantissa
+// bits (a relative change below 2^-15), because the density is live across
+// every call between the primary sample and its lighting anyway. Carried as a
+// value of its own - a global, an out parameter, packed in the height or in
+// localStorm - it cost 2.4 ms at SIDE build-vs-build: the driver pays for any
+// extra value held across cloudDensity's subroutine calls. The primary march
+// flags the packed density by passing localStorm + 4.
+float paPackDensityForm(float density, float form) {
+#ifdef PA_BIT_ENCODING
+    if (density <= 0.0) {
+        return density;
+    }
+    uint q = uint(clamp(round(form * 50.8), -127.0, 127.0) + 128.0);
+    return uintBitsToFloat((floatBitsToUint(density) & 0xFFFFFF00u) | q);
+#else
+    return density;
+#endif
+}
+
+float paUnpackDensityForm(float density) {
+#ifdef PA_BIT_ENCODING
+    if (density <= 0.0) {
+        return 0.0;
+    }
+    return (float(floatBitsToUint(density) & 0xFFu) - 128.0) / 50.8;
+#else
+    return paShadeReliefForm;
+#endif
+}
+
 vec3 evaluateLightingComponents(
         float opticalDepth,
         float localDensity,
@@ -7993,6 +8052,14 @@ vec3 evaluateLightingComponents(
     // Distant clouds redden more at sunset: longer light path through air.
     vec3 sunTint = mix(vec3(1.0), vec3(1.0, 0.52, 0.30), SunsetStrength * distance01 * 0.65);
 
+    // T232. Only the primary march's density carries the relief form, and it
+    // says so with localStorm + 4 (localStorm is saturated); every other
+    // caller shades with 0.
+    float reliefForm = 0.0;
+    if (localStorm >= 2.0) {
+        localStorm -= 4.0;
+        reliefForm = paUnpackDensityForm(localDensity);
+    }
     float combinedStorm = saturate(max(StormDarkening * 0.58, localStorm * 0.72));
     float undersideShade = saturate(
         (0.18 + materialDarkness * 0.82)
@@ -8026,7 +8093,7 @@ vec3 evaluateLightingComponents(
         // zero wherever stage 5 made no macro fetch. Zero-mean in the field's
         // own calibrated statistics; no density, no alpha.
         float reliefShadow = smoothstep(2.0, 5.0, opticalDepth);
-        ambient *= 1.0 - PaReliefShade * paShadeMacroSigned * paShadeLowerWeight * reliefShadow;
+        ambient *= 1.0 - PaReliefShade * reliefForm * reliefShadow;
     }
     ambient *= mix(1.0, 0.68, rainFraction);
 
@@ -8181,6 +8248,18 @@ vec3 sampleLighting(
             return vec3(saturate(0.5 + paShadeMacroSigned / 5.0));
         }
         return vec3(saturate((-(paShadeUnionDistance + paShadeMacroShift) + 150.0) / 600.0));
+    }
+    if (PaDiagnosticLightingMode == 14) {
+        // T232. Decode check for the density-packed relief form: red is the
+        // error against the form cloudDensityImpl returned (x25, so 1/101.6
+        // quantisation reads <= 0.25), green marks a non-zero form, blue a
+        // primary sample that carries one.
+        diagnosticLightOpticalDepth = 0.0;
+        bool paPacked = localStorm >= 2.0;
+        float paDecoded = paPacked ? paUnpackDensityForm(localDensity) : 0.0;
+        float paCarried = paPacked ? paShadeReliefForm : 0.0;
+        return vec3(saturate(abs(paDecoded - paCarried) * 25.0),
+            abs(paCarried) > 0.02 ? 0.5 : 0.0, paPacked ? 0.25 : 0.0);
     }
     if (PaDiagnosticLightingMode == 10) {
         // T229. Surface depth at the shaded sample: v = (-d + 150) / 600, so
@@ -10233,7 +10312,8 @@ void main() {
                 p, DetailQuality > 0, nearCamera, paPrimaryCovered);
         }
         if ((PaStormFieldEnabled & 16) == 0 || !paPrimaryCovered) {
-            bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
+            bodyDensity = cloudDensityImpl(
+                p, 0.0, DetailQuality > 0, nearCamera, false, paShadeReliefForm);
             paShadeUnionDistance = paLastStormUnionDistance;
             paShadeMacroShift = paLastMacroShiftBlocks;
             paShadeLowerWeight = paLastLowerDeckWeight;
@@ -10320,7 +10400,7 @@ void main() {
             ? rainShaftDensityOverSegment(p, segmentEnd, 0.0) * DensityMul
             : 0.0;
 #endif
-        float density = bodyDensity + rainDensity;
+        float density = paPackDensityForm(bodyDensity + rainDensity, paShadeReliefForm);
 #ifdef PA_RAIN_MASK_OUTPUT
         {
             // Optical mass, not raw density: what the frame would actually show
@@ -10729,7 +10809,7 @@ void main() {
                 h01,
                 cosTheta,
                 saturate(t / MaxRenderDistance),
-                localStorm,
+                localStorm + 4.0,
                 materialDarkness,
                 rainFraction,
                 cameraStartsInsideSlab,

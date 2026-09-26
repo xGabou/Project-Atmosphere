@@ -9143,8 +9143,21 @@ public final class StormVolumetricGeometrySandbox {
                 + "shaders/core/cloud_atmosphere_volume.fsh");
         require(shader.contains("return anvil && !base ? 1.0 - smoothstep(0.12, 0.30, height01) : 0.0;"),
                 "the lower-deck window changed: it must stay anvil-only, base-free and below h 0.30");
-        require(shader.contains("ambient *= 1.0 - PaReliefShade * paShadeMacroSigned * paShadeLowerWeight * reliefShadow;"),
+        require(shader.contains("ambient *= 1.0 - PaReliefShade * reliefForm * reliefShadow;")
+                        && shader.contains("reliefForm = paLastMacroSigned * paLastLowerDeckWeight;")
+                        && shader.contains("p, 0.0, DetailQuality > 0, nearCamera, false, paShadeReliefForm);")
+                        && !shader.contains("paLastReliefForm")
+                        && shader.contains("float density = paPackDensityForm(bodyDensity + rainDensity, paShadeReliefForm);")
+                        && shader.contains("reliefForm = paUnpackDensityForm(localDensity);")
+                        && shader.contains("#extension GL_ARB_shader_bit_encoding : enable"),
                 "the lower-anvil form shading changed sign or inputs");
+        // T232. The form leaves cloudDensity by its out parameter and reaches
+        // the lighting packed in the density bits - never as a value of its
+        // own (2.4 ms at SIDE) - and the lean constants stay baked (0.7 ms).
+        String gradle = readWorkspaceSource("build.gradle");
+        require(gradle.contains("'const int PaLowerDeckRelief = 1;'")
+                        && gradle.contains("'const float PaReliefShade = 0.12;'"),
+                "the lean FINAL program no longer bakes the T231 constants");
         String json = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
                 + "shaders/core/cloud_atmosphere_volume.json");
         require(json.contains("\"name\": \"PaLowerDeckRelief\", \"type\": \"int\", \"count\": 1, \"values\": [ 1 ]")

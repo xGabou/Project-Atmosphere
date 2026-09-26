@@ -293,6 +293,12 @@ def leanFinalConstants = [
         'uniform int PaLegacyHitDepth;'            : 'const int PaLegacyHitDepth = 0;',
         'uniform int PaLegacyFinePromotion;'       : 'const int PaLegacyFinePromotion = 0;',
         'uniform int PaDiagnosticLightingMode;'    : 'const int PaDiagnosticLightingMode = 0;',
+        // T232. T231's lower-anvil relief and form shading, baked at their
+        // production values: as live uniforms their branches could not fold
+        // (0.7 ms at SIDE, build-vs-build - a cost no same-build uniform A/B
+        // can see). Any other value is an arm and takes the monolith.
+        'uniform int PaLowerDeckRelief;'           : 'const int PaLowerDeckRelief = 1;',
+        'uniform float PaReliefShade;'             : 'const float PaReliefShade = 0.12;',
         'uniform int PaRayTraceMode;'              : 'const int PaRayTraceMode = 0;',
         'uniform vec2 PaRayTraceNdc;'              : 'const vec2 PaRayTraceNdc = vec2(0.0);',
         'uniform vec2 PaRayTraceFragCoord;'        : 'const vec2 PaRayTraceFragCoord = vec2(0.0);',

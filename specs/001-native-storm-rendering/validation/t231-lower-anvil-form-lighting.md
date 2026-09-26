@@ -7,6 +7,14 @@ shadow-form lighting term, so the underside relief becomes visible?
 this shading. One standing risk surfaced on the way: **production is over the 10 ms budget at SIDE
 in this session's heavier storm (11.9 ms), with or without T231** (item 38). The next task restores
 the budget before any further visual cost.
+
+> **T232 correction (25 Sep 2026): the budget risk WAS T231.** The 11.96 vs 11.86 ms control below
+> toggled live uniforms inside one build, so both arms carried T231's code. Build-vs-build on
+> one session: T230 source 9.21 ms, T231 12.16 ms at SIDE (+2.9; PVN +2.0), with flat storm
+> workload. The cost was the live-uniform branches (0.7 ms) and carrying the per-sample relief
+> form out of the primary `cloudDensity` call (~2.4 ms). T232 fixes both with no image change
+> (SIDE 9.33 ms); see `t232-heavy-storm-budget.md`.
+
 - The shading: `ambient *= 1 - 0.12 * macroSigned * lowerWeight * smoothstep(2,5,od)`.
 - It makes the underside's form readable. Flat fraction in the lower-anvil region: **NEAREDGE
   0.98 -> 0.86, LOWSIDE 0.82 -> 0.51, SIDE 0.89 -> 0.54, LATERAL 0.70 -> 0.26**, against T230's
@@ -155,6 +163,11 @@ Visual (`T231_NEAREDGE_LOWSIDE_P0_RS_RSL.png`, `T231_THROUGH_P0_R_RS_RSL.png`):
     T231 costs nothing measurable. **Production itself exceeds 10 ms at SIDE in this storm
     realization** (T224's sessions: 9.35-9.70 ms); the raw phase alone reads 8.8 ms against 6.1 ms
     there. The thin margin T224 flagged has been crossed by production alone in a heavier storm.
+
+    **Corrected by T232: wrong.** Both rows are the same build with different uniforms, so the
+    code's own cost is in both. Build-vs-build, T231 costs +2.9 ms at SIDE. It is not volume -
+    steps and coverage are flat - but the transport of the shading's per-sample form. T232
+    removes it.
 
 ## DECISION
 

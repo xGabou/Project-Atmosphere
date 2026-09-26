@@ -355,7 +355,7 @@ public final class VolumetricCloudDebugConfig {
     }
 
     public static void setDiagnosticLightingMode(int mode) {
-        diagnosticLightingMode = Math.max(0, Math.min(13, mode));
+        diagnosticLightingMode = Math.max(0, Math.min(14, mode));
     }
 
     public static boolean t098LegacyFinePromotion() {
