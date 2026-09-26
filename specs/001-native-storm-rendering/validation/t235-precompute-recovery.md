@@ -1,35 +1,31 @@
 # T235 - Recovering the SIDE Cost of T234
 
 **The goal:** recover the ~0.45 ms SIDE loss from removing `PA_ARM_DESC_PRECOMPUTE` (T234) while
-keeping the shipped shader's motion stability, preferably with a small code-shape fragment that
-keeps the "stabilising" compile - not by simply restoring the precompute.
+keeping the shipped shader's motion stability. Do not simply restore the old precompute; test
+small, isolated candidates and validate each on motion and on paired timing.
 
-**The result: the premise was false - but per the goal's fallback, production stays as T234
-left it, and restoring the precompute is a recommendation awaiting a decision.**
+**The result: FINAL now precomputes only the edge width (`PA_ARM_DESC_PRECOMPUTE_EDGE`); the
+ownership radii stay derived in the loop.**
 
-- **No code-shape fragment exists to find**, because the precompute never affected motion.
-- **The restore itself was measured:** SIDE 10.04 -> 8.90 ms, PVN 9.25 -> 8.14 ms (paired ABAB),
-  with motion identical to the current shipped shader.
-- **It was briefly committed** (`f292aa00`) and then reverted, because the goal said not to
-  restore the precompute and to keep T234 if no smaller fragment worked.
+- **Motion.** On the temporal path it moves exactly like T234's FINAL, within the repeat floor
+  in every route segment.
+- **Timing (paired ABAB).** SIDE 10.13 -> **8.98 ms** (-1.15), PVN 9.06 -> **8.54 ms** (-0.52).
+- **Budget.** The whole renderer is ≤ 10 ms, and SIDE is under the 9.5 ms target again.
 
-- **T234's attribution was confounded.** The T207 temporal reconstruction runs only for
-  `LEAN_FINAL`: `VolumetricCloudRenderer` requires `program.normalProductionOutput()`, which is
-  true for FINAL and the T140 oracles only. The monolith and every campaign variant T234 used as
-  a "bridge" rendered non-temporally, whatever the route arm requested.
-- **What the "stable" programs really had in common:** they were not temporal, not a shared code
-  shape.
-- **Measured directly on one route, one storm:**
-  - FINAL with the precompute, put on the temporal path, moves exactly like FINAL without it.
-  - FINAL without the precompute, taken off the temporal path, moves exactly like the monolith.
-- **Consequences:**
-  - There is no code-shape fragment to find: the precompute never affected motion.
-  - Restoring it does not bring flicker back.
-  - The restore would meet every acceptance criterion of the goal: motion at the current level,
-    SIDE ≤ 9.5 ms, no PVN regression, no driver instability.
-  - It is still not applied, because the goal ruled it out explicitly.
+**On the way, T234's premise turned out to be false.**
 
-## 1. What T234 compared (the confound)
+- **The confound.** The T207 temporal reconstruction runs only for `LEAN_FINAL`:
+  `VolumetricCloudRenderer` requires `program.normalProductionOutput()`. So the monolith and every
+  variant T234 compared FINAL with were non-temporal.
+- **What it means.** The precompute never affected motion. The FINAL/diagnostic gap is the
+  temporal lattice itself.
+- **The full restore, briefly committed and reverted.** Restoring the whole precompute was
+  measured too (SIDE 10.04 -> 8.90 ms), committed (`f292aa00`) and reverted (`c49e1928`), because
+  the goal ruled out simply restoring it.
+- **What shipped instead:** the smaller subset the goal's candidate list allows ("retain only the
+  subset of operations"). It carries nearly all of the saving.
+
+## 1. The confound in T234
 
 | program | temporal reconstruction on the route? | T234 read it as |
 |---|---|---|
@@ -37,86 +33,91 @@ left it, and restoring the precompute is a recommendation awaiting a decision.**
 | diagnostic monolith | no (`normalProductionOutput()` false) | "stable reference" |
 | `t234_bridge_a/c/d`, `t235_pre_*` variants | no | "stable code shape" |
 
-`StormT152MovingCameraFixture` sets `temporalMode(1)` for these arms. But
-`VolumetricCloudRenderer` enables the phase lattice only when `temporalMode != 0 &&
-profile.temporalEnabled() && program.normalProductionOutput() && ...`, so for non-FINAL programs
-the setting was silently inert.
+- **What the fixture asks for.** `StormT152MovingCameraFixture` sets `temporalMode(1)` for these
+  arms.
+- **What the renderer does.** `VolumetricCloudRenderer` enables the phase lattice only when
+  `temporalMode != 0 && profile.temporalEnabled() && program.normalProductionOutput() && ...`.
+  For non-FINAL programs the setting was silently inert.
+- **The fix for measuring.** To compare a variant with FINAL under motion it has to be put on the
+  temporal path (added to `normalProductionOutput()`). T235's harness does that temporarily.
 
-## 2. The decisive route (`t235-route-temporal-path.log`)
+## 2. Motion (T152 route, one storm per run, 2200 frames per arm)
 
-Arms on one storm, in order: `final` (current FINAL, no precompute), `mono`, `pre_full_temporal`
-(FINAL with the precompute, temporarily added to `normalProductionOutput()`), `final_notemporal`
-(current FINAL with temporal mode 0), `final_b` (repeat).
+Ratios are flicker / alpha dMean / luma dLuma / ghost against the named reference; the `final_b`
+row is the same run's repeat floor.
 
-Ratios are flicker / alpha dMean / luma dLuma / ghost.
+**The shipped candidate - edge-only precompute on the temporal path** (`t235-route-edge-only-temporal.log`):
 
 | vs current FINAL | APPROACH | ENTRY | INTERIOR | OUTSIDE |
 |---|---|---|---|---|
-| `pre_full_temporal` | 1.006 / 0.999 / 1.001 / 0.98 | 0.999 / 1.000 / 1.005 / 1.00 | 1.038 / 1.020 / 1.003 / 1.07 | **1.005** / 0.999 / 1.006 / 0.99 |
-| `final_b` (repeat floor) | 1.007 / 1.001 / 1.001 / 0.99 | 0.997 / 0.999 / 1.001 / 1.00 | 1.037 / 1.018 / 0.998 / 1.06 | 1.063 / 1.035 / 1.006 / 1.10 |
+| **edge-only precompute** | 0.998 / 1.001 / 1.002 / 1.02 | 0.999 / 1.000 / 1.001 / 1.00 | 0.990 / 0.992 / 0.924 / 1.03 | **1.008** / 0.997 / 0.998 / 1.00 |
+| `final_b` (floor) | 0.997 / 1.001 / 1.001 / 1.01 | 0.999 / 1.000 / 1.001 / 1.00 | 0.992 / 0.993 / 0.919 / 1.02 | 1.064 / 1.040 / 0.998 / 1.04 |
 
-| vs monolith | APPROACH | ENTRY | INTERIOR | OUTSIDE |
+- **Result.** Inside the repeat floor in every segment and every metric: flicker, alpha, luma and
+  ghost / disocclusion. The march-step and silhouette behaviour matches the current program's.
+- **Route cost.** Cloud GPU mean 6.16 ms -> 5.58 ms; ENTRY 8.03 -> 7.33.
+
+**The full precompute and the no-temporal control** (`t235-route-temporal-path.log`):
+
+| | APPROACH | ENTRY | INTERIOR | OUTSIDE |
 |---|---|---|---|---|
-| current FINAL | 1.225 | 1.236 | 1.100 | 1.925 |
-| `final_notemporal` | **1.001** | **1.000** | 1.157 | **1.037** |
+| full precompute on the temporal path, vs current FINAL (flicker) | 1.006 | 0.999 | 1.038 | 1.005 |
+| repeat floor | 1.007 | 0.997 | 1.037 | 1.063 |
+| current FINAL, temporal **off**, vs monolith (flicker) | **1.001** | **1.000** | 1.157 | **1.037** |
+| current FINAL (temporal on) vs monolith (flicker) | 1.225 | 1.236 | 1.100 | 1.925 |
 
-- **Motion.** The precompute on the temporal path is inside the repeat floor in every segment;
-  ghost is equal; the march-step and silhouette behaviour is the same program's.
-- **Where the FINAL/diagnostic gap comes from.** Turning temporal reconstruction off turns
-  FINAL's flicker into the monolith's in APPROACH, ENTRY and OUTSIDE. The gap is the T207 lattice
-  itself (INTERIOR differs mainly in ghosting, where the monolith's non-temporal image has none
-  to reproject).
-- **Route cost.** Cloud GPU mean 6.21 ms (FINAL) against 5.61 (with precompute); ENTRY 8.13 ->
-  7.39.
+- **Neither precompute changes motion.** Turning temporal reconstruction off makes FINAL move like
+  the monolith, so the FINAL/diagnostic gap is the T207 lattice.
+- **The non-temporal route** (`t235-route-halves-nontemporal.log`) agrees. The full, ownership-
+  and edge-only precompute variants, all non-temporal, match the monolith (OUTSIDE 0.998-1.001),
+  while the temporal FINAL arms read 2.34× with or without the precompute.
 
-The earlier non-temporal route (`t235-route-halves-nontemporal.log`) shows the same thing from
-the other side. The full precompute, the ownership-only half and the edge-only half, all run as
-non-temporal variants, match the monolith (OUTSIDE 0.998-1.001), while both temporal FINAL arms
-read 2.34× - regardless of the precompute.
+## 3. Performance (paired ABAB, one session: HEAD, candidate, HEAD, candidate; T208 totals, ms)
 
-## 3. Performance (paired ABAB, one session; T208 totals, ms)
+**Shipped candidate:** HEAD = `c49e1928` (T234's FINAL), candidate = edge-only precompute
+(`t235-timing-abab-edge.log`).
 
-| | A1 HEAD | B1 T235 | A2 HEAD | B2 T235 | HEAD mean | T235 mean | delta |
+| | A1 | B1 | A2 | B2 | HEAD mean | candidate mean | delta |
 |---|---|---|---|---|---|---|---|
-| SIDE total | 10.15 | 8.90 | 9.93 | 8.89 | 10.04 | **8.90** | **-1.14 (0.886×)** |
-| SIDE raw p50 | 7.24 | 6.14 | 7.06 | 6.10 | 7.15 | 6.12 | -1.03 |
-| SIDE raw p95 | 7.53 | 6.48 | 7.38 | 6.36 | 7.46 | 6.42 | -1.04 |
-| PVN total | 9.32 | 7.94 | 9.18 | 8.33 | 9.25 | **8.14** | -1.11 |
+| SIDE total | 10.00 | 9.12 | 10.26 | 8.85 | 10.13 | **8.98** | **-1.15 (0.887×)** |
+| SIDE raw p50 | 7.08 | 6.34 | 7.35 | 6.06 | 7.21 | 6.20 | -1.01 |
+| SIDE raw p95 | 7.44 | 6.74 | 7.56 | 6.32 | 7.50 | 6.53 | -0.97 |
+| PVN total | 9.10 | 8.83 | 9.03 | 8.26 | 9.06 | **8.54** | -0.52 |
 
-- HEAD = `d8fa530f` (T234, no precompute); T235 = the precompute restored.
-- **This session's storm was heavier than T234's:** HEAD 10.0 ms at SIDE against 9.3 there. In
-  it the precompute is worth more than T234's +0.45 ms estimate.
-- **The whole renderer is ≤ 10 ms again with margin:** SIDE 8.9, PVN 7.9-8.3.
-- **No driver instability.** The restored program is byte-identical in NV assembly to the one
-  measured on the route (6,775 instructions, 121 temporaries).
+- **The full precompute, for reference** (`t235-timing-abab-full-precompute.log`, HEAD =
+  `d8fa530f`): SIDE 10.04 -> 8.90, PVN 9.25 -> 8.14. The edge half keeps essentially all of the
+  SIDE saving and about half of the PVN one.
+- **Storm load.** These sessions' storm was heavier than T234's: HEAD reads ~10.0-10.1 ms at SIDE
+  here against 9.3 there. So the recovered time exceeds T234's +0.45 ms estimate.
+- **No driver instability.** The shipped FINAL is byte-identical in NV assembly to the variant
+  measured on the route (6,786 instructions, 121 temporaries, 73 `CAL`s).
 
-## 4. Production change: none (T234 kept), and the recommendation
+## 4. Production change
 
-- **What stays.** FINAL stays as T234 left it: no precompute, NV assembly byte-identical to
-  T234's.
-- **What changed:** only T234's comments in `build.gradle` and the T172 sandbox pin, which stated
-  the disproven motion reason. They now point here.
-- **Recommendation:** put `PA_ARM_DESC_PRECOMPUTE` back in `leanFinalDefines`. It is the exact
-  program measured in section 2 and timed in section 3, recovering ~1.1 ms at SIDE and PVN with
-  motion identical to the current shipped shader.
-- **Applying it** is one define plus the pre-T234 sandbox pins (`git show f292aa00` has the
-  complete change).
+- **The define.** `leanFinalDefines` = `PA_PRECIPITATION_ABSENT`, **`PA_ARM_DESC_PRECOMPUTE_EDGE`**,
+  `PA_ARM_NO_RAIN_SEGMENT`, `PA_RAIN_SPLIT_COMPOSITE`, with a note on why.
+- **What FINAL does now:** it reads the edge width from texel 3 (T172's CPU value, one ULP from the
+  derivation) and still derives the ownership radii per descriptor.
+- **The sandbox:**
+  - the T172 check requires FINAL to define the edge half, and forbids the combined precompute
+    and the ownership half (each would need its own temporal-path motion check);
+  - the T206 specialization check lists the combined define as absent;
+  - the T206 reference comparison discounts the edge define.
+- **Unchanged:** historical programs (T140 oracles, T199/T206 anchors, rain pass, gate build),
+  morphology, rain, temporal architecture, light range and descriptor values.
 - **Kept from T234:** the T152 route's per-frame `stepScale` / `gpuMs` fields.
-- **Temporary harness removed:** the T235 campaign, variant programs, route arms and the
-  `normalProductionOutput` override.
-- **No change** to morphology, rain, temporal architecture, light range or descriptor values.
+- **Temporary harness removed:** campaign, variants, route arms and the `normalProductionOutput`
+  override.
 
 ## 5. What this leaves open
 
-- **The FINAL/diagnostic motion gap is real but intentional.** The T207 temporal lattice
-  flickers ~1.2× at storm edges (APPROACH/ENTRY) and ~1.9-2.3× outside the storm compared with
-  non-temporal rendering.
-- **Judging it** is a question about the temporal reconstruction's edge handling (T207/T208's
-  domain), not about shader code shape. Any future work must compare temporal against temporal.
-  The monolith is no motion reference for FINAL, because it can never run the lattice.
-- **Harness rule, now proven twice:** a route arm's `temporal` field only takes effect for
-  `normalProductionOutput()` programs. Variant programs must be added there - as T235 did,
-  temporarily - to be compared with FINAL under motion.
+- **The FINAL/diagnostic motion gap is the T207 temporal lattice itself** (~1.2× at storm edges,
+  ~1.9-2.4× outside the storm, against non-temporal rendering). It is an intended architecture
+  difference.
+- **Any future edge-stability work** belongs to the temporal reconstruction and must compare
+  temporal against temporal.
+- **The ownership half of the precompute** was not shipped. Its extra saving is small (route
+  5.58 -> ~5.57 ms), and the goal ruled out the full restore.
 
 ## Validation
 
@@ -130,7 +131,9 @@ read 2.34× - regardless of the precompute.
 
 | file | what |
 |---|---|
-| `t235-route-temporal-path.log` | the decisive route: FINAL / monolith / FINAL+precompute on the temporal path / FINAL non-temporal / repeat |
-| `t235-route-halves-nontemporal.log` | FINAL / monolith / precompute full, owner, edge (non-temporal variants) / repeat |
-| `t235-timing-abab.log` | the paired timing |
-| `t235_route.py`, `t235_harness.py` | analysis, and the temporary campaign/variant installer used for both routes |
+| `t235-route-edge-only-temporal.log` | the shipped candidate on the temporal path vs current FINAL, monolith, repeat |
+| `t235-route-temporal-path.log` | full precompute on the temporal path; FINAL non-temporal vs monolith |
+| `t235-route-halves-nontemporal.log` | full / owner / edge precompute as non-temporal variants (the confound, reproduced) |
+| `t235-timing-abab-edge.log` | the shipped candidate's paired timing |
+| `t235-timing-abab-full-precompute.log` | the full precompute's paired timing (not shipped) |
+| `t235_route.py`, `t235_harness.py` | analysis, and the temporary campaign/variant installer |

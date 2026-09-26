@@ -4315,19 +4315,20 @@ implementation, while visual polish remains independently active.
   Next: **T235 recover ~0.45 ms at SIDE without the precompute's code shape** (judged ABAB and on the
   route against the monolith). [SC-005, SC-016, SC-021]
   **Corrected by T235: the attribution was confounded (only FINAL runs the T207 temporal lattice, so
-  the monolith and every bridge were non-temporal); the precompute has no motion effect - restore recommended.**
-- [X] T235 [PERF] [US1] Recover T234's SIDE cost. **The premise was false; T234 kept per the goal's
-  fallback, restoring `PA_ARM_DESC_PRECOMPUTE` recommended (briefly committed as f292aa00, reverted).** `VolumetricCloudRenderer` enables the T207 phase lattice only for
-  `program.normalProductionOutput()` (FINAL + T140 oracles), so a route arm's `temporal` field was inert
-  for the monolith and every campaign variant: T234's "stable" programs were simply non-temporal. One
-  route, one storm: FINAL with the precompute put on the temporal path = FINAL without it (OUTSIDE 1.005x,
-  ENTRY 0.999x, repeat floor 1.06x); FINAL with temporal off = the monolith (OUTSIDE 1.037x, ENTRY 1.000x).
-  The FINAL/diagnostic gap is the temporal lattice itself (intended architecture). Paired ABAB vs T234:
-  SIDE 10.04 -> 8.90 ms, PVN 9.25 -> 8.14 ms (this session's storm heavier than T234's); program
-  byte-identical to the one measured on the route. Production unchanged from T234 (comments corrected);
-  the restore is one define + the pre-T234 pins, awaiting a decision. Evidence in `validation/t235-precompute-recovery.md` and
-  `validation/t235-campaign/`. Harness rule: motion comparisons with FINAL need the other program on the
-  temporal path (add it to `normalProductionOutput()`), never the monolith. [SC-005, SC-016, SC-021]
+  the monolith and every bridge were non-temporal); the precompute has no motion effect - T235 ships its edge half.**
+- [X] T235 [PERF] [US1] Recover T234's SIDE cost. **KEEP: FINAL ships the edge half of the precompute
+  (`PA_ARM_DESC_PRECOMPUTE_EDGE`), ownership radii still derived.** T234's premise was false:
+  `VolumetricCloudRenderer` enables the T207 phase lattice only for `program.normalProductionOutput()`
+  (FINAL + T140 oracles), so the monolith and every variant T234 compared were non-temporal. On the
+  temporal path (variant added to `normalProductionOutput()`), the edge-only precompute = current FINAL in
+  every segment (OUTSIDE 1.008x, ENTRY 0.999x, INTERIOR 0.990x; repeat floor 1.064/0.999/0.992), and FINAL
+  with temporal off = the monolith (OUTSIDE 1.037x, ENTRY 1.000x): the FINAL/diagnostic gap is the lattice
+  itself. Paired ABAB vs T234: SIDE 10.13 -> 8.98 ms, PVN 9.06 -> 8.54 ms; NV assembly identical to the
+  measured variant. The full precompute (SIDE -> 8.90) was committed (f292aa00) and reverted (c49e1928)
+  because the goal ruled out simply restoring it. Sandbox pins require the edge half and forbid the
+  combined/owner defines. Evidence in `validation/t235-precompute-recovery.md` and
+  `validation/t235-campaign/`. Harness rule: compare FINAL variants under motion only on the temporal
+  path; the monolith is never a motion reference for FINAL. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

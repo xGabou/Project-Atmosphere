@@ -17,9 +17,10 @@ FIX KEPT (CASE B), at +0.45 ms at SIDE.**
 > cheaper. With temporal off, current FINAL matches the monolith (OUTSIDE 1.037×).
 >
 > **The FINAL/diagnostic gap is temporal reconstruction on versus off** - an intended
-> architecture difference. Restoring the precompute is recommended (SIDE ~1.1 ms cheaper, identical
-> motion) but not applied, pending a decision; see `t235-precompute-recovery.md`. The measurements
-> below stand; only their interpretation (items 29-32, 36-37) does not.
+> architecture difference. T235 shipped the edge half of the precompute
+> (`PA_ARM_DESC_PRECOMPUTE_EDGE`): identical motion on the temporal path, SIDE 10.13 -> 8.98 ms;
+> see `t235-precompute-recovery.md`. The measurements below stand; only their interpretation
+> (items 29-32, 36-37) does not.
 
 - **The mechanism is code shape, not values.**
   - The precompute replaces two per-descriptor derivations in the storm walk (edge width and

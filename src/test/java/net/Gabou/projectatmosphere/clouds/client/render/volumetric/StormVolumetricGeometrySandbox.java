@@ -1255,8 +1255,11 @@ public final class StormVolumetricGeometrySandbox {
             require(finalSource.contains("#define " + define + " 1"),
                     "FINAL does not define " + define);
         }
-        // T234: the descriptor precompute left FINAL (motion stability).
-        for (String define : new String[] {"PA_ARM_DESC_PRECOMPUTE", "PA_RAIN_PASS", "PA_RAIN_PASS_FINE",
+        // T234: the combined descriptor precompute left FINAL; T235 ships only
+        // its edge half (PA_ARM_DESC_PRECOMPUTE_EDGE), pinned in the T172 check.
+        require(!finalSource.contains("#define PA_ARM_DESC_PRECOMPUTE 1"),
+                "FINAL defines the combined PA_ARM_DESC_PRECOMPUTE");
+        for (String define : new String[] {"PA_RAIN_PASS", "PA_RAIN_PASS_FINE",
                 "PA_RAIN_MASK_OUTPUT", "PA_T140_ORACLE", "PA_LIGHT_AUDIT", "PA_PRIMARY_AUDIT"}) {
             require(!finalSource.contains("#define " + define),
                     "FINAL defines " + define);
@@ -1310,9 +1313,11 @@ public final class StormVolumetricGeometrySandbox {
         String referenceBody = referenceSource.substring(referenceSource.indexOf("#version 150"));
         require(finalBody.replace("#define PA_ARM_NO_RAIN_SEGMENT 1\n", "")
                         .replace("#define PA_RAIN_SPLIT_COMPOSITE 1\n", "")
-                        // T234: FINAL dropped the descriptor precompute; this
-                        // historical anchor (other controls are byte-identical
-                        // to it) keeps it.
+                        .replace("#define PA_ARM_DESC_PRECOMPUTE_EDGE 1\n", "")
+                        // T234 dropped the combined precompute from FINAL and
+                        // T235 put back its edge half; this historical anchor
+                        // (other controls are byte-identical to it) keeps the
+                        // combined define.
                         .equals(referenceBody.replace("#define PA_ARM_DESC_PRECOMPUTE 1\n", "")),
                 "t206_monolithic_ref is not FINAL minus the two split defines"
                         + " (and the precompute FINAL dropped in T234)");
@@ -8567,20 +8572,19 @@ public final class StormVolumetricGeometrySandbox {
         String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
         String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
 
-        // T234 inverted T174: FINAL must NOT define it. T235 showed T234's
-        // motion evidence confounded (only FINAL is temporal) and recommends
-        // restoring it (~1.1 ms at SIDE, identical motion); until that is
-        // decided, this pin keeps FINAL as T234 left it.
-        require(!finalSource.contains("#define PA_ARM_DESC_PRECOMPUTE 1"),
-                "FINAL defines PA_ARM_DESC_PRECOMPUTE; restoring it is the pending T235"
-                        + " recommendation - update this pin together with that decision");
-        // The isolated halves stay diagnostic: FINAL takes the combined define,
-        // never one side of it, or the two paths could disagree.
+        // T234 removed the combined precompute from FINAL (on motion evidence
+        // T235 showed confounded: only FINAL is temporal). T235 ships the edge
+        // half alone: the edge width comes from texel 3, the ownership radii
+        // stay derived in the loop. Measured on the temporal path it moves
+        // exactly like T234's program and keeps nearly all of the saving.
+        require(finalSource.contains("#define PA_ARM_DESC_PRECOMPUTE_EDGE 1"),
+                "FINAL no longer defines PA_ARM_DESC_PRECOMPUTE_EDGE (T235's edge-width"
+                        + " precompute); the walk would derive edge width per sample again");
         for (String define : new String[] {
-                "PA_ARM_DESC_PRECOMPUTE_EDGE", "PA_ARM_DESC_PRECOMPUTE_OWNER"}) {
-            require(!finalSource.contains("#define " + define),
-                    "FINAL defines the isolated " + define + " rather than the combined"
-                            + " precompute");
+                "PA_ARM_DESC_PRECOMPUTE", "PA_ARM_DESC_PRECOMPUTE_OWNER"}) {
+            require(!finalSource.contains("#define " + define + " 1"),
+                    "FINAL defines " + define + "; T235 shipped only the edge half, and any"
+                            + " wider precompute needs its own temporal-path motion check");
         }
         // The T140 oracle family renders production frames and is documented as
         // bit-for-bit equivalent to FINAL, so it must carry the same
