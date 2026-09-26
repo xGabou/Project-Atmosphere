@@ -4300,6 +4300,20 @@ implementation, while visual polish remains independently active.
   (gated on a static pass). Evidence in `validation/t233-through-underside-octave.md` and
   `validation/t233-campaign/`. Next: **T234 the lean-vs-monolith motion gap** (lean flickers 12-15%
   more on the T152 route, equally on HEAD and T232). [SC-005, SC-016, SC-021]
+- [X] T234 [QUALITY] [US1] FINAL vs diagnostic motion divergence. **FIX (CASE B): the gap is T172's
+  descriptor precompute (`PA_ARM_DESC_PRECOMPUTE`), a codegen effect.** Route arms on one storm (repeat
+  floor <= 1%): FINAL/monolith flicker 1.13x ALL, 2.3-2.7x OUTSIDE, 1.15-1.28x ENTRY in four runs; NOT rain
+  (same with precipitation 0), NOT the governor (step scale 0.5 constant; pinned arms identical), NOT
+  resolve (ghost equal), NOT a static delta (static FINAL/mono difference - silhouettes, step contours,
+  rain; RMS ~1 - unchanged by the fix). FINAL without the precompute = monolith motion (OUTSIDE 1.001x);
+  bridge_c (FINAL's CPU values, derivation compiled behind a never-true branch) and bridge_d (mirror)
+  also = monolith, so values (1.3e-7 rel. from the derivation) are not the cause - the derivation's code
+  presence is. Fix: dropped from `leanFinalDefines`; new FINAL NV assembly byte-identical to the measured
+  bridge. ABAB: SIDE 9.33 -> 9.77 ms (+0.45), PVN 8.77 -> 8.67 (noise); <= 10 ms, 9.5 margin lost.
+  Sandbox pins inverted/relaxed; historical programs keep the define. T152 frames now log stepScale and
+  gpuMs. Evidence in `validation/t234-final-diagnostic-motion-gap.md` and `validation/t234-campaign/`.
+  Next: **T235 recover ~0.45 ms at SIDE without the precompute's code shape** (judged ABAB and on the
+  route against the monolith). [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

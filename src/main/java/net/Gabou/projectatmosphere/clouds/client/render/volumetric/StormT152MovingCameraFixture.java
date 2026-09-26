@@ -1338,6 +1338,11 @@ final class StormT152MovingCameraFixture {
                 .append(" rayFloorY=").append(fmt(VolumetricCloudRenderer.lastRayVolumeFloorY()))
                 .append(" slabBaseY=").append(fmt(VolumetricCloudRenderer.lastSlabBaseY()))
                 .append(" maxPrecip=").append(fmt(VolumetricCloudRenderer.lastMaxPrecipitation()))
+                // T234. The frame-time governor's march step scale and the GPU
+                // time it reacts to. The route does not pin the governor, so a
+                // program whose speed moves it would change its own sampling.
+                .append(" stepScale=").append(fmt(VolumetricCloudRenderer.governorStepScale()))
+                .append(" gpuMs=").append(fmt(VolumetricCloudRenderer.lastGpuMilliseconds()))
                 .append(t225Geometry(point, routeTangent(t), inputs.cameraCloudDensity()))
                 .append(" alphaMean=").append(fmt(pixels > 0 ? alphaSum / pixels : 0.0D))
                 .append(" res=").append(width).append('x').append(height2)

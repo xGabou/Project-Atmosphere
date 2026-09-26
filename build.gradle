@@ -269,7 +269,13 @@ def leanFinalShaderName = 'cloud_atmosphere_volume_final'
 // stay byte-identical to FINAL (the T171 identity controls) take the same list.
 // T163 precipitation-absent, T174 descriptor precompute, T206 the split: the
 // rain family out of the cloud program, the rain pass's result composited in.
-def leanFinalDefines = ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+// T234. PA_ARM_DESC_PRECOMPUTE (T172) is no longer in FINAL. Its CPU values are
+// correct (1 ulp), but dropping the in-loop derivation changes the driver's
+// code for the walk, and that program is measurably less stable under motion:
+// alpha flicker 2.5x the monolith's OUTSIDE, 1.3x at ENTRY/APPROACH. Keeping
+// the derivation in the loop - with either value - matches the monolith
+// exactly (validation/t234-final-diagnostic-motion-gap.md). ~0.15 ms.
+def leanFinalDefines = ['PA_PRECIPITATION_ABSENT 1',
                         'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_RAIN_SPLIT_COMPOSITE 1']
 
 // uniform declaration -> replacement declaration. The value on the right is the
