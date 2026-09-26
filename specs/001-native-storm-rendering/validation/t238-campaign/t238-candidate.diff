@@ -1,0 +1,389 @@
+diff --git a/build.gradle b/build.gradle
+index fcdba067..76e676e9 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -305,6 +305,7 @@ def leanFinalConstants = [
+         // (0.7 ms at SIDE, build-vs-build - a cost no same-build uniform A/B
+         // can see). Any other value is an arm and takes the monolith.
+         'uniform int PaLowerDeckRelief;'           : 'const int PaLowerDeckRelief = 1;',
++        'uniform int PaLobeShape;'                 : 'const int PaLobeShape = 0;', // T238 TEMP
+         'uniform float PaReliefShade;'             : 'const float PaReliefShade = 0.12;',
+         'uniform int PaRayTraceMode;'              : 'const int PaRayTraceMode = 0;',
+         'uniform vec2 PaRayTraceNdc;'              : 'const vec2 PaRayTraceNdc = vec2(0.0);',
+diff --git a/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudDebugConfig.java b/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudDebugConfig.java
+index fd03a6a2..fd2ea84b 100644
+--- a/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudDebugConfig.java
++++ b/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudDebugConfig.java
+@@ -354,6 +354,17 @@ public final class VolumetricCloudDebugConfig {
+         return t136ConstantLighting ? 1 : diagnosticLightingMode;
+     }
+ 
++    private static volatile int lobeShapeMode; // T238 TEMP
++
++    /** T238 TEMP. PaLobeShape: 0 production, 1 slab anvil + column tower. */
++    public static int lobeShapeMode() {
++        return lobeShapeMode;
++    }
++
++    public static void setLobeShapeMode(int mode) {
++        lobeShapeMode = mode;
++    }
++
+     public static void setDiagnosticLightingMode(int mode) {
+         diagnosticLightingMode = Math.max(0, Math.min(18, mode));
+     }
+diff --git a/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java b/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java
+index 574467e7..95bf2725 100644
+--- a/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java
++++ b/src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java
+@@ -705,6 +705,7 @@ public final class VolumetricCloudRenderer {
+         }
+         shader.safeGetUniform("MaxPrecipitation").set(paMaxPrecipitation);
+         shader.safeGetUniform("PaLowerDeckRelief").set(VolumetricCloudDebugConfig.lowerDeckReliefMode());
++        shader.safeGetUniform("PaLobeShape").set(VolumetricCloudDebugConfig.lobeShapeMode()); // T238 TEMP
+         shader.safeGetUniform("PaReliefShade").set(VolumetricCloudDebugConfig.reliefShadeStrength());
+         // T224. Where the shader's cameraStartsInsideSlab turns on: the ray
+         // volume's floor, SlabBaseY lowered by precipitationRayPadding(). Not
+@@ -1331,6 +1332,7 @@ public final class VolumetricCloudRenderer {
+                 && !VolumetricCloudDebugConfig.t098LegacyHitDepth()
+                 && !VolumetricCloudDebugConfig.t098LegacyFinePromotion()
+                 && VolumetricCloudDebugConfig.diagnosticLightingMode() == 0
++                && VolumetricCloudDebugConfig.lobeShapeMode() == 0 // T238 TEMP
+                 // T232. FINAL bakes T231's relief and shade; any other value
+                 // is an arm and takes the monolith, where they are live.
+                 && VolumetricCloudDebugConfig.lowerDeckReliefMode()
+diff --git a/src/main/java/net/Gabou/projectatmosphere/clouds/simulation/CloudGroupSpawner.java b/src/main/java/net/Gabou/projectatmosphere/clouds/simulation/CloudGroupSpawner.java
+index 7509f61d..5ca7a8ea 100644
+--- a/src/main/java/net/Gabou/projectatmosphere/clouds/simulation/CloudGroupSpawner.java
++++ b/src/main/java/net/Gabou/projectatmosphere/clouds/simulation/CloudGroupSpawner.java
+@@ -20,6 +20,15 @@ public final class CloudGroupSpawner {
+     private CloudGroupSpawner() {
+     }
+ 
++    /**
++     * T237. Re-lays the live storms out with a storm template version (0 the
++     * T134/T127 layout, 1 the T237 layout) for the same-storm capture A/B.
++     * Server thread only.
++     */
++    public static String relayoutStorms(ServerLevel level, int version) {
++        return CloudMorphologyGenerators.relayoutStormRegions(level, version);
++    }
++
+     public static @Nullable CloudRegionState spawnRequestedCloud(ServerLevel level, BlockPos pos, String cloudTypeId) {
+         if (level == null || pos == null || !level.dimension().equals(Level.OVERWORLD)) {
+             return null;
+diff --git a/src/main/java/net/Gabou/projectatmosphere/clouds/simulation/CloudMorphologyGenerators.java b/src/main/java/net/Gabou/projectatmosphere/clouds/simulation/CloudMorphologyGenerators.java
+index 7ee49fdf..34cb1453 100644
+--- a/src/main/java/net/Gabou/projectatmosphere/clouds/simulation/CloudMorphologyGenerators.java
++++ b/src/main/java/net/Gabou/projectatmosphere/clouds/simulation/CloudMorphologyGenerators.java
+@@ -1,6 +1,10 @@
+ package net.Gabou.projectatmosphere.clouds.simulation;
+ 
+ import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
++import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
++import net.Gabou.projectatmosphere.clouds.state.CloudRegionStateStore;
++import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
++import net.minecraft.server.level.ServerLevel;
+ import net.Gabou.projectatmosphere.clouds.field.CloudMorphologyMembership;
+ import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+ import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyMemberTier;
+@@ -83,6 +87,28 @@ final class CloudMorphologyGenerators {
+     private static final float STORM_ANVIL_UPWIND_POSITION = -0.20F;
+     private static final float STORM_ANVIL_DOWNWIND_POSITION = 0.52F;
+ 
++    /**
++     * T237. The storm template: 0 is the T134/T127 layout (a symmetric
++     * canopy of four large anvil lobes over a short tower and a tall base
++     * ball - the mushroom T236 attributed), 1 the T237 layout (a flatter
++     * two-lobe base, a column-scale tower that spans from inside the base
++     * into the anvil, and varied anvil lobes placed downwind along +X, the
++     * axis the anvil row has always used).
++     */
++    static final int PRODUCTION_STORM_TEMPLATE = 0;
++    static volatile int stormTemplateVersion = PRODUCTION_STORM_TEMPLATE;
++    // T237 V1 anvil row: along-wind position (x groupRadius), cross offset
++    // (x groupRadius) and radius multiplier, upwind to downwind.
++    private static final float[] V1_ANVIL_ALONG = {0.15F, 0.55F, 0.95F, 1.35F};
++    private static final float[] V1_ANVIL_CROSS = {0.10F, -0.18F, 0.20F, -0.08F};
++    private static final float[] V1_ANVIL_RADIUS = {0.42F, 0.62F, 0.72F, 0.60F};
++    // T237 V2 (the one revision): the V1 layout with the anvil deck lowered
++    // onto the tower's visible top (V1 left a sky gap in the along-wind view),
++    // a thinner deck and broader lobes (V1's small lobes read as balls).
++    private static final float[] V2_ANVIL_ALONG = {0.10F, 0.50F, 0.90F, 1.30F};
++    private static final float[] V2_ANVIL_CROSS = {0.12F, -0.20F, 0.22F, -0.10F};
++    private static final float[] V2_ANVIL_RADIUS = {0.55F, 0.72F, 0.86F, 0.80F};
++
+     private CloudMorphologyGenerators() {
+     }
+ 
+@@ -694,6 +720,9 @@ final class CloudMorphologyGenerators {
+         int baseCount = Math.max(1, lowerCount / 3);
+         int coreCount = Math.max(1, (lowerCount - baseCount) / 2);
+         int towerStart = baseCount + coreCount;
++        if (stormTemplateVersion >= 1) {
++            return stormLobeSpecV1(plan, clusterIndex, centerY, stage, baseCount, coreCount, towerStart, anvilStart);
++        }
+         switch (stage) {
+             case BASE -> {
+                 radiusMultiplier = 1.16F;
+@@ -1130,6 +1159,55 @@ final class CloudMorphologyGenerators {
+         }
+     }
+ 
++    /**
++     * T237 V1 sizing. BASE: two broad, flat lobes (top at 0.20 / 0.16 of the
++     * top rise, ~290 blocks tall instead of ~450). TOWER: column-scale radii
++     * (0.60 / 0.52 of the plan radius instead of 0.39 / 0.33) spanning from
++     * inside the base (0.04 T) up into the anvil (0.86 T). ANVIL: varied,
++     * smaller lobes (0.42-0.72) and a thinner deck.
++     */
++    private static StormLobeSpec stormLobeSpecV1(SpawnPlan plan, int clusterIndex, float centerY,
++            CloudMorphologyMembership.Stage stage, int baseCount, int coreCount, int towerStart,
++            int anvilStart) {
++        float t = plan.topRise();
++        float radiusMultiplier;
++        float baseY;
++        float topY;
++        switch (stage) {
++            case BASE -> {
++                boolean primary = clusterIndex == 0;
++                radiusMultiplier = primary ? 1.30F : 1.02F;
++                baseY = centerY - plan.baseDrop() * (primary ? 1.0F : 0.75F);
++                topY = centerY + t * (primary ? 0.20F : 0.16F);
++            }
++            case CORE -> {
++                int ordinal = Math.max(0, clusterIndex - baseCount);
++                // T238 R1 (version 3): cores narrower than the column and kept
++                // low, so the tower is the visible central body.
++                boolean r1 = stormTemplateVersion >= 3;
++                radiusMultiplier = r1 ? (ordinal == 0 ? 0.42F : 0.40F) : (ordinal == 0 ? 0.62F : 0.58F);
++                baseY = centerY - t * 0.08F;
++                topY = centerY + t * (r1 ? (ordinal == 0 ? 0.16F : 0.18F) : (ordinal == 0 ? 0.26F : 0.30F));
++            }
++            case TOWER -> {
++                int ordinal = Math.max(0, clusterIndex - towerStart);
++                radiusMultiplier = ordinal == 0 ? 0.60F : 0.52F;
++                baseY = centerY - t * (ordinal == 0 ? 0.26F : 0.20F);
++                topY = centerY + t * (ordinal == 0 ? 0.24F : 0.28F);
++            }
++            case ANVIL -> {
++                int a = Math.min(V1_ANVIL_RADIUS.length - 1, Math.max(0, clusterIndex - anvilStart));
++                boolean v2 = stormTemplateVersion >= 2;
++                radiusMultiplier = (v2 ? V2_ANVIL_RADIUS : V1_ANVIL_RADIUS)[a];
++                float halfDeck = v2 ? 0.08F : 0.10F;
++                baseY = centerY - t * halfDeck;
++                topY = centerY + t * halfDeck;
++            }
++            default -> throw new IllegalStateException("Unexpected storm lobe stage " + stage);
++        }
++        return new StormLobeSpec(stage, radiusMultiplier, baseY, Math.max(baseY + 8.0F, topY));
++    }
++
+     record StormLobeSpec(
+             CloudMorphologyMembership.Stage stage,
+             float radiusMultiplier,
+@@ -1162,6 +1240,9 @@ final class CloudMorphologyGenerators {
+     }
+ 
+     private static Vec3 stormCell(Vec3 origin, SpawnPlan plan, int clusterIndex, RandomSource random) {
++        if (stormTemplateVersion >= 1) {
++            return stormCellV1(origin, plan, clusterIndex, random);
++        }
+         CloudMorphologyMembership.Stage stage = new CloudMorphologyMembership(
+                 null,
+                 clusterIndex,
+@@ -1232,6 +1313,115 @@ final class CloudMorphologyGenerators {
+         return origin.add(Math.cos(angle) * distance + shear, y, Math.sin(angle) * distance);
+     }
+ 
++    /** T237 V1 member placement; member 0 stays at the origin (caller). */
++    private static Vec3 stormCellV1(Vec3 origin, SpawnPlan plan, int clusterIndex, RandomSource random) {
++        CloudMorphologyMembership.Stage stage = new CloudMorphologyMembership(
++                null, clusterIndex, plan.clusterCount()).stageFor(CloudMorphologyFamily.STORM_ANVIL);
++        float r = plan.radius();
++        float g = plan.groupRadius();
++        float t = plan.topRise();
++        int anvilStart = plan.clusterCount() / 2 + 1;
++        int baseCount = Math.max(1, anvilStart / 3);
++        int coreCount = Math.max(1, (anvilStart - baseCount) / 2);
++        int towerStart = baseCount + coreCount;
++        float jitterA = (random.nextFloat() - 0.5F);
++        float jitterC = (random.nextFloat() - 0.5F);
++        float along;
++        float cross;
++        float y;
++        switch (stage) {
++            case BASE -> {
++                along = 0.22F * r + jitterA * 0.08F * r;
++                cross = -0.14F * r + jitterC * 0.08F * r;
++                y = 0.0F;
++            }
++            case CORE -> {
++                int ordinal = Math.max(0, clusterIndex - baseCount);
++                along = (0.04F + 0.05F * ordinal) * r + jitterA * 0.04F * r;
++                cross = (ordinal == 0 ? 0.06F : -0.06F) * r + jitterC * 0.04F * r;
++                y = t * (0.10F + 0.08F * ordinal);
++            }
++            case TOWER -> {
++                int ordinal = Math.max(0, clusterIndex - towerStart);
++                // The column leans downwind with height.
++                along = (0.08F + 0.10F * ordinal) * r + jitterA * 0.05F * r;
++                cross = (ordinal == 0 ? 0.05F : -0.04F) * r + jitterC * 0.05F * r;
++                y = t * (0.30F + 0.28F * ordinal);
++            }
++            case ANVIL -> {
++                int a = Math.min(V1_ANVIL_ALONG.length - 1, Math.max(0, clusterIndex - anvilStart));
++                boolean v2 = stormTemplateVersion >= 2;
++                along = g * (v2 ? V2_ANVIL_ALONG : V1_ANVIL_ALONG)[a] * (0.88F + (jitterA + 0.5F) * 0.24F);
++                cross = g * ((v2 ? V2_ANVIL_CROSS : V1_ANVIL_CROSS)[a] + jitterC * 0.10F);
++                y = t * ((v2 ? 0.74F : 0.80F) - 0.01F * a);
++            }
++            default -> throw new IllegalStateException("Unexpected storm stage " + stage);
++        }
++        return origin.add(along, y + (random.nextFloat() - 0.5F) * 6.0F, cross);
++    }
++
++    /**
++     * T237. Re-lays every live STORM_ANVIL region out with the given template,
++     * in place: member 0 keeps its centre (the plan origin), every other
++     * member is re-placed and re-sized from a random seeded by the region and
++     * member index, so two templates applied to one storm differ only in the
++     * layout. Radii are set at their targets (no growth animation). Used by
++     * the same-storm capture A/B; returns a one-line summary.
++     */
++    static String relayoutStormRegions(ServerLevel level, int version) {
++        int previous = stormTemplateVersion;
++        int regions = 0;
++        int members = 0;
++        try {
++            stormTemplateVersion = version;
++            for (CloudRegionState region : CloudRegionStateStore.getAll(level)) {
++                List<CloudClusterState> clusters = region.getClusters();
++                CloudClusterState origin = null;
++                int count = 0;
++                for (CloudClusterState cluster : clusters) {
++                    if (cluster.getMorphologyFamily() == CloudMorphologyFamily.STORM_ANVIL
++                            && cluster.getMorphologyCount() >= 4) {
++                        count = cluster.getMorphologyCount();
++                        if (cluster.getMorphologyIndex() == 0) {
++                            origin = cluster;
++                        }
++                    }
++                }
++                if (origin == null || count < 4) {
++                    continue;
++                }
++                CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(origin.getCloudTypeId());
++                SpawnPlan plan = stormAnvilPlanForCount(definition, count);
++                Vec3 originCentre = origin.getCenter();
++                long regionSeed = region.getRegionId().getMostSignificantBits()
++                        ^ region.getRegionId().getLeastSignificantBits();
++                for (CloudClusterState cluster : clusters) {
++                    if (cluster.getMorphologyFamily() != CloudMorphologyFamily.STORM_ANVIL) {
++                        continue;
++                    }
++                    int index = cluster.getMorphologyIndex();
++                    RandomSource random = RandomSource.create(regionSeed ^ (index * 0x9E3779B97F4A7C15L));
++                    Vec3 centre = index == 0 ? originCentre
++                            : createClusterCenter(originCentre, plan, index, random);
++                    StormLobeSpec spec = stormLobeSpec(plan, index, (float) centre.y);
++                    float radius = Math.max(8.0F, plan.radius() * spec.radiusMultiplier());
++                    cluster.setCenter(centre);
++                    cluster.setPreviousCenter(centre);
++                    cluster.setRadius(radius);
++                    cluster.setSpawnRadius(radius);
++                    cluster.setTargetRadius(radius);
++                    cluster.setVerticalBounds(spec.baseY(), spec.topY());
++                    members++;
++                }
++                regions++;
++            }
++            CloudRegionStateStore.markDirty(level);
++        } finally {
++            stormTemplateVersion = previous;
++        }
++        return "t237_relayout version=" + version + " regions=" + regions + " members=" + members;
++    }
++
+     private static Vec3 spiralCell(Vec3 origin, SpawnPlan plan, int clusterIndex, RandomSource random) {
+         float turn = (float) clusterIndex / Math.max(1.0F, plan.clusterCount() - 1.0F);
+         float angle = turn * (float) (Math.PI * 3.6D) + random.nextFloat() * 0.36F;
+diff --git a/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh b/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh
+index 5b8bff4e..145f5bb1 100644
+--- a/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh
++++ b/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh
+@@ -1456,6 +1456,10 @@ uniform int PaDiagnosticLightingMode;
+ // PaReliefShade: the lower-anvil form shading, per macro sd, that lets that
+ // relief show - the shadowed lighting has no other term that reads shape.
+ uniform int PaLowerDeckRelief;
++// T238 TEMP. Lobe primitive: 0 production role profiles, 1 slab anvil +
++// column tower, 2 slab anvil only, 3 column tower only, 4 = 1 with the
++// lower-deck relief kept off tower overlap (R1). FINAL bakes 0.
++uniform int PaLobeShape;
+ uniform float PaReliefShade;
+ uniform int PaRayTraceMode;
+ uniform vec2 PaRayTraceNdc;
+@@ -2166,6 +2170,15 @@ void stormRoleProfile(
+         verticalShape = smoothstep(0.0, 0.24, height01)
+             * (1.0 - smoothstep(0.62, 1.0, height01));
+         shearProgress = smoothstep(0.0, 1.0, height01) * 0.35;
++    } else if (role == 2 && (PaLobeShape == 1 || PaLobeShape == 3 || PaLobeShape == 4)) {
++        // T238 column: a wider root where it overlaps the base, a near-constant
++        // body, a slight flare where it feeds the anvil. Range [0.82, 1.00].
++        profileRadius = 0.82
++            + 0.18 * (1.0 - smoothstep(0.0, 0.22, height01))
++            + 0.08 * smoothstep(0.82, 1.0, height01);
++        verticalShape = smoothstep(0.0, 0.28, height01)
++            * (1.0 - smoothstep(0.72, 1.0, height01));
++        shearProgress = pow(height01, 1.6);
+     } else if (role == 2) {
+         // Broad root across the core's upper half before continuous tapering.
+         // Keep this mirrored with StormLobeEvaluator.
+@@ -2174,6 +2187,14 @@ void stormRoleProfile(
+         verticalShape = smoothstep(0.0, 0.28, height01)
+             * (1.0 - smoothstep(0.72, 1.0, height01));
+         shearProgress = pow(height01, 1.6);
++    } else if (PaLobeShape == 1 || PaLobeShape == 2 || PaLobeShape == 4) {
++        // T238 slab: widest at mid-deck, the rim thinning toward the flat top
++        // and bottom faces (a disc, not a cup). Range [1.35, 1.80].
++        float paDeck = abs(2.0 * height01 - 1.0);
++        profileRadius = 1.80 - 0.45 * paDeck * paDeck * paDeck;
++        verticalShape = smoothstep(0.0, 0.35, height01)
++            * (1.0 - smoothstep(0.76, 1.0, height01));
++        shearProgress = smoothstep(0.0, 0.65, height01);
+     } else {
+         // Broaden the anvil's root and canopy for a tower-fed upper deck;
+         // sampled descriptor strength remains authoritative for coverage.
+@@ -3818,7 +3839,8 @@ float directStormFinalDensity(
+         // envelope from the one the body renders.
+         float deckWeight = smoothstep(0.55, 0.72, dominantHeight01)
+             * (1.0 - smoothstep(0.93, 1.0, dominantHeight01));
+-        if (PaLowerDeckRelief != 0) {
++        // T238 TEMP (R1): keep the underside relief off the tower junction.
++        if (PaLowerDeckRelief != 0 && !(PaLobeShape == 4 && (activeRoleMask & 4) != 0)) {
+             deckWeight += stormLowerDeckWeight(dominantHeight01, activeRoleMask);
+         }
+         if (PaMacroEnvelope >= 3) {
+@@ -6620,6 +6642,10 @@ float cloudDensityImpl(
+             paLastUnderSigned = 0.0;
+             paLastLowerDeckWeight = stormLowerDeckWeight(
+                 directStormHeight01, directStormActiveRoleMask);
++            // T238 TEMP (R1): keep the underside relief off the tower junction.
++            if (PaLobeShape == 4 && (directStormActiveRoleMask & 4) != 0) {
++                paLastLowerDeckWeight = 0.0;
++            }
+             if (PaMacroEnvelope != 0 && cloud > 0.12 && cloud < 0.98) {
+                 // T212. The macro band the body noise does not have. `cloud`
+                 // is still the coverage envelope here, so shifting it moves
+diff --git a/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.json b/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.json
+index 6cde235a..3f0701f7 100644
+--- a/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.json
++++ b/src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.json
+@@ -107,6 +107,7 @@
+     { "name": "PaLowerBodyFill", "type": "int", "count": 1, "values": [ 0 ] },
+     { "name": "PaDeepScatter", "type": "int", "count": 1, "values": [ 0 ] },
+     { "name": "PaLowerDeckRelief", "type": "int", "count": 1, "values": [ 1 ] },
++    { "name": "PaLobeShape", "type": "int", "count": 1, "values": [ 0 ] },
+     { "name": "PaReliefShade", "type": "float", "count": 1, "values": [ 0.12 ] },
+     { "name": "DensityMul", "type": "float", "count": 1, "values": [ 1.0 ] },
+     { "name": "CoverageMul", "type": "float", "count": 1, "values": [ 1.0 ] },

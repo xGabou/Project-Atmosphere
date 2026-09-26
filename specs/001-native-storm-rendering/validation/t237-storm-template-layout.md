@@ -24,6 +24,10 @@ stop the storm reading as "a big round ball + a thin stick + a giant symmetric m
   In the old layout the union buried these primitives (T236: lobe-profile edits changed ≤ 5% of the
   silhouette). The new layout exposes them.
 
+> **T238 correction.** Below, "stretched 1.56× vertically" is wrong. `radii.y *= 1.56` widens
+> the anvil's short HORIZONTAL axis. The cap shape comes from the height profile alone (0.70 root
+> flaring to 2.10). See `t238-lobe-shape-replacement.md`.
+
 **Correction to T236.** T236 attributed the defect to `CloudletLayout.stormLayout`. That layout is
 **not** used by fixture / world storms (PA_CLUSTER): `addFieldCloudletCells` skips PA_CLUSTER
 regions, so it only feeds non-cluster fields, `CloudFieldValidation` and the debug renderer. The

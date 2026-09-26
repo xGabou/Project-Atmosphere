@@ -4354,6 +4354,16 @@ implementation, while visual polish remains independently active.
   downwind/below it stays cap-over-ball - each anvil lobe is a flared cap and the wide tower lobe a
   tapered dome. Next: **T238 lobe primitives on the T237 layout** (slab anvil, column tower,
   re-derived T127/T133 bands). [SC-005, SC-016, SC-021]
+- [X] T238 [QUALITY] [US1] Lobe shape replacement on the V2 layout. **REJECTED (case E) - no
+  production change; see `validation/t238-lobe-shape-replacement.md`.** Slab anvil
+  (`1.80 - 0.45|2h-1|^3`) + column tower (1.00 root / 0.82 body / 0.90 top) on the T237 V2 layout,
+  same-storm ABBA on 3 storms (one run a one-layout shape attribution) plus the one allowed
+  transition revision R1 (cores below the column, lower-deck relief off the tower junction). The deck
+  flattens (thickness/width 0.34-0.42 -> 0.23-0.27) but from downwind floats over a 10-22-row gap and
+  its underside tears (LOWSIDE 9-16 components); the column is buried in base/cores or, above them, a
+  ragged stalk; the ball remains. Production's visible tower is its 1.25 root bulge. `radii.y *= 1.56`
+  is the anvil's short HORIZONTAL axis (T237 said vertical). Next: **T239 new storm geometry basis**
+  (one continuous storm field, not role lobes). [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

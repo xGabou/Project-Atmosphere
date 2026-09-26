@@ -1,0 +1,167 @@
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=0 centerX=5.0 centerZ=1.0 baseY=136.0 topY=583.6 majorRadius=471.7949 minorRadius=424.6154 densityWeight=0.0058955504 verticalDevelopment=0.9487173
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=0 centerX=-11.012259 centerZ=61.356045 baseY=151.98932 topY=599.5893 majorRadius=458.41763 minorRadius=412.57587 densityWeight=0.005362882 verticalDevelopment=0.97640216
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=1 centerX=-1.762841 centerZ=-15.762454 baseY=349.7572 topY=630.5572 majorRadius=273.31235 minorRadius=245.98111 densityWeight=0.006921432 verticalDevelopment=1.0
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=1 centerX=-5.420996 centerZ=6.970727 baseY=404.28687 topY=700.6868 majorRadius=233.85724 minorRadius=210.47151 densityWeight=0.006920037 verticalDevelopment=1.0
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=2 centerX=-7.238443 centerZ=7.874169 baseY=437.4836 topY=804.0836 majorRadius=195.48508 minorRadius=160.29776 densityWeight=0.006408288 verticalDevelopment=1.0
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=2 centerX=26.157318 centerZ=21.253212 baseY=592.6332 topY=928.0332 majorRadius=164.34866 minorRadius=134.7659 densityWeight=0.006409787 verticalDevelopment=1.0
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=-74.83292 centerZ=-3.4443111 baseY=771.6035 topY=982.2035 majorRadius=432.4248 minorRadius=250.80638 densityWeight=0.0053826245 verticalDevelopment=0.9
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=18.56545 centerZ=60.77565 baseY=776.3132 topY=986.91315 majorRadius=429.43512 minorRadius=249.07236 densityWeight=0.0053822533 verticalDevelopment=0.9
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=121.37121 centerZ=-58.29867 baseY=783.49493 topY=994.0949 majorRadius=437.31406 minorRadius=253.64215 densityWeight=0.005383546 verticalDevelopment=0.9
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=216.38521 centerZ=3.0646918 baseY=790.47296 topY=1001.07294 majorRadius=419.80817 minorRadius=243.48872 densityWeight=0.005382999 verticalDevelopment=0.9
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=0 centerX=5.0 centerZ=1.0 baseY=136.0 topY=583.6 majorRadius=471.7949 minorRadius=424.6154 densityWeight=0.022072796 verticalDevelopment=0.9487173
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=0 centerX=-11.012259 centerZ=61.356045 baseY=151.98932 topY=599.5893 majorRadius=458.41763 minorRadius=412.57587 densityWeight=0.02008814 verticalDevelopment=0.97640216
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=1 centerX=-1.762841 centerZ=-15.762454 baseY=349.7572 topY=630.5572 majorRadius=273.31235 minorRadius=245.98111 densityWeight=0.025919426 verticalDevelopment=1.0
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=1 centerX=-5.420996 centerZ=6.970727 baseY=404.28687 topY=700.6868 majorRadius=233.85724 minorRadius=210.47151 densityWeight=0.025900071 verticalDevelopment=1.0
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=2 centerX=-7.238443 centerZ=7.874169 baseY=437.4836 topY=804.0836 majorRadius=195.48508 minorRadius=160.29776 densityWeight=0.023993295 verticalDevelopment=1.0
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=2 centerX=26.157318 centerZ=21.253212 baseY=592.6332 topY=928.0332 majorRadius=164.34866 minorRadius=134.7659 densityWeight=0.024014091 verticalDevelopment=1.0
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=-74.83292 centerZ=-3.4443111 baseY=771.6035 topY=982.2035 majorRadius=432.4248 minorRadius=250.80638 densityWeight=0.02014969 verticalDevelopment=0.9
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=18.56545 centerZ=60.77565 baseY=776.3132 topY=986.91315 majorRadius=429.43512 minorRadius=249.07236 densityWeight=0.020144535 verticalDevelopment=0.9
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=121.37121 centerZ=-58.29867 baseY=783.49493 topY=994.0949 majorRadius=437.31406 minorRadius=253.64215 densityWeight=0.02016247 verticalDevelopment=0.9
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=216.38521 centerZ=3.0646918 baseY=790.47296 topY=1001.07294 majorRadius=419.80817 minorRadius=243.48872 densityWeight=0.02015488 verticalDevelopment=0.9
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=0 centerX=5.0 centerZ=1.0 baseY=136.0 topY=583.6 majorRadius=471.7949 minorRadius=424.6154 densityWeight=0.097507976 verticalDevelopment=0.9487173
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=0 centerX=-11.012259 centerZ=61.356045 baseY=151.98932 topY=599.5893 majorRadius=458.41763 minorRadius=412.57587 densityWeight=0.088928334 verticalDevelopment=0.97640216
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=1 centerX=-1.762841 centerZ=-15.762454 baseY=349.7572 topY=630.5572 majorRadius=273.31235 minorRadius=245.98111 densityWeight=0.114612766 verticalDevelopment=1.0
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=1 centerX=-5.420996 centerZ=6.970727 baseY=404.28687 topY=700.6868 majorRadius=233.85724 minorRadius=210.47151 densityWeight=0.11425212 verticalDevelopment=1.0
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=2 centerX=-7.238443 centerZ=7.874169 baseY=437.4836 topY=804.0836 majorRadius=195.48508 minorRadius=160.29776 densityWeight=0.106007926 verticalDevelopment=1.0
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=2 centerX=26.157318 centerZ=21.253212 baseY=592.6332 topY=928.0332 majorRadius=164.34866 minorRadius=134.7659 densityWeight=0.10639539 verticalDevelopment=1.0
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=-74.83292 centerZ=-3.4443111 baseY=771.6035 topY=982.2035 majorRadius=432.4248 minorRadius=250.80638 densityWeight=0.08895947 verticalDevelopment=0.9
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=18.56545 centerZ=60.77565 baseY=776.3132 topY=986.91315 majorRadius=429.43512 minorRadius=249.07236 densityWeight=0.08886345 verticalDevelopment=0.9
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=121.37121 centerZ=-58.29867 baseY=783.49493 topY=994.0949 majorRadius=437.31406 minorRadius=253.64215 densityWeight=0.08919762 verticalDevelopment=0.9
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=216.38521 centerZ=3.0646918 baseY=790.47296 topY=1001.07294 majorRadius=419.80817 minorRadius=243.48872 densityWeight=0.08905621 verticalDevelopment=0.9
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=0 centerX=5.0 centerZ=1.0 baseY=136.0 topY=583.6 majorRadius=471.7949 minorRadius=424.6154 densityWeight=0.097507976 verticalDevelopment=0.9487173
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=0 centerX=-11.012259 centerZ=61.356045 baseY=151.98932 topY=599.5893 majorRadius=458.41763 minorRadius=412.57587 densityWeight=0.088928334 verticalDevelopment=0.97640216
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=1 centerX=-1.762841 centerZ=-15.762454 baseY=349.7572 topY=630.5572 majorRadius=273.31235 minorRadius=245.98111 densityWeight=0.114612766 verticalDevelopment=1.0
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=1 centerX=-5.420996 centerZ=6.970727 baseY=404.28687 topY=700.6868 majorRadius=233.85724 minorRadius=210.47151 densityWeight=0.11425212 verticalDevelopment=1.0
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=2 centerX=-7.238443 centerZ=7.874169 baseY=437.4836 topY=804.0836 majorRadius=195.48508 minorRadius=160.29776 densityWeight=0.106007926 verticalDevelopment=1.0
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=2 centerX=26.157318 centerZ=21.253212 baseY=592.6332 topY=928.0332 majorRadius=164.34866 minorRadius=134.7659 densityWeight=0.10639539 verticalDevelopment=1.0
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=-74.83292 centerZ=-3.4443111 baseY=771.6035 topY=982.2035 majorRadius=432.4248 minorRadius=250.80638 densityWeight=0.08895947 verticalDevelopment=0.9
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=18.56545 centerZ=60.77565 baseY=776.3132 topY=986.91315 majorRadius=429.43512 minorRadius=249.07236 densityWeight=0.08886345 verticalDevelopment=0.9
+[16:33:52] [ClientMgr-1/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=121.37121 centerZ=-58.29867 baseY=783.49493 topY=994.0949 majorRadius=437.31406 minorRadius=253.64215 densityWeight=0.08919762 verticalDevelopment=0.9
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=0 centerX=5.0 centerZ=1.0 baseY=136.0 topY=583.6 majorRadius=471.7949 minorRadius=424.6154 densityWeight=0.109138615 verticalDevelopment=0.9487173
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=0 centerX=-11.012259 centerZ=61.356045 baseY=151.98932 topY=599.5893 majorRadius=458.41763 minorRadius=412.57587 densityWeight=0.09956635 verticalDevelopment=0.97640216
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=1 centerX=-1.762841 centerZ=-15.762454 baseY=349.7572 topY=630.5572 majorRadius=273.31235 minorRadius=245.98111 densityWeight=0.12830198 verticalDevelopment=1.0
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=1 centerX=-5.420996 centerZ=6.970727 baseY=404.28687 topY=700.6868 majorRadius=233.85724 minorRadius=210.47151 densityWeight=0.12785327 verticalDevelopment=1.0
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=2 centerX=-7.238443 centerZ=7.874169 baseY=437.4836 topY=804.0836 majorRadius=195.48508 minorRadius=160.29776 densityWeight=0.11865505 verticalDevelopment=1.0
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=2 centerX=26.157318 centerZ=21.253212 baseY=592.6332 topY=928.0332 majorRadius=164.34866 minorRadius=134.7659 densityWeight=0.119137146 verticalDevelopment=1.0
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=-74.83292 centerZ=-3.4443111 baseY=771.6035 topY=982.2035 majorRadius=432.4248 minorRadius=250.80638 densityWeight=0.09956176 verticalDevelopment=0.9
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=18.56545 centerZ=60.77565 baseY=776.3132 topY=986.91315 majorRadius=429.43512 minorRadius=249.07236 densityWeight=0.09944229 verticalDevelopment=0.9
+[16:33:52] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=121.37121 centerZ=-58.29867 baseY=783.49493 topY=994.0949 majorRadius=437.31406 minorRadius=253.64215 densityWeight=0.099858075 verticalDevelopment=0.9
+[16:35:11] [Server thread/INFO] [projectatmosphere/]: T237_RELAYOUT t237_relayout version=2 regions=1 members=10
+[16:35:26] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=0 centerX=5.0 centerZ=1.0 baseY=136.0 topY=412.0 majorRadius=585.0 minorRadius=526.5 densityWeight=0.87793493 verticalDevelopment=0.9
+[16:35:26] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=0 centerX=109.40701 centerZ=-72.20427 baseY=166.61206 topY=381.41205 majorRadius=459.0 minorRadius=413.09998 densityWeight=0.81230456 verticalDevelopment=0.9
+[16:35:26] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=1 centerX=17.849394 centerZ=20.984808 baseY=271.2006 topY=536.4006 majorRadius=329.21997 minorRadius=296.29797 densityWeight=1.0 verticalDevelopment=0.95053756
+[16:35:26] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=1 centerX=50.585365 centerZ=-19.566961 baseY=333.2326 topY=629.6326 majorRadius=307.97998 minorRadius=277.18198 densityWeight=1.0 verticalDevelopment=1.0
+[16:35:26] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=2 centerX=51.65529 centerZ=33.85582 baseY=289.79443 topY=679.79443 majorRadius=345.6 minorRadius=283.392 densityWeight=0.9554457 verticalDevelopment=1.0
+[16:35:26] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=2 centerX=79.54887 centerZ=-21.939548 baseY=553.8595 topY=928.2595 majorRadius=299.52 minorRadius=245.60638 densityWeight=0.9776572 verticalDevelopment=1.0
+[16:35:26] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=46.55776 centerZ=46.588436 baseY=773.1059 topY=897.90594 majorRadius=247.5 minorRadius=143.55 densityWeight=0.79763126 verticalDevelopment=0.9
+[16:35:26] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=183.54417 centerZ=-74.96714 baseY=762.6006 topY=887.40063 majorRadius=324.0 minorRadius=187.92 densityWeight=0.79209673 verticalDevelopment=0.9
+[16:35:26] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=405.21536 centerZ=102.513824 baseY=758.1291 topY=882.92914 majorRadius=387.0 minorRadius=224.45999 densityWeight=0.8111996 verticalDevelopment=0.9
+[16:35:26] [Render thread/INFO] [projectatmosphere/]: T215_GEOMETRY role=3 centerX=591.75146 centerZ=-40.97368 baseY=749.3175 topY=874.11755 majorRadius=360.0 minorRadius=208.79999 densityWeight=0.8031204 verticalDevelopment=0.9
+[16:44:18] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S3R_THROUGH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:44:26] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S3N_THROUGH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:44:33] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S2R_THROUGH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:44:40] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S2N_THROUGH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:44:47] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S1R_THROUGH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:44:54] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S1N_THROUGH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:45:01] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S0R_THROUGH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:45:08] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S0N_THROUGH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:45:15] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S0N_FAR_LAT_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:45:22] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S0R_FAR_LAT_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:45:29] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S1N_FAR_LAT_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:45:37] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S1R_FAR_LAT_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:45:44] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S2N_FAR_LAT_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:45:51] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S2R_FAR_LAT_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:45:58] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S3N_FAR_LAT_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:46:05] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S3R_FAR_LAT_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:46:12] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S3R_FAR_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:46:19] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S3N_FAR_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:46:26] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S2R_FAR_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:46:33] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S2N_FAR_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:46:41] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S1R_FAR_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:46:48] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S1N_FAR_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:46:55] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S0R_FAR_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:47:02] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T238_S0N_FAR_OPP descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:47:09] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=1_FAR descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:47:16] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=2_SIDE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:47:23] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=3_UNDER descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:47:30] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=4_INSIDE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:47:37] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=4B_THROUGH_BODY descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:47:44] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=5_ABOVE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:47:51] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=6_LATERAL_A descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:47:59] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=7_LATERAL_B descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:48:06] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=9_LADDER_120 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:48:13] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=9_LADDER_130 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:48:20] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=9_LADDER_140 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:48:27] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=9_LADDER_150 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:48:34] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=9_LADDER_160 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:48:41] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=9_LADDER_180 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:48:48] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=A_SIDE_CURRENT_ONLY descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:48:56] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=B_SIDE_HISTORY_ONLY descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:49:03] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=C_SIDE_HISTORY_REJECTION descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:49:10] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=D_SIDE_LEGACY_HIT_DEPTH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:49:17] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=E_FAR_LEGACY_HIT_DEPTH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:49:24] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=F_SIDE_CORRECTED descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:49:31] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=G_FAR_CORRECTED descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:49:38] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=P_SIDE_LEGACY_PROMOTION descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:49:45] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=P_SIDE_CORRECTED_PROMOTION descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:49:52] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=P_FAR_LEGACY_PROMOTION descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:49:59] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=P_FAR_CORRECTED_PROMOTION descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:07] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=P_ABOVE_LEGACY_PROMOTION descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:14] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=P_ABOVE_CORRECTED_PROMOTION descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:21] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=P_BELOW_LEGACY_PROMOTION descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:28] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=P_BELOW_CORRECTED_PROMOTION descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:35] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_SIDE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:35] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_SIDE_T8 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:36] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_SIDE_ALPHA descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:36] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_SIDE_DEPTH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:36] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_SIDE_ALIGNMENT descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:36] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_SIDE_ARM descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:36] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_SIDE_ARM_T8 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:43] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_LATERAL descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:44] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_LATERAL_T8 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:44] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_LATERAL_ALPHA descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:44] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_LATERAL_DEPTH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:44] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_LATERAL_ALIGNMENT descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:44] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_LATERAL_ARM descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:45] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_LATERAL_ARM_T8 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:52] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_ABOVE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:52] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_ABOVE_T8 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:53] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_ABOVE_ALPHA descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:53] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_ABOVE_DEPTH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:53] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_ABOVE_ALIGNMENT descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:53] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_ABOVE_ARM descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:50:53] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J0_ABOVE_ARM_T8 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:01] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_SIDE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:01] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_SIDE_T8 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:01] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_SIDE_ALPHA descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:01] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_SIDE_DEPTH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:01] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_SIDE_ALIGNMENT descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:01] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_SIDE_ARM descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:02] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_SIDE_ARM_T8 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:09] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_LATERAL descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:09] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_LATERAL_T8 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:10] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_LATERAL_ALPHA descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:10] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_LATERAL_DEPTH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:10] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_LATERAL_ALIGNMENT descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:10] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_LATERAL_ARM descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:10] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_LATERAL_ARM_T8 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:17] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_ABOVE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:18] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_ABOVE_T8 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:18] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_ABOVE_ALPHA descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:18] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_ABOVE_DEPTH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:18] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_ABOVE_ALIGNMENT descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:18] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_ABOVE_ARM descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:19] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=J1_ABOVE_ARM_T8 descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:26] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T217_L0_INSIDE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:33] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T217_ON_INSIDE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:40] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T217_L0_THROUGH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:47] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T217_ON_THROUGH descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:51:54] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T217_L0_SIDE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:52:01] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T217_ON_SIDE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:52:09] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T217_L0_LATERAL descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:52:16] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T217_ON_LATERAL descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:52:23] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T217_L0_NEAREDGE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:52:30] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T217_ON_NEAREDGE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:52:37] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T217_L0_ABOVE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:52:44] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=T217_ON_ABOVE descriptors fell 10 -> 0; this frame and every later one are not evidence
+[16:52:51] [Render thread/WARN] [projectatmosphere/]: T098_CAPTURE_FIXTURE_LOST shot=8_NEAR_EDGE descriptors fell 10 -> 0; this frame and every later one are not evidence

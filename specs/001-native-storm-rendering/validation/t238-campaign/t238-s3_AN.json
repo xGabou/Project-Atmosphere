@@ -1,0 +1,263 @@
+{
+ "FAR": {
+  "area": 44567,
+  "perimeter": 2341,
+  "perim_over_sqrt_area": 11.0890594882874,
+  "components": 1,
+  "largest_frac": 0.9979405444126075,
+  "sil": {
+   "clipped_top": false,
+   "height": 243,
+   "anvil_offset_over_width": 0.04576297547850521,
+   "anvil_right_over_left": 1.2290507971820541,
+   "tower_rows": 47,
+   "anvil_w": 290.9999999999999,
+   "neck_w": 64.11111111111111,
+   "lower_w": 198.99999999999997,
+   "neck_over_anvil": 0.2203130966017565,
+   "lower_over_anvil": 0.6838487972508592,
+   "anvil_rise_over_width": 0.20618556701030935,
+   "top_flat_share": 0.3127147766323024,
+   "top_curvature": 0.10982249979886621,
+   "mirror_iou": 0.7771499559188908,
+   "rows": {
+    "anvil": 60,
+    "neck": 107,
+    "lower": 172
+   }
+  }
+ },
+ "FAR_OPP": {
+  "area": 87663,
+  "perimeter": 3926,
+  "perim_over_sqrt_area": 13.259957459570533,
+  "components": 8,
+  "largest_frac": 0.5173671255356004,
+  "sil": {
+   "clipped_top": false,
+   "height": 334,
+   "anvil_offset_over_width": 0.9227603805768432,
+   "anvil_right_over_left": 110.30484693877551,
+   "tower_rows": 139,
+   "anvil_w": 522.5555555555555,
+   "neck_w": 43.22222222222222,
+   "lower_w": 43.22222222222222,
+   "neck_over_anvil": 0.0827131618116096,
+   "lower_over_anvil": 0.0827131618116096,
+   "anvil_rise_over_width": 0.3406336381033383,
+   "top_flat_share": 0.1421188630490956,
+   "top_curvature": 0.08236457442513677,
+   "mirror_iou": 0.3470225556973508,
+   "rows": {
+    "anvil": 178,
+    "neck": 317,
+    "lower": 317
+   }
+  }
+ },
+ "FAR_LAT": {
+  "area": 44599,
+  "perimeter": 2317,
+  "perim_over_sqrt_area": 10.971435979537132,
+  "components": 1,
+  "largest_frac": 0.9937247870909905,
+  "sil": {
+   "clipped_top": false,
+   "height": 236,
+   "anvil_offset_over_width": -0.06645941264590483,
+   "anvil_right_over_left": 0.7030073736632823,
+   "tower_rows": 167,
+   "anvil_w": 292.88888888888886,
+   "neck_w": 57.777777777777764,
+   "lower_w": 57.777777777777764,
+   "neck_over_anvil": 0.19726858877086492,
+   "lower_over_anvil": 0.19726858877086492,
+   "anvil_rise_over_width": 0.19461305007587257,
+   "top_flat_share": 0.15699658703071673,
+   "top_curvature": 0.08744894273306233,
+   "mirror_iou": 0.7812061148336877,
+   "rows": {
+    "anvil": 57,
+    "neck": 224,
+    "lower": 224
+   }
+  }
+ },
+ "FAR_LAT_OPP": {
+  "area": 8371,
+  "perimeter": 785,
+  "perim_over_sqrt_area": 8.579875496115873,
+  "components": 2,
+  "largest_frac": 0.859942638623327,
+  "sil": {
+   "clipped_top": false,
+   "height": 68,
+   "anvil_offset_over_width": -0.6137889468617497,
+   "anvil_right_over_left": 0.047685656154628685,
+   "tower_rows": 23,
+   "anvil_w": 192.2222222222222,
+   "neck_w": 39.55555555555555,
+   "lower_w": 39.55555555555555,
+   "neck_over_anvil": 0.20578034682080926,
+   "lower_over_anvil": 0.20578034682080926,
+   "anvil_rise_over_width": 0.20289017341040463,
+   "top_flat_share": 0.19170984455958548,
+   "top_curvature": 0.033739492639829956,
+   "mirror_iou": 0.2896776193428394,
+   "rows": {
+    "anvil": 41,
+    "neck": 64,
+    "lower": 64
+   }
+  }
+ },
+ "SIDE": {
+  "area": 249403,
+  "perimeter": 4676,
+  "perim_over_sqrt_area": 9.363186326702799,
+  "components": 5,
+  "largest_frac": 0.9975628527449975,
+  "sil": {
+   "clipped_top": false,
+   "height": 643,
+   "anvil_offset_over_width": 0.06104520186976745,
+   "anvil_right_over_left": 1.3351223505867371,
+   "tower_rows": 152,
+   "anvil_w": 619.0,
+   "neck_w": 122.0,
+   "lower_w": 351.0,
+   "neck_over_anvil": 0.19709208400646203,
+   "lower_over_anvil": 0.567043618739903,
+   "anvil_rise_over_width": 0.35379644588045234,
+   "top_flat_share": 0.2310177705977383,
+   "top_curvature": 0.2087421896997822,
+   "mirror_iou": 0.7915448746562226,
+   "rows": {
+    "anvil": 219,
+    "neck": 371,
+    "lower": 530
+   }
+  }
+ },
+ "LATERAL": {
+  "area": 127461,
+  "perimeter": 3866,
+  "perim_over_sqrt_area": 10.82862187853977,
+  "components": 5,
+  "largest_frac": 0.9966081467290601,
+  "sil": {
+   "clipped_top": false,
+   "height": 417,
+   "anvil_offset_over_width": -0.05673516242888674,
+   "anvil_right_over_left": 0.7290960760738878,
+   "tower_rows": 287,
+   "anvil_w": 477.0,
+   "neck_w": 64.55555555555556,
+   "lower_w": 64.55555555555556,
+   "neck_over_anvil": 0.1353365944560913,
+   "lower_over_anvil": 0.1353365944560913,
+   "anvil_rise_over_width": 0.22851153039832284,
+   "top_flat_share": 0.1719077568134172,
+   "top_curvature": 0.10009154113166964,
+   "mirror_iou": 0.8368025440878867,
+   "rows": {
+    "anvil": 109,
+    "neck": 396,
+    "lower": 396
+   }
+  }
+ },
+ "ABOVE": {
+  "area": 685200,
+  "perimeter": 4751,
+  "perim_over_sqrt_area": 5.739530304338427,
+  "components": 1,
+  "largest_frac": 0.9998831311502232,
+  "ellipse_err": 0.06447763757826747,
+  "minor_over_major": 0.6340276364680694
+ },
+ "LOWSIDE": {
+  "area": 304013,
+  "perimeter": 5111,
+  "perim_over_sqrt_area": 9.269574589758625,
+  "components": 2,
+  "largest_frac": 0.9987768147203114,
+  "sil": {
+   "clipped_top": true,
+   "height": 698,
+   "anvil_offset_over_width": -0.09122297359136597,
+   "anvil_right_over_left": 0.615410331068694,
+   "tower_rows": 451,
+   "anvil_w": 577.4444444444445,
+   "neck_w": 183.44444444444443,
+   "lower_w": 189.44444444444446,
+   "neck_over_anvil": 0.31768327881470076,
+   "lower_over_anvil": 0.3280738887819896,
+   "anvil_rise_over_width": 0.3636713488551087,
+   "top_flat_share": 0.5632582322357019,
+   "top_curvature": 0.24900493351675926,
+   "mirror_iou": 0.7828064669687407,
+   "rows": {
+    "anvil": 210,
+    "neck": 661,
+    "lower": 667
+   }
+  }
+ },
+ "NEAREDGE": {
+  "area": 845496,
+  "perimeter": 8133,
+  "perim_over_sqrt_area": 8.844942086353234,
+  "components": 10,
+  "largest_frac": 0.9939082645175327,
+  "sil": {
+   "clipped_top": true,
+   "height": 899,
+   "anvil_offset_over_width": 0.06915477871916934,
+   "anvil_right_over_left": 1.416586139018841,
+   "tower_rows": 388,
+   "anvil_w": 1600.0000000000002,
+   "neck_w": 243.33333333333331,
+   "lower_w": 998.5555555555554,
+   "neck_over_anvil": 0.1520833333333333,
+   "lower_over_anvil": 0.6240972222222221,
+   "anvil_rise_over_width": 0.0024999999999999996,
+   "top_flat_share": 1.0,
+   "top_curvature": 0.0,
+   "mirror_iou": 0.7911591279385523,
+   "rows": {
+    "anvil": 4,
+    "neck": 392,
+    "lower": 843
+   }
+  }
+ },
+ "TOWERLOW": {
+  "area": 95705,
+  "perimeter": 3309,
+  "perim_over_sqrt_area": 10.696198485180446,
+  "components": 6,
+  "largest_frac": 0.9896368726756091,
+  "sil": {
+   "clipped_top": false,
+   "height": 692,
+   "anvil_offset_over_width": 0.4919789429278463,
+   "anvil_right_over_left": 511.7258064516129,
+   "tower_rows": 224,
+   "anvil_w": 346.1111111111111,
+   "neck_w": 0.0,
+   "lower_w": 7.666666666666667,
+   "neck_over_anvil": 0.0,
+   "lower_over_anvil": 0.02215088282504013,
+   "anvil_rise_over_width": 0.43627608346709473,
+   "top_flat_share": 0.3112391930835735,
+   "top_curvature": 0.31725834811504405,
+   "mirror_iou": 0.7647058823529411,
+   "rows": {
+    "anvil": 151,
+    "neck": 375,
+    "lower": 522
+   }
+  }
+ }
+}
