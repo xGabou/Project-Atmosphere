@@ -56,6 +56,7 @@ final class StormFieldSampler {
     private final double[] domain = new double[3];
     private final double[] texel = new double[4];
     private final double[] fields = new double[2];
+    private final StormBodyEvaluator.Sample bodySample = new StormBodyEvaluator.Sample();
 
     private StormFieldSampler(
             Composition composition,
@@ -110,8 +111,11 @@ final class StormFieldSampler {
                 : StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
     }
 
+    /** T240. The production storm geometry: the continuous body's coverage. */
     double coverageAt(StormLobeDescriptor[] lobes, double x, double y, double z) {
-        return StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+        StormBodyEvaluator.Sample sample = bodySample;
+        return StormBodyEvaluator.nearestAt(lobes, x, y, z, sample)
+                ? StormBodyEvaluator.coverage(sample) : 0.0D;
     }
 
     /** Strength chosen by the same smooth unions as the descriptor envelope. */
@@ -243,13 +247,25 @@ final class StormFieldSampler {
                 );
     }
 
+    /**
+     * T240. The production composition over the continuous storm body - what
+     * camera density and whiteout read, so they agree with the rendered body:
+     * the body's coverage, strength and interior fill, then the same stage 5 / 6.
+     */
     double densityAt(StormLobeDescriptor[] lobes, double x, double y, double z) {
-        double coverage = coverageAt(lobes, x, y, z);
+        StormBodyEvaluator.Sample sample = bodySample;
+        if (!StormBodyEvaluator.nearestAt(lobes, x, y, z, sample)) {
+            return 0.0D;
+        }
+        double coverage = StormBodyEvaluator.coverage(sample);
         if (coverage <= 0.0D) {
             return 0.0D;
         }
         noiseFieldsAt(x, y, z, fields);
-        return densityFromFields(coverage,
-                StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z), fields[0], fields[1]);
+        if (composition == Composition.AUDITED_PHASE_4R) {
+            return densityFromFields(coverage, sample.strength, fields[0], fields[1]);
+        }
+        return StormDensityModel.finalDensity(
+                coverage, sample.strength, fields[0], fields[1], sample.interiorFill);
     }
 }

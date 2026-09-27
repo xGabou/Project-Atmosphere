@@ -7642,8 +7642,10 @@ public final class StormVolumetricGeometrySandbox {
         UUID storm = group(790);
         StormLobeDescriptor selected = descriptor(storm, 0, 1, StormLobeDescriptor.Role.BASE,
                 0.0D, 0.0D, 220.0F, 300.0F, 80.0F, 64.0F).withGroupSlot(0);
+        // T240: the live buffer is the whole descriptor texture - descriptor
+        // rows plus the continuous-body skeleton rows the refresh derives.
         float[] destination = new float[
-                StormLobeSpatialIndex.MAX_LOBES * StormLobeDescriptor.FLOATS_PER_DESCRIPTOR
+                StormLobeSpatialIndex.DESCRIPTOR_FLOATS
         ];
         Arrays.fill(destination, Float.NaN);
         try {

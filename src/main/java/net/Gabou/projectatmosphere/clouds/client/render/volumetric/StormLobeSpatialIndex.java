@@ -18,7 +18,15 @@ public final class StormLobeSpatialIndex {
     public static final int CANDIDATES_PER_TILE = 8;
     public static final int PACK_BASE = MAX_LOBES + 1;
     public static final int DESCRIPTOR_WIDTH = StormLobeDescriptor.TEXELS_PER_DESCRIPTOR;
-    public static final int DESCRIPTOR_HEIGHT = MAX_LOBES;
+    /**
+     * T240. The descriptor texture carries, after the MAX_LOBES descriptor
+     * rows, two rows per group slot holding that storm's continuous-body
+     * skeleton ({@link StormBodySkeleton}).
+     */
+    public static final int DESCRIPTOR_HEIGHT = MAX_LOBES
+            + StormBodySkeleton.ROWS_PER_GROUP * MAX_GROUPS;
+    /** Floats in the full descriptor texture (descriptor rows + skeleton rows). */
+    public static final int DESCRIPTOR_FLOATS = DESCRIPTOR_HEIGHT * StormLobeDescriptor.FLOATS_PER_DESCRIPTOR;
 
     private static final long FNV_OFFSET = 0xcbf29ce484222325L;
     private static final long FNV_PRIME = 0x100000001b3L;
@@ -172,15 +180,17 @@ public final class StormLobeSpatialIndex {
         }
 
         StormLobeDescriptor[] selectedArray = selected.toArray(StormLobeDescriptor[]::new);
-        float[] descriptorTexels = new float[MAX_LOBES * StormLobeDescriptor.FLOATS_PER_DESCRIPTOR];
+        float[] descriptorTexels = new float[DESCRIPTOR_FLOATS];
         for (int index = 0; index < selectedArray.length; index++) {
             selectedArray[index].writeTexels(
                     descriptorTexels,
                     index * StormLobeDescriptor.FLOATS_PER_DESCRIPTOR
             );
         }
+        StormBodySkeleton.writeAll(descriptorTexels, selectedArray.length);
 
-        GridBuild grid = buildGrid(selectedArray, input.originX(), input.originZ(), input.extent());
+        GridBuild grid = buildGrid(selectedArray, descriptorTexels,
+                input.originX(), input.originZ(), input.extent());
         return new StormGeometryBuild(
                 input,
                 selectedArray,
@@ -208,6 +218,7 @@ public final class StormLobeSpatialIndex {
 
     private static GridBuild buildGrid(
             StormLobeDescriptor[] descriptors,
+            float[] descriptorTexels,
             double originX,
             double originZ,
             float extent
@@ -252,6 +263,17 @@ public final class StormLobeSpatialIndex {
             }
             if (witness < 0) {
                 continue;
+            }
+            // T240. The continuous body's own AABB (band and pad included) is
+            // unioned in: its deck reaches 1.2 R downwind of an anvil lobe,
+            // past the lobes' 1.24 R tile bound.
+            int body = StormBodySkeleton.offset(groupSlot);
+            if (descriptorTexels[body + StormBodySkeleton.VALID] > 0.0F) {
+                float pad = halfDiagonal + tileWorld;
+                minXWorld = Math.min(minXWorld, descriptorTexels[body + StormBodySkeleton.AABB_MIN_X] - pad);
+                maxXWorld = Math.max(maxXWorld, descriptorTexels[body + StormBodySkeleton.AABB_MAX_X] + pad);
+                minZWorld = Math.min(minZWorld, descriptorTexels[body + StormBodySkeleton.AABB_MIN_Z] - pad);
+                maxZWorld = Math.max(maxZWorld, descriptorTexels[body + StormBodySkeleton.AABB_MAX_Z] + pad);
             }
             int minX = tileCoordinate(minXWorld, originX, tileWorld);
             int maxX = tileCoordinate(maxXWorld, originX, tileWorld);

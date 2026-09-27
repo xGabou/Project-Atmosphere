@@ -4377,6 +4377,19 @@ implementation, while visual polish remains independently active.
   program; FINAL / rain pass / gate build assembly identical). Next: **T240 continuous-body production
   integration** (CPU skeleton, FINAL, field bounds, CPU mirror, re-derived bands, macro layering,
   motion, build-vs-build budget). [SC-005, SC-016, SC-021]
+- [X] T240 [QUALITY] [US1] Continuous storm body in production. **KEEP - production change; see
+  `validation/t240-continuous-body-production.md`.** V2 template is production
+  (`PRODUCTION_STORM_TEMPLATE = 2`); a per-storm skeleton (`StormBodySkeleton`, 60 floats) is derived on
+  the CPU from the group's descriptors and uploaded as 3 extra descriptor-texture rows per group; FINAL
+  evaluates one continuous SDF (`stormBodyGroupField`, mirrored by `StormBodyEvaluator`) - deck footprint
+  a disc union (exact distance; T239's box overestimated past the deck ends), Lipschitz 1.03/1.59
+  (published 1.4/1.7), AABB early-out, AABB-based tiles and segment test, field built from the body,
+  camera density on the body, `PaBodyMacro = 2` (T213 envelope + T230 relief). Legacy lobe union is
+  monolith-only (`PA_LEGACY_LOBE_UNION` stripped from lean programs). T127/T133 guards pinned to template
+  0; new `StormBodyAnatomySandbox` bands. Same-storm A/B on 3 storms reproduces T239; paired ABAB:
+  SIDE 7.63 -> 5.60 ms, PVN 8.07 -> 4.44 ms; motion alpha flicker -58%, low-coverage luma confounded by
+  the lobe-sized route. Next: **T241 storm identity + body-derived capture poses / route**.
+  [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

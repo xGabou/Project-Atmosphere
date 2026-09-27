@@ -354,12 +354,31 @@ public final class VolumetricCloudDebugConfig {
         return t136ConstantLighting ? 1 : diagnosticLightingMode;
     }
 
-    /** T239 (experimental): the storm geometry uploaded as PaStormGeometry. */
-    private static volatile int stormGeometryMode;
+    /** T240. The storm geometry FINAL bakes: the continuous storm body. */
+    public static final int PRODUCTION_STORM_GEOMETRY = 1;
+    /**
+     * T240. The macro layering FINAL bakes on the continuous body: 2, the
+     * T213 envelope and the T230 lower-deck relief - production's existing
+     * large-scale variation, which also drives T231's relief shading.
+     */
+    public static final int PRODUCTION_BODY_MACRO = 2;
+    /** The storm geometry uploaded as PaStormGeometry (monolith A/B only). */
+    private static volatile int stormGeometryMode = PRODUCTION_STORM_GEOMETRY;
+    /** PaBodyMacro: 0 none, 1 T213 macro envelope, 2 envelope + T230 lower-deck relief. */
+    private static volatile int bodyMacroMode = PRODUCTION_BODY_MACRO;
+
+    public static int bodyMacroMode() {
+        return bodyMacroMode;
+    }
+
+    public static void setBodyMacroMode(int mode) {
+        bodyMacroMode = Math.max(0, Math.min(2, mode));
+    }
 
     /**
-     * T239 (experimental). PaStormGeometry: 0 the role-lobe union (production),
-     * 1 the continuous storm body. Any value but 0 takes the monolith.
+     * T240. PaStormGeometry: 0 the legacy role-lobe union (monolith A/B only),
+     * 1 the continuous storm body (production). Any value but production takes
+     * the monolith.
      */
     public static int stormGeometryMode() {
         return stormGeometryMode;
@@ -737,6 +756,8 @@ public final class VolumetricCloudDebugConfig {
      * explicitly or one diagnostic can silently contaminate a later world.
      */
     public static void resetDefaults() {
+        stormGeometryMode = PRODUCTION_STORM_GEOMETRY; // T240
+        bodyMacroMode = PRODUCTION_BODY_MACRO; // T240
         depthCompositeEnabled = true;
         sceneRayLimitEnabled = true;
         coveragePretestEnabled = false;

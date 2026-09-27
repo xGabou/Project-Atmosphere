@@ -305,7 +305,12 @@ def leanFinalConstants = [
         // (0.7 ms at SIDE, build-vs-build - a cost no same-build uniform A/B
         // can see). Any other value is an arm and takes the monolith.
         'uniform int PaLowerDeckRelief;'           : 'const int PaLowerDeckRelief = 1;',
-        'uniform int PaStormGeometry;'             : 'const int PaStormGeometry = 0;', // T239: continuous body off
+        // T240. The continuous storm body is the storm geometry; the legacy
+        // lobe union is monolith-only (PA_LEGACY_LOBE_UNION, stripped below).
+        'uniform int PaStormGeometry;'             : 'const int PaStormGeometry = 1;',
+        // T240: the body keeps production's macro layering (T213 envelope +
+        // T230 relief, and so T231's relief shading).
+        'uniform int PaBodyMacro;'                 : 'const int PaBodyMacro = 2;',
         'uniform float PaReliefShade;'             : 'const float PaReliefShade = 0.12;',
         'uniform int PaRayTraceMode;'              : 'const int PaRayTraceMode = 0;',
         'uniform vec2 PaRayTraceNdc;'              : 'const vec2 PaRayTraceNdc = vec2(0.0);',
@@ -377,8 +382,8 @@ def leanFinalRemovedSamplers = ['OracleIntervalSampler']
 // it behind the live pass the renderer never uploads as 2. The mechanism
 // stays for the next monolith-only measurement, with that lesson attached:
 // re-time FINAL before trusting that removing dead code is free.
-// T239: the experimental continuous storm body is monolith-only.
-def leanFinalStrippedDefines = ['PA_CONTINUOUS_STORM_BODY']
+// T240: the legacy role-lobe union is monolith-only (same-storm A/B).
+def leanFinalStrippedDefines = ['PA_LEGACY_LOBE_UNION']
 
 // The uniform names the lean program no longer declares. Minecraft binds every
 // uniform named in the JSON, so the generated JSON must drop them; the renderer

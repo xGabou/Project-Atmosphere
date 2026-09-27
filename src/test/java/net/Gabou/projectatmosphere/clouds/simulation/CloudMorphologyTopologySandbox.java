@@ -68,8 +68,20 @@ public final class CloudMorphologyTopologySandbox {
         validatePuffTopology("cumulus_mediocris", mediocris, 2.20D);
         validateStructuredPuffProfileOrdering();
         validatePuffRetargetPreservesRadiusRatios();
-        validateStormAnvilTopology();
-        validateStormPhysicalScale();
+        // T240. The T127 / T133 / T098 lobe-template guards describe the
+        // legacy role-lobe union (template 0) - still spawnable for monolith
+        // A/B - so they run pinned to it. The production template (V2) is the
+        // continuous body's skeleton; its guards are StormBodyAnatomySandbox,
+        // measured on the body itself.
+        int t240PreviousTemplate = CloudMorphologyGenerators.stormTemplateVersion;
+        try {
+            CloudMorphologyGenerators.stormTemplateVersion = 0;
+            validateStormAnvilTopology();
+            validateStormPhysicalScale();
+        } finally {
+            CloudMorphologyGenerators.stormTemplateVersion = t240PreviousTemplate;
+        }
+        StormBodyAnatomySandbox.validate();
 
         CloudMorphologyGenerators.PuffTopologyParameters puff =
                 CloudMorphologyGenerators.puffTopologyParameters();

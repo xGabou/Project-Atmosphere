@@ -38,8 +38,7 @@ public final class StormGeometryBuild {
             long buildNanos
     ) {
         int selectedCount = selectedDescriptors == null ? 0 : selectedDescriptors.length;
-        int descriptorFloatCount = StormLobeSpatialIndex.MAX_LOBES
-                * StormLobeDescriptor.FLOATS_PER_DESCRIPTOR;
+        int descriptorFloatCount = StormLobeSpatialIndex.DESCRIPTOR_FLOATS;
         int candidateFloatCount = StormLobeSpatialIndex.GRID_SIZE
                 * StormLobeSpatialIndex.GRID_SIZE * 4;
         if (selectedCount > StormLobeSpatialIndex.MAX_LOBES

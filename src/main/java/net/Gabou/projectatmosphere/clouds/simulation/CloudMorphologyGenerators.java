@@ -93,9 +93,13 @@ final class CloudMorphologyGenerators {
      * ball - the mushroom T236 attributed), 1 the T237 layout (a flatter
      * two-lobe base, a column-scale tower that spans from inside the base
      * into the anvil, and varied anvil lobes placed downwind along +X, the
-     * axis the anvil row has always used).
+     * axis the anvil row has always used), 2 its T237 V2 revision.
+     *
+     * <p>T240: production is V2. It is the skeleton the continuous storm body
+     * (T239) is built from - a directional layout whose TOWER pair gives the
+     * updraft axis and whose ANVIL row gives the downwind deck.
      */
-    static final int PRODUCTION_STORM_TEMPLATE = 0;
+    static final int PRODUCTION_STORM_TEMPLATE = 2;
     static volatile int stormTemplateVersion = PRODUCTION_STORM_TEMPLATE;
     // T237 V1 anvil row: along-wind position (x groupRadius), cross offset
     // (x groupRadius) and radius multiplier, upwind to downwind.

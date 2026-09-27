@@ -22,10 +22,10 @@ public final class StormGeometryBuildCoordinator {
             StormLobeSpatialIndex.GRID_SIZE * StormLobeSpatialIndex.GRID_SIZE * 4
     );
     private static final FloatBuffer DESCRIPTOR_UPLOAD = BufferUtils.createFloatBuffer(
-            StormLobeSpatialIndex.MAX_LOBES * StormLobeDescriptor.FLOATS_PER_DESCRIPTOR
+            StormLobeSpatialIndex.DESCRIPTOR_FLOATS
     );
     private static final float[] LIVE_DESCRIPTOR_TEXELS = new float[
-            StormLobeSpatialIndex.MAX_LOBES * StormLobeDescriptor.FLOATS_PER_DESCRIPTOR
+            StormLobeSpatialIndex.DESCRIPTOR_FLOATS
     ];
     private static final VolumetricRenderCell[] LIVE_DESCRIPTOR_MATCHES =
             new VolumetricRenderCell[StormLobeSpatialIndex.MAX_LOBES];
@@ -395,6 +395,10 @@ public final class StormGeometryBuildCoordinator {
                 selected.length * StormLobeDescriptor.FLOATS_PER_DESCRIPTOR,
                 destination.length - selected.length * StormLobeDescriptor.FLOATS_PER_DESCRIPTOR
         );
+        // T240. The continuous-body skeleton rows follow from the live
+        // descriptor rows just written (a pure function of them, so the
+        // descriptor signature already covers them).
+        StormBodySkeleton.writeAll(destination, selected.length);
         return signature;
     }
 
