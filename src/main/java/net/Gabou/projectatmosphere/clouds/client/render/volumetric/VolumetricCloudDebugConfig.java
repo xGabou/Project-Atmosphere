@@ -354,6 +354,21 @@ public final class VolumetricCloudDebugConfig {
         return t136ConstantLighting ? 1 : diagnosticLightingMode;
     }
 
+    /** T239 (experimental): the storm geometry uploaded as PaStormGeometry. */
+    private static volatile int stormGeometryMode;
+
+    /**
+     * T239 (experimental). PaStormGeometry: 0 the role-lobe union (production),
+     * 1 the continuous storm body. Any value but 0 takes the monolith.
+     */
+    public static int stormGeometryMode() {
+        return stormGeometryMode;
+    }
+
+    public static void setStormGeometryMode(int mode) {
+        stormGeometryMode = mode;
+    }
+
     public static void setDiagnosticLightingMode(int mode) {
         diagnosticLightingMode = Math.max(0, Math.min(18, mode));
     }

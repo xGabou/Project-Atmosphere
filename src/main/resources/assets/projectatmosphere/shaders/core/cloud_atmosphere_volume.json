@@ -107,6 +107,7 @@
     { "name": "PaLowerBodyFill", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaDeepScatter", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaLowerDeckRelief", "type": "int", "count": 1, "values": [ 1 ] },
+    { "name": "PaStormGeometry", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaReliefShade", "type": "float", "count": 1, "values": [ 0.12 ] },
     { "name": "DensityMul", "type": "float", "count": 1, "values": [ 1.0 ] },
     { "name": "CoverageMul", "type": "float", "count": 1, "values": [ 1.0 ] },

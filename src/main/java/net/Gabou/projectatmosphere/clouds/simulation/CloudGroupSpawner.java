@@ -20,6 +20,15 @@ public final class CloudGroupSpawner {
     private CloudGroupSpawner() {
     }
 
+    /**
+     * T237. Re-lays the live storms out with a storm template version (0 the
+     * T134/T127 layout, 1 the T237 layout) for the same-storm capture A/B.
+     * Server thread only.
+     */
+    public static String relayoutStorms(ServerLevel level, int version) {
+        return CloudMorphologyGenerators.relayoutStormRegions(level, version);
+    }
+
     public static @Nullable CloudRegionState spawnRequestedCloud(ServerLevel level, BlockPos pos, String cloudTypeId) {
         if (level == null || pos == null || !level.dimension().equals(Level.OVERWORLD)) {
             return null;

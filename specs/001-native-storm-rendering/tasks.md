@@ -4364,6 +4364,19 @@ implementation, while visual polish remains independently active.
   ragged stalk; the ball remains. Production's visible tower is its 1.25 root bulge. `radii.y *= 1.56`
   is the anvil's short HORIZONTAL axis (T237 said vertical). Next: **T239 new storm geometry basis**
   (one continuous storm field, not role lobes). [SC-005, SC-016, SC-021]
+- [X] T239 [QUALITY] [US1] Continuous storm body. **KEEP as the accepted shape basis - not in
+  production; see `validation/t239-continuous-storm-body.md`.** Task 1: the BASE+CORE+TOWER overlap
+  fill exists (`stormCoverageLowerBound` continuity fill when `(roleMask & 7) == 7`) but only lifts
+  the interior floor (mean +2-5%, coverage >= 0.82 only) - a narrow lobe is wispy because its soft
+  band scales with its radius. One continuous SDF per storm from the descriptors as skeleton (V2
+  layout): flat-bottomed superellipse base, a leaning column Rt*(1.3 / 1.0 / 1.25), a downwind deck
+  sheet (fan width, 0.85 -> 0.40 thickness, flat top), smooth-min joins, a fixed 24-48-block band and
+  explicit interior fill. V2 (one revision) on 3 storms: tower rows 3-9% -> 34-37% at near-constant
+  width, base h/w 0.64-0.70 -> 0.38-0.40, anvil thickness/width 0.41-0.46 -> 0.28-0.31, one component
+  in every view, fan footprint. Monolith-only (`PA_CONTINUOUS_STORM_BODY` stripped from every lean
+  program; FINAL / rain pass / gate build assembly identical). Next: **T240 continuous-body production
+  integration** (CPU skeleton, FINAL, field bounds, CPU mirror, re-derived bands, macro layering,
+  motion, build-vs-build budget). [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

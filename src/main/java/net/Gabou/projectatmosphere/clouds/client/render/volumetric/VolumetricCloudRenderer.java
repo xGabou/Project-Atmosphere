@@ -705,6 +705,7 @@ public final class VolumetricCloudRenderer {
         }
         shader.safeGetUniform("MaxPrecipitation").set(paMaxPrecipitation);
         shader.safeGetUniform("PaLowerDeckRelief").set(VolumetricCloudDebugConfig.lowerDeckReliefMode());
+        shader.safeGetUniform("PaStormGeometry").set(VolumetricCloudDebugConfig.stormGeometryMode());
         shader.safeGetUniform("PaReliefShade").set(VolumetricCloudDebugConfig.reliefShadeStrength());
         // T224. Where the shader's cameraStartsInsideSlab turns on: the ray
         // volume's floor, SlabBaseY lowered by precipitationRayPadding(). Not
@@ -1331,6 +1332,9 @@ public final class VolumetricCloudRenderer {
                 && !VolumetricCloudDebugConfig.t098LegacyHitDepth()
                 && !VolumetricCloudDebugConfig.t098LegacyFinePromotion()
                 && VolumetricCloudDebugConfig.diagnosticLightingMode() == 0
+                // T239. Every lean program bakes the lobe union; the continuous
+                // body is an experimental arm and takes the monolith.
+                && VolumetricCloudDebugConfig.stormGeometryMode() == 0
                 // T232. FINAL bakes T231's relief and shade; any other value
                 // is an arm and takes the monolith, where they are live.
                 && VolumetricCloudDebugConfig.lowerDeckReliefMode()

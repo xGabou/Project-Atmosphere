@@ -5,6 +5,10 @@
 #extension GL_ARB_shader_bit_encoding : enable
 #define PA_BIT_ENCODING 1
 #endif
+// T239. The experimental continuous storm body (PaStormGeometry) exists in
+// the monolith only: build.gradle strips this define from every lean program,
+// so FINAL and the rain programs compile exactly as without it.
+#define PA_CONTINUOUS_STORM_BODY 1
 
 #moj_import <projectatmosphere:cloud_storm_tower_union.glsl>
 #moj_import <projectatmosphere:cloud_ray_origin_jitter.glsl>
@@ -1456,6 +1460,12 @@ uniform int PaDiagnosticLightingMode;
 // PaReliefShade: the lower-anvil form shading, per macro sd, that lets that
 // relief show - the shadowed lighting has no other term that reads shape.
 uniform int PaLowerDeckRelief;
+#ifdef PA_CONTINUOUS_STORM_BODY
+// T239 (experimental). Storm geometry: 0 the role-lobe union (production), 1
+// the continuous storm body. Monolith only: PA_CONTINUOUS_STORM_BODY is a
+// leanFinalStrippedDefines entry, so no lean program contains any of it.
+uniform int PaStormGeometry;
+#endif
 uniform float PaReliefShade;
 uniform int PaRayTraceMode;
 uniform vec2 PaRayTraceNdc;
@@ -3473,6 +3483,261 @@ void directStormGroupField(
     }
 }
 
+#ifdef PA_CONTINUOUS_STORM_BODY
+// =====================================================================
+// T239 (experimental, off in production). The continuous storm body.
+//
+// One continuous SDF per storm group instead of the ten-lobe union. The
+// group's descriptors are read only as skeleton data: the storm floor, the
+// base footprint, the updraft axis (tower lobe centres) and the deck extents
+// (anvil lobes). Frame: origin at the lower updraft, u along the wind (tower
+// centroid -> anvil centroid), c across it, y up.
+//
+//   base    flat-bottomed broad slab (0.75 of the base lobes' height), a
+//           superellipse footprint (n = 3) over the base lobes' separate
+//           upwind/downwind and left/right extents, gentle taper;
+//   updraft one column along the tower axis, radius Rt * f(h): 1.3 at the
+//           base junction, 1.0 through the middle, 1.3 into the deck;
+//   deck    one flat-topped sheet over the along-wind coordinate: compact
+//           upwind root, 1.2 R downwind reach, thickness 0.85 -> 0.40 of the
+//           deck span, cross width fanning to the full lobe extent by
+//           mid-deck, rounded root and tip;
+//   joins   smooth-min base|column and column|deck (k 0.6 Rt).
+//
+// Needs a directional skeleton (the T237 V2 layout); on the production
+// layout the anvil lobes surround the tower and the wind axis is weak.
+// T239 accepted the shape; production integration is T240.
+//
+// The edge band is a fixed physical width (T239 Task 1: a band proportional
+// to lobe radius is what leaves a narrow lobe all edge), and the interior
+// fill is owned explicitly: base, updraft and transition interiors take the
+// structural-continuity fill, the deck the strength fill.
+// =====================================================================
+int paContinuousRegion = 0;
+bool paContinuousInteriorFill = false;
+
+float paContinuousSmin(float a, float b, float k, out float weightA) {
+    weightA = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, weightA) - k * weightA * (1.0 - weightA);
+}
+
+void paContinuousStormGroupField(
+        vec3 p,
+        int witnessIndex,
+        int groupSlot,
+        out float groupDistance,
+        out float groupMinimumRadius,
+        out float groupStrength,
+        out float groupSoftness,
+        out float groupHeight01,
+        out int groupActiveRoleMask,
+        out bool ownsGroup,
+        out float groupMinClearance) {
+    int firstIndex = stormGroupFirstIndex(witnessIndex, groupSlot);
+    int endIndex = stormGroupEndIndex(witnessIndex, groupSlot);
+    float floorY = 1.0e9;
+    float baseTop = -1.0e9;
+    float deckBottom = 1.0e9;
+    float deckTop = -1.0e9;
+    vec2 towerLo = vec2(0.0);
+    vec2 towerHi = vec2(0.0);
+    float towerLoY = 1.0e9;
+    float towerHiY = -1.0e9;
+    float towerRadiusSum = 0.0;
+    vec2 anvilSum = vec2(0.0);
+    float anvilWeight = 0.0;
+    float baseStrength = 0.0;
+    float towerStrength = 0.0;
+    float anvilStrength = 0.0;
+    int baseCount = 0;
+    int towerCount = 0;
+    int anvilCount = 0;
+    ownsGroup = false;
+    for (int index = firstIndex; index < MAX_STORM_LOBES; index++) {
+        if (index >= endIndex) {
+            break;
+        }
+        vec4 t0 = stormDescriptorTexel(index, 0);
+        vec4 t1 = stormDescriptorTexel(index, 1);
+        vec4 t2 = stormDescriptorTexel(index, 2);
+        vec4 t3 = stormDescriptorTexel(index, 3);
+        if (t3.w < -0.5) {
+            continue;
+        }
+        int packedTopology = int(floor(t3.w + 0.5));
+        int role = packedTopology - (packedTopology / 8) * 8;
+        vec2 ownershipCenter = t0.xy + t2.xy * 0.5;
+        float extentX = length(vec2(t1.x * t1.w, t1.y * t1.z));
+        float extentZ = length(vec2(t1.x * t1.z, t1.y * t1.w));
+        vec2 ownershipRadii = max(vec2(extentX, extentZ) * 1.85, vec2(1.0));
+        ownsGroup = ownsGroup || length((p.xz - ownershipCenter) / ownershipRadii) <= 1.0;
+        if (role == 0) {
+            floorY = min(floorY, t0.z);
+            baseTop = max(baseTop, t0.w);
+            baseStrength += saturate(t2.z);
+            baseCount++;
+        } else if (role == 2) {
+            float mid = 0.5 * (t0.z + t0.w);
+            if (mid < towerLoY) {
+                towerLoY = mid;
+                towerLo = t0.xy;
+            }
+            if (mid > towerHiY) {
+                towerHiY = mid;
+                towerHi = t0.xy;
+            }
+            towerRadiusSum += t1.x;
+            towerStrength += saturate(t2.z);
+            towerCount++;
+        } else if (role == 3) {
+            deckBottom = min(deckBottom, t0.z);
+            deckTop = max(deckTop, t0.w);
+            anvilSum += t0.xy * t1.x;
+            anvilWeight += t1.x;
+            anvilStrength += saturate(t2.z);
+            anvilCount++;
+        }
+    }
+    if (baseCount == 0 || towerCount == 0 || anvilCount == 0) {
+        directStormGroupField(p, witnessIndex, groupSlot, groupDistance, groupMinimumRadius,
+            groupStrength, groupSoftness, groupHeight01, groupActiveRoleMask, ownsGroup,
+            groupMinClearance);
+        return;
+    }
+    vec2 origin = towerLo;
+    vec2 anvilCentre = anvilSum / max(anvilWeight, 1.0);
+    vec2 windOffset = anvilCentre - 0.5 * (towerLo + towerHi);
+    vec2 wind = length(windOffset) > 1.0 ? normalize(windOffset) : vec2(1.0, 0.0);
+    vec2 crossDir = vec2(-wind.y, wind.x);
+
+    // Extents in the wind frame.
+    float baseUp = 1.0;
+    float baseDown = 1.0;
+    float baseLeft = 1.0;
+    float baseRight = 1.0;
+    float deckLo = 1.0e9;
+    float deckHi = -1.0e9;
+    float deckHalfWidth = 1.0;
+    float deckCrossSum = 0.0;
+    for (int index = firstIndex; index < MAX_STORM_LOBES; index++) {
+        if (index >= endIndex) {
+            break;
+        }
+        vec4 t0 = stormDescriptorTexel(index, 0);
+        vec4 t1 = stormDescriptorTexel(index, 1);
+        vec4 t3 = stormDescriptorTexel(index, 3);
+        if (t3.w < -0.5) {
+            continue;
+        }
+        int packedTopology = int(floor(t3.w + 0.5));
+        int role = packedTopology - (packedTopology / 8) * 8;
+        vec2 rel = t0.xy - origin;
+        float lw = dot(rel, wind);
+        float lc = dot(rel, crossDir);
+        if (role == 0) {
+            baseUp = max(baseUp, -(lw - t1.x));
+            baseDown = max(baseDown, lw + t1.x);
+            baseLeft = max(baseLeft, -(lc - t1.y));
+            baseRight = max(baseRight, lc + t1.y);
+        } else if (role == 3) {
+            deckLo = min(deckLo, lw - 0.6 * t1.x);
+            deckHi = max(deckHi, lw + 1.2 * t1.x);
+            deckHalfWidth = max(deckHalfWidth, abs(lc) + 1.4 * t1.y);
+            deckCrossSum += lc * t1.x;
+        }
+    }
+    float deckCrossMean = deckCrossSum / max(anvilWeight, 1.0);
+
+    vec2 rel = p.xz - origin;
+    float w = dot(rel, wind);
+    float c = dot(rel, crossDir);
+    float towerRadius = 0.62 * towerRadiusSum / float(towerCount);
+
+    // Base: broad, flat-bottomed, gently tapered slab.
+    float baseHeight = max(baseTop - floorY, 1.0) * 0.75;
+    float baseT = clamp((p.y - floorY) / baseHeight, 0.0, 1.0);
+    float baseScale = 1.0 - 0.20 * baseT * baseT;
+    float extentW = w > 0.0 ? baseDown : baseUp;
+    float extentC = c > 0.0 ? baseRight : baseLeft;
+    vec2 q = abs(vec2(w / extentW, c / extentC));
+    float superRadius = pow(q.x * q.x * q.x + q.y * q.y * q.y, 1.0 / 3.0);
+    float baseH = (superRadius - baseScale) * min(extentW, extentC);
+    float baseV = max(floorY - p.y, p.y - (floorY + baseHeight));
+    float baseRound = 0.18 * baseHeight;
+    vec2 baseD = vec2(baseH, baseV) + baseRound;
+    float dBase = length(max(baseD, 0.0)) + min(max(baseD.x, baseD.y), 0.0) - baseRound;
+
+    // Updraft column.
+    float deckMid = 0.5 * (deckBottom + deckTop);
+    float axisT = clamp((p.y - towerLoY) / max(towerHiY - towerLoY, 1.0), 0.0, 1.0);
+    vec2 axis = mix(towerLo, towerHi, axisT);
+    float baseCrown = floorY + baseHeight;
+    float columnT = (p.y - baseCrown) / max(deckBottom - baseCrown, 1.0);
+    float columnScale = 1.0
+        + 0.30 * (1.0 - smoothstep(-0.4, 0.25, columnT))
+        + 0.30 * smoothstep(0.5, 1.2, columnT);
+    float dColumn = max(length(p.xz - axis) - towerRadius * columnScale,
+        max(floorY + 0.10 * baseHeight - p.y, p.y - deckMid));
+
+    // Deck sheet.
+    float deckLength = max(deckHi - deckLo, 1.0);
+    float ud = clamp((w - deckLo) / deckLength, 0.0, 1.0);
+    float deckSpan = max(deckTop - deckBottom, 20.0);
+    float thickness = deckSpan * (0.85 - 0.45 * ud);
+    float top = deckTop - 0.05 * deckSpan * ud;
+    float bottom = top - thickness;
+    float halfWidth = mix(1.3 * towerRadius, deckHalfWidth, smoothstep(0.0, 0.45, ud));
+    float tip = smoothstep(0.78, 1.0, ud);
+    float root = 1.0 - smoothstep(0.0, 0.15, ud);
+    halfWidth *= sqrt(max(1.0 - 0.85 * tip * tip, 0.0)) * sqrt(max(1.0 - 0.6 * root * root, 0.0));
+    float centreLine = deckCrossMean * ud;
+    vec3 deckD = vec3(
+        max(deckLo - w, w - deckHi),
+        abs(c - centreLine) - halfWidth,
+        max(bottom - p.y, p.y - top));
+    float deckRound = min(0.20 * thickness, 20.0);
+    deckD += deckRound;
+    float dDeck = length(max(deckD, 0.0)) + min(max(deckD.x, max(deckD.y, deckD.z)), 0.0) - deckRound;
+
+    // Joins.
+    float baseWeight;
+    float lower = paContinuousSmin(dBase, dColumn, 0.6 * towerRadius, baseWeight);
+    float lowerWeight;
+    float d = paContinuousSmin(lower, dDeck, 0.6 * towerRadius, lowerWeight);
+
+    int region;
+    float heightUpdraft = saturate((p.y - floorY) / max(deckMid - floorY, 1.0));
+    float heightDeck = saturate((p.y - bottom) / max(thickness, 1.0));
+    if (lowerWeight < 0.15) {
+        region = 8;
+        groupHeight01 = heightDeck;
+    } else if (lowerWeight < 0.85) {
+        region = 2;
+        groupHeight01 = mix(heightDeck, heightUpdraft, lowerWeight);
+    } else if (baseWeight >= 0.5) {
+        region = 1;
+        groupHeight01 = baseT;
+    } else {
+        region = 4;
+        groupHeight01 = heightUpdraft;
+    }
+    float strengthBase = baseStrength / float(baseCount);
+    float strengthTower = towerStrength / float(towerCount);
+    float strengthAnvil = anvilStrength / float(anvilCount);
+    groupStrength = mix(strengthAnvil, mix(strengthTower, strengthBase, baseWeight), lowerWeight);
+    float softness = clamp(0.20 * towerRadius, 24.0, 48.0);
+    groupSoftness = mix(min(softness, 0.30 * thickness), softness, lowerWeight);
+    groupDistance = d;
+    groupMinimumRadius = towerRadius;
+    groupActiveRoleMask = d <= groupSoftness ? region : 0;
+    float clearance = d - groupSoftness;
+    groupMinClearance = clearance > 0.0 ? clearance * 0.8 : clearance;
+    paContinuousRegion = region;
+    paContinuousInteriorFill = region != 8 && d < -groupSoftness;
+}
+
+#endif
+
 // Candidate witnesses identify only bounded complete groups. Within each
 // admitted group the exact descriptor distance field and both smooth-union
 // levels stay authoritative; the candidate texture supplies no density values.
@@ -3644,11 +3909,27 @@ float directStormShape(
         int groupActiveRoleMask;
         bool ownsGroup;
         float groupMinClearance;
+#ifdef PA_CONTINUOUS_STORM_BODY
+        if (PaStormGeometry != 0) {
+            paContinuousStormGroupField(
+                p, witnessIndex, groupSlot,
+                groupDistance, groupMinimumRadius, groupStrength, groupSoftness,
+                groupHeight01, groupActiveRoleMask, ownsGroup, groupMinClearance
+            );
+        } else {
         directStormGroupField(
             p, witnessIndex, groupSlot,
             groupDistance, groupMinimumRadius, groupStrength, groupSoftness,
             groupHeight01, groupActiveRoleMask, ownsGroup, groupMinClearance
         );
+        }
+#else
+        directStormGroupField(
+            p, witnessIndex, groupSlot,
+            groupDistance, groupMinimumRadius, groupStrength, groupSoftness,
+            groupHeight01, groupActiveRoleMask, ownsGroup, groupMinClearance
+        );
+#endif
 #ifdef PA_ARM_CLEARANCE_FIRST_GROUP
         // T175 Task 4 oracle. Only the first entered group is allowed to
         // constrain the safe advance; every group's density contribution is
@@ -3801,7 +4082,11 @@ float directStormFinalDensity(
     }
     vec3 samplePos = p;
     samplePos.xz -= MaterialOffset;
+#ifdef PA_CONTINUOUS_STORM_BODY
+    if (PaMacroEnvelope != 0 && PaStormGeometry == 0 && coverage > 0.12 && coverage < 0.98) {
+#else
     if (PaMacroEnvelope != 0 && coverage > 0.12 && coverage < 0.98) {
+#endif
         // T212. Displace the envelope surface, not the density: inside the
         // +/-edgeWidth soft band this moves coverage both ways, so the
         // silhouette gains coherent protrusions and recesses that survive the
@@ -3848,7 +4133,12 @@ float shift = (deckWeight * blocksPerSd
     }
     float detailFbm;
     float carrier = stormBaseCarrierAt(samplePos, mipBias, detailFbm);
+#ifdef PA_CONTINUOUS_STORM_BODY
+    bool embeddedConvectiveOverlap = PaStormGeometry != 0
+        ? paContinuousInteriorFill : (activeRoleMask & 7) == 7;
+#else
     bool embeddedConvectiveOverlap = (activeRoleMask & 7) == 7;
+#endif
     float body = stormBody(
         coverage, envelopeStrength, stormBaseField(carrier), embeddedConvectiveOverlap);
     return max(body - (1.0 - detailFbm) * STORM_EROSION, 0.0);
@@ -3888,6 +4178,11 @@ bool stormGroupSegmentMayIntersect(
 }
 
 bool directStormSegmentMayIntersect(vec3 segmentStart, vec3 segmentEnd) {
+#ifdef PA_CONTINUOUS_STORM_BODY
+    if (PaStormGeometry != 0) {
+        return true; // T239: the continuous body is not bounded by lobe spheres
+    }
+#endif
     if (paWorkloadCaptureActive()) {
         paSegmentTestCalls++;
     }
@@ -6385,10 +6680,18 @@ float cloudDensityImpl(
     if (paStormFieldBuildNode) {
         // T198. The threshold the body is formed against at STAGE 5, from the
         // same walk: what the exact-noise light lookup needs from the node.
+#ifdef PA_CONTINUOUS_STORM_BODY
+        paLastStormLowerBound = directStormAvailable && directStormCoverage > 0.001
+            ? stormCoverageLowerBound(directStormCoverage, directStormStrength,
+                PaStormGeometry != 0 ? paContinuousInteriorFill
+                    : (directStormActiveRoleMask & 7) == 7)
+            : 1.0;
+#else
         paLastStormLowerBound = directStormAvailable && directStormCoverage > 0.001
             ? stormCoverageLowerBound(directStormCoverage, directStormStrength,
                 (directStormActiveRoleMask & 7) == 7)
             : 1.0;
+#endif
         paLastStormHeight01 = directStormHeight01;
     }
 
@@ -6612,7 +6915,12 @@ float cloudDensityImpl(
             // the descriptors themselves. Treating the envelope as the body is
             // what produced a smooth balloon that passed every
             // artifact-absence check.
+#ifdef PA_CONTINUOUS_STORM_BODY
+            bool embeddedConvectiveOverlap = PaStormGeometry != 0
+                ? paContinuousInteriorFill : (directStormActiveRoleMask & 7) == 7;
+#else
             bool embeddedConvectiveOverlap = (directStormActiveRoleMask & 7) == 7;
+#endif
             paLastRoleMask = float(directStormActiveRoleMask);
             paLastDescHeight = directStormHeight01;
             paLastMacroShiftBlocks = 0.0;
@@ -6620,7 +6928,11 @@ float cloudDensityImpl(
             paLastUnderSigned = 0.0;
             paLastLowerDeckWeight = stormLowerDeckWeight(
                 directStormHeight01, directStormActiveRoleMask);
+#ifdef PA_CONTINUOUS_STORM_BODY
+            if (PaMacroEnvelope != 0 && PaStormGeometry == 0 && cloud > 0.12 && cloud < 0.98) {
+#else
             if (PaMacroEnvelope != 0 && cloud > 0.12 && cloud < 0.98) {
+#endif
                 // T212. The macro band the body noise does not have. `cloud`
                 // is still the coverage envelope here, so shifting it moves
                 // the envelope SURFACE coherently over ~400 blocks instead of

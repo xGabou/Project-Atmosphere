@@ -305,6 +305,7 @@ def leanFinalConstants = [
         // (0.7 ms at SIDE, build-vs-build - a cost no same-build uniform A/B
         // can see). Any other value is an arm and takes the monolith.
         'uniform int PaLowerDeckRelief;'           : 'const int PaLowerDeckRelief = 1;',
+        'uniform int PaStormGeometry;'             : 'const int PaStormGeometry = 0;', // T239: continuous body off
         'uniform float PaReliefShade;'             : 'const float PaReliefShade = 0.12;',
         'uniform int PaRayTraceMode;'              : 'const int PaRayTraceMode = 0;',
         'uniform vec2 PaRayTraceNdc;'              : 'const vec2 PaRayTraceNdc = vec2(0.0);',
@@ -376,7 +377,8 @@ def leanFinalRemovedSamplers = ['OracleIntervalSampler']
 // it behind the live pass the renderer never uploads as 2. The mechanism
 // stays for the next monolith-only measurement, with that lesson attached:
 // re-time FINAL before trusting that removing dead code is free.
-def leanFinalStrippedDefines = []
+// T239: the experimental continuous storm body is monolith-only.
+def leanFinalStrippedDefines = ['PA_CONTINUOUS_STORM_BODY']
 
 // The uniform names the lean program no longer declares. Minecraft binds every
 // uniform named in the JSON, so the generated JSON must drop them; the renderer
@@ -1949,6 +1951,17 @@ tasks.register('stormDensityThresholdSandbox', JavaExec) {
     if (project.hasProperty('stormNoiseArgs')) {
         args project.property('stormNoiseArgs').toString().split(' ')
     }
+}
+
+// T239. Instrument: does the storm interior fill depend on BASE + CORE + TOWER
+// overlap? Real baked noise through the CPU composition mirror; not a gate.
+tasks.register('stormFillOverlapAudit', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T239: measures the overlap-dependent core fill (controlled + live storms).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormFillOverlapAudit'
+    workingDir = project.rootDir
 }
 
 tasks.register('stormMorphologySandbox', JavaExec) {
