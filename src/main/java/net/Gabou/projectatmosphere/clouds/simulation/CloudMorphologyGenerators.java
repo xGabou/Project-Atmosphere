@@ -1026,17 +1026,17 @@ final class CloudMorphologyGenerators {
         for (int middle = 0; middle < 2; middle++) {
             PuffLobeSpec lobe = createUpperPuffLobe(lobes.get(1 + (first + middle) % shoulderCount),
                     condensationBase, radius, random,
-                    0.12F, 0.16F, 0.44F, 0.50F, 0.28F, 0.36F, 1.00F, 1.15F, 0.50F,
+                    0.12F, 0.16F, 0.54F, 0.60F, 0.28F, 0.36F, 1.00F, 1.15F, 0.50F,
                     CloudMorphologyMemberTier.MIDDLE, tangentSign);
             middles.add(lobe);
             lobes.add(lobe);
         }
         PuffLobeSpec upper = createUpperPuffLobe(middles.get(random.nextInt(2)), condensationBase, radius,
-                random, 0.10F, 0.14F, 0.44F, 0.50F, 0.70F, 0.82F, 0.95F, 1.05F, 0.45F,
+                random, 0.10F, 0.14F, 0.54F, 0.60F, 0.70F, 0.82F, 0.95F, 1.05F, 0.45F,
                 CloudMorphologyMemberTier.MIDDLE, -tangentSign);
         lobes.add(upper);
         lobes.add(createUpperPuffLobe(upper, condensationBase, radius,
-                random, 0.10F, 0.14F, 0.34F, 0.40F, 1.20F, 1.32F, 0.75F, 0.85F, 0.40F,
+                random, 0.10F, 0.14F, 0.44F, 0.50F, 1.20F, 1.32F, 0.75F, 0.85F, 0.40F,
                 CloudMorphologyMemberTier.CROWN, tangentSign));
         return List.copyOf(lobes);
     }

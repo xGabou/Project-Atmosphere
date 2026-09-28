@@ -97,6 +97,10 @@ section 3.
 cumulonimbus calvus and supercell are the T241 body (trunk + thin wedge anvil); congestus a
 connected puff tower; humilis / mediocris crisp small lobed cumulus; stratus a ragged continuous deck
 (overcast from below); stratocumulus a field of irregular clumps; nimbostratus a thick ragged deck;
-cirrus thin high wisps. Known remaining weaknesses: congestus rises as a single narrow turret;
+cirrus thin high wisps. Known remaining weaknesses:
 nimbostratus from above still shows member lobes; the puff path holds 8 candidates per 16-block
 tile, so dense cumulus fields fall back to the weather-map path.
+
+Follow-up: congestus middle / upper lobes 0.44-0.50 -> 0.54-0.60 of the nominal radius, crown
+0.34-0.40 -> 0.44-0.50 - a broad cauliflower column instead of one narrow turret (`t242_t8.png`),
+index still complete (max 8 per tile).
