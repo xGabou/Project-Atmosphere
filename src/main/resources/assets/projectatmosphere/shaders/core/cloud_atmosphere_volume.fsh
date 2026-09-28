@@ -6861,12 +6861,26 @@ float cloudDensityImpl(
         );
         bool directPuffIndexed = false;
         float directPuffHeight01 = h01;
+        float puffBillowSignal = baseNoise.b;
+        float puffBillowStrength = 0.0;
+        if (directPuffAvailable) {
+            // T242: cauliflower billows on cumulus puffs from the detail
+            // FBM (22/11/6-block cells, the lobes' own scale). Its baked
+            // distribution is mean 0.48, sd ~0.075: stretch +-2 sd onto the
+            // resolver's 0.28..0.68 remap. Strength 3 moves the exposed
+            // shell's isovalue by up to +-0.18 of lobe depth; junctions,
+            // cores and the base-root corridor stay protected (flat base).
+            vec4 billowTap = texture(DetailNoiseSampler, detailNoiseDomain(samplePos), mipBias);
+            float billowFbm = billowTap.r * 0.625 + billowTap.g * 0.25 + billowTap.b * 0.125;
+            puffBillowSignal = 0.48 + (billowFbm - 0.48) * 1.333;
+            puffBillowStrength = 3.0;
+        }
         float directPuff = directPuffAvailable
             ? directPuffContinuousShape(
                 p,
                 baseNoise.g,
-                baseNoise.b,
-                0.0,
+                puffBillowSignal,
+                puffBillowStrength,
                 directPuffIndexed,
                 directPuffHeight01
             )
@@ -6928,6 +6942,31 @@ float cloudDensityImpl(
                 * smoothstep(0.008, 0.12, coverageMod);
         }
         cloud = macroShape * envelopeCoverage;
+        if (!directStormAvailable && !useDirectPuff && profileId != 6) {
+            // T242: carve the outline against the RAW weather coverage
+            // (it saturates to a plateau after the 0.012..0.42 remap, measured
+            // 73-83 % of a cloud's texels) and a soft per-family vertical
+            // profile, displaced by z-scored noise (the baked FBM has sd ~0.08).
+            float vprof;
+            if (profileId == 2) {
+                vprof = smoothstep(0.0, 0.22, h01) * (1.0 - smoothstep(0.30, 1.0, h01));
+            } else if (sheetProfile) {
+                vprof = smoothstep(0.0, 0.30, h01) * (1.0 - smoothstep(0.50, 1.0, h01));
+            } else {
+                vprof = smoothstep(0.0, 0.12, h01) * (1.0 - smoothstep(0.35, 1.0, h01));
+            }
+            float envelope = min(saturate(coverageSignal / 0.5), vprof);
+            vec4 carveTap = texture(BaseNoiseSampler,
+                baseNoiseDomain(samplePos, baseNoiseScale * 2.7), mipBias);
+            float fineCarve = carveTap.g * 0.625 + carveTap.b * 0.25 + carveTap.a * 0.125;
+            float carveNoise = clamp((0.6 * (fineCarve - 0.48) + 0.4 * (lowFbm - 0.48)) / (0.08 * 2.5),
+                -1.0, 1.0);
+            // Decks (stratus, nimbostratus) stay continuous: a lower carve
+            // threshold and half the displacement.
+            bool continuousDeck = profileId == 1 || profileId == 5;
+            cloud *= smoothstep(-0.08, 0.12, envelope - (continuousDeck ? 0.30 : 0.5)
+                + (continuousDeck ? 0.22 : 0.45) * carveNoise);
+        }
 
         if (paTraceCapture) {
             paCdMacroShape = macroShape;

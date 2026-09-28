@@ -210,6 +210,10 @@ void main() {
             + 0.11 * lobeStrength * sin(theta * 3.0 + seed * 7.7)
             + 0.07 * lobeStrength * sin(theta * 5.0 + seed * 13.9);
         r /= max(lobes, 0.35);
+        // T242: an irregular member outline (+-0.22 of the radius per sd,
+        // half on the continuous decks), shared with the morphology splat.
+        r += mix(0.22, 0.11, sheet) * paMemberOutline(normalized, media.z)
+            * (1.0 - storm) * (1.0 - cirrus);
         r += paSevereContourErosion(
             warp,
             theta,
@@ -223,6 +227,10 @@ void main() {
         edgeStart = mix(edgeStart, 0.76, sheet);
         edgeStart = mix(edgeStart, 0.62, stratocumulus);
         edgeStart = mix(edgeStart, 0.58, cirrus);
+        // T242: non-storm members get a wide, gentle coverage rim (the raw
+        // coverage domes from 0.25 of the radius), so the volume carves the
+        // outline against it instead of a saturated plateau.
+        edgeStart = mix(edgeStart, 0.25, (1.0 - storm) * (1.0 - cirrus));
         float footprint = 1.0 - smoothstep(edgeStart, 1.0, r);
         // Lifecycle is continuous: forming cells condense, mature cells keep
         // their full mass and dissipating cells erode without a hard pop.

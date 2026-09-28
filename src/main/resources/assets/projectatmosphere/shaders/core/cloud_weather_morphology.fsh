@@ -119,6 +119,9 @@ void main() {
             + 0.11 * lobeStrength * sin(theta * 3.0 + seed * 7.7)
             + 0.07 * lobeStrength * sin(theta * 5.0 + seed * 13.9);
         r /= max(lobes, 0.35);
+        // T242: the member outline, identical to the weather splat's.
+        r += mix(0.22, 0.11, sheet) * paMemberOutline(normalized, media.z)
+            * (1.0 - storm) * (1.0 - cirrus);
         r += paSevereContourErosion(
             warp,
             theta,

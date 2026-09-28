@@ -4401,6 +4401,15 @@ implementation, while visual polish remains independently active.
   Vogel oval fill), cirrus now spawns +480 blocks. Non-storm silhouettes remain smooth (8-block weather
   map, morphology ellipse gate, low-contrast noise measured). Next: **T242 analytic non-storm cloud
   bodies** (cumulus, congestus, layers). [SC-005, SC-016, SC-021]
+- [X] T242 [QUALITY] [US1] Non-storm cloud shape. **KEEP - production change; see
+  `validation/t242-non-storm-shape.md`.** Two harness traps found and fixed first (tick-settled
+  captures grab stale frames after a teleport; the weather maps are cached on an input signature, so a
+  splat uniform never re-rendered them) - a footprint-halving sanity arm proves the fixed harness. Ships:
+  one shared z-scored member outline in the weather / morphology / cumulus-layer splats (0.22 of the
+  radius, 0.11 on decks), a wide non-storm coverage rim, a volume carve against RAW coverage with a
+  per-family vertical profile (decks continuous), and detail-FBM billows on cumulus puffs. Congestus is
+  a lumpy tower, stratocumulus irregular clumps, stratus / nimbostratus ragged decks. Humilis / mediocris
+  still small. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

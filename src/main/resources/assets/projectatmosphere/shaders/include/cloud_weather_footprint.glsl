@@ -127,3 +127,28 @@ vec2 paCumulusCurvedLayerRange(
     float curvedTop = layerTop - span * topDrop * curve;
     return vec2(curvedBase, max(curvedTop, curvedBase + 0.001));
 }
+
+// T242. An irregular member outline: two octaves of value noise in
+// the member's own normalised frame (about 2-3 bumps across its radius at any
+// size, moving rigidly with it), returned in standard deviations (the octave
+// sum has sd ~0.12 around 0.5), clamped to +-2. Shared by every splat so the
+// coverage, category and cumulus-stage footprints keep one outline.
+float paOutlineHash(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+float paOutlineNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(paOutlineHash(i), paOutlineHash(i + vec2(1.0, 0.0)), f.x),
+        mix(paOutlineHash(i + vec2(0.0, 1.0)), paOutlineHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
+float paMemberOutline(vec2 normalized, float seed) {
+    vec2 q = normalized * 2.3 + vec2(seed * 17.31, seed * 9.73);
+    float n = paOutlineNoise(q) * 0.65 + paOutlineNoise(q * 2.07 + vec2(5.3, -2.1)) * 0.35;
+    return clamp((n - 0.5) / 0.12, -2.0, 2.0);
+}

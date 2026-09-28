@@ -99,6 +99,8 @@ void main() {
             + 0.11 * 0.22 * sin(theta * 3.0 + seed * 7.7)
             + 0.07 * 0.22 * sin(theta * 5.0 + seed * 13.9);
         r /= max(lobes, 0.35);
+        // T242: the member outline, identical to the weather splat's.
+        r += 0.22 * paMemberOutline(normalized, media.z);
 
         float edgeStart = mix(0.78, 0.42, saturate(shape.w));
         float footprint = 1.0 - smoothstep(edgeStart, 1.0, r);
