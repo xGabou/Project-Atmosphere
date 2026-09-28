@@ -8603,7 +8603,11 @@ final class StormT132AutoDriver {
                     // this only resolves the adopted storm and its poses, it
                     // starts no suite session and changes no renderer state -
                     // and retry the capture begin on the next tick.
-                    if (!t211FixtureRequested) {
+                    // T242. A storm group can be momentarily incomplete in the
+                    // descriptor snapshot (natural storms share the budget);
+                    // a single failed request used to skip the whole capture,
+                    // so re-request every 120 frames until adoption times out.
+                    if (!t211FixtureRequested || stageFrames % 120 == 0) {
                         t211FixtureRequested = true;
                         ProjectAtmosphere.LOGGER.info(
                                 "T132_AUTORUN t211 capture fixture: {}",
