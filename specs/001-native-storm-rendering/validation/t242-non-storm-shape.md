@@ -90,3 +90,13 @@ task (shape-only mandate); flag for the next performance pass.
 `campaignGate` 72/72; `cloudMorphologyTopologySandbox` and `stormVolumetricGeometrySandbox` pass;
 offline NVIDIA compile of monolith, lean FINAL, rain pass and rain-gate build. Production gallery in
 section 3.
+
+## 6. Current state (production, all types)
+
+`t242_final.png` - SIDE / UNDER / ABOVE, neutral and production lighting, one of each type:
+cumulonimbus calvus and supercell are the T241 body (trunk + thin wedge anvil); congestus a
+connected puff tower; humilis / mediocris crisp small lobed cumulus; stratus a ragged continuous deck
+(overcast from below); stratocumulus a field of irregular clumps; nimbostratus a thick ragged deck;
+cirrus thin high wisps. Known remaining weaknesses: congestus rises as a single narrow turret;
+nimbostratus from above still shows member lobes; the puff path holds 8 candidates per 16-block
+tile, so dense cumulus fields fall back to the weather-map path.
