@@ -97,8 +97,8 @@ section 3.
 cumulonimbus calvus and supercell are the T241 body (trunk + thin wedge anvil); congestus a
 connected puff tower; humilis / mediocris crisp small lobed cumulus; stratus a ragged continuous deck
 (overcast from below); stratocumulus a field of irregular clumps; nimbostratus a thick ragged deck;
-cirrus thin high wisps. Known remaining weaknesses: the puff path holds 8 candidates per 16-block
-tile, so dense cumulus fields fall back to the weather-map path.
+cirrus thin high wisps. Known remaining weaknesses: the puff tile holds 8 candidates, so one cloud may not stack more than eight
+lobes over a 16-block tile.
 
 Follow-up: congestus middle / upper lobes 0.44-0.50 -> 0.54-0.60 of the nominal radius, crown
 0.34-0.40 -> 0.44-0.50 - a broad cauliflower column instead of one narrow turret (`t242_t8.png`),
@@ -110,3 +110,10 @@ after rim, outline noise and carve is ~0.6 R - from above the deck was separate 
 (`t242_d1.png`). Deck members now share the deck's base, top, density and coverage (the random draws
 are still consumed, so other families keep their sequences), stay level, and pack at 0.75 radii:
 one continuous ragged-edged deck (`t242_d3.png`).
+
+Follow-up: crowded cumulus skies. The puff index holds 32 lobes and truncated lobe by lobe; any
+truncation marked it incomplete, so with more than about four cumulus in view EVERY cumulus fell back
+to the weather-map path. It now takes whole clouds nearest the camera until the budget is full and
+leaves the rest out entirely - they render through the map path tile by tile in hybrid mode - and a
+whole-cloud exclusion no longer marks the index incomplete. Six clustered cumulus (43 lobes): complete,
+29 lobes direct, two clouds on the map path (`t242_crowd.png`).

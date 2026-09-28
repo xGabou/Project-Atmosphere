@@ -51,6 +51,7 @@ public final class PuffLobeSpatialIndex {
 
     private static int lobeCount;
     private static int truncatedLobes;
+    private static int excludedClouds;
     private static int baseTierLobes;
     private static int middleTierLobes;
     private static int crownTierLobes;
@@ -79,25 +80,65 @@ public final class PuffLobeSpatialIndex {
 
     /** Refreshes compact descriptors without rebuilding the conservative grid. */
     public static void updateDescriptors(List<VolumetricRenderCell> cells) {
+        updateDescriptors(cells, Double.NaN, Double.NaN);
+    }
+
+    /**
+     * T242. Refreshes the descriptors by whole clouds, nearest the camera first:
+     * a cloud whose lobes do not all fit the MAX_LOBES budget is left out
+     * entirely (it renders through the weather-map path, tile by tile, in
+     * hybrid mode). Truncating individual lobes used to mark the index
+     * incomplete and dropped every cumulus in view to the map fallback as
+     * soon as more than about four clouds were visible.
+     */
+    public static void updateDescriptors(List<VolumetricRenderCell> cells, double cameraX, double cameraZ) {
         Arrays.fill(POS_RADIUS, 0.0F);
         Arrays.fill(SHAPE, 0.0F);
         Arrays.fill(MEDIA, 0.0F);
         lobeCount = 0;
         truncatedLobes = 0;
+        excludedClouds = 0;
         baseTierLobes = 0;
         middleTierLobes = 0;
         crownTierLobes = 0;
         unknownTierLobes = 0;
 
         if (cells != null) {
+            java.util.LinkedHashMap<java.util.UUID, List<VolumetricRenderCell>> clouds = new java.util.LinkedHashMap<>();
             for (VolumetricRenderCell cell : cells) {
-                if (!isDirectPuff(cell)) {
+                if (isDirectPuff(cell)) {
+                    clouds.computeIfAbsent(cell.morphologyGroupId(), key -> new java.util.ArrayList<>()).add(cell);
+                }
+            }
+            List<List<VolumetricRenderCell>> ordered = new java.util.ArrayList<>(clouds.values());
+            if (Double.isFinite(cameraX) && Double.isFinite(cameraZ)) {
+                ordered.sort(java.util.Comparator.comparingDouble(cloud -> {
+                    double nearest = Double.MAX_VALUE;
+                    for (VolumetricRenderCell member : cloud) {
+                        double dx = member.x() - cameraX;
+                        double dz = member.z() - cameraZ;
+                        nearest = Math.min(nearest, dx * dx + dz * dz);
+                    }
+                    return nearest;
+                }));
+            }
+            for (List<VolumetricRenderCell> cloud : ordered) {
+                if (lobeCount + cloud.size() > MAX_LOBES) {
+                    truncatedLobes += cloud.size();
+                    excludedClouds++;
                     continue;
                 }
-                if (lobeCount >= MAX_LOBES) {
-                    truncatedLobes++;
-                    continue;
+                for (VolumetricRenderCell cell : cloud) {
+                    writeDescriptor(cell);
                 }
+            }
+        }
+        descriptorSignature = descriptorSignature();
+    }
+
+    private static void writeDescriptor(VolumetricRenderCell cell) {
+        {
+            {
                 int base = lobeCount * 4;
                 POS_RADIUS[base] = (float) cell.x();
                 POS_RADIUS[base + 1] = (float) cell.z();
@@ -126,7 +167,6 @@ public final class PuffLobeSpatialIndex {
                 lobeCount++;
             }
         }
-        descriptorSignature = descriptorSignature();
     }
 
     /** Rebuilds the tile indirection only when its horizontal geometry changed. */
@@ -269,8 +309,9 @@ public final class PuffLobeSpatialIndex {
     }
 
     public static boolean directRepresentationComplete() {
+        // Whole clouds left out by the lobe budget are not a hole in the
+        // representation: they are drawn by the weather-map path.
         return lobeCount > 0
-                && truncatedLobes == 0
                 && overflowTiles == 0
                 && uploadedTarget != null
                 && uploadedTextureId > 0
@@ -548,6 +589,7 @@ public final class PuffLobeSpatialIndex {
     public static void invalidate() {
         lobeCount = 0;
         truncatedLobes = 0;
+        excludedClouds = 0;
         baseTierLobes = 0;
         middleTierLobes = 0;
         crownTierLobes = 0;

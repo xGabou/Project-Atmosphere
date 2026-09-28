@@ -413,7 +413,7 @@ public final class CloudWeatherMapRenderer {
         // Refresh them only together; a cache hit keeps the exact pair used by
         // the cached weather map instead of uploading new descriptors through
         // an older, quantized tile grid.
-        PuffLobeSpatialIndex.updateDescriptors(cells);
+        PuffLobeSpatialIndex.updateDescriptors(cells, cameraX, cameraZ);
         PuffLobeSpatialIndex.rebuildIfNeeded(
                 puffCandidateTarget,
                 originX,
