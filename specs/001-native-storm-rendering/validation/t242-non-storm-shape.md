@@ -56,6 +56,16 @@ not kept: forcing `PuffShapeMode.DIRECT_ONLY` (to rule out hybrid tile seams) - 
 on the captured instance (`t242_c3_zoom.png`). Maturity checked: gallery cumulus are at their target
 radius (growth 1.0); rendered humilis is ~30 blocks, about the real proportion to a 1400-block Cb.
 
+## 3c. Fringe sheets (cirrus streaks, congestus fins)
+
+Empty weather-map texels just beyond a member's footprint (r 1..1.45, zero weight) wrote the fixed
+sentinel interval (0.35..0.45 of the slab). Bilinear filtering between a cloud's last covered texel and
+that sentinel slid the interval across one 8-block texel - a thin near-vertical sheet of faint density
+off every cloud far from the sentinel height: the "vertical streaks" hanging from cirrus (y ~734) and
+likely the pointed fins on congestus. The splat now remembers the nearest member within its cull
+radius and writes that member's own base/top into the empty fringe texel. `t242_f1_cirrus.png`: before,
+only the streaks were visible; after, the streaks are gone and cirrus shows as thin elongated wisps.
+
 ## 4. Cost
 
 One extra 3-D texture fetch per non-storm map-path density sample (the carve's base-noise tap) and

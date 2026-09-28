@@ -102,6 +102,9 @@ void main() {
     float stratusSurfaceBaseAccum = 0.0;
     float stratusSurfaceTopAccum = 0.0;
     float dominantCategoryWeight = -1.0;
+    float fringeNearest = 1.0e9;
+    float fringeBase = 0.35;
+    float fringeTop = 0.45;
     float dominantCategoryProfile = 0.0;
 
     for (int i = 0; i < MAX_CELLS; i++) {
@@ -181,6 +184,16 @@ void main() {
         float maxRadius = max(scaledRadius.x, scaledRadius.y) * 1.45;
         if (dot(delta, delta) > maxRadius * maxRadius) {
             continue;
+        }
+        // T242: remember the nearest member's own interval, so an empty
+        // fringe texel next to it carries the cloud's heights instead of the
+        // fixed sentinel slab (bilinear filtering between the two hung thin
+        // near-vertical sheets off every cloud far from 0.35-0.45).
+        float fringeR = length(delta / scaledRadius);
+        if (fringeR < fringeNearest) {
+            fringeNearest = fringeR;
+            fringeBase = shape.y;
+            fringeTop = shape.z;
         }
 
         float cosO = cos(-shape.x);
@@ -427,6 +440,9 @@ void main() {
             || (SentinelHeightsEnabled == 1
                 && (weightAccum <= 0.0000005 || coverage <= 0.002))) {
         fragColor = vec4(0.0, 0.35, 0.45, 0.0);
+        if (fringeNearest < 1.0e8) {
+            fragColor = vec4(0.0, fringeBase, max(fringeTop, fringeBase + 2.0 / slabSpan), 0.0);
+        }
         return;
     }
 
