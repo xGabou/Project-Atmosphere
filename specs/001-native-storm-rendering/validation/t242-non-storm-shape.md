@@ -66,6 +66,19 @@ likely the pointed fins on congestus. The splat now remembers the nearest member
 radius and writes that member's own base/top into the empty fringe texel. `t242_f1_cirrus.png`: before,
 only the streaks were visible; after, the streaks are gone and cirrus shows as thin elongated wisps.
 
+## 3d. Congestus as an analytic puff tower
+
+On the weather-map path congestus rendered as 8-block columns - straight vertical walls, a comb of
+spires and horizontal banding (`t242_t1_zoomN.png`, neutral lighting, so shape not light). It is now
+`PUFF` family (registry, `defaultFor`, validation case) with a tall hierarchical layout: the mediocris
+four-lobe base, then two middle lobes, one upper lobe and a crown turret, each tier's root starting
+inside its parent below the parent's widest point (shallower roots left floating gaps between tiers).
+Exactly eight lobes: a puff candidate tile holds eight, a stacked column puts every lobe over its
+central tile, and nine overflowed on some frames and dropped the whole puff index to the map fallback.
+Humilis / mediocris layouts are untouched (the congestus branch leaves after the shared base section).
+Result (`t242_t6.png`): one connected cumulus with a turret rising from a lumpy base; from below a
+dark cauliflower mass. Profile top offset 96 -> 150 to match the tower's bounds.
+
 ## 4. Cost
 
 One extra 3-D texture fetch per non-storm map-path density sample (the carve's base-noise tap) and

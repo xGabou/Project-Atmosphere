@@ -142,7 +142,9 @@ public final class CloudShapeProfile {
             case "vapor_cluster" -> new CloudShapeProfile("projectatmosphere:shape/vapor", 34.0F, 7.0F, 16.0F, 3, 7, 0.34F, 0.00F, 0.12F, 0.06F, 0.08F, 0.00F, 0.10F, 0.42F, 0.00F);
             case "cumulus_humilis" -> new CloudShapeProfile("projectatmosphere:shape/cumulus_humilis", 42.0F, 10.0F, 20.0F, 5, 10, 0.66F, 0.02F, 0.10F, 0.10F, 0.14F, 0.00F, 0.28F, 0.58F, 0.00F);
             case "cumulus_mediocris" -> new CloudShapeProfile("projectatmosphere:shape/cumulus_mediocris", 56.0F, 15.0F, 40.0F, 6, 12, 0.72F, 0.05F, 0.14F, 0.14F, 0.34F, 0.00F, 0.24F, 0.58F, 0.00F);
-            case "cumulus_congestus" -> new CloudShapeProfile("projectatmosphere:shape/cumulus_congestus", 64.0F, 18.0F, 96.0F, 6, 13, 0.78F, 0.10F, 0.22F, 0.26F, 0.74F, 0.04F, 0.18F, 0.62F, 0.18F);
+            // T242: congestus is a tower, clearly taller than wide (~1/3 of the
+            // cumulonimbus height at this world scale), not a squat blob.
+            case "cumulus_congestus" -> new CloudShapeProfile("projectatmosphere:shape/cumulus_congestus", 64.0F, 18.0F, 150.0F, 6, 13, 0.78F, 0.10F, 0.22F, 0.26F, 0.74F, 0.04F, 0.18F, 0.62F, 0.18F);
             case "cumulonimbus_calvus" -> new CloudShapeProfile("projectatmosphere:shape/cumulonimbus_calvus", 88.0F, 28.0F, 150.0F, 7, 14, 0.84F, 0.16F, 0.34F, 0.42F, 0.86F, 0.22F, 0.24F, 0.72F, 0.62F);
             case "cumulonimbus_capillatus" -> new CloudShapeProfile("projectatmosphere:shape/cumulonimbus_capillatus", 116.0F, 34.0F, 170.0F, 8, 16, 0.90F, 0.20F, 0.54F, 0.54F, 0.78F, 0.92F, 0.26F, 0.78F, 0.82F);
             case "supercell" -> new CloudShapeProfile("projectatmosphere:shape/supercell", 148.0F, 38.0F, 196.0F, 10, 20, 0.94F, 0.28F, 0.72F, 0.68F, 0.72F, 1.00F, 0.24F, 0.82F, 1.00F);

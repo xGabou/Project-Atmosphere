@@ -42,8 +42,7 @@ public enum CloudMorphologyFamily {
     public static CloudMorphologyFamily defaultFor(String cloudTypeId, CloudFamily family) {
         String id = cloudTypeId == null ? "" : cloudTypeId.trim().toLowerCase(Locale.ROOT);
         return switch (id) {
-            case "vapor_cluster", "cumulus_humilis", "cumulus_mediocris" -> PUFF;
-            case "cumulus_congestus" -> TOWER;
+            case "vapor_cluster", "cumulus_humilis", "cumulus_mediocris", "cumulus_congestus" -> PUFF;
             case "cumulonimbus_calvus", "cumulonimbus_capillatus", "supercell" -> STORM_ANVIL;
             case "stratus_nebulosus", "nimbostratus" -> SHEET;
             case "stratocumulus" -> CELLULAR_SHEET;

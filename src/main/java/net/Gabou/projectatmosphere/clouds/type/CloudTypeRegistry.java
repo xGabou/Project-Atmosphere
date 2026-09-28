@@ -82,7 +82,7 @@ public final class CloudTypeRegistry {
                 "cumulus_congestus",
                 "Cumulus congestus",
                 CloudFamily.CUMULUS,
-                CloudMorphologyFamily.TOWER,
+                CloudMorphologyFamily.PUFF,
                 new CloudVisualProfile(2.05F, 0.60F, 0.28F, 0.13F, 0.42F, 0.015F, 0.128F, 0.168F, 1.18F, 1.02F, 0.42F, 0.84F, 0.03F, 0.10F),
                 fairWeather(0.58F, 1.00F),
                 new CloudEvolutionRules(List.of(

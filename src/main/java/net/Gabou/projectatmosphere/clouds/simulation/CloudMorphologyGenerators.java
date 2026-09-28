@@ -397,23 +397,26 @@ final class CloudMorphologyGenerators {
         String id = definition.getId().toLowerCase(Locale.ROOT);
         boolean humilis = "cumulus_humilis".equals(id);
         boolean mediocris = "cumulus_mediocris".equals(id);
+        // T242: congestus is a tall analytic puff tower (the weather-map path
+        // drew it as 8-block columns with vertical walls and spires).
+        boolean congestus = "cumulus_congestus".equals(id);
         // Fair-weather cumulus needs a real hierarchy, not a ring of four
         // almost full-size cushions. Keep the count deterministic so the
         // persisted membership layout and render descriptors cannot change
         // shape when the same field is rebuilt.
-        int minClusters = id.contains("vapor") ? 2 : humilis ? 7 : mediocris ? 8 : 4;
-        int maxClusters = id.contains("vapor") ? 4 : humilis ? 7 : mediocris ? 8 : 7;
-        float radius = shape.getBaseRadius() * (mediocris ? 0.98F : 0.82F);
+        int minClusters = id.contains("vapor") ? 2 : humilis ? 7 : mediocris ? 8 : congestus ? 8 : 4;
+        int maxClusters = id.contains("vapor") ? 4 : humilis ? 7 : mediocris ? 8 : congestus ? 8 : 7;
+        float radius = shape.getBaseRadius() * (mediocris || congestus ? 0.98F : 0.82F);
         SpawnPlan basePlan = plan(definition, random, minClusters, maxClusters, radius,
                 radius * PUFF_GROUP_RADIUS_MULTIPLIER,
                 shape.getBaseOffset() * 0.95F, shape.getTopOffset(),
                 0.38F + visual.getDensityMultiplier() * 0.25F,
                 0.42F + visual.getCoverageMultiplier() * 0.24F,
                 0.24F + visual.getEdgeErosionStrength() * 0.42F);
-        if (!humilis && !mediocris) {
+        if (!humilis && !mediocris && !congestus) {
             return basePlan;
         }
-        return basePlan.withPuffLobes(createHierarchicalPuffLobes(basePlan, mediocris, random));
+        return basePlan.withPuffLobes(createHierarchicalPuffLobes(basePlan, mediocris || congestus, congestus, random));
     }
 
     private static SpawnPlan towerPlan(@NotNull CloudTypeDefinition definition, @NotNull RandomSource random) {
@@ -869,6 +872,7 @@ final class CloudMorphologyGenerators {
     private static List<PuffLobeSpec> createHierarchicalPuffLobes(
             SpawnPlan plan,
             boolean mediocris,
+            boolean congestus,
             RandomSource random
     ) {
         // Four compact, vertically credible base billows establish the flat
@@ -877,7 +881,7 @@ final class CloudMorphologyGenerators {
         // constrained against the renderer's 0.96 horizontal radius: no base
         // primitive is allowed to become the wide, shallow pancake that caused
         // the rejected pear/shelf capture.
-        int upperCount = mediocris ? 4 : 3;
+        int upperCount = congestus ? 4 : mediocris ? 4 : 3;
         int baseCount = plan.clusterCount() - upperCount;
         if (baseCount != 4) {
             throw new IllegalStateException(
@@ -944,6 +948,9 @@ final class CloudMorphologyGenerators {
             ));
         }
 
+        if (congestus) {
+            return createCongestusTiers(lobes, condensationBase, radius, shoulderCount, random);
+        }
         int firstSupport = random.nextInt(shoulderCount);
         float middleTangentSign = random.nextBoolean() ? 1.0F : -1.0F;
         List<PuffLobeSpec> middleLobes = new ArrayList<>(2);
@@ -992,6 +999,45 @@ final class CloudMorphologyGenerators {
                     crownTangentSign
             ));
         }
+        return List.copyOf(lobes);
+    }
+
+    /**
+     * T242. The towering tiers of a congestus above its four base lobes: two
+     * middle lobes, one upper lobe and a crown turret.
+     * Each tier's root starts inside its parent, below the parent's widest
+     * point (an upper lobe narrows to a point at its root, so shallower roots
+     * left floating gaps), and is stacked close over it (small separation) so
+     * the column rises as one cauliflower tower instead of spreading.
+     */
+    private static List<PuffLobeSpec> createCongestusTiers(
+            List<PuffLobeSpec> lobes,
+            float condensationBase,
+            float radius,
+            int shoulderCount,
+            RandomSource random
+    ) {
+        // Eight lobes in all: a puff candidate tile holds at most eight, and a
+        // stacked column puts every lobe over its central tile (nine overflowed
+        // and dropped the whole index to the weather-map fallback).
+        float tangentSign = random.nextBoolean() ? 1.0F : -1.0F;
+        int first = random.nextInt(shoulderCount);
+        List<PuffLobeSpec> middles = new ArrayList<>(2);
+        for (int middle = 0; middle < 2; middle++) {
+            PuffLobeSpec lobe = createUpperPuffLobe(lobes.get(1 + (first + middle) % shoulderCount),
+                    condensationBase, radius, random,
+                    0.12F, 0.16F, 0.44F, 0.50F, 0.28F, 0.36F, 1.00F, 1.15F, 0.50F,
+                    CloudMorphologyMemberTier.MIDDLE, tangentSign);
+            middles.add(lobe);
+            lobes.add(lobe);
+        }
+        PuffLobeSpec upper = createUpperPuffLobe(middles.get(random.nextInt(2)), condensationBase, radius,
+                random, 0.10F, 0.14F, 0.44F, 0.50F, 0.70F, 0.82F, 0.95F, 1.05F, 0.45F,
+                CloudMorphologyMemberTier.MIDDLE, -tangentSign);
+        lobes.add(upper);
+        lobes.add(createUpperPuffLobe(upper, condensationBase, radius,
+                random, 0.10F, 0.14F, 0.34F, 0.40F, 1.20F, 1.32F, 0.75F, 0.85F, 0.40F,
+                CloudMorphologyMemberTier.CROWN, tangentSign));
         return List.copyOf(lobes);
     }
 

@@ -464,7 +464,7 @@ public final class CloudFieldValidation {
     ) {
         List<LayoutCase> cases = List.of(
                 new LayoutCase("cumulus_humilis", CloudMorphologyFamily.PUFF),
-                new LayoutCase("cumulus_congestus", CloudMorphologyFamily.TOWER),
+                new LayoutCase("cumulus_congestus", CloudMorphologyFamily.PUFF),
                 new LayoutCase("cumulonimbus_capillatus", CloudMorphologyFamily.STORM_ANVIL),
                 new LayoutCase("stratus_nebulosus", CloudMorphologyFamily.SHEET),
                 new LayoutCase("nimbostratus", CloudMorphologyFamily.SHEET),
