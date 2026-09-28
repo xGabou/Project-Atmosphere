@@ -47,6 +47,15 @@ irregular clumps; stratus / nimbostratus ragged-edged decks (nimbostratus mostly
 of ellipse petals. Humilis / mediocris change modestly - they stay small (their rendered size is well
 below their cluster bounds; the puff hierarchy is out of this step's scope).
 
+## 3b. Crisp cumulus edges (follow-up)
+
+The puff resolver ramped density linearly from the surface to the core, so every cumulus rendered as
+a soft blur ("balloon animal"). It now reaches full density within 0.18 of lobe depth inside the
+surface (`t242_c2_zoom.png`: production left, crisp right) - defined domed lobes from below. Tried and
+not kept: forcing `PuffShapeMode.DIRECT_ONLY` (to rule out hybrid tile seams) - no visible difference
+on the captured instance (`t242_c3_zoom.png`). Maturity checked: gallery cumulus are at their target
+radius (growth 1.0); rendered humilis is ~30 blocks, about the real proportion to a 1400-block Cb.
+
 ## 4. Cost
 
 One extra 3-D texture fetch per non-storm map-path density sample (the carve's base-noise tap) and

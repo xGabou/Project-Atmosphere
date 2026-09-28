@@ -4574,10 +4574,10 @@ float resolvePuffContinuousField(
         0.40
     );
     float surfaceIso = mix(billowIso, 0.012, protection);
-    float continuousShape = max(
-        (envelope - surfaceIso) / max(1.0 - surfaceIso, 0.001),
-        0.0
-    );
+    // T242: a cumulus has a defined edge - full density within 0.18 of lobe
+    // depth inside its surface, not a linear ramp from the surface to the core
+    // (which rendered every puff as a soft blur).
+    float continuousShape = smoothstep(0.0, 0.18, envelope - surfaceIso);
     return continuousShape * materialFactor;
 }
 
