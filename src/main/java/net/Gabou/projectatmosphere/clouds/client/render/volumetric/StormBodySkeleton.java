@@ -25,21 +25,19 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
  * A group without all three of BASE, TOWER and ANVIL gets an invalid block
  * (valid flag -1); the shader then treats the group as empty.
  *
- * <p>Row layout (5 RGBA texels per row, 60 floats per group; row C holds the
- * deck footprint's DECK_DISCS disc radii, see {@link StormBodyEvaluator}):
+ * <p>Row layout (5 RGBA texels per row, 40 floats per group):
  * <pre>
  *  A.0 originX originZ windX windZ      B.0 deckLo deckHi deckHalfWidth deckCrossMean
  *  A.1 floorY baseHeight deckMid band   B.1 deckBottom deckTop strengthBase strengthTower
  *  A.2 baseUp baseDown baseLeft baseRight B.2 strengthAnvil ownershipReach 0 0
  *  A.3 towerLoX towerLoZ towerHiX towerHiZ B.3 aabbMinX aabbMinZ aabbMaxX aabbMaxZ
  *  A.4 towerLoY towerHiY towerRadius valid B.4 aabbMinY aabbMaxY 0 0
- *  C.0-C.2 deck disc radii 0..10 (upwind root to downwind tip)
  * </pre>
  * Keep in step with {@code stormBody*} in cloud_atmosphere_volume.fsh and with
  * {@link StormBodyEvaluator}.
  */
 public final class StormBodySkeleton {
-    public static final int ROWS_PER_GROUP = 3;
+    public static final int ROWS_PER_GROUP = 2;
     public static final int FLOATS_PER_GROUP =
             ROWS_PER_GROUP * StormLobeDescriptor.FLOATS_PER_DESCRIPTOR;
 
@@ -79,19 +77,24 @@ public final class StormBodySkeleton {
     public static final int AABB_MAX_Z = 35;
     public static final int AABB_MIN_Y = 36;
     public static final int AABB_MAX_Y = 37;
-    /** Deck footprint: DECK_DISCS discs along the deck axis, radii from row C. */
-    public static final int DECK_DISCS = 11;
-    public static final int DECK_RADIUS_0 = 40;
 
     /** Base height kept from the BASE lobes (flatter lower mass). */
     static final double BASE_HEIGHT_FRACTION = 0.75D;
     /** Updraft radius from the mean TOWER descriptor radius. */
     static final double TOWER_RADIUS_FRACTION = 0.62D;
+    /**
+     * T241. The updraft is at least this fraction of the lower mass's mean
+     * reach (a massive tower rising out of it, not a stem on a saucer), and
+     * the lower mass is scaled back to the tower's flared foot, at most
+     * BASE_FOOT_OF_TOWER Rt of mean reach (asymmetry kept, never below half).
+     */
+    static final double TOWER_FROM_BASE_FRACTION = 0.48D;
+    static final double BASE_FOOT_OF_TOWER = 1.3D;
     static final double DECK_UPWIND_REACH = 0.6D;
     static final double DECK_DOWNWIND_REACH = 1.2D;
     static final double DECK_CROSS_REACH = 1.4D;
-    /** Largest column scale over its height (1.3 at the base junction). */
-    static final double COLUMN_MAX_SCALE = 1.3D;
+    /** Largest column reach over Rt: turret centres at 1.43 Rt plus their 0.42 Rt radius. */
+    static final double COLUMN_MAX_SCALE = 1.95D;
     /** Deck corner rounding cap and the AABB pad beyond the band. */
     static final double DECK_ROUND_MAX = 20.0D;
     static final double AABB_PAD = 8.0D;
@@ -250,7 +253,16 @@ public final class StormBodySkeleton {
             }
         }
         double deckCrossMean = deckCrossSum / Math.max(anvilWeight, 1.0D);
-        double towerRadius = TOWER_RADIUS_FRACTION * towerRadiusSum / towerCount;
+        double ownershipReach = Math.max(Math.max(baseUp, baseDown), Math.max(baseLeft, baseRight));
+        double baseMeanReach = 0.25D * (baseUp + baseDown + baseLeft + baseRight);
+        double towerRadius = Math.max(TOWER_RADIUS_FRACTION * towerRadiusSum / towerCount,
+                TOWER_FROM_BASE_FRACTION * baseMeanReach);
+        double footScale = Math.max(0.5D, Math.min(1.0D,
+                BASE_FOOT_OF_TOWER * towerRadius / Math.max(baseMeanReach, 1.0D)));
+        baseUp *= footScale;
+        baseDown *= footScale;
+        baseLeft *= footScale;
+        baseRight *= footScale;
         double baseHeight = Math.max(baseTop - floorY, 1.0D) * BASE_HEIGHT_FRACTION;
         double band = bandFor(towerRadius);
         double deckMid = 0.5D * (deckBottom + deckTop);
@@ -262,26 +274,13 @@ public final class StormBodySkeleton {
         // k / 4 beyond its parts.
         double pad = band + 0.15D * towerRadius + DECK_ROUND_MAX + AABB_PAD;
         double columnReach = towerRadius * COLUMN_MAX_SCALE;
-        // The deck footprint's own reach: its discs (see StormBodyEvaluator)
-        // round the tip past deckHi by up to ~0.1 of the deck length.
-        double discFirst = StormBodyEvaluator.deckHalfWidth(0.0D, towerRadius, deckHalfWidth);
-        double discLast = StormBodyEvaluator.deckHalfWidth(1.0D, towerRadius, deckHalfWidth);
-        double discStart = deckLo + discFirst;
-        double discTravel = Math.max(deckHi - discLast - discStart, 0.0D);
+        // The deck wedge's own reach: [deckLo, deckHi] along the wind and its
+        // widest half-width either side of the cross drift.
+        double tipHalf = StormBodyEvaluator.wedgeTipHalf(towerRadius, deckHalfWidth);
         double deckReachLo = deckLo;
         double deckReachHi = deckHi;
-        double deckReachCMin = 0.0D;
-        double deckReachCMax = 0.0D;
-        for (int disc = 0; disc < DECK_DISCS; disc++) {
-            double u = disc / (double) (DECK_DISCS - 1);
-            double r = StormBodyEvaluator.deckHalfWidth(u, towerRadius, deckHalfWidth);
-            double centreW = discStart + u * discTravel;
-            double centreC = deckCrossMean * u;
-            deckReachLo = Math.min(deckReachLo, centreW - r);
-            deckReachHi = Math.max(deckReachHi, centreW + r);
-            deckReachCMin = Math.min(deckReachCMin, centreC - r);
-            deckReachCMax = Math.max(deckReachCMax, centreC + r);
-        }
+        double deckReachCMin = Math.min(0.0D, deckCrossMean) - tipHalf;
+        double deckReachCMax = Math.max(0.0D, deckCrossMean) + tipHalf;
         double hiW = (towerHiX - originX) * windX + (towerHiZ - originZ) * windZ;
         double hiC = (towerHiX - originX) * crossX + (towerHiZ - originZ) * crossZ;
         double wMin = Math.min(Math.min(-baseUp, deckReachLo), Math.min(0.0D, hiW) - columnReach) - pad;
@@ -334,16 +333,11 @@ public final class StormBodySkeleton {
         out[outOffset + STRENGTH_BASE] = (float) (baseStrength / baseCount);
         out[outOffset + STRENGTH_TOWER] = (float) (towerStrength / towerCount);
         out[outOffset + STRENGTH_ANVIL] = (float) (anvilStrength / anvilCount);
-        out[outOffset + OWNERSHIP_REACH] = (float) Math.max(
-                Math.max(baseUp, baseDown), Math.max(baseLeft, baseRight));
+        out[outOffset + OWNERSHIP_REACH] = (float) ownershipReach;
         out[outOffset + AABB_MIN_X] = (float) minX;
         out[outOffset + AABB_MIN_Z] = (float) minZ;
         out[outOffset + AABB_MAX_X] = (float) maxX;
         out[outOffset + AABB_MAX_Z] = (float) maxZ;
-        for (int disc = 0; disc < DECK_DISCS; disc++) {
-            out[outOffset + DECK_RADIUS_0 + disc] = (float) StormBodyEvaluator.deckHalfWidth(
-                    disc / (double) (DECK_DISCS - 1), towerRadius, deckHalfWidth);
-        }
         out[outOffset + AABB_MIN_Y] = (float) (floorY - pad);
         out[outOffset + AABB_MAX_Y] = (float) (deckTop + pad);
         return true;

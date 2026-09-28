@@ -490,8 +490,7 @@ public record VolumetricRenderCell(
 
     private static int profileFor(String cloudTypeId, CloudMorphologyFamily morphology) {
         String id = cloudTypeId == null ? "" : cloudTypeId.toLowerCase(Locale.ROOT);
-        if (id.contains("supercell") || id.contains("hurricane")
-                || morphology == CloudMorphologyFamily.SPIRAL_STORM) {
+        if (id.contains("hurricane") || morphology == CloudMorphologyFamily.SPIRAL_STORM) {
             return 7;
         }
         if (id.contains("cumulonimbus") || morphology == CloudMorphologyFamily.STORM_ANVIL) {

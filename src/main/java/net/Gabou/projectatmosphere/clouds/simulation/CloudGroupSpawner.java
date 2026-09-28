@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.clouds.simulation;
 import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionStateStore;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.platform.config.AtmosphereConfig;
@@ -29,6 +30,17 @@ public final class CloudGroupSpawner {
         return CloudMorphologyGenerators.relayoutStormRegions(level, version);
     }
 
+    /**
+     * High-level ice cloud (cirrus) forms near the anvil-top level of the
+     * storms, far above the low and middle families that share the native
+     * spawn height.
+     */
+    static float altitudeOffset(CloudMorphologyFamily family) {
+        return family == CloudMorphologyFamily.FILAMENT ? CIRRUS_ALTITUDE_OFFSET : 0.0F;
+    }
+
+    static final float CIRRUS_ALTITUDE_OFFSET = 480.0F;
+
     public static @Nullable CloudRegionState spawnRequestedCloud(ServerLevel level, BlockPos pos, String cloudTypeId) {
         if (level == null || pos == null || !level.dimension().equals(Level.OVERWORLD)) {
             return null;
@@ -36,7 +48,8 @@ public final class CloudGroupSpawner {
 
         CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cloudTypeId);
         String resolvedTypeId = definition.getId();
-        float spawnHeight = AtmosphereConfig.clouds().nativeCloudSpawnHeight();
+        float spawnHeight = AtmosphereConfig.clouds().nativeCloudSpawnHeight()
+                + altitudeOffset(definition.getMorphologyFamily());
         RandomSource random = level.getRandom();
         CloudMorphologyGenerators.SpawnPlan morphology = CloudMorphologyGenerators.createSpawnPlan(definition, random);
         Vec3 center = new Vec3(pos.getX(), spawnHeight, pos.getZ());

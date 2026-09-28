@@ -6,27 +6,29 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
  * a {@link StormBodySkeleton} block. Same equations, same constants; the
  * camera-density path and the morphology sandboxes read the body through it.
  *
- * <p>The body (T239, accepted):
+ * <p>The body (T239 accepted, T241 shape polish):
  * <ul>
  * <li>base - a flat-bottomed slab, 0.75 of the BASE lobes' height, footprint a
  * superellipse (n = 3) over the separate upwind / downwind / left / right
- * reach, radius scale 1 - 0.20 t^2, corners rounded by 0.18 of its height;</li>
- * <li>updraft - one column along the leaning tower axis, radius
- * Rt * (1 + 0.30 (1 - smoothstep(-0.4, 0.25, t)) + 0.30 smoothstep(0.5, 1.2, t)),
- * t from the base crown (0) to the deck bottom (1);</li>
- * <li>deck - one flat-topped sheet over u = (w - deckLo) / length: thickness
- * span * (0.85 - 0.45 u), top sinking 0.05 span downwind, half-width fanning
- * from 1.3 Rt to the deck half-width by u = 0.45, root and tip rounded,
- * centreline drifting to the mean cross offset;</li>
+ * reach (scaled by the skeleton to the tower's 1.3 Rt foot), radius scale
+ * 1 - 0.20 t^2, corners rounded by 0.18 of its height;</li>
+ * <li>updraft - one column along the leaning tower axis with no waist: radius
+ * Rt * (1.30 + 0.15 smoothstep(0.3, 1.2, t)), t from the base crown (0) to the
+ * deck bottom (1), rising into the deck to 0.25 of its span below the top,
+ * carrying cauliflower turrets - a staggered sphere lattice (5 around, rows
+ * 0.8 Rt apart, radius 0.42 Rt) smooth-unioned at 0.12 Rt;</li>
+ * <li>deck - a thin flat-topped sheet over u = (w - deckLo) / length:
+ * thickness span * (0.38 - 0.18 u), top sinking 0.05 span downwind; in plan an
+ * exact rounded trapezoid (wedge), Rt wide at the upwind root and
+ * max(1.1 deck half-width, 1.2 Rt) at the downwind edge, following the cross
+ * drift; its underside lowered by 0.22 of the crown-to-deck span at the
+ * column and curving up over 1.2 Rt past it;</li>
  * <li>joins - smooth minimum base|column, then |deck, k = 0.6 Rt.</li>
  * </ul>
- * T240 over T239, for a true distance (the march's safe advance and the
- * shared field's dilation rely on it): the base term is divided by its
- * analytic gradient magnitude, and the deck footprint - T239's half-width
- * profile W(u) - is the union of DECK_DISCS discs of radius W(u_i) along the
- * deck axis (following the cross drift), an exact distance where T239's
- * clamped-u box overestimated beyond the deck's ends (the anatomy sandbox
- * measured gradients up to 8.4 there).
+ * The base term is divided by its analytic gradient magnitude and the
+ * turrets and the wedge are exact, so the result is a first-order distance
+ * (the march's safe advance and the shared field's dilation rely on it).
+ * Every interior (anvil included) takes the structural-continuity fill.
  */
 public final class StormBodyEvaluator {
     /** Regions (mode 17 bits): base, transition, updraft, anvil deck. */
@@ -42,6 +44,24 @@ public final class StormBodyEvaluator {
      */
     public static final double LIPSCHITZ_HORIZONTAL = 1.4D;
     public static final double LIPSCHITZ_VERTICAL = 1.7D;
+
+    /**
+     * Cauliflower turrets on the column: a staggered sphere lattice, TURRET_AROUND
+     * per row, rows TURRET_SPACING Rt apart, radius TURRET_RADIUS Rt, centred
+     * just inside the column surface, smooth-unioned at TURRET_SMOOTH Rt.
+     */
+    static final int TURRET_AROUND = 5;
+    static final double TURRET_SPACING = 0.80D;
+    static final double TURRET_RADIUS = 0.42D;
+    static final double TURRET_SMOOTH = 0.12D;
+    /** The column rises into the deck to a quarter of the deck span below its top. */
+    static final double COLUMN_TOP_BELOW_DECK_TOP = 0.25D;
+    /** Deck thickness over the deck span: 0.38 at the root falling to 0.20 at the tip. */
+    static final double DECK_ROOT_THICKNESS = 0.38D;
+    static final double DECK_THICKNESS_FALL = 0.18D;
+    /** The deck underside's root drop (fraction of crown-to-deck) and its reach past the column (Rt). */
+    static final double ROOT_DROP = 0.22D;
+    static final double ROOT_REACH = 1.2D;
 
     private StormBodyEvaluator() {
     }
@@ -86,7 +106,7 @@ public final class StormBodyEvaluator {
         double baseV = Math.max(floorY - y, y - (floorY + baseHeight));
         double dBase = roundedBox2(baseH, baseV, 0.18D * baseHeight);
 
-        // Updraft column.
+        // Updraft column: no waist, carrying the cauliflower turret lattice.
         double loY = s[o + StormBodySkeleton.TOWER_LO_Y];
         double hiY = s[o + StormBodySkeleton.TOWER_HI_Y];
         double axisT = clamp01((y - loY) / Math.max(hiY - loY, 1.0D));
@@ -94,28 +114,39 @@ public final class StormBodyEvaluator {
         double axisZ = lerp(s[o + StormBodySkeleton.TOWER_LO_Z], s[o + StormBodySkeleton.TOWER_HI_Z], axisT);
         double deckBottom = s[o + StormBodySkeleton.DECK_BOTTOM];
         double deckTop = s[o + StormBodySkeleton.DECK_TOP];
+        double span = Math.max(deckTop - deckBottom, 20.0D);
         double crown = floorY + baseHeight;
-        double columnT = (y - crown) / Math.max(deckBottom - crown, 1.0D);
-        double columnScale = 1.0D
-                + 0.30D * (1.0D - smoothstep(-0.4D, 0.25D, columnT))
-                + 0.30D * smoothstep(0.5D, 1.2D, columnT);
-        double dColumn = Math.max(Math.hypot(x - axisX, z - axisZ) - towerRadius * columnScale,
-                Math.max(floorY + 0.10D * baseHeight - y, y - deckMid));
+        double columnSpan = Math.max(deckBottom - crown, 1.0D);
+        double columnT = (y - crown) / columnSpan;
+        double fromAxisX = x - axisX;
+        double fromAxisZ = z - axisZ;
+        double radial = Math.hypot(fromAxisX, fromAxisZ);
+        double dColumn = Math.max(radial - towerRadius * columnScale(columnT),
+                Math.max(floorY + 0.10D * baseHeight - y, y - (deckTop - COLUMN_TOP_BELOW_DECK_TOP * span)));
+        double dTurrets = turrets(x, y, z, axisX, axisZ, Math.atan2(fromAxisZ, fromAxisX),
+                towerRadius, crown, columnSpan);
+        double turretK = TURRET_SMOOTH * towerRadius;
+        dColumn = smin(dColumn, dTurrets, turretK, sminWeight(dColumn, dTurrets, turretK));
 
-        // Deck sheet.
+        // Deck sheet: thin, a wedge in plan, its underside lowered at the root.
         double deckLo = s[o + StormBodySkeleton.DECK_LO];
         double deckHi = s[o + StormBodySkeleton.DECK_HI];
         double deckLength = Math.max(deckHi - deckLo, 1.0D);
         double ud = clamp01((w - deckLo) / deckLength);
-        double span = Math.max(deckTop - deckBottom, 20.0D);
-        double thickness = span * (0.85D - 0.45D * ud);
+        double thickness = span * (DECK_ROOT_THICKNESS - DECK_THICKNESS_FALL * ud);
         double top = deckTop - 0.05D * span * ud;
         double bottom = top - thickness;
         double crossMean = s[o + StormBodySkeleton.DECK_CROSS_MEAN];
-        double dFootprint = deckFootprint(s, o, w, c, deckLo, deckHi, crossMean);
-        double dVertical = Math.max(bottom - y, y - top);
+        double dFootprint = deckWedge(w, c, deckLo, deckHi, crossMean,
+                towerRadius, s[o + StormBodySkeleton.DECK_HALF_WIDTH]);
         double deckRound = Math.min(0.20D * thickness, StormBodySkeleton.DECK_ROUND_MAX);
-        double dDeck = roundedBox2(dFootprint, dVertical, deckRound);
+        double rootReach = ROOT_REACH * towerRadius;
+        double rootT = clamp01(Math.max(radial - towerRadius, 0.0D) / rootReach);
+        double rootDrop = ROOT_DROP * Math.max(deckBottom - crown, 0.0D);
+        double rootSlope = rootDrop * 1.5D / rootReach;
+        double deckUnder = (bottom - rootDrop * (1.0D - rootT * rootT * (3.0D - 2.0D * rootT)) - y)
+                / Math.sqrt(1.0D + rootSlope * rootSlope);
+        double dDeck = roundedBox2(dFootprint, Math.max(deckUnder, y - top), deckRound);
 
         // Joins.
         double k = 0.6D * towerRadius;
@@ -144,7 +175,7 @@ public final class StormBodyEvaluator {
         out.strength = lerp(s[o + StormBodySkeleton.STRENGTH_ANVIL], strengthLower, lowerWeight);
         out.band = lerp(Math.min(band, 0.30D * thickness), band, lowerWeight);
         out.distance = d;
-        out.interiorFill = out.region != REGION_ANVIL && d < -out.band;
+        out.interiorFill = d < -out.band;
         return true;
     }
 
@@ -196,36 +227,72 @@ public final class StormBodyEvaluator {
         return StormLobeEvaluator.envelopeFromDistance(sample.distance, sample.band, sample.strength);
     }
 
+    /** Column radius scale over the crown-to-deck coordinate: no waist, a little wider into the deck. */
+    static double columnScale(double columnT) {
+        return 1.30D + 0.15D * smoothstep(0.3D, 1.2D, columnT);
+    }
+
     /**
-     * The deck footprint's distance: the union of DECK_DISCS discs along the
-     * deck axis, disc i at along-wind position spanning [deckLo + r_0,
-     * deckHi - r_last] and cross offset crossMean * u_i, radius r_i =
-     * W(u_i) (row C of the skeleton).
+     * Distance to the nearest four turret spheres: the two lattice rows
+     * around y and the two lattice angles around theta in each. The picked set
+     * only changes where its dropped and added spheres are equidistant, so the
+     * minimum stays continuous.
      */
-    static double deckFootprint(float[] s, int o, double w, double c,
-            double deckLo, double deckHi, double crossMean) {
-        int last = StormBodySkeleton.DECK_DISCS - 1;
-        double first = s[o + StormBodySkeleton.DECK_RADIUS_0];
-        double end = s[o + StormBodySkeleton.DECK_RADIUS_0 + last];
-        double start = deckLo + first;
-        double travel = Math.max(deckHi - end - start, 0.0D);
+    static double turrets(double x, double y, double z, double axisX, double axisZ, double theta,
+            double towerRadius, double crown, double columnSpan) {
+        double spacing = TURRET_SPACING * towerRadius;
+        int rows = Math.max((int) (columnSpan / spacing), 1);
+        int row0 = (int) Math.floor((y - crown) / spacing - 0.5D);
+        double step = 2.0D * Math.PI / TURRET_AROUND;
         double best = 1.0E9D;
-        for (int disc = 0; disc <= last; disc++) {
-            double u = disc / (double) last;
-            double dw = w - (start + u * travel);
-            double dc = c - crossMean * u;
-            best = Math.min(best, Math.sqrt(dw * dw + dc * dc)
-                    - s[o + StormBodySkeleton.DECK_RADIUS_0 + disc]);
+        for (int rowPick = 0; rowPick < 2; rowPick++) {
+            int row = Math.max(0, Math.min(rows - 1, row0 + rowPick));
+            double rowY = crown + (row + 0.5D) * spacing;
+            double rowRadius = towerRadius * (1.28D + 0.15D * smoothstep(0.3D, 1.2D, (rowY - crown) / columnSpan));
+            double rowOffset = row * 0.5D * step + 0.9D * (row % 3);
+            double around = Math.floor((theta - rowOffset) / step);
+            for (int anglePick = 0; anglePick < 2; anglePick++) {
+                double angle = rowOffset + (around + anglePick) * step;
+                double dx = x - (axisX + rowRadius * Math.cos(angle));
+                double dy = y - rowY;
+                double dz = z - (axisZ + rowRadius * Math.sin(angle));
+                best = Math.min(best, Math.sqrt(dx * dx + dy * dy + dz * dz) - TURRET_RADIUS * towerRadius);
+            }
         }
         return best;
     }
 
-    static double deckHalfWidth(double ud, double towerRadius, double halfWidthMax) {
-        double halfWidth = lerp(1.3D * towerRadius, halfWidthMax, smoothstep(0.0D, 0.45D, ud));
-        double tip = smoothstep(0.78D, 1.0D, ud);
-        double root = 1.0D - smoothstep(0.0D, 0.15D, ud);
-        return halfWidth * Math.sqrt(Math.max(1.0D - 0.85D * tip * tip, 0.0D))
-                * Math.sqrt(Math.max(1.0D - 0.6D * root * root, 0.0D));
+    /** Widest downwind half-width of the deck wedge. */
+    static double wedgeTipHalf(double towerRadius, double deckHalfWidth) {
+        return Math.max(1.1D * deckHalfWidth, 1.2D * towerRadius);
+    }
+
+    /**
+     * The deck footprint: an exact rounded trapezoid (wedge) along the deck
+     * axis, half-width Rt at the upwind root and {@link #wedgeTipHalf} at the
+     * downwind edge, corners rounded 0.5 Rt, its cross coordinate sheared by
+     * the cross drift crossMean * u.
+     */
+    static double deckWedge(double w, double c, double deckLo, double deckHi, double crossMean,
+            double towerRadius, double deckHalfWidth) {
+        double deckLength = Math.max(deckHi - deckLo, 1.0D);
+        double ud = clamp01((w - deckLo) / deckLength);
+        double halfLength = 0.5D * deckLength;
+        double corner = 0.5D * towerRadius;
+        double qx = Math.abs(c - crossMean * ud);
+        double qy = w - (deckLo + halfLength);
+        double r1 = towerRadius - corner;
+        double r2 = wedgeTipHalf(towerRadius, deckHalfWidth) - corner;
+        double he = Math.max(halfLength - corner, 1.0D);
+        double k2x = r2 - r1;
+        double k2y = 2.0D * he;
+        double cax = qx - Math.min(qx, qy < 0.0D ? r1 : r2);
+        double cay = Math.abs(qy) - he;
+        double t = Math.max(0.0D, Math.min(1.0D, ((r2 - qx) * k2x + (he - qy) * k2y) / (k2x * k2x + k2y * k2y)));
+        double cbx = qx - r2 + k2x * t;
+        double cby = qy - he + k2y * t;
+        double sign = (cbx < 0.0D && cay < 0.0D) ? -1.0D : 1.0D;
+        return sign * Math.sqrt(Math.min(cax * cax + cay * cay, cbx * cbx + cby * cby)) - corner;
     }
 
     /**

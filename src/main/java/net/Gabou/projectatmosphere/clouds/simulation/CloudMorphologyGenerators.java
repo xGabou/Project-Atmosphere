@@ -1432,12 +1432,26 @@ final class CloudMorphologyGenerators {
     }
 
     private static Vec3 sheetCell(Vec3 origin, SpawnPlan plan, int clusterIndex, RandomSource random, float gapBias) {
-        int signedIndex = clusterIndex - (plan.clusterCount() / 2);
-        float along = signedIndex * plan.radius() * (0.72F + gapBias) + (random.nextFloat() - 0.5F) * plan.radius() * 0.82F;
-        float across = (random.nextFloat() - 0.5F) * plan.groupRadius() * (0.30F + gapBias * 0.32F);
-        float y = (random.nextFloat() - 0.5F) * plan.topRise() * 0.16F;
-        return origin.add(along, y, across);
+        // A layer fills an area, not a line: members sit on a sunflower
+        // (Vogel) spiral inside a 5:3 oval. Neighbour spacing is (1 + gapBias)
+        // member radii with a 0.66 area packing, so stratus members overlap
+        // into one continuous deck and stratocumulus keeps clumps with gaps.
+        int count = Math.max(1, plan.clusterCount());
+        float spacing = plan.radius() * (1.0F + gapBias);
+        float ovalRadius = spacing * (float) Math.sqrt(count / (Math.PI * 0.6D * 0.66D));
+        float fraction = (float) Math.sqrt((clusterIndex + 0.5F) / count);
+        float angle = clusterIndex * SHEET_GOLDEN_ANGLE;
+        float along = (float) Math.cos(angle) * ovalRadius * fraction
+                + (random.nextFloat() - 0.5F) * spacing * 0.35F;
+        float across = (float) Math.sin(angle) * ovalRadius * 0.6F * fraction
+                + (random.nextFloat() - 0.5F) * spacing * 0.35F;
+        float cos = (float) Math.cos(plan.orientationRadians());
+        float sin = (float) Math.sin(plan.orientationRadians());
+        float y = (random.nextFloat() - 0.5F) * plan.topRise() * 0.10F;
+        return origin.add(along * cos - across * sin, y, along * sin + across * cos);
     }
+
+    private static final float SHEET_GOLDEN_ANGLE = 2.3999632F;
 
     private static Vec3 filamentCell(Vec3 origin, SpawnPlan plan, int clusterIndex, RandomSource random) {
         int signedIndex = clusterIndex - (plan.clusterCount() / 2);

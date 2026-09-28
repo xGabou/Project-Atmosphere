@@ -3500,26 +3500,27 @@ void directStormGroupField(
 //   base    flat-bottomed slab (0.75 of the BASE lobes' height), footprint a
 //           superellipse (n = 3) over the separate upwind / downwind / left /
 //           right reach, radius scale 1 - 0.20 t^2, corners rounded 0.18 h;
-//   updraft one column along the leaning tower axis, radius
-//           Rt * (1 + 0.30 (1 - smoothstep(-0.4, 0.25, t))
-//                   + 0.30 smoothstep(0.5, 1.2, t));
-//   deck    one flat-topped sheet over the along-wind coordinate: thickness
-//           span * (0.85 - 0.45 u); footprint the union of 11 discs along the
-//           deck axis whose radii follow T239's half-width profile (1.3 Rt
-//           fanning to the deck half-width by u = 0.45, rounded root and
-//           tip) and whose centres follow the cross drift - an exact
-//           distance, where T239's clamped box overestimated past the ends;
+//   updraft one column along the leaning tower axis with no waist, radius
+//           Rt * (1.30 + 0.15 smoothstep(0.3, 1.2, t)), rising into the deck
+//           to 0.25 of its span below the top, carrying cauliflower turrets
+//           (a staggered sphere lattice, 5 around, rows 0.8 Rt apart,
+//           radius 0.42 Rt, smooth-unioned at k = 0.12 Rt);
+//   deck    a thin flat-topped sheet: thickness span * (0.38 - 0.18 u); in
+//           plan an exact rounded trapezoid (wedge) from Rt at the upwind
+//           root to max(1.1 half-width, 1.2 Rt) downwind, following the
+//           cross drift; underside lowered 0.22 of the crown-to-deck span at
+//           the column, curving up over 1.2 Rt past it (T241);
 //   joins   smooth minimum base|column then |deck, k = 0.6 Rt.
 //
-// The base term is divided by its analytic gradient magnitude and the deck
-// footprint is a disc union, so the result is a first-order distance: the
-// march's safe advance and the shared field's dilation rely on it (Lipschitz
-// bounds below, measured by StormBodyAnatomySandbox: 1.03 / 1.59).
+// The base term is divided by its analytic gradient magnitude and the
+// turrets and the wedge are exact, so the result is a first-order distance:
+// the march's safe advance and the shared field's dilation rely on it
+// (Lipschitz bounds below, measured by StormBodyAnatomySandbox).
 //
 // Regions (mode 17): 1 base, 2 transition, 4 updraft, 8 anvil deck. The edge
 // band is a fixed physical width (T239 Task 1) and the interior fill is owned
-// here: base, updraft and transition interiors take the structural-continuity
-// fill, the deck the strength fill.
+// here: every interior, the anvil sheet included, takes the structural-
+// continuity fill (T241).
 // =====================================================================
 const float STORM_BODY_LIPSCHITZ_HORIZONTAL = 1.4;
 const float STORM_BODY_LIPSCHITZ_VERTICAL = 1.7;
@@ -3527,26 +3528,8 @@ int paBodyRegion = 0;
 bool paBodyInteriorFill = false;
 
 vec4 stormBodyTexel(int groupSlot, int texelIndex) {
-    int row = MAX_STORM_LOBES + 3 * groupSlot + texelIndex / 5;
+    int row = MAX_STORM_LOBES + 2 * groupSlot + texelIndex / 5;
     return texelFetch(StormDescriptorSampler, ivec2(texelIndex - (texelIndex / 5) * 5, row), 0);
-}
-
-// The deck footprint: 11 discs along the deck axis, from the upwind root
-// (touching deckLo) to the downwind tip, radii from skeleton row C.
-float stormBodyDeckFootprint(int groupSlot, vec2 wc, float deckLo, float deckHi, float crossMean) {
-    vec4 r0 = stormBodyTexel(groupSlot, 10);
-    vec4 r1 = stormBodyTexel(groupSlot, 11);
-    vec4 r2 = stormBodyTexel(groupSlot, 12);
-    float radii[11] = float[11](r0.x, r0.y, r0.z, r0.w, r1.x, r1.y, r1.z, r1.w, r2.x, r2.y, r2.z);
-    float start = deckLo + radii[0];
-    float travel = max(deckHi - radii[10] - start, 0.0);
-    float best = 1.0e9;
-    for (int disc = 0; disc < 11; disc++) {
-        float u = float(disc) * 0.1;
-        vec2 centre = vec2(start + u * travel, crossMean * u);
-        best = min(best, length(wc - centre) - radii[disc]);
-    }
-    return best;
 }
 
 float stormBodySminWeight(float a, float b, float k) {
@@ -3639,29 +3622,79 @@ void stormBodyGroupField(
     vec2 baseD = vec2(baseH, baseV) + baseRound;
     float dBase = length(max(baseD, 0.0)) + min(max(baseD.x, baseD.y), 0.0) - baseRound;
 
-    // Updraft column.
+    // Updraft column: no waist - the flared root width held to the deck and
+    // widening a little into it - carrying cauliflower turrets: a staggered
+    // lattice of spheres (5 around, rows 0.8 Rt apart, radius 0.42 Rt) on the
+    // column surface, the nearest four smooth-unioned in. Exact sphere
+    // distances keep the body a true distance (Lipschitz ~1).
     float axisT = clamp((p.y - a4.x) / max(a4.y - a4.x, 1.0), 0.0, 1.0);
     vec2 axis = mix(a3.xy, a3.zw, axisT);
     float deckBottom = b1.x;
     float deckTop = b1.y;
+    float span = max(deckTop - deckBottom, 20.0);
     float crown = floorY + baseHeight;
-    float columnT = (p.y - crown) / max(deckBottom - crown, 1.0);
-    float columnScale = 1.0
-        + 0.30 * (1.0 - smoothstep(-0.4, 0.25, columnT))
-        + 0.30 * smoothstep(0.5, 1.2, columnT);
-    float dColumn = max(length(p.xz - axis) - towerRadius * columnScale,
-        max(floorY + 0.10 * baseHeight - p.y, p.y - deckMid));
+    float columnSpan = max(deckBottom - crown, 1.0);
+    float columnT = (p.y - crown) / columnSpan;
+    vec2 fromAxis = p.xz - axis;
+    float radial = length(fromAxis);
+    float dColumn = max(radial - towerRadius * (1.30 + 0.15 * smoothstep(0.3, 1.2, columnT)),
+        max(floorY + 0.10 * baseHeight - p.y, p.y - (deckTop - 0.25 * span)));
+    float theta = atan(fromAxis.y, fromAxis.x);
+    float turretSpacing = 0.80 * towerRadius;
+    int turretRows = max(int(columnSpan / turretSpacing), 1);
+    int turretRow0 = int(floor((p.y - crown) / turretSpacing - 0.5));
+    const float TURRET_STEP = 6.2831853 / 5.0;
+    float dTurrets = 1.0e9;
+    for (int rowPick = 0; rowPick < 2; rowPick++) {
+        int row = clamp(turretRow0 + rowPick, 0, turretRows - 1);
+        float rowY = crown + (float(row) + 0.5) * turretSpacing;
+        float rowRadius = towerRadius
+            * (1.28 + 0.15 * smoothstep(0.3, 1.2, (rowY - crown) / columnSpan));
+        float rowOffset = float(row) * 0.5 * TURRET_STEP + 0.9 * float(row - 3 * (row / 3));
+        float around = floor((theta - rowOffset) / TURRET_STEP);
+        for (int anglePick = 0; anglePick < 2; anglePick++) {
+            float angle = rowOffset + (around + float(anglePick)) * TURRET_STEP;
+            vec3 turretCentre = vec3(axis.x + rowRadius * cos(angle), rowY,
+                axis.y + rowRadius * sin(angle));
+            dTurrets = min(dTurrets, length(p - turretCentre) - 0.42 * towerRadius);
+        }
+    }
+    float turretK = 0.12 * towerRadius;
+    dColumn = stormBodySmin(dColumn, dTurrets, turretK, stormBodySminWeight(dColumn, dTurrets, turretK));
 
-    // Deck sheet.
+    // Deck: a thin sheet capping the tower, spreading as a wedge - an exact
+    // rounded trapezoid, tower-wide at its upwind root and broadest at its
+    // downwind edge - whose underside is lowered near the updraft (0.22 of
+    // the crown-to-deck span) and curves up over 1.2 Rt past the column.
     float deckLength = max(b0.y - b0.x, 1.0);
     float ud = clamp((w - b0.x) / deckLength, 0.0, 1.0);
-    float span = max(deckTop - deckBottom, 20.0);
-    float thickness = span * (0.85 - 0.45 * ud);
+    float thickness = span * (0.38 - 0.18 * ud);
     float top = deckTop - 0.05 * span * ud;
     float bottom = top - thickness;
-    float dFootprint = stormBodyDeckFootprint(groupSlot, vec2(w, c), b0.x, b0.y, b0.w);
+    float halfLength = 0.5 * deckLength;
+    float rootHalf = towerRadius;
+    float tipHalf = max(1.1 * b0.z, 1.2 * towerRadius);
+    float corner = 0.5 * rootHalf;
+    vec2 wedgeQ = vec2(abs(c - b0.w * ud), w - (b0.x + halfLength));
+    float wedgeR1 = rootHalf - corner;
+    float wedgeR2 = tipHalf - corner;
+    float wedgeHe = max(halfLength - corner, 1.0);
+    vec2 wedgeK1 = vec2(wedgeR2, wedgeHe);
+    vec2 wedgeK2 = vec2(wedgeR2 - wedgeR1, 2.0 * wedgeHe);
+    vec2 wedgeCa = vec2(wedgeQ.x - min(wedgeQ.x, wedgeQ.y < 0.0 ? wedgeR1 : wedgeR2),
+        abs(wedgeQ.y) - wedgeHe);
+    vec2 wedgeCb = wedgeQ - wedgeK1
+        + wedgeK2 * clamp(dot(wedgeK1 - wedgeQ, wedgeK2) / dot(wedgeK2, wedgeK2), 0.0, 1.0);
+    float wedgeSign = (wedgeCb.x < 0.0 && wedgeCa.y < 0.0) ? -1.0 : 1.0;
+    float dFootprint = wedgeSign * sqrt(min(dot(wedgeCa, wedgeCa), dot(wedgeCb, wedgeCb))) - corner;
     float deckRound = min(0.20 * thickness, 20.0);
-    vec2 deckD = vec2(dFootprint, max(bottom - p.y, p.y - top)) + deckRound;
+    float rootReach = 1.2 * towerRadius;
+    float rootT = clamp(max(radial - towerRadius, 0.0) / rootReach, 0.0, 1.0);
+    float rootDrop = 0.22 * max(deckBottom - crown, 0.0);
+    float rootSlope = rootDrop * 1.5 / rootReach;
+    float deckUnder = (bottom - rootDrop * (1.0 - rootT * rootT * (3.0 - 2.0 * rootT)) - p.y)
+        / sqrt(1.0 + rootSlope * rootSlope);
+    vec2 deckD = vec2(dFootprint, max(deckUnder, p.y - top)) + deckRound;
     float dDeck = length(max(deckD, 0.0)) + min(max(deckD.x, deckD.y), 0.0) - deckRound;
 
     // Joins.
@@ -3694,7 +3727,8 @@ void stormBodyGroupField(
     float clearance = d - groupSoftness;
     groupMinClearance = clearance > 0.0 ? clearance * 0.8 : clearance;
     paBodyRegion = region;
-    paBodyInteriorFill = region != 8 && d < -groupSoftness;
+    // The anvil is a solid sheet: every interior takes the structural fill.
+    paBodyInteriorFill = d < -groupSoftness;
     if (paStormFieldBuildNode) {
         paLastStormMaxVerticalSlope = max(paLastStormMaxVerticalSlope,
             STORM_BODY_LIPSCHITZ_VERTICAL);

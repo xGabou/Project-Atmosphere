@@ -4390,6 +4390,17 @@ implementation, while visual polish remains independently active.
   SIDE 7.63 -> 5.60 ms, PVN 8.07 -> 4.44 ms; motion alpha flicker -58%, low-coverage luma confounded by
   the lobe-sized route. Next: **T241 storm identity + body-derived capture poses / route**.
   [SC-005, SC-016, SC-021]
+- [X] T241 [QUALITY] [US1] Cloud shape polish. **KEEP - production change; see
+  `validation/t241-shape-polish.md`.** Storm body, one mechanism per same-storm A/B (C1-C15): tower
+  sized from the lower mass (0.48 base reach) with the base scaled to its 1.3 Rt foot, no-waist column
+  (1.30 -> 1.45 Rt), thin deck (0.38 -> 0.20 span) as an exact wedge, root drop 0.22 over 1.2 Rt, solid
+  anvil fill; rejected: sinusoid grooves, straight walls, overshooting dome, big 3-lattice turrets. The
+  sinusoid lumps broke the distance (Lipschitz 51/35) and were replaced by an exact turret sphere
+  lattice (Lipschitz 1.02/1.03). Skeleton now 2 rows per group (descriptor height 80). All-type gallery:
+  supercell was `SPIRAL_STORM` (now STORM_ANVIL, a full Cb), sheet members were laid on a line (now a
+  Vogel oval fill), cirrus now spawns +480 blocks. Non-storm silhouettes remain smooth (8-block weather
+  map, morphology ellipse gate, low-contrast noise measured). Next: **T242 analytic non-storm cloud
+  bodies** (cumulus, congestus, layers). [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

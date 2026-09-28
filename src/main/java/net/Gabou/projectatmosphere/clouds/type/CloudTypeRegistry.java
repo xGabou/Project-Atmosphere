@@ -116,7 +116,7 @@ public final class CloudTypeRegistry {
                 "supercell",
                 "Supercell",
                 CloudFamily.CUMULONIMBUS,
-                CloudMorphologyFamily.SPIRAL_STORM,
+                CloudMorphologyFamily.STORM_ANVIL,
                 new CloudVisualProfile(3.20F, 0.78F, 0.52F, 0.10F, 0.86F, 0.010F, 0.145F, 0.190F, 1.68F, 1.30F, 0.24F, 1.00F, 1.00F, 0.74F),
                 stormReady(),
                 new CloudEvolutionRules(List.of())

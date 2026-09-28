@@ -44,8 +44,7 @@ public enum CloudMorphologyFamily {
         return switch (id) {
             case "vapor_cluster", "cumulus_humilis", "cumulus_mediocris" -> PUFF;
             case "cumulus_congestus" -> TOWER;
-            case "cumulonimbus_calvus", "cumulonimbus_capillatus" -> STORM_ANVIL;
-            case "supercell" -> SPIRAL_STORM;
+            case "cumulonimbus_calvus", "cumulonimbus_capillatus", "supercell" -> STORM_ANVIL;
             case "stratus_nebulosus", "nimbostratus" -> SHEET;
             case "stratocumulus" -> CELLULAR_SHEET;
             case "cirrus" -> FILAMENT;

@@ -173,8 +173,8 @@ public final class StormBodyAnatomySandbox {
                                     -rx * texels[o + StormBodySkeleton.WIND_Z] + rz * texels[o + StormBodySkeleton.WIND_X],
                                     y - floor, Math.max(minX - x, x - maxX), Math.max(minZ - z, z - maxZ),
                                     Math.max(minY - y, y - maxY), deckTop - floor);
-                            System.out.printf(Locale.ROOT, "  deckLo=%.0f deckHi=%.0f r0=%.0f r10=%.0f wind=(%.3f,%.3f) crossMean=%.0f halfW=%.0f tower=%.0f%n",
-                                    deckLo, deckHi, texels[o + StormBodySkeleton.DECK_RADIUS_0], texels[o + StormBodySkeleton.DECK_RADIUS_0 + 10],
+                            System.out.printf(Locale.ROOT, "  deckLo=%.0f deckHi=%.0f wind=(%.3f,%.3f) crossMean=%.0f halfW=%.0f tower=%.0f%n",
+                                    deckLo, deckHi,
                                     texels[o + StormBodySkeleton.WIND_X], texels[o + StormBodySkeleton.WIND_Z], texels[o + StormBodySkeleton.DECK_CROSS_MEAN],
                                     texels[o + StormBodySkeleton.DECK_HALF_WIDTH], texels[o + StormBodySkeleton.TOWER_RADIUS]);
                         }
@@ -214,7 +214,10 @@ public final class StormBodyAnatomySandbox {
                 crossDrift, axisCore, lipschitzH, lipschitzV, enclosureMisses, enclosureSamples);
 
         requireRange("storm body height", height, 640.0D, 860.0D);
-        requireRange("storm body base aspect (height / along-wind footprint)", baseAspect, 0.0D, 0.25D);
+        // T241: the lower mass is the tower's flared foot (1.3 Rt of mean reach),
+        // not a wide saucer, so its aspect rose from ~0.2 to ~0.28 - still a
+        // flat foot at about 3.5 : 1, never a ball.
+        requireRange("storm body base aspect (height / along-wind footprint)", baseAspect, 0.0D, 0.35D);
         requireRange("storm body exposed updraft (of storm height)", exposedUpdraft, 0.40D, 0.75D);
         requireRange("storm body column width max / min (25-75%)", columnWidthRatio, 1.0D, 1.25D);
         requireRange("storm body deck aspect (mean thickness / length)", deckAspect, 0.0D, 0.15D);

@@ -470,7 +470,7 @@ public final class CloudFieldValidation {
                 new LayoutCase("nimbostratus", CloudMorphologyFamily.SHEET),
                 new LayoutCase("stratocumulus", CloudMorphologyFamily.CELLULAR_SHEET),
                 new LayoutCase("cirrus", CloudMorphologyFamily.FILAMENT),
-                new LayoutCase("supercell", CloudMorphologyFamily.SPIRAL_STORM)
+                new LayoutCase("supercell", CloudMorphologyFamily.STORM_ANVIL)
         );
         for (LayoutCase layoutCase : cases) {
             CloudField field = sampleField(Vec3.ZERO, layoutCase.cloudTypeId(), layoutCase.morphology());
