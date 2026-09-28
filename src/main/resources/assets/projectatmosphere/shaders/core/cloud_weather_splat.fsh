@@ -332,6 +332,22 @@ void main() {
             edgeLift = curvedRange.x - shape.y;
             edgeDrop = shape.z - curvedRange.y;
         }
+        if (nimbostratus > 0.5) {
+            // T243: nimbostratus is a flat-topped rain layer with room below
+            // its base for a ragged hanging lower structure (the volume carves
+            // it). The top tapers over the outer rim only - a flat top run to
+            // the rim ended the deck in a vertical wall whose blocky coverage
+            // contour read as stairs.
+            edgeDrop = edge01 * edge01 * cellSpan * 0.55;
+            edgeLift = -0.25 * cellSpan;
+        }
+        if (stratus > 0.5) {
+            // T243: each stratus member's own rim taper printed a dip into the
+            // averaged deck top - fish-scale plates from above. Members stay
+            // flat; the volume tapers the deck at its OUTER rim instead.
+            edgeDrop = 0.0;
+            edgeLift = 0.0;
+        }
         float localBase = shape.y + edgeLift;
         float localTop = shape.z - edgeDrop;
         if (envelopeOnly) {

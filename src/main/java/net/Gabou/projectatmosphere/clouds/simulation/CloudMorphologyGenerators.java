@@ -248,9 +248,10 @@ final class CloudMorphologyGenerators {
         // applied that scale twice and made upper tower lobes needle-thin.
         float finalRadius = Math.max(6.0F, plan.radius() * stableScale * lobeScale * radiusJitter);
         if (family == CloudMorphologyFamily.FILAMENT) {
-            finalRadius = Math.max(5.0F, finalRadius * (0.42F + random.nextFloat() * 0.20F));
+            finalRadius = Math.max(5.0F, finalRadius * (0.80F + random.nextFloat() * 0.30F));
         } else if (family == CloudMorphologyFamily.CELLULAR_SHEET) {
-            finalRadius = Math.max(10.0F, finalRadius * (0.52F + random.nextFloat() * 0.24F));
+            // T243: a wider clump-size spread (0.55..1.0) for a varied field.
+            finalRadius = Math.max(10.0F, finalRadius * (0.55F + random.nextFloat() * 0.45F));
         }
 
         float finalDensity = Mth.clamp(plan.density() * (0.90F + random.nextFloat() * 0.18F), 0.0F, 1.0F);
@@ -485,6 +486,17 @@ final class CloudMorphologyGenerators {
         CloudShapeProfile shape = definition.getShapeProfile();
         CloudVisualProfile visual = definition.getVisualProfile();
         float radius = shape.getBaseRadius() * 0.74F;
+        if (definition.getId().contains("nimbostratus")) {
+            // T243: the rain deck from ~16 smaller members (about the same
+            // total area) - eight big ellipses traced a curled, notched outline
+            // from above; this reads as one broad continuous layer.
+            float small = shape.getBaseRadius() * 0.52F;
+            return plan(definition, random, 14, 18, small, radius * 3.40F,
+                    Math.max(4.0F, shape.getBaseOffset() * 0.72F), Math.max(8.0F, shape.getTopOffset() * 0.72F),
+                    0.46F + visual.getDensityMultiplier() * 0.22F + visual.getPrecipitationCoreStrength() * 0.16F,
+                    0.64F + visual.getCoverageMultiplier() * 0.22F,
+                    0.32F + visual.getTopSoftness() * 0.46F);
+        }
         return plan(definition, random, 7, 11, radius, radius * 3.40F,
                 Math.max(4.0F, shape.getBaseOffset() * 0.72F), Math.max(8.0F, shape.getTopOffset() * 0.72F),
                 0.46F + visual.getDensityMultiplier() * 0.22F + visual.getPrecipitationCoreStrength() * 0.16F,
@@ -506,8 +518,9 @@ final class CloudMorphologyGenerators {
     private static SpawnPlan filamentPlan(@NotNull CloudTypeDefinition definition, @NotNull RandomSource random) {
         CloudShapeProfile shape = definition.getShapeProfile();
         CloudVisualProfile visual = definition.getVisualProfile();
-        float radius = shape.getBaseRadius() * 0.24F;
-        return plan(definition, random, 6, 10, radius, radius * 6.25F,
+        // T243: cirrus spans a broad stretch of sky - longer, larger strands.
+        float radius = shape.getBaseRadius() * 0.45F;
+        return plan(definition, random, 8, 12, radius, radius * 6.25F,
                 Math.max(2.0F, shape.getBaseOffset() * 0.42F), Math.max(5.0F, shape.getTopOffset() * 0.46F),
                 0.18F + visual.getDensityMultiplier() * 0.16F,
                 0.20F + visual.getCoverageMultiplier() * 0.14F,
@@ -955,23 +968,29 @@ final class CloudMorphologyGenerators {
         float middleTangentSign = random.nextBoolean() ? 1.0F : -1.0F;
         List<PuffLobeSpec> middleLobes = new ArrayList<>(2);
         for (int middle = 0; middle < 2; middle++) {
-            int supportIndex = 1 + ((firstSupport + middle) % shoulderCount);
+            // T243: mediocris raises both middle lobes from the same shoulder,
+            // flanking it in opposite tangent directions - one broad connected,
+            // asymmetric upper mass instead of two lobes on shoulders 120
+            // degrees apart with a notch between them (the "ears" / V).
+            int supportIndex = mediocris
+                    ? 1 + (firstSupport % shoulderCount)
+                    : 1 + ((firstSupport + middle) % shoulderCount);
             PuffLobeSpec middleLobe = createUpperPuffLobe(
                     lobes.get(supportIndex),
                     condensationBase,
                     radius,
                     random,
-                    0.26F,
-                    0.30F,
+                    mediocris ? 0.30F : 0.26F,
+                    mediocris ? 0.34F : 0.30F,
                     mediocris ? 0.36F : 0.32F,
                     mediocris ? 0.42F : 0.38F,
                     mediocris ? 0.24F : 0.22F,
                     mediocris ? 0.32F : 0.30F,
                     mediocris ? 0.72F : 0.58F,
                     mediocris ? 0.86F : 0.70F,
-                    0.60F,
+                    mediocris ? 0.80F : 0.60F,
                     CloudMorphologyMemberTier.MIDDLE,
-                    middleTangentSign
+                    mediocris && middle == 1 ? -middleTangentSign : middleTangentSign
             );
             middleLobes.add(middleLobe);
             lobes.add(middleLobe);
@@ -1026,13 +1045,13 @@ final class CloudMorphologyGenerators {
         for (int middle = 0; middle < 2; middle++) {
             PuffLobeSpec lobe = createUpperPuffLobe(lobes.get(1 + (first + middle) % shoulderCount),
                     condensationBase, radius, random,
-                    0.12F, 0.16F, 0.54F, 0.60F, 0.28F, 0.36F, 1.00F, 1.15F, 0.50F,
+                    0.12F, 0.16F, 0.64F, 0.70F, 0.28F, 0.36F, 1.00F, 1.15F, 0.50F,
                     CloudMorphologyMemberTier.MIDDLE, tangentSign);
             middles.add(lobe);
             lobes.add(lobe);
         }
         PuffLobeSpec upper = createUpperPuffLobe(middles.get(random.nextInt(2)), condensationBase, radius,
-                random, 0.10F, 0.14F, 0.54F, 0.60F, 0.70F, 0.82F, 0.95F, 1.05F, 0.45F,
+                random, 0.10F, 0.14F, 0.60F, 0.66F, 0.70F, 0.82F, 0.95F, 1.05F, 0.45F,
                 CloudMorphologyMemberTier.MIDDLE, -tangentSign);
         lobes.add(upper);
         lobes.add(createUpperPuffLobe(upper, condensationBase, radius,
@@ -1483,17 +1502,23 @@ final class CloudMorphologyGenerators {
         // member radii with a 0.66 area packing, so stratus members overlap
         // into one continuous deck and stratocumulus keeps clumps with gaps.
         int count = Math.max(1, plan.clusterCount());
-        // Continuous decks pack at 0.75 radii: after the rim, the outline noise
-        // and the carve, a member's solid core is ~0.6 of its radius, so wider
-        // spacing left the deck as separate islands.
-        float spacing = plan.radius() * (gapBias > 0.3F ? 1.0F + gapBias : 0.75F);
+        // Continuous decks pack at 0.65 radii with a third of the jitter: after
+        // the rim, the outline noise and the carve, a member's solid core is
+        // ~0.6 of its radius, so wider spacing left the deck as separate
+        // islands and a jittered rim member hung off as a knob (T243).
+        // Cellular sheets (stratocumulus) pack at ~0.78 plan radii: 0.94 left a
+        // sparse scatter of separate clumps; now most neighbours join into a
+        // semi-connected field and small clumps leave natural gaps (T243).
+        boolean continuousDeck = gapBias <= 0.3F;
+        float spacing = plan.radius() * (continuousDeck ? 0.65F : 0.46F + gapBias * 0.62F);
+        float jitter = spacing * (continuousDeck ? 0.15F : 0.35F);
         float ovalRadius = spacing * (float) Math.sqrt(count / (Math.PI * 0.6D * 0.66D));
         float fraction = (float) Math.sqrt((clusterIndex + 0.5F) / count);
         float angle = clusterIndex * SHEET_GOLDEN_ANGLE;
         float along = (float) Math.cos(angle) * ovalRadius * fraction
-                + (random.nextFloat() - 0.5F) * spacing * 0.35F;
+                + (random.nextFloat() - 0.5F) * jitter;
         float across = (float) Math.sin(angle) * ovalRadius * 0.6F * fraction
-                + (random.nextFloat() - 0.5F) * spacing * 0.35F;
+                + (random.nextFloat() - 0.5F) * jitter;
         float cos = (float) Math.cos(plan.orientationRadians());
         float sin = (float) Math.sin(plan.orientationRadians());
         // Continuous decks (small gap bias) stay level; cellular sheets keep a

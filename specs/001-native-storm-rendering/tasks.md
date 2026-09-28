@@ -4410,6 +4410,15 @@ implementation, while visual polish remains independently active.
   per-family vertical profile (decks continuous), and detail-FBM billows on cumulus puffs. Congestus is
   a lumpy tower, stratocumulus irregular clumps, stratus / nimbostratus ragged decks. Humilis / mediocris
   still small. [SC-005, SC-016, SC-021]
+- [X] T243 [QUALITY] [US1] Per-family cloud shape pass. **KEEP - production change, accepted by the
+  user at candidate 60; see `validation/t243-shape-pass.md`.** One family at a time, each change a
+  gallery A/B: storm mass floor by anatomy (solid base / trunk, thinner solid anvil with wispy edge);
+  cauliflower turrets on cumulus lobes, one-shoulder mediocris upper mass, wider congestus tiers;
+  stratus flat member tops with a deck-rim taper and coverage-only carve (no plates / terraces);
+  stratocumulus semi-connected packing; nimbostratus flat top, tapered rim, ragged hanging base and
+  ~16 smaller deck members; fibrous cirrus at 3x density. Rejected: thin-ribbon cirrus (vanishes
+  overhead), inward mediocris middles (guard-capped, no effect), storm core density x1.8 / x4 (the
+  trunk's blue see-through look is LIGHTING, not density - next task). [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

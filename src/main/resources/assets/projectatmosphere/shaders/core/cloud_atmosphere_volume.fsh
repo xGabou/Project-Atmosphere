@@ -4413,6 +4413,19 @@ vec4 directPuffLobeSample(vec3 p, int candidateIndex, out int puffTier) {
             radial / max(equatorRadius, 0.001),
             verticalCoordinate
         ));
+        {
+            // T243: a cumulus lobe is not a smooth sphere - its upper part
+            // carries broad rounded cauliflower turrets (seeded per lobe,
+            // 3 and 5 around, ~1.6 / 2.4 up the lobe, square-rooted so they
+            // survive the lobe union at 0.40 / 0.25 of the lobe radius).
+            // The flat base (below the lobe's widest point) is untouched.
+            float lobeTheta = atan(local.y, local.x);
+            float lobeSeed = lobePhase * 6.2831853;
+            float bumpA = sqrt(max(sin(3.0 * lobeTheta + lobeSeed) * sin(10.05 * h + lobeSeed * 1.7), 0.0));
+            float bumpB = sqrt(max(sin(5.0 * lobeTheta - lobeSeed * 2.3) * sin(15.08 * h - lobeSeed), 0.0));
+            float upperPart = smoothstep(peakHeight * 0.6, peakHeight + 0.1, h);
+            implicitRadius /= 1.0 + (0.40 * bumpA + 0.25 * bumpB) * upperPart;
+        }
         envelopeDepth = max(1.0 - implicitRadius, 0.0);
         if (puffTier == 0) {
             envelopeDepth *= smoothstep(0.0, baseFeatherH, h);
@@ -5007,7 +5020,9 @@ float familyMacroShape(
         float sheet = smoothstep(0.16, 0.68,
             lowFbm * 0.52 + baseCarrier * 0.22
                 + directionalCarrier * 0.10 + precipitation * 0.16);
-        return verticalBand(h, 0.018, mix(0.62, 0.92, sheet))
+        // T243: a flat rain-layer top, not noise-bulged blob crowns.
+        float nimboTop = mix(0.86, 0.94, sheet);
+        return verticalBand(h, 0.018, nimboTop)
             * mix(0.42, 1.0, sheet);
     }
     if (profileId == 6) {
@@ -6942,6 +6957,18 @@ float cloudDensityImpl(
                 * smoothstep(0.008, 0.12, coverageMod);
         }
         cloud = macroShape * envelopeCoverage;
+        if (profileId == 6 && !directStormAvailable) {
+            // T243: cirrus is fibrous - strands ~18 blocks apart across the
+            // wind, curved and feathered by the slow noise, with body kept
+            // between the fibres (sharper fibres left under a tenth of the
+            // density and cirrus vanished); not lumpy cumulus noise.
+            float across = dot(samplePos.xz, crossWind);
+            float along = dot(samplePos.xz, windDir);
+            float fiberPhase = across * (6.2831853 / 18.0) + lowFbm * 9.0 + along * 0.004;
+            float fiber = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(fiberPhase), 2.0);
+            float strand = smoothstep(0.20, 0.60, lowFbm + 0.25 * sin(along * 0.011 + baseNoise.b * 6.0));
+            cloud *= fiber * strand;
+        }
         if (!directStormAvailable && !useDirectPuff && profileId != 6) {
             // T242: carve the outline against the RAW weather coverage
             // (it saturates to a plateau after the 0.012..0.42 remap, measured
@@ -6952,10 +6979,32 @@ float cloudDensityImpl(
                 vprof = smoothstep(0.0, 0.22, h01) * (1.0 - smoothstep(0.30, 1.0, h01));
             } else if (sheetProfile) {
                 vprof = smoothstep(0.0, 0.30, h01) * (1.0 - smoothstep(0.50, 1.0, h01));
+                if (profileId == 1) {
+                    // T243: stratus thickness varies gently - the deck's upper
+                    // surface rises and sinks with the slow noise (about +-0.2
+                    // of the layer) and tapers where the deck's TOTAL coverage
+                    // thins (its outer rim; the splat keeps member tops flat,
+                    // per-member rim tapers averaged into fish-scale plates).
+                    // The base stays flat.
+                    float rimThin = 1.0 - saturate(coverageSignal / 0.5);
+                    float topShift = 0.20 * clamp((lowFbm - 0.48) / 0.08, -1.5, 1.5) / 1.5
+                        - 0.45 * rimThin;
+                    vprof = smoothstep(0.0, 0.30, h01)
+                        * (1.0 - smoothstep(0.50 + topShift, 1.0 + topShift, h01));
+                }
             } else {
                 vprof = smoothstep(0.0, 0.12, h01) * (1.0 - smoothstep(0.35, 1.0, h01));
             }
             float envelope = min(saturate(coverageSignal / 0.5), vprof);
+            float verticalGate = 1.0;
+            if (profileId == 1) {
+                // T243: noise carving against the vertical profile punched the
+                // stratus top into a patchwork of small terraced plates. Carve
+                // the outline against coverage only; the top follows the
+                // smooth profile above.
+                verticalGate = smoothstep(0.05, 0.35, vprof);
+                envelope = saturate(coverageSignal / 0.5);
+            }
             vec4 carveTap = texture(BaseNoiseSampler,
                 baseNoiseDomain(samplePos, baseNoiseScale * 2.7), mipBias);
             float fineCarve = carveTap.g * 0.625 + carveTap.b * 0.25 + carveTap.a * 0.125;
@@ -6964,8 +7013,18 @@ float cloudDensityImpl(
             // Decks (stratus, nimbostratus) stay continuous: a lower carve
             // threshold and half the displacement.
             bool continuousDeck = profileId == 1 || profileId == 5;
-            cloud *= smoothstep(-0.08, 0.12, envelope - (continuousDeck ? 0.30 : 0.5)
-                + (continuousDeck ? 0.22 : 0.45) * carveNoise);
+            float carveThreshold = continuousDeck ? 0.30 : 0.5;
+            float carveAmplitude = continuousDeck ? 0.22 : 0.45;
+            if (profileId == 5) {
+                // T243: the nimbostratus lower third hangs in ragged fragments
+                // (strong, deep carve); the body above stays one broad layer.
+                float hang = 1.0 - smoothstep(0.12, 0.40, h01);
+                envelope = min(saturate(coverageSignal / 0.5), (1.0 - smoothstep(0.82, 1.0, h01)));
+                carveThreshold = mix(0.25, 0.55, hang);
+                carveAmplitude = mix(0.22, 0.75, hang);
+            }
+            cloud *= smoothstep(-0.08, 0.12, envelope - carveThreshold + carveAmplitude * carveNoise)
+                * verticalGate;
         }
 
         if (paTraceCapture) {
@@ -7227,6 +7286,20 @@ float shift = (deckWeight * blocksPerSd
                 // magnitude rather than by a gate: CORE_FILL is derived so the
                 // weakest core sample still outruns the deepest erosion bite.
                 cloud = max(cloud - (1.0 - detailFbm) * STORM_EROSION, 0.0);
+                // T243: storm mass by anatomy. The base, trunk and transition
+                // are solid from just inside their surface band - no speckled
+                // see-through flanks - while the outer band keeps the
+                // cauliflower. The anvil (region 8) is thin - its interior lies
+                // within about one edge band of the surface - so its floor is
+                // lower and ramps in from a quarter band: a solid sheet with a
+                // wispy outer edge.
+                {
+                    float massBand = max(paLastStormUnionSoftness, STORM_MIN_EDGE_BLOCKS);
+                    float massDepth = -paUnionDistanceUnusedB;
+                    cloud = paBodyRegion == 8
+                        ? max(cloud, 0.75 * smoothstep(0.25 * massBand, massBand, massDepth))
+                        : max(cloud, 0.9 * smoothstep(0.35 * massBand, 1.2 * massBand, massDepth));
+                }
                 if (PaDiagnosticLightingMode >= 4) {
                     paSigEroded = cloud;
                 }
@@ -7322,7 +7395,9 @@ float shift = (deckWeight * blocksPerSd
     } else if (!directStormAvailable && profileId == 5) {
         familyDensityScale = 0.72;
     } else if (!directStormAvailable && profileId == 6) {
-        familyDensityScale = 0.78;
+        // T243: 3 x 0.78 - thin fibrous cirrus nearly vanished straight
+        // overhead; its streaks keep their shape but read against the sky.
+        familyDensityScale = 2.34;
     } else if (!directStormAvailable && profileId == 7) {
         familyDensityScale = 0.74;
     }
