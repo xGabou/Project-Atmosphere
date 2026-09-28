@@ -73,18 +73,34 @@ public final class CloudGroupSpawner {
             CloudMorphologyGenerators.tuneSpawnedCluster(primary, definition, morphology, 1.0F, 0, random);
         }
 
+        // T242: a continuous deck (stratus, nimbostratus) is one layer - its
+        // members share base, top, density and coverage, so the deck reads as
+        // one surface instead of a cluster of lobes. The draws are still made
+        // so every other family keeps its random sequence.
+        boolean deck = definition.getMorphologyFamily() == CloudMorphologyFamily.SHEET;
         for (int i = 1; i < morphology.clusterCount(); i++) {
             Vec3 clusterCenter = CloudMorphologyGenerators.createClusterCenter(center, morphology, i, random);
             float scale = 0.72F + random.nextFloat() * 0.42F;
+            float baseFactor = 0.84F + random.nextFloat() * 0.20F;
+            float topFactor = 0.82F + random.nextFloat() * 0.34F;
+            float densityFactor = 0.86F + random.nextFloat() * 0.22F;
+            float coverageFactor = 0.84F + random.nextFloat() * 0.24F;
+            if (deck) {
+                baseFactor = 1.0F;
+                topFactor = 1.0F;
+                densityFactor = 1.0F;
+                coverageFactor = 1.0F;
+                scale = 1.0F;
+            }
             CloudClusterState cluster = new CloudClusterState(
                     UUID.randomUUID(),
                     level.dimension(),
                     clusterCenter,
                     Math.max(8.0F, morphology.radius()),
-                    spawnHeight - morphology.baseDrop() * (0.84F + random.nextFloat() * 0.20F),
-                    spawnHeight + morphology.topRise() * (0.82F + random.nextFloat() * 0.34F),
-                    morphology.density() * (0.86F + random.nextFloat() * 0.22F),
-                    morphology.coverage() * (0.84F + random.nextFloat() * 0.24F),
+                    spawnHeight - morphology.baseDrop() * baseFactor,
+                    spawnHeight + morphology.topRise() * topFactor,
+                    morphology.density() * densityFactor,
+                    morphology.coverage() * coverageFactor,
                     morphology.edgeSoftness()
             );
             cluster.setCloudTypeId(resolvedTypeId);

@@ -1483,7 +1483,10 @@ final class CloudMorphologyGenerators {
         // member radii with a 0.66 area packing, so stratus members overlap
         // into one continuous deck and stratocumulus keeps clumps with gaps.
         int count = Math.max(1, plan.clusterCount());
-        float spacing = plan.radius() * (1.0F + gapBias);
+        // Continuous decks pack at 0.75 radii: after the rim, the outline noise
+        // and the carve, a member's solid core is ~0.6 of its radius, so wider
+        // spacing left the deck as separate islands.
+        float spacing = plan.radius() * (gapBias > 0.3F ? 1.0F + gapBias : 0.75F);
         float ovalRadius = spacing * (float) Math.sqrt(count / (Math.PI * 0.6D * 0.66D));
         float fraction = (float) Math.sqrt((clusterIndex + 0.5F) / count);
         float angle = clusterIndex * SHEET_GOLDEN_ANGLE;
@@ -1493,7 +1496,9 @@ final class CloudMorphologyGenerators {
                 + (random.nextFloat() - 0.5F) * spacing * 0.35F;
         float cos = (float) Math.cos(plan.orientationRadians());
         float sin = (float) Math.sin(plan.orientationRadians());
-        float y = (random.nextFloat() - 0.5F) * plan.topRise() * 0.10F;
+        // Continuous decks (small gap bias) stay level; cellular sheets keep a
+        // little vertical jitter between their clumps.
+        float y = (random.nextFloat() - 0.5F) * plan.topRise() * (gapBias > 0.3F ? 0.10F : 0.0F);
         return origin.add(along * cos - across * sin, y, along * sin + across * cos);
     }
 
