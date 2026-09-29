@@ -4419,6 +4419,11 @@ implementation, while visual polish remains independently active.
   ~16 smaller deck members; fibrous cirrus at 3x density. Rejected: thin-ribbon cirrus (vanishes
   overhead), inward mediocris middles (guard-capped, no effect), storm core density x1.8 / x4 (the
   trunk's blue see-through look is LIGHTING, not density - next task). [SC-005, SC-016, SC-021]
+- [X] T244 [QUALITY] [US1] Storm trunk lighting. **KEEP - production change, accepted by the user; see
+  `validation/t244-storm-trunk-lighting.md`.** The trunk is opaque (ambient zeroed -> black, solid); its
+  see-through look was sky-blue ambient in shadow matching the sky behind it. In shadow the ambient now
+  keeps its luminance but loses the sky chroma, and low in the cloud loses the 12 % occluded-zenith
+  share: trunk B-R 50 -> 13, whole-cloud luminance -1.3 %, geometry identical. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

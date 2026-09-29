@@ -8578,6 +8578,23 @@ vec3 evaluateLightingComponents(
         ambient *= 1.0 - PaReliefShade * reliefForm * reliefShadow;
     }
     ambient *= mix(1.0, 0.68, rainFraction);
+    {
+        // T244: shadowed cloud does not see the blue zenith - the tower and
+        // anvil above it occlude it - and is lit by the horizon sky and grey
+        // cloud / ground bounce, the more so the lower it sits. Pure sky-blue
+        // ambient in shadow made the storm trunk the colour of the sky behind
+        // it, so an opaque trunk read as see-through (with the ambient zeroed
+        // it renders black and solid). In shadow the ambient keeps its
+        // luminance but loses the sky chroma, and low in the cloud the
+        // occluded zenith share (12 %) is removed - local, not a global
+        // darkening. Radiance only: density, extinction and alpha untouched.
+        float shadowed = 1.0 - directTransmission;
+        float lowerWeight = mix(0.75, 1.0, 1.0 - saturate(h01ForAmbient));
+        float ambientLuma = dot(ambient, vec3(0.2126, 0.7152, 0.0722));
+        vec3 neutral = ambientLuma * vec3(1.03, 1.0, 0.95);
+        ambient = mix(ambient, neutral, shadowed * lowerWeight);
+        ambient *= 1.0 - 0.12 * shadowed * lowerWeight;
+    }
 
     // Silver lining is restricted to an optically thin shell looking toward
     // the light, instead of boosting the entire volume through the HG phase.
