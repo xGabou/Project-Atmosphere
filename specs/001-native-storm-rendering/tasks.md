@@ -4427,6 +4427,13 @@ implementation, while visual polish remains independently active.
   build (ABAB, t208): SIDE total +0.012 ms, raw p50 0.000 / p95 +0.022 ms, PVN not slower at matched
   workload, registers unchanged (116 temps, +8 instructions) - negligible, **closed**.
   [SC-005, SC-016, SC-021]
+- [X] T245 [QUALITY] [US1] Most important remaining defect. **NO CHANGE KEPT; see
+  `validation/t245-lower-trunk-seam.md`.** Fresh production gallery: the storm lower trunk has a hard
+  horizontal seam - below the weather-map base the opaque body is shaded as RAIN (`rainFraction` steps
+  at `baseY`; the light march is swapped for a density-only optical depth), a light, mottled pillar.
+  Attributed (not rain: rain-off unchanged; exempting body material changes exactly the block).
+  Candidate C1 (cloud shading below the base) made it a near-black blotchy step - rejected. Dark
+  humilis = harness (fixture anvil shadow, od 33 from above). Fix belongs with T226. [SC-005, SC-016]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
