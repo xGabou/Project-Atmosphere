@@ -4434,6 +4434,12 @@ implementation, while visual polish remains independently active.
   Attributed (not rain: rain-off unchanged; exempting body material changes exactly the block).
   Candidate C1 (cloud shading below the base) made it a near-black blotchy step - rejected. Dark
   humilis = harness (fixture anvil shadow, od 33 from above). Fix belongs with T226. [SC-005, SC-016]
+- [X] T226-S1 [QUALITY] [US1] Lower-trunk seam, transition band. **REJECTED, no change kept; see
+  `validation/t245-lower-trunk-seam.md` section 6.** Ramping the rain fraction in over 160 blocks below
+  the base and blending the rain optical depth with the light march added a dark band under the base
+  (luma 124 -> 97 / 117 -> 73) and left the light block unchanged: the light march there is near black,
+  the rain optical depth ignores the overhead storm and is bright, so any blend is non-monotonic. Needs
+  a rain optical depth that includes the column above it (T226 precipitation model). [SC-005, SC-016]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

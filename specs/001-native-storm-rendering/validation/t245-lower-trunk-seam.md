@@ -50,3 +50,28 @@ band below `baseY` that keeps the light march and blends the rain tint in with d
 either shading model alone. The rain shading of storm bodies is adjacent to T226 (per-descriptor
 precipitation, parked on `quality/t226-local-precipitation`), so it should be scheduled with or after
 T226 rather than on top of it.
+
+## 6. T226 seam S1 - transition band, rejected (not visibly better)
+
+Resumed under T226 on this branch (T243 shapes and T244 L3 untouched; the parked
+`quality/t226-local-precipitation` branch untouched). One focused candidate, same-storm A/B in one run
+(control monolith vs candidate, production lighting; neutral view for geometry):
+
+* body material below `baseY` (`!precipitationSample`) takes the rain fraction in with depth,
+  `rainFraction *= smoothstep(0, 160, baseY - p.y)`;
+* in `sampleLighting` the cheap rain optical depth is blended with the light march by
+  `smoothstep(0.05, 0.25, rainFraction)` (rain proper, rainFraction >= 0.25, unchanged).
+
+Result (`t245-campaign/t226_seam_s1_rejected.png`): only a thin strip just below the base changed - it
+became a **new dark band** (trunk-centre luma calvus 124 -> 97, supercell 117 -> 73) - and the light,
+mottled block below it is unchanged. Not visibly better; removed. The heavy-rain verification arms were
+not run because the candidate failed on the seam first.
+
+**Why a band cannot work here.** The two shading models disagree in luminance, not just in texture:
+the full light march under the anvil is near black (T245 C1), while the rain path's
+`localDensity * 8 * ExtinctionScale` optical depth ignores the storm above the sample and is bright. Any
+blend between them is non-monotonic with depth - dark just below the base, light further down - so a
+band only moves the discontinuity or adds a dark stripe; tuning its width would not remove it. A real
+fix has to make the rain-classified lower body carry the overhead shadow itself (an optical depth that
+includes the column above it), which changes rain shading proper and belongs to the T226 precipitation
+model, not to a transition band.
