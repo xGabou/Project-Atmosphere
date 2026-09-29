@@ -50,10 +50,31 @@ production build reproduces it (calvus trunk B - R 12.5, luma 134.6; `t244_produ
 L2 alone left the trunk bluish (`t244_l2.png`). The user's direction: keep this neutral-grey level - no
 darker, no more blue.
 
-## 4. Cost
+## 4. Cost - measured, negligible (T244 closed)
 
-A few ALU operations per lit sample, no fetches, no new values carried across `cloudDensity`. Not
-measured build-vs-build; flag for the next performance pass.
+Build against build, ABAB in one session (29 Sep 2026): A = pre-T244 volume shader (`2bc464b0`),
+B = T244 (`67507cbf`); only that file differs. One client per run, back to back, `t208` marker
+(lean FINAL, 0.25 phase scale, ULTRA, 96 steps, 1920x1080). Log: `t244-campaign/t244-timing.log`.
+
+| | A1 | B1 | A2 | B2 | A mean | B mean | delta |
+|---|---|---|---|---|---|---|---|
+| SIDE total (ms) | 5.357 | 5.439 | 5.498 | 5.441 | 5.428 | 5.440 | **+0.012** |
+| SIDE raw p50 (ms) | 3.616 | 3.656 | 3.752 | 3.712 | 3.684 | 3.684 | **0.000** |
+| SIDE raw p95 (ms) | 3.842 | 3.873 | 3.958 | 3.970 | 3.900 | 3.922 | **+0.022** |
+| PVN total (ms) | 4.320 | 4.510 | 4.693 | 4.176 | 4.506 | 4.343 | -0.163 |
+| SIDE primary steps (M) | 4.60 | 4.63 | 4.64 | 4.65 | | | |
+| PVN primary steps (M) | 1.44 | 1.97 | 2.02 | 1.55 | | | |
+
+* SIDE workload is steady (4.60-4.65 M steps): the SIDE delta is +0.2 % total, 0 % raw p50 - inside
+  the run-to-run spread (A1 vs A2 alone differ 0.14 ms).
+* PVN workload varies with the storm realization (1.44-2.02 M steps), so its totals are compared at
+  matched workload: B1 (1.97 M) 4.51 vs A2 (2.02 M) 4.69; B2 (1.55 M) 4.18 vs A1 (1.44 M) 4.32 - T244
+  is not slower in either pair.
+* Registers (offline NVIDIA compile of the generated lean FINAL): 116 temporaries in both builds,
+  instructions 6813 -> 6821 (+8), texture instructions 28 / 28, subroutine calls 49 / 49. The
+  intermediate can hide back-end register cost (T232), but the paired timings show none.
+
+**Decision: negligible - T244 closed, L3 unchanged.**
 
 ## 5. Validation
 

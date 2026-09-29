@@ -4423,7 +4423,10 @@ implementation, while visual polish remains independently active.
   `validation/t244-storm-trunk-lighting.md`.** The trunk is opaque (ambient zeroed -> black, solid); its
   see-through look was sky-blue ambient in shadow matching the sky behind it. In shadow the ambient now
   keeps its luminance but loses the sky chroma, and low in the cloud loses the 12 % occluded-zenith
-  share: trunk B-R 50 -> 13, whole-cloud luminance -1.3 %, geometry identical. [SC-005, SC-016, SC-021]
+  share: trunk B-R 50 -> 13, whole-cloud luminance -1.3 %, geometry identical. Cost measured build vs
+  build (ABAB, t208): SIDE total +0.012 ms, raw p50 0.000 / p95 +0.022 ms, PVN not slower at matched
+  workload, registers unchanged (116 temps, +8 instructions) - negligible, **closed**.
+  [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
