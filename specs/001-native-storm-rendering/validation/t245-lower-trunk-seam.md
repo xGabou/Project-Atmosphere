@@ -75,3 +75,8 @@ band only moves the discontinuity or adds a dark stripe; tuning its width would 
 fix has to make the rain-classified lower body carry the overhead shadow itself (an optical depth that
 includes the column above it), which changes rain shading proper and belongs to the T226 precipitation
 model, not to a transition band.
+
+## 7. Closed by T226
+
+The seam is fixed in production by T226 (bounded overhead-shadow rain lighting, quarter-strength rain
+darkening, neutral colour below the base); see `t226-lower-trunk-rain-lighting.md`.

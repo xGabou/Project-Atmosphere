@@ -4440,6 +4440,17 @@ implementation, while visual polish remains independently active.
   (luma 124 -> 97 / 117 -> 73) and left the light block unchanged: the light march there is near black,
   the rain optical depth ignores the overhead storm and is bright, so any blend is non-monotonic. Needs
   a rain optical depth that includes the column above it (T226 precipitation model). [SC-005, SC-016]
+- [X] T226 [QUALITY] [US1] Storm lower-trunk seam - overhead-shadowed rain lighting. **KEEP - production
+  change, closed; see `validation/t226-lower-trunk-rain-lighting.md`.** The storm body below the
+  weather-map base is rain-classified and its local-only optical depth ignored the storm above it (a
+  light, mottled block, seam +21..+30). R1: the rain branch adds the overhead weather-map column through
+  a saturating response bounded at od 2.2 (`2.2 * (1 - exp(-overhead / 2.2))`); D1: the rain-only
+  darkening at a quarter strength; below the base T244's low-cloud weighting stays at 0.75. Production,
+  six storms: seam -3.0..-5.0, lower trunk neutral (R-B -0.4..+0.2), blotchiness ~halved, upper trunk
+  unchanged; heavy rain limited but no regression. Build vs build: SIDE 5.52 -> 5.46 ms, raw p50
+  3.78 -> 3.71, rain pass +0.018 ms, PVN at matched workload +0.01 ms; lean FINAL 116 -> 117 temps,
+  +36 instructions, +1 fetch - negligible. The per-descriptor precipitation work stays parked on
+  `quality/t226-local-precipitation`. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

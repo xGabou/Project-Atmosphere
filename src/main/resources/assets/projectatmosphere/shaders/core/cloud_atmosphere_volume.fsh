@@ -8553,7 +8553,12 @@ vec3 evaluateLightingComponents(
     vec3 sunTerm = LightColor * sunTint * scatter * powderTerm * (4.0 * PI);
     sunTerm *= mix(1.0, 0.76, combinedStorm);
     sunTerm *= mix(1.0, mix(0.70, 0.82, combinedStorm), undersideShade);
-    sunTerm *= mix(1.0, 0.80, rainFraction);
+    // T226 (D1). The rain-only darkening (sun, ambient, tint) acts at a
+    // quarter of its old strength. The storm body below the weather-map base
+    // is rain-classified; with R1 (rainOverheadOpticalDepth) supplying its
+    // overhead shadow, the full darkening left it ~25 levels below the trunk.
+    float rainShadeWeight = rainFraction * 0.25;
+    sunTerm *= mix(1.0, 0.80, rainShadeWeight);
     vec3 ambient = mix(AmbientBottom, AmbientTop, saturate(h01ForAmbient));
     // T217 uses the sky energy BEFORE the storm/underside/retention darkening:
     // multiple scattering delivers the sky the buried sample cannot see, and
@@ -8577,7 +8582,7 @@ vec3 evaluateLightingComponents(
         float reliefShadow = smoothstep(2.0, 5.0, opticalDepth);
         ambient *= 1.0 - PaReliefShade * reliefForm * reliefShadow;
     }
-    ambient *= mix(1.0, 0.68, rainFraction);
+    ambient *= mix(1.0, 0.68, rainShadeWeight);
     {
         // T244: shadowed cloud does not see the blue zenith - the tower and
         // anvil above it occlude it - and is lit by the horizon sky and grey
@@ -8590,6 +8595,12 @@ vec3 evaluateLightingComponents(
         // darkening. Radiance only: density, extinction and alpha untouched.
         float shadowed = 1.0 - directTransmission;
         float lowerWeight = mix(0.75, 1.0, 1.0 - saturate(h01ForAmbient));
+        // T226. Below the base (rain-classified material) the low-cloud bonus
+        // is dropped: at h01 = 0 its full warm neutral turned the lower trunk
+        // brown-grey under a cool upper trunk. Unchanged at and above the base.
+        if (rainFraction > 0.05) {
+            lowerWeight = 0.75;
+        }
         float ambientLuma = dot(ambient, vec3(0.2126, 0.7152, 0.0722));
         vec3 neutral = ambientLuma * vec3(1.03, 1.0, 0.95);
         ambient = mix(ambient, neutral, shadowed * lowerWeight);
@@ -8650,7 +8661,7 @@ vec3 evaluateLightingComponents(
     diagnosticPhaseShadow = scatter * powderTerm * directTransmission;
 
     vec3 rainTint = mix(vec3(0.76, 0.80, 0.86), vec3(0.48, 0.54, 0.64), NightFactor);
-    radiance *= mix(vec3(1.0), rainTint, rainFraction * 0.50);
+    radiance *= mix(vec3(1.0), rainTint, rainShadeWeight * 0.50);
     radiance = max(radiance, vec3(0.0));
     // A peak normalization mapped every energetic sample to exactly white.
     // Filmic exponential compression preserves highlight ordering and colour
@@ -8686,6 +8697,23 @@ vec3 evaluateLightingFromOpticalDepth(
         ignoredAmbient,
         ignoredPhaseShadow
     );
+}
+
+// T226 (R1). Rain-classified material - rain, and the storm body where it
+// reaches below the weather-map base - is shaded without a light march, and
+// its local-only optical depth ignored the storm above it, so the lower trunk
+// rendered as a bright, density-mottled block under the anvil. This adds the
+// overhead column: the weather-map cloud interval above the point at a
+// quarter of core density, through a saturating response bounded at 2.2 so
+// tall storms are not pushed onto the full-shadow floor.
+float rainOverheadOpticalDepth(vec3 p) {
+    vec4 column = sampleWeather(p.xz);
+    float slabSpan = max(SlabTopY - SlabBaseY, 1.0);
+    float columnTop = SlabBaseY + column.b * slabSpan;
+    float columnBase = SlabBaseY + column.g * slabSpan;
+    float overhead = max(columnTop - max(columnBase, p.y), 0.0)
+        * 0.25 * DensityMul * ExtinctionScale;
+    return 2.2 * (1.0 - exp(-overhead / 2.2));
 }
 
 vec3 sampleLighting(
@@ -8796,7 +8824,7 @@ vec3 sampleLighting(
         // exp(-od/2) saturates in 8 bits at od 8.31, which hid every anvil
         // underside. Decode: od = exp(value * log(65)) - 1.
         float pathDepth = rainFraction > 0.05
-            ? localDensity * 8.0 * ExtinctionScale
+            ? localDensity * 8.0 * ExtinctionScale + rainOverheadOpticalDepth(p)
             : lightMarchOpticalDepth(
                 p,
                 localDensity,
@@ -8811,7 +8839,7 @@ vec3 sampleLighting(
         // taken through the production call, so any structure the light cone
         // carries is carried here and nothing else is.
         float pathDepth = rainFraction > 0.05
-            ? localDensity * 8.0 * ExtinctionScale
+            ? localDensity * 8.0 * ExtinctionScale + rainOverheadOpticalDepth(p)
             : lightMarchOpticalDepth(
                 p,
                 localDensity,
@@ -8824,7 +8852,7 @@ vec3 sampleLighting(
     // Fine rain streaks do not need a full cloud light cone. Avoid paying the
     // multi-sample self-shadow march for every precipitation step.
     float opticalDepth = rainFraction > 0.05
-        ? localDensity * 8.0 * ExtinctionScale
+        ? localDensity * 8.0 * ExtinctionScale + rainOverheadOpticalDepth(p)
         : lightMarchOpticalDepth(
             p,
             localDensity,
