@@ -1,0 +1,386 @@
+{
+  "cloud_type": "cumulus_mediocris",
+  "spawn": {
+    "ok": true,
+    "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+    "at": [
+      9130.392496871948,
+      27000.862152767182
+    ]
+  },
+  "renderer": "production lean FINAL (T243 shapes, T244 lighting, T226 rain/lower-trunk lighting), lighting mode 0, no experiment switches",
+  "views": {
+    "side": {
+      "type": "cumulus_mediocris",
+      "view": "side",
+      "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+      "centre": [
+        9133.22502,
+        27004.62136
+      ],
+      "ext": 50.52144,
+      "base": 241.75,
+      "top": 314.83755,
+      "downwind": [
+        0.57369,
+        0.81907
+      ],
+      "ground": 64.0,
+      "camera": [
+        9054.38357,
+        278.29378,
+        27059.84275
+      ],
+      "aim": [
+        9133.22502,
+        278.29378,
+        27004.62136
+      ],
+      "note": "",
+      "yaw": -125.00781,
+      "pitch": -0.0,
+      "source": "CG_cumulus_mediocris__side.png"
+    },
+    "opposite_side": {
+      "type": "cumulus_mediocris",
+      "view": "opposite_side",
+      "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+      "centre": [
+        9133.22502,
+        27004.62136
+      ],
+      "ext": 50.52144,
+      "base": 241.75,
+      "top": 314.83755,
+      "downwind": [
+        0.57369,
+        0.81907
+      ],
+      "ground": 64.0,
+      "camera": [
+        9212.06648,
+        278.29378,
+        26949.39996
+      ],
+      "aim": [
+        9133.22502,
+        278.29378,
+        27004.62136
+      ],
+      "note": "",
+      "yaw": 54.99219,
+      "pitch": -0.0,
+      "source": "CG_cumulus_mediocris__opposite_side.png"
+    },
+    "front": {
+      "type": "cumulus_mediocris",
+      "view": "front",
+      "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+      "centre": [
+        9133.22502,
+        27004.62136
+      ],
+      "ext": 50.52144,
+      "base": 241.75,
+      "top": 314.83755,
+      "downwind": [
+        0.57369,
+        0.81907
+      ],
+      "ground": 64.0,
+      "camera": [
+        9078.00363,
+        278.29378,
+        26925.7799
+      ],
+      "aim": [
+        9133.22502,
+        278.29378,
+        27004.62136
+      ],
+      "note": "",
+      "yaw": -35.00781,
+      "pitch": -0.0,
+      "source": "CG_cumulus_mediocris__front.png"
+    },
+    "back": {
+      "type": "cumulus_mediocris",
+      "view": "back",
+      "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+      "centre": [
+        9133.22502,
+        27004.62136
+      ],
+      "ext": 50.52144,
+      "base": 241.75,
+      "top": 314.83755,
+      "downwind": [
+        0.57369,
+        0.81907
+      ],
+      "ground": 64.0,
+      "camera": [
+        9188.44642,
+        278.29378,
+        27083.46281
+      ],
+      "aim": [
+        9133.22502,
+        278.29378,
+        27004.62136
+      ],
+      "note": "",
+      "yaw": -215.00781,
+      "pitch": -0.0,
+      "source": "CG_cumulus_mediocris__back.png"
+    },
+    "above": {
+      "type": "cumulus_mediocris",
+      "view": "above",
+      "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+      "centre": [
+        9133.22502,
+        27004.62136
+      ],
+      "ext": 50.52144,
+      "base": 241.75,
+      "top": 314.83755,
+      "downwind": [
+        0.57369,
+        0.81907
+      ],
+      "ground": 64.0,
+      "camera": [
+        9116.6586,
+        372.59166,
+        26980.96892
+      ],
+      "aim": [
+        9133.22502,
+        278.29378,
+        27004.62136
+      ],
+      "note": "",
+      "yaw": -35.00781,
+      "pitch": 72.973724,
+      "source": "CG_cumulus_mediocris__above.png"
+    },
+    "below": {
+      "type": "cumulus_mediocris",
+      "view": "below",
+      "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+      "centre": [
+        9133.22502,
+        27004.62136
+      ],
+      "ext": 50.52144,
+      "base": 241.75,
+      "top": 314.83755,
+      "downwind": [
+        0.57369,
+        0.81907
+      ],
+      "ground": 64.0,
+      "camera": [
+        9120.81079,
+        152.875,
+        27013.31642
+      ],
+      "aim": [
+        9133.22502,
+        260.02189,
+        27004.62136
+      ],
+      "note": "",
+      "yaw": -125.00781,
+      "pitch": -81.94866,
+      "source": "CG_cumulus_mediocris__below.png"
+    },
+    "low_angle": {
+      "type": "cumulus_mediocris",
+      "view": "low_angle",
+      "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+      "centre": [
+        9133.22502,
+        27004.62136
+      ],
+      "ext": 50.52144,
+      "base": 241.75,
+      "top": 314.83755,
+      "downwind": [
+        0.57369,
+        0.81907
+      ],
+      "ground": 64.0,
+      "camera": [
+        9038.42827,
+        104.0,
+        26987.91945
+      ],
+      "aim": [
+        9133.22502,
+        278.29378,
+        27004.62136
+      ],
+      "note": "",
+      "yaw": -80.00781,
+      "pitch": -61.089546,
+      "source": "CG_cumulus_mediocris__low_angle.png"
+    },
+    "far": {
+      "type": "cumulus_mediocris",
+      "view": "far",
+      "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+      "centre": [
+        9133.22502,
+        27004.62136
+      ],
+      "ext": 50.52144,
+      "base": 241.75,
+      "top": 314.83755,
+      "downwind": [
+        0.57369,
+        0.81907
+      ],
+      "ground": 64.0,
+      "camera": [
+        9013.92769,
+        278.29378,
+        27155.71622
+      ],
+      "aim": [
+        9133.22502,
+        278.29378,
+        27004.62136
+      ],
+      "note": "",
+      "yaw": -141.70705,
+      "pitch": -0.0,
+      "source": "CG_cumulus_mediocris__far.png"
+    },
+    "close": {
+      "type": "cumulus_mediocris",
+      "view": "close",
+      "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+      "centre": [
+        9133.22502,
+        27004.62136
+      ],
+      "ext": 50.52144,
+      "base": 241.75,
+      "top": 314.83755,
+      "downwind": [
+        0.57369,
+        0.81907
+      ],
+      "ground": 64.0,
+      "camera": [
+        9075.46276,
+        278.29378,
+        27045.07866
+      ],
+      "aim": [
+        9133.22502,
+        278.29378,
+        27004.62136
+      ],
+      "note": "",
+      "yaw": -125.00781,
+      "pitch": -0.0,
+      "source": "CG_cumulus_mediocris__close.png"
+    },
+    "lower_body": {
+      "type": "cumulus_mediocris",
+      "view": "lower_body",
+      "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+      "centre": [
+        9133.22502,
+        27004.62136
+      ],
+      "ext": 50.52144,
+      "base": 241.75,
+      "top": 314.83755,
+      "downwind": [
+        0.57369,
+        0.81907
+      ],
+      "ground": 64.0,
+      "camera": [
+        9054.38357,
+        252.71313,
+        27059.84275
+      ],
+      "aim": [
+        9133.22502,
+        252.71313,
+        27004.62136
+      ],
+      "note": "",
+      "yaw": -125.00781,
+      "pitch": -0.0,
+      "source": "CG_cumulus_mediocris__lower_body.png"
+    },
+    "tower": {
+      "type": "cumulus_mediocris",
+      "view": "tower",
+      "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+      "centre": [
+        9133.22502,
+        27004.62136
+      ],
+      "ext": 50.52144,
+      "base": 241.75,
+      "top": 314.83755,
+      "downwind": [
+        0.57369,
+        0.81907
+      ],
+      "ground": 64.0,
+      "camera": [
+        9054.38357,
+        274.6394,
+        27059.84275
+      ],
+      "aim": [
+        9133.22502,
+        274.6394,
+        27004.62136
+      ],
+      "note": "",
+      "yaw": -125.00781,
+      "pitch": -0.0,
+      "source": "CG_cumulus_mediocris__tower.png"
+    },
+    "transition": {
+      "type": "cumulus_mediocris",
+      "view": "transition",
+      "region": "de48cf1b-13f3-48c1-97ec-47f0732762c2",
+      "centre": [
+        9133.22502,
+        27004.62136
+      ],
+      "ext": 50.52144,
+      "base": 241.75,
+      "top": 314.83755,
+      "downwind": [
+        0.57369,
+        0.81907
+      ],
+      "ground": 64.0,
+      "camera": [
+        9054.38357,
+        296.56567,
+        27059.84275
+      ],
+      "aim": [
+        9133.22502,
+        294.37304,
+        27004.62136
+      ],
+      "note": "",
+      "yaw": -125.00781,
+      "pitch": 1.3049102,
+      "source": "CG_cumulus_mediocris__transition.png"
+    }
+  }
+}

@@ -1,0 +1,541 @@
+{
+  "cloud_type": "cirrus",
+  "spawn": {
+    "ok": true,
+    "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+    "at": [
+      9130.392496871948,
+      72000.86215276718
+    ]
+  },
+  "renderer": "production lean FINAL (T243 shapes, T244 lighting, T226 rain/lower-trunk lighting), lighting mode 0, no experiment switches",
+  "views": {
+    "side": {
+      "type": "cirrus",
+      "view": "side",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        9264.86347,
+        738.66586,
+        72662.95464
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -187.69167,
+      "pitch": -0.0,
+      "source": "CG_cirrus__side.png"
+    },
+    "opposite_side": {
+      "type": "cirrus",
+      "view": "opposite_side",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        9085.59638,
+        738.66586,
+        71335.61362
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -7.691672,
+      "pitch": -0.0,
+      "source": "CG_cirrus__opposite_side.png"
+    },
+    "front": {
+      "type": "cirrus",
+      "view": "front",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        8511.55941,
+        738.66586,
+        72088.91767
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -97.69167,
+      "pitch": -0.0,
+      "source": "CG_cirrus__front.png"
+    },
+    "back": {
+      "type": "cirrus",
+      "view": "back",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        9838.90043,
+        738.66586,
+        71909.65058
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": 82.30833,
+      "pitch": -0.0,
+      "source": "CG_cirrus__back.png"
+    },
+    "above": {
+      "type": "cirrus",
+      "view": "above",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        8976.12877,
+        1145.22335,
+        72026.17419
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -97.69167,
+      "pitch": 63.702766,
+      "source": "CG_cirrus__above.png"
+    },
+    "below": {
+      "type": "cirrus",
+      "view": "below",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        9200.71464,
+        398.96298,
+        72187.97975
+      ],
+      "aim": [
+        9175.22992,
+        736.29591,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -187.69167,
+      "pitch": -60.557285,
+      "source": "CG_cirrus__below.png"
+    },
+    "low_angle": {
+      "type": "cirrus",
+      "view": "low_angle",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        8769.32449,
+        104.0,
+        72531.95053
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -142.69167,
+      "pitch": -43.461628,
+      "source": "CG_cirrus__low_angle.png"
+    },
+    "far": {
+      "type": "cirrus",
+      "view": "far",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        9728.34529,
+        738.66586,
+        73219.13422
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -204.39091,
+      "pitch": -0.0,
+      "source": "CG_cirrus__far.png"
+    },
+    "close": {
+      "type": "cirrus",
+      "view": "close",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        9262.85583,
+        738.66586,
+        72648.0896
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -187.69167,
+      "pitch": -0.0,
+      "source": "CG_cirrus__close.png"
+    },
+    "upwind": {
+      "type": "cirrus",
+      "view": "upwind",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        8511.55941,
+        973.05946,
+        72088.91767
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -97.69167,
+      "pitch": 19.290047,
+      "source": "CG_cirrus__upwind.png"
+    },
+    "downwind": {
+      "type": "cirrus",
+      "view": "downwind",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        9838.90043,
+        973.05946,
+        71909.65058
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": 82.30833,
+      "pitch": 19.290047,
+      "source": "CG_cirrus__downwind.png"
+    },
+    "crosswind_left": {
+      "type": "cirrus",
+      "view": "crosswind_left",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        9085.59638,
+        973.05946,
+        71335.61362
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -7.691672,
+      "pitch": 19.290047,
+      "source": "CG_cirrus__crosswind_left.png"
+    },
+    "crosswind_right": {
+      "type": "cirrus",
+      "view": "crosswind_right",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        9264.86347,
+        973.05946,
+        72662.95464
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -187.69167,
+      "pitch": 19.290047,
+      "source": "CG_cirrus__crosswind_right.png"
+    },
+    "sheet_extent": {
+      "type": "cirrus",
+      "view": "sheet_extent",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        8299.87134,
+        1145.22335,
+        72522.97339
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -120.89026,
+      "pitch": 21.730547,
+      "source": "CG_cirrus__sheet_extent.png"
+    },
+    "underside": {
+      "type": "cirrus",
+      "view": "underside",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        9187.97228,
+        398.96298,
+        72093.63194
+      ],
+      "aim": [
+        9552.62117,
+        733.92596,
+        71948.31469
+      ],
+      "note": "",
+      "yaw": -111.72791,
+      "pitch": -40.475014,
+      "source": "CG_cirrus__underside.png"
+    },
+    "edge_profile": {
+      "type": "cirrus",
+      "view": "edge_profile",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 64.0,
+      "camera": [
+        9300.71688,
+        738.66586,
+        72928.42284
+      ],
+      "aim": [
+        9175.22992,
+        738.66586,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -187.69167,
+      "pitch": -0.0,
+      "source": "CG_cirrus__edge_profile.png"
+    },
+    "top_profile": {
+      "type": "cirrus",
+      "view": "top_profile",
+      "region": "91ea27f7-ebbe-453a-be92-21b39ef67000",
+      "centre": [
+        9175.22992,
+        71999.28413
+      ],
+      "ext": 634.69599,
+      "base": 733.92596,
+      "top": 743.40576,
+      "downwind": [
+        0.991,
+        -0.13384
+      ],
+      "ground": 111.0,
+      "camera": [
+        9282.79018,
+        758.40576,
+        72795.68874
+      ],
+      "aim": [
+        9175.22992,
+        741.5098,
+        71999.28413
+      ],
+      "note": "",
+      "yaw": -187.69167,
+      "pitch": 1.2044328,
+      "source": "CG_cirrus__top_profile.png"
+    }
+  }
+}
