@@ -4493,9 +4493,10 @@ implementation, while visual polish remains independently active.
   `validation/t249-nimbostratus-tail-continuity.md`.** Seeded reproduction (isolated outermost member,
   nearest neighbour 90..103 blocks vs 66..81 median): the deck top is smooth after T248; the step is the
   underside edge of the T243 ragged hanging lower layer, whose carve keys on the coverage envelope (cause D, not
-  the 40-block radius). Seven candidates: a wider rim support, a wider hang band and a ragged floor change
+  the 40-block radius). Nine candidates: a wider rim support, a wider hang band and a ragged floor change
   nothing visible; a smooth underside floor removes the step but turns the ragged layer into a smooth lens
-  (capsule-like). Removing it needs a redesigned fractus layer - a decision, not a tail fix. [SC-005, SC-016]
+  (capsule-like), and a dilated hang coverage extends it under the tail but makes it solid. Removing it needs a
+  redesigned fractus layer - a decision, not a tail fix. [SC-005, SC-016]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

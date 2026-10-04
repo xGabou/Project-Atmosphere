@@ -37,13 +37,16 @@ upper layer remains - the tail. B (sparse-end support weighting) is the same mec
 | T6 | the smooth floor alone | same smooth lens: the deck's averaged coverage is below 0.5 almost everywhere, so the floor cuts under the whole deck | rejected |
 | T8 | hang-zone envelope fades over a wider band (0.05..0.75) | ragged layer kept, edge unchanged | rejected |
 | T9a / T9b | a ragged floor displaced by the carve noise over the coverage the deck spans (0.05..0.30 / 0.20) | indistinguishable from production | rejected |
+| T10a / T10b | the hang carve reads a DILATED coverage (half / full max of the nine T248 taps, no extra fetches) so the layer continues under a lone member | the layer extends under the tail but turns SOLID and smooth - the ragged wisps vanish, a heavy smooth belly | rejected (underside changed) |
 
-Sheets: `t249a_out` (T1), `t249b_out` (T3/T4), `t249c_out` (T6/T8), `t249d_out` (T9).
+Sheets: `t249a_out` (T1), `t249b_out` (T3/T4), `t249c_out` (T6/T8), `t249d_out` (T9), `t249e_out` (T10).
 
 ## 4. Accepted mechanism
 
 None. The step is the visible edge of the accepted T243 ragged rain-base layer; every candidate that removes the
-edge removes the raggedness with it, and every candidate that keeps the raggedness keeps the edge.
+edge removes the raggedness with it, and every candidate that keeps the raggedness keeps the edge. The coupling is
+structural: the fragments are ragged BECAUSE the hang carve sees a moderate envelope, so anything that carries the
+layer out under the tail (higher envelope there) makes it solid, and anything that keeps the envelope keeps the edge.
 
 ## 5-6. Seeded before / after, normal clouds
 
