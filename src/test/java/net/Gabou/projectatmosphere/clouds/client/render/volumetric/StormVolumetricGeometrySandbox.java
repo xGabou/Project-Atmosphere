@@ -1961,7 +1961,7 @@ public final class StormVolumetricGeometrySandbox {
             require(!source.contains("#define PA_LIGHT_AUDIT"), arm[0] + " defines the audit");
             compileFragmentShader(resolveMojImports(source), arm[0]);
         }
-        require(shader.contains("float paStormFieldLightDensityAt(vec3 p, bool detailTap)")
+        require(shader.contains("float paStormFieldLightDensityAt(vec3 p, bool detailTap, bool exactUncovered)")
                         && shader.contains("(PaStormFieldEnabled & 8) != 0"),
                 "the exact-noise light lookup is not selected by consumer bit 8");
         for (String name : new String[] {"final", "t196_field_light", "t196_field_both"}) {

@@ -4472,6 +4472,16 @@ implementation, while visual polish remains independently active.
   stratocumulus: no change. Final production gallery: `validation/t246-final-gallery`. **Open, needs a decision:** the
   remaining panels on non-storm clouds are the T199 field's 16-block node density used as their light;
   exact light density removes them but changes lighting and cost for every layered family. [SC-005, SC-016]
+- [X] T247 [QUALITY] [US1] Non-storm lighting panels. **KEEP - production; see
+  `validation/t247-nonstorm-lighting-grid.md`.** Two faults in the T199 field's non-storm light lookup: with
+  consumer bit 32 a covered node's A is its clearance floor (4096 when empty) and the hardware bilinear
+  blended it into the light density of every cell bordering a covered node (opaque, grid-aligned dark
+  panels on decks, clumps and puff tile edges); and the 16-block point-sampled node density left faint
+  plates. Fix: the non-storm bilinear excludes covered nodes, and the first light tap of a non-storm sample
+  is exact (one shared cloudDensity call site). Same-instance arms: indistinguishable from exact lighting;
+  stratocumulus and humilis error 0, motion pops gone (stratocumulus p99 107 -> 15). Build vs build: SIDE
+  +0.09 ms (two call sites cost +0.25), PVN +0.13 at matched workload; non-storm scenes +0.1..0.6 ms at
+  1.3..4.3 ms. Morphology, density, opacity, silhouettes and storm lighting unchanged. [SC-005, SC-016, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

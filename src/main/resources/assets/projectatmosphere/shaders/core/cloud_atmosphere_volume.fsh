@@ -7550,13 +7550,42 @@ float paStormFieldDensityAt(vec3 p) {
     return mix(d0, d1, t);
 }
 
+// T247. Bilinear of the node density over the four nodes around (x, z) on
+// slice k for NON-storm material. A is a density only on uncovered nodes:
+// with consumer bit 32 a covered node's A is its clearance floor (4096 when
+// empty), and the hardware bilinear blended it into the light density of every
+// cell bordering a covered node - opaque, grid-aligned dark panels on decks,
+// stratocumulus clumps and puffs at their tile edges. A covered node carries
+// no non-storm material, so it contributes 0.
+float paStormFieldUncoveredDensity(float x, float z, int k) {
+    float edge = float(PaStormFieldXZ);
+    vec2 g = vec2(clamp(x, 0.5, edge - 0.5), clamp(z, 0.5, edge - 0.5)) - 0.5;
+    ivec2 i0 = ivec2(floor(g));
+    vec2 f = g - vec2(i0);
+    ivec2 i1 = min(i0 + 1, ivec2(PaStormFieldXZ - 1));
+    ivec2 tile = ivec2(k - (k / PA_STORM_FIELD_TILES_X) * PA_STORM_FIELD_TILES_X,
+        k / PA_STORM_FIELD_TILES_X) * PaStormFieldXZ;
+    vec2 n00 = texelFetch(StormFieldSampler, tile + ivec2(i0.x, i0.y), 0).ra;
+    vec2 n10 = texelFetch(StormFieldSampler, tile + ivec2(i1.x, i0.y), 0).ra;
+    vec2 n01 = texelFetch(StormFieldSampler, tile + ivec2(i0.x, i1.y), 0).ra;
+    vec2 n11 = texelFetch(StormFieldSampler, tile + ivec2(i1.x, i1.y), 0).ra;
+    float uncovered = PA_STORM_FIELD_UNCOVERED * 0.5;
+    float d00 = n00.x <= uncovered ? n00.y : 0.0;
+    float d10 = n10.x <= uncovered ? n10.y : 0.0;
+    float d01 = n01.x <= uncovered ? n01.y : 0.0;
+    float d11 = n11.x <= uncovered ? n11.y : 0.0;
+    return mix(mix(d00, d10, f.x), mix(d01, d11, f.x), f.y);
+}
+
 // T198. Light: the field's threshold and height at p, then the exact base
 // noise at p - one 3D fetch - forms the body exactly as cloudDensity's STAGE
 // 5 does; a detail tap adds the detail fetch and the erosion bite; the
 // material terms follow with the descriptor constants cloudDensity uses.
 // A node the field does not cover (R at the sentinel) falls back to the
 // node density in A.
-float paStormFieldLightDensityAt(vec3 p, bool detailTap) {
+// T247: exactUncovered asks for the exact density of non-storm material: the
+// lookup then returns -1 on an uncovered node and the caller evaluates it.
+float paStormFieldLightDensityAt(vec3 p, bool detailTap, bool exactUncovered) {
     vec3 c = paStormFieldCoord(p);
     if (c.y < 0.0 || c.y > float(PA_STORM_FIELD_Y)) {
         return 0.0;
@@ -7571,7 +7600,11 @@ float paStormFieldLightDensityAt(vec3 p, bool detailTap) {
     vec4 f0 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k0));
     vec4 f1 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k1));
     if (min(f0.r, f1.r) <= PA_STORM_FIELD_UNCOVERED * 0.5) {
-        return mix(f0.a, f1.a, t);
+        if (exactUncovered) {
+            return -1.0;
+        }
+        return mix(paStormFieldUncoveredDensity(c.x, c.z, k0),
+            paStormFieldUncoveredDensity(c.x, c.z, k1), t);
     }
     float lowerBound = mix(f0.r, f1.r, t);
     if (lowerBound >= 0.999) {
@@ -8215,7 +8248,7 @@ float lightMarchOpticalDepth(
         // the same point with the same tap state (mip bias, detail flag, T149
         // grading) - or, for variant 6, the field's own node equation there.
         float density = (PaStormFieldEnabled & 8) != 0
-            ? paStormFieldLightDensityAt(pos + offset, detailTap)
+            ? paStormFieldLightDensityAt(pos + offset, detailTap, false)
             : paStormFieldDensityAt(pos + offset);
         {
             vec3 paLaPoint = pos + offset;
@@ -8244,11 +8277,19 @@ float lightMarchOpticalDepth(
             }
         }
 #else
+        // T247: the nearest tap of a non-storm sample is exact. The 16-block
+        // node density alone left plates on decks and clumps; the first tap
+        // carries most of the local shading, the rest stay on the field. One
+        // cloudDensity call site serves both the field-off path and the exact
+        // tap: a second inlined call cost ~0.16 ms at SIDE in codegen alone.
         float density = (PaStormFieldEnabled & 1) != 0
             ? ((PaStormFieldEnabled & 8) != 0
-                ? paStormFieldLightDensityAt(pos + offset, detailTap)
+                ? paStormFieldLightDensityAt(pos + offset, detailTap, i == 0)
                 : paStormFieldDensityAt(pos + offset))
-            : cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
+            : -1.0;
+        if (density < 0.0) {
+            density = cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
+        }
 #endif
 #endif
         paDensityConsumer = 0;
