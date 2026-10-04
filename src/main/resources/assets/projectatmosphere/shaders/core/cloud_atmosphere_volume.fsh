@@ -4416,15 +4416,32 @@ vec4 directPuffLobeSample(vec3 p, int candidateIndex, out int puffTier) {
         {
             // T243: a cumulus lobe is not a smooth sphere - its upper part
             // carries broad rounded cauliflower turrets (seeded per lobe,
-            // 3 and 5 around, ~1.6 / 2.4 up the lobe, square-rooted so they
-            // survive the lobe union at 0.40 / 0.25 of the lobe radius).
-            // The flat base (below the lobe's widest point) is untouched.
+            // 3 and 5 around, ~1.6 / 2.4 up the lobe, at 0.40 / 0.25 of the
+            // lobe radius). The flat base (below the lobe's widest point) is
+            // untouched.
+            // T246: raised cosines - the old square-rooted sin products were
+            // zero on half the sectors with a kink at every zero crossing,
+            // radial star creases from above and below - and the outward
+            // growth saturates at the lobe's own headroom: the unbumped
+            // surface radius here is eq * sqrt(1 - v^2), so the bumped surface
+            // stays inside radial 0.95, inside the 1.05 cut-off below (growth
+            // reached 1.65 x and was cut flat there).
             float lobeTheta = atan(local.y, local.x);
             float lobeSeed = lobePhase * 6.2831853;
-            float bumpA = sqrt(max(sin(3.0 * lobeTheta + lobeSeed) * sin(10.05 * h + lobeSeed * 1.7), 0.0));
-            float bumpB = sqrt(max(sin(5.0 * lobeTheta - lobeSeed * 2.3) * sin(15.08 * h - lobeSeed), 0.0));
+            float aroundA = 0.5 + 0.5 * sin(3.0 * lobeTheta + lobeSeed);
+            float aroundB = 0.5 + 0.5 * sin(5.0 * lobeTheta - lobeSeed * 2.3);
+            float upA = 0.5 + 0.5 * sin(10.05 * h + lobeSeed * 1.7);
+            float upB = 0.5 + 0.5 * sin(15.08 * h - lobeSeed);
             float upperPart = smoothstep(peakHeight * 0.6, peakHeight + 0.1, h);
-            implicitRadius /= 1.0 + (0.40 * bumpA + 0.25 * bumpB) * upperPart;
+            float turretRaw = (0.40 * aroundA * aroundA * upA
+                + 0.25 * aroundB * aroundB * upB) * upperPart;
+            float unbumpedRadius = max(equatorRadius, 0.001)
+                * sqrt(max(1.0 - verticalCoordinate * verticalCoordinate, 1.0e-4));
+            float turretHeadroom = max(0.95 / unbumpedRadius - 1.0, 0.0);
+            float turretGrowth = turretHeadroom > 1.0e-4
+                ? turretHeadroom * (1.0 - exp(-turretRaw / turretHeadroom))
+                : 0.0;
+            implicitRadius /= 1.0 + turretGrowth;
         }
         envelopeDepth = max(1.0 - implicitRadius, 0.0);
         if (puffTier == 0) {
@@ -7633,6 +7650,16 @@ bool paStormFieldMaterialPossible(vec3 p) {
 // window stays a superset) marks the node uncovered. Descriptor-owned storms suppress their
 // member rasters, so this does not fire inside them.
 bool paStormFieldNonStormPossible(vec2 nodeXZ) {
+    // T246. Analytic PUFF lobes are not confined to their raster: turrets and
+    // billows reach past the painted texels, and a node there was provably
+    // empty - the march stepped over real cumulus, cutting flat walls on the
+    // node grid. The candidate index shares this grid (256 cells over
+    // WeatherExtent: a node's cell IS a puff tile) and registers a lobe on
+    // every tile within radius + half a tile diagonal of it, past the lobe's
+    // 1.05 cut-off, so one fetch at the node centre is a superset.
+    if (decodePuffCandidate(puffCandidatesAt(nodeXZ), 0) >= 0) {
+        return true;
+    }
     ivec2 size = textureSize(WeatherMapSampler, 0);
     ivec2 centre = ivec2(floor((nodeXZ - WeatherOrigin) / WeatherExtent * vec2(size)));
     for (int dz = -1; dz <= 1; dz++) {
