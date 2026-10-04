@@ -520,7 +520,7 @@ final class CloudMorphologyGenerators {
         CloudVisualProfile visual = definition.getVisualProfile();
         // T243: cirrus spans a broad stretch of sky - longer, larger strands.
         float radius = shape.getBaseRadius() * 0.45F;
-        return plan(definition, random, 8, 12, radius, radius * 6.25F,
+        return plan(definition, random, 14, 20, radius, radius * 6.25F,
                 Math.max(2.0F, shape.getBaseOffset() * 0.42F), Math.max(5.0F, shape.getTopOffset() * 0.46F),
                 0.18F + visual.getDensityMultiplier() * 0.16F,
                 0.20F + visual.getCoverageMultiplier() * 0.14F,
@@ -932,9 +932,15 @@ final class CloudMorphologyGenerators {
                     mediocris ? 0.40F : 0.36F,
                     mediocris ? 0.46F : 0.42F
             );
+            // T246: for mediocris, +-0.06 rad made the base an exact
+            // three-fold clover - a symmetric "X" from above. Irregular gaps
+            // (+-0.20 rad) keep every shoulder overlapping the anchor but break
+            // the symmetry (humilis keeps +-0.06: its anisotropy budget has no
+            // room).
+            float angleJitter = mediocris ? 0.20F : 0.06F;
             float angle = plan.orientationRadians()
                     + shoulder * ((float) (Math.PI * 2.0D) / shoulderCount)
-                    + randomRange(random, -0.06F, 0.06F);
+                    + randomRange(random, -angleJitter, angleJitter);
             // This distance is measured against the actual lobe radii. The
             // previous 0.54..0.60 range could connect at birth only by
             // reopening the rejected 0.72-radius shelf. At 0.40..0.44 the
@@ -1530,11 +1536,25 @@ final class CloudMorphologyGenerators {
     private static final float SHEET_GOLDEN_ANGLE = 2.3999632F;
 
     private static Vec3 filamentCell(Vec3 origin, SpawnPlan plan, int clusterIndex, RandomSource random) {
-        int signedIndex = clusterIndex - (plan.clusterCount() / 2);
-        float along = signedIndex * plan.radius() * 1.42F + (random.nextFloat() - 0.5F) * plan.radius() * 0.72F;
-        float across = (random.nextFloat() - 0.5F) * plan.radius() * 0.55F;
+        // T246: cirrus covers a stretch of sky, not a line. Members are 5:1
+        // streaks aligned with the wind at render time; laying them on one
+        // world-axis line printed a comb of short sticks (a cross where the
+        // line met the wind at an angle). They now fill a 2:1 oval on a
+        // sunflower spiral, ~1.3 member radii apart, so the streaks read as a
+        // broad field of parallel fibres whatever the wind.
+        int count = Math.max(1, plan.clusterCount());
+        float spacing = plan.radius() * 1.30F;
+        float ovalRadius = spacing * (float) Math.sqrt(count / (Math.PI * 0.5D * 0.70D));
+        float fraction = (float) Math.sqrt((clusterIndex + 0.5F) / count);
+        float angle = clusterIndex * SHEET_GOLDEN_ANGLE;
+        float along = (float) Math.cos(angle) * ovalRadius * fraction
+                + (random.nextFloat() - 0.5F) * spacing * 0.45F;
+        float across = (float) Math.sin(angle) * ovalRadius * 0.5F * fraction
+                + (random.nextFloat() - 0.5F) * spacing * 0.45F;
+        float cos = (float) Math.cos(plan.orientationRadians());
+        float sin = (float) Math.sin(plan.orientationRadians());
         float y = (random.nextFloat() - 0.5F) * plan.topRise() * 0.12F;
-        return origin.add(along, y, across);
+        return origin.add(along * cos - across * sin, y, along * sin + across * cos);
     }
 
     private static float radiusMultiplier(CloudMorphologyFamily family) {

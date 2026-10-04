@@ -4465,8 +4465,11 @@ implementation, while visual polish remains independently active.
   3.71 -> 3.63, PVN equal at matched workload - no cost. **Nimbostratus - KEEP:** member tops flat in
   the splat and the deck top tapers only where total coverage thins - the tall central capsule with thin
   wings becomes one broad even deck (three instances). Rejected: earlier coverage saturation (exposes a
-  lathe-turned bottle), low-passed base / top (no effect). Storms, stratus, cirrus, stratocumulus: no
-  change. Final production gallery: `validation/t246-final-gallery`. **Open, needs a decision:** the
+  lathe-turned bottle), low-passed base / top (no effect). **Cirrus - KEEP:** members fill a 2:1 oval
+  (were one world-axis line of sticks), 14..20 of them, and share their group's angle in calm air - a
+  field of near-parallel streaks. **Mediocris - KEEP:** base shoulder angles +-0.20 rad (was an exact
+  trefoil / X from above; the topology sandbox pins the distances and humilis). Storms, stratus,
+  stratocumulus: no change. Final production gallery: `validation/t246-final-gallery`. **Open, needs a decision:** the
   remaining panels on non-storm clouds are the T199 field's 16-block node density used as their light;
   exact light density removes them but changes lighting and cost for every layered family. [SC-005, SC-016]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,

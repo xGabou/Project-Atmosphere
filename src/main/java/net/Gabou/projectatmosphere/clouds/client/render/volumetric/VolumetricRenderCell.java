@@ -483,6 +483,18 @@ public record VolumetricRenderCell(
         }
         Vec3 wind = snapshot.windVector();
         if (wind.horizontalDistanceSqr() <= 1.0E-8D) {
+            if (morphology == CloudMorphologyFamily.FILAMENT
+                    && snapshot.morphologyMembership() != null) {
+                // T246: in calm air every cirrus member took its own seed angle -
+                // a scatter of sticks pointing everywhere. Members of one group
+                // share the group's angle (+-0.15 rad each), so the strands stay
+                // a field of near-parallel fibres.
+                long group = snapshot.morphologyMembership().groupId().getLeastSignificantBits()
+                        ^ snapshot.morphologyMembership().groupId().getMostSignificantBits();
+                float groupAngle = (float) (Math.floorMod(group, 628L) * 0.01D);
+                float memberJitter = ((Math.floorMod(snapshot.seed(), 1000L) / 1000.0F) - 0.5F) * 0.30F;
+                return groupAngle + memberJitter;
+            }
             return fallback;
         }
         return (float) Math.atan2(wind.z(), wind.x());

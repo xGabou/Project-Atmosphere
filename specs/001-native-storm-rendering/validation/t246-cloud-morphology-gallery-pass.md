@@ -151,11 +151,37 @@ the final gallery); above / below unchanged. Remaining: faint dark field panels 
 stepped narrow end. Sheets: `ns_ref_vs_nsa` (reference vs NS-A, three instances), `ns_zoom` (P / Q
 diagnostics), `nsb_zoom`, `nsc_zoom`.
 
-### Stratocumulus, cumulonimbus, supercell, stratus, cirrus - NO CHANGE
+### Cirrus - KEEP, production (layout)
+
+Defect (reference `below` / `underside` / `above`): a handful of short sticks laid on ONE world-X line
+(`filamentCell` ignored orientation), the wind-aligned 5:1 streaks crossing that line - a comb / cross.
+In calm air (the gallery freezes motion, `windVector` 0) every member also fell back to its own seed angle.
+
+* CI-A (`CloudMorphologyGenerators.filamentCell`): members fill a 2:1 oval on the sheet sunflower spiral,
+  ~1.3 member radii apart, rotated by the plan orientation; 14..20 members (was 8..12).
+* CI-B (`VolumetricRenderCell.orientationFor`): with no wind, FILAMENT members share their group's angle
+  (hash of the morphology group id) with +-0.15 rad per member - parallel fibres instead of a scatter.
+
+Result (three instances, sessions `t246ci` = CI-A only, `t246cm` = CI-A + CI-B): a broad field of
+near-parallel streaks across the sky from below / underside / above / upwind; CI-A alone left the streaks
+pointing everywhere (rejected on its own). Still short separate streaks rather than long merged fibres.
+Sheets: `ci_a`, `ci_b`.
+
+### Cumulus mediocris - KEEP, production (base layout)
+
+Defect: the three base shoulders sat at exactly 120 deg (+-0.06 rad) around the anchor - with the old star
+creases, a symmetric four-leaf "X" from above. MED-A: mediocris shoulder angles jitter +-0.20 rad. Wider
+angles / distances were tried first and rejected by the topology sandbox (mediocris width/height 1.5005 > 1.5,
+humilis anisotropy p95 2.14 / 1.97 > 1.9, mediocris primary separation 0.925 > 0.92, shoulder birth below the
+pinned 0.47..0.54), so the distances and humilis are unchanged. Result (three instances, `t246cm`): irregular
+hourglass / uneven trefoil plans from above instead of the symmetric X; below / side / close unchanged in
+character. Moderate improvement. Sheet: `med_a`.
+
+### Stratocumulus, cumulonimbus, supercell, stratus - NO CHANGE
 
 No candidate was run for these families. The storms (T240/T241 architecture) were LOW in the audit and are
-untouched by both changes (the probe change only affects nodes whose cell holds a puff candidate, and storms
-carry no puff lobes); stratus and cirrus were LOW. Stratocumulus (MEDIUM: dark slab edges under clumps) shares
+untouched by every change (the probe change only affects nodes whose cell holds a puff candidate, and storms
+carry no puff lobes); stratus was LOW (a thin continuous deck; its level views are a line by nature). Stratocumulus (MEDIUM: dark slab edges under clumps) shares
 the nimbostratus panel mechanism - non-storm light from the coarse field node density - so its fix is the
 section 7 decision, not a shape change.
 
@@ -201,7 +227,9 @@ FINAL, all 9 families, 126 views, session `t246fin`), same harness and view defi
   raster are now uncovered, so their light also comes from the node density).
 * nimbostratus: one broad even deck instead of the capsule.
 * cumulonimbus: unchanged. supercell, stratocumulus: this session spawned different realizations and the poses
-  follow them (no code path changed for either); stratus, cirrus: unchanged.
+  follow them (no code path changed for either); stratus: unchanged.
+* cirrus and cumulus_mediocris folders were re-captured after CI-A/B and MED-A (session `t246cm`, first
+  instance, same harness).
 
 Every session spawns a new realization per family (cross-session realizations differ), so the gallery-to-gallery
 comparison is structural; the controlled same-instance A/Bs are in sections 3-4.
