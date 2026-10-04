@@ -7036,7 +7036,12 @@ float cloudDensityImpl(
                 // T243: the nimbostratus lower third hangs in ragged fragments
                 // (strong, deep carve); the body above stays one broad layer.
                 float hang = 1.0 - smoothstep(0.12, 0.40, h01);
-                envelope = min(saturate(coverageSignal / 0.5), (1.0 - smoothstep(0.82, 1.0, h01)));
+                // T246: member tops are flat (per-member rim tapers averaged
+                // into a tall central capsule); the deck thins only where its
+                // total coverage thins - its outer rim.
+                float nsRimThin = 1.0 - saturate(coverageSignal / 0.5);
+                envelope = min(saturate(coverageSignal / 0.5),
+                    1.0 - smoothstep(0.82 - 0.45 * nsRimThin, 1.0 - 0.45 * nsRimThin, h01));
                 carveThreshold = mix(0.25, 0.55, hang);
                 carveAmplitude = mix(0.22, 0.75, hang);
             }

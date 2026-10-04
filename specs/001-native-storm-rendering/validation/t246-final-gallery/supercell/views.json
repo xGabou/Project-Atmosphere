@@ -1,0 +1,541 @@
+{
+  "cloud_type": "supercell",
+  "spawn": {
+    "ok": true,
+    "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+    "at": [
+      9146.752609062194,
+      9003.519074821472
+    ]
+  },
+  "renderer": "production lean FINAL (T243 shapes, T244 lighting, T226 rain/lower-trunk lighting), lighting mode 0, no experiment switches",
+  "views": {
+    "side": {
+      "type": "supercell",
+      "view": "side",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        9122.27596,
+        531.9458,
+        10022.69764
+      ],
+      "aim": [
+        9253.92902,
+        531.9458,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -172.64325,
+      "pitch": -0.0,
+      "source": "CG_supercell__side.png"
+    },
+    "opposite_side": {
+      "type": "supercell",
+      "view": "opposite_side",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        9385.58207,
+        531.9458,
+        7983.30236
+      ],
+      "aim": [
+        9253.92902,
+        531.9458,
+        9003.0
+      ],
+      "note": "",
+      "yaw": 7.356755,
+      "pitch": -0.0,
+      "source": "CG_supercell__opposite_side.png"
+    },
+    "front": {
+      "type": "supercell",
+      "view": "front",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        8234.23137,
+        531.9458,
+        8871.34694
+      ],
+      "aim": [
+        9253.92902,
+        531.9458,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -82.64324,
+      "pitch": -0.0,
+      "source": "CG_supercell__front.png"
+    },
+    "back": {
+      "type": "supercell",
+      "view": "back",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        10273.62666,
+        531.9458,
+        9134.65306
+      ],
+      "aim": [
+        9253.92902,
+        531.9458,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -262.64325,
+      "pitch": -0.0,
+      "source": "CG_supercell__back.png"
+    },
+    "above": {
+      "type": "supercell",
+      "view": "above",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        8948.01972,
+        1544.78843,
+        8963.50408
+      ],
+      "aim": [
+        9253.92902,
+        531.9458,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -82.64324,
+      "pitch": 73.062546,
+      "source": "CG_supercell__above.png"
+    },
+    "below": {
+      "type": "supercell",
+      "view": "below",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        9860.2616,
+        96.4,
+        9222.31654
+      ],
+      "aim": [
+        9253.92902,
+        333.9729,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -250.11444,
+      "pitch": -20.226662,
+      "source": "CG_supercell__below.png"
+    },
+    "low_angle": {
+      "type": "supercell",
+      "view": "low_angle",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        8439.80113,
+        104.0,
+        9630.94235
+      ],
+      "aim": [
+        9253.92902,
+        531.9458,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -127.64324,
+      "pitch": -22.598269,
+      "source": "CG_supercell__low_angle.png"
+    },
+    "far": {
+      "type": "supercell",
+      "view": "far",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        9587.74342,
+        531.9458,
+        11032.04687
+      ],
+      "aim": [
+        9253.92902,
+        531.9458,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -189.34248,
+      "pitch": -0.0,
+      "source": "CG_supercell__far.png"
+    },
+    "close": {
+      "type": "supercell",
+      "view": "close",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        9161.81705,
+        531.9458,
+        9716.43846
+      ],
+      "aim": [
+        9253.92902,
+        531.9458,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -172.64325,
+      "pitch": -0.0,
+      "source": "CG_supercell__close.png"
+    },
+    "upwind": {
+      "type": "supercell",
+      "view": "upwind",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        8234.23137,
+        891.80228,
+        8871.34694
+      ],
+      "aim": [
+        9253.92902,
+        531.9458,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -82.64324,
+      "pitch": 19.290047,
+      "source": "CG_supercell__upwind.png"
+    },
+    "downwind": {
+      "type": "supercell",
+      "view": "downwind",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        10273.62666,
+        891.80228,
+        9134.65306
+      ],
+      "aim": [
+        9253.92902,
+        531.9458,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -262.64325,
+      "pitch": 19.290047,
+      "source": "CG_supercell__downwind.png"
+    },
+    "crosswind_left": {
+      "type": "supercell",
+      "view": "crosswind_left",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        9385.58207,
+        891.80228,
+        7983.30236
+      ],
+      "aim": [
+        9253.92902,
+        531.9458,
+        9003.0
+      ],
+      "note": "",
+      "yaw": 7.356755,
+      "pitch": 19.290047,
+      "source": "CG_supercell__crosswind_left.png"
+    },
+    "crosswind_right": {
+      "type": "supercell",
+      "view": "crosswind_right",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 64.0,
+      "camera": [
+        9122.27596,
+        891.80228,
+        10022.69764
+      ],
+      "aim": [
+        9253.92902,
+        531.9458,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -172.64325,
+      "pitch": 19.290047,
+      "source": "CG_supercell__crosswind_right.png"
+    },
+    "lower_body": {
+      "type": "supercell",
+      "view": "lower_body",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 68.0,
+      "camera": [
+        9122.27596,
+        254.78374,
+        10022.69764
+      ],
+      "aim": [
+        9253.92902,
+        254.78374,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -172.64325,
+      "pitch": -0.0,
+      "source": "CG_supercell__lower_body.png"
+    },
+    "tower": {
+      "type": "supercell",
+      "view": "tower",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 68.0,
+      "camera": [
+        9122.27596,
+        492.35122,
+        10022.69764
+      ],
+      "aim": [
+        9253.92902,
+        492.35122,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -172.64325,
+      "pitch": -0.0,
+      "source": "CG_supercell__tower.png"
+    },
+    "transition": {
+      "type": "supercell",
+      "view": "transition",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 68.0,
+      "camera": [
+        9122.27596,
+        729.9187,
+        10022.69764
+      ],
+      "aim": [
+        9253.92902,
+        706.16195,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -172.64325,
+      "pitch": 1.3236436,
+      "source": "CG_supercell__transition.png"
+    },
+    "anvil": {
+      "type": "supercell",
+      "view": "anvil",
+      "region": "3911707d-5c47-4c81-86c0-26a008be0665",
+      "centre": [
+        9253.92902,
+        9003.0
+      ],
+      "ext": 699.36017,
+      "base": 136.0,
+      "top": 927.8916,
+      "downwind": [
+        0.99177,
+        0.12805
+      ],
+      "ground": 71.0,
+      "camera": [
+        9095.94535,
+        1133.52388,
+        10226.63717
+      ],
+      "aim": [
+        9253.92902,
+        848.70244,
+        9003.0
+      ],
+      "note": "",
+      "yaw": -172.64325,
+      "pitch": 12.999018,
+      "source": "CG_supercell__anvil.png"
+    }
+  }
+}

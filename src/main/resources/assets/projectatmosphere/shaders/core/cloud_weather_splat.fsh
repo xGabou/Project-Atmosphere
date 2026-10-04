@@ -338,7 +338,7 @@ void main() {
             // it). The top tapers over the outer rim only - a flat top run to
             // the rim ended the deck in a vertical wall whose blocky coverage
             // contour read as stairs.
-            edgeDrop = edge01 * edge01 * cellSpan * 0.55;
+            edgeDrop = 0.0; // T246: flat member tops; the volume tapers the deck rim
             edgeLift = -0.25 * cellSpan;
         }
         if (stratus > 0.5) {

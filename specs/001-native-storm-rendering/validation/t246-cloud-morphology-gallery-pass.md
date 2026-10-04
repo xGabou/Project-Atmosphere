@@ -98,7 +98,24 @@ mediocris `below` / `above` sliced corners, congestus `above` jagged facets and 
 congestus i3 `below` - and changes nothing else. Two A frames (`side` of the first instance of a family) are
 stale teleport frames (a distant tiny cloud), a known harness settle issue, not a renderer difference.
 
-_(in progress: nimbostratus and the remaining families)_
+### Nimbostratus
+
+All nimbostratus arms run on the monolith (control `M` = code 99, no candidate) so the program is not a
+confound (the lean FINAL arm runs the temporal lattice, the monolith does not); three instances per session.
+
+| id | change | result | verdict |
+|---|---|---|---|
+| NS-A | splat: member tops flat (`edgeDrop = 0`, was `edge01² · 0.55 · span` per member); volume: the deck top tapers only where TOTAL coverage thins (`smoothstep(0.82 - 0.45 r, 1 - 0.45 r, h01)`, `r = 1 - cov / 0.5`) | against the reference gallery (same views, three instances): the tall central capsule with thin wings becomes a broad body with a much more even top; a narrower stepped tail remains at one end | **kept** |
+| P (diag 31) | light cone evaluates the exact density wherever the field node is uncovered | the dark rectangular PANELS on the deck face vanish - they are the field's 16-block node density used as non-storm light; beneath them the deck is a chain of faceted lumps | diagnostic: lighting, see recommendation |
+| Q (diag 33) | march probe never skips | identical to M | probe not involved |
+| NS-B | coverage normalisation 0.5 -> 0.20 / 0.12 (deck interior saturates) | WORSE: the carve stops engaging, exposing a smooth lathe-turned "bottle" with bulges and steps | rejected - the lumps are in the weather base / top (per-member heights), not the coverage taper |
+
+| NS-C | volume: deck base / top low-passed (coverage-weighted 3x3 of the weather map at +-24 / +-48 blocks) | identical to M | rejected - not the base / top either |
+
+The silhouette steps that remain at the deck's narrow end are not the coverage taper (NS-B), not the base / top
+heights (NS-C), not the probe (Q) and not the material profile (`familyMacroShape` profile 5 has no per-member
+term); they are left unexplained. The dominant remaining blockiness on the deck face is the light-field panel
+artefact (P), a lighting question - see section 7.
 
 ## 4. Per-family result
 
@@ -123,7 +140,24 @@ Raw per-arm captures stay local (`t246-campaign/<family>/<candidate>/<arm>/`, 17
 Still visible after the fix (not addressed): the symmetric four-lobe "X" plan from above on mediocris
 (layout), a smooth flat-shaded body below the turrets.
 
-_(in progress: nimbostratus and the remaining families)_
+### Nimbostratus - KEEP NS-A, production
+
+Production change: `cloud_weather_splat.fsh` nimbostratus members keep flat tops (`edgeDrop = 0`, the base
+lift `-0.25 span` unchanged); `cloud_atmosphere_volume.fsh` profile-5 carve envelope
+`min(cov / 0.5, 1 - smoothstep(0.82 - 0.45 r, 1 - 0.45 r, h01))`, `r = 1 - saturate(cov / 0.5)` (was
+`min(cov / 0.5, 1 - smoothstep(0.82, 1, h01))`). The per-member rim tapers no longer average into a tall central
+capsule with thin wings; the deck reads as one broad, even layer from side / front / close (three instances plus
+the final gallery); above / below unchanged. Remaining: faint dark field panels on the face (section 7), a
+stepped narrow end. Sheets: `ns_ref_vs_nsa` (reference vs NS-A, three instances), `ns_zoom` (P / Q
+diagnostics), `nsb_zoom`, `nsc_zoom`.
+
+### Stratocumulus, cumulonimbus, supercell, stratus, cirrus - NO CHANGE
+
+No candidate was run for these families. The storms (T240/T241 architecture) were LOW in the audit and are
+untouched by both changes (the probe change only affects nodes whose cell holds a puff candidate, and storms
+carry no puff lobes); stratus and cirrus were LOW. Stratocumulus (MEDIUM: dark slab edges under clumps) shares
+the nimbostratus panel mechanism - non-storm light from the coarse field node density - so its fix is the
+section 7 decision, not a shape change.
 
 ## 5. Validation
 
@@ -151,8 +185,35 @@ run to run independently of the build (A 1.31-1.61 M, B 1.28-2.05 M - the fixtur
 two runs); at matched workload B3 (1.28 M steps, 4.21 ms) equals A2 (1.31 M, 4.18 ms). No measurable shader cost;
 every frame far below the 10 ms ceiling.
 
-_(in progress: nimbostratus and the remaining families)_
+Final static run (plumbing removed, NS-A in): `campaignGate` 0, `check` 0, `stormMorphologySandbox` 0
+(`gate-t246b.log`, `check-build-t246b.log`, `sandbox-t246b.log`). NS-A changes only profile-5 code and is not
+in the storm benchmark's workload; no further timing was needed.
 
 ## 6. Final gallery
 
-_(in progress: nimbostratus and the remaining families)_
+`validation/t246-final-gallery/<family>/<view>.png` (+ `views.json`): the production build after T246 (lean
+FINAL, all 9 families, 126 views, session `t246fin`), same harness and view definitions as the reference
+`cloud-shape-gallery` (left in place). Side-by-side sheets: `t246-campaign/sheets/fin_a` (cumulus),
+`fin_b` (nimbostratus, storms), `fin_c` (stratocumulus, stratus, cirrus).
+
+* cumulus humilis / mediocris / congestus: the cut blocks, sliced corners and jagged facets are gone in every view.
+  One small dark rectangle remains on humilis `close`: the panel artefact of section 7 (puff nodes outside the
+  raster are now uncovered, so their light also comes from the node density).
+* nimbostratus: one broad even deck instead of the capsule.
+* cumulonimbus: unchanged. supercell, stratocumulus: this session spawned different realizations and the poses
+  follow them (no code path changed for either); stratus, cirrus: unchanged.
+
+Every session spawns a new realization per family (cross-session realizations differ), so the gallery-to-gallery
+comparison is structural; the controlled same-instance A/Bs are in sections 3-4.
+
+## 7. Recommendation (not applied - lighting, needs a decision)
+
+The largest remaining artefact on every NON-storm family (nimbostratus panels, stratocumulus dark slab edges, the
+humilis rectangle) is lighting, not shape: the T199 shared field gives the light cone a 16-block, bilinear node
+density for any material it does not model, and its tent contours print rectangles / diamonds into the shading.
+Diagnostic P (exact density in the light cone wherever the node is uncovered) removes the panels on the
+nimbostratus deck in all three instances. It was NOT kept: it changes the lighting of every layered family and
+the light-cone cost wherever non-storm cloud is in view (the storm benchmark would not see it), the goal excludes
+lighting / performance changes, and on puffs the same change (CU-G) exposes lobe discs from below. A follow-up task
+should measure P's cost in a layered-cloud scene and decide; a cheaper middle ground is a finer non-storm light
+field.

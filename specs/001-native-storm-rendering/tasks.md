@@ -4451,7 +4451,7 @@ implementation, while visual polish remains independently active.
   3.78 -> 3.71, rain pass +0.018 ms, PVN at matched workload +0.01 ms; lean FINAL 116 -> 117 temps,
   +36 instructions, +1 fetch - negligible. The per-descriptor precipitation work stays parked on
   `quality/t226-local-precipitation`. [SC-005, SC-016, SC-021]
-- [ ] T246 [QUALITY] [US1] Cloud morphology pass from the production gallery (`cloud-shape-gallery`), one
+- [X] T246 [QUALITY] [US1] Cloud morphology pass from the production gallery (`cloud-shape-gallery`), one
   family at a time; see `validation/t246-cloud-morphology-gallery-pass.md`. **Cumulus family - KEEP,
   production:** the vertical planar walls / square cut blocks on humilis, mediocris and congestus were the
   T196/T199 shared storm field's empty-space probe marking every node with an unpainted weather-raster
@@ -4462,8 +4462,13 @@ implementation, while visual polish remains independently active.
   Rejected: wider cut-off, hybrid-fringe analytic, analytic-global, continuous union height, raster-gate
   bypass (no effect); exact puff light density (exposes lobe discs, lighting change). Three instances of
   every cumulus family: walls gone, nothing else changed. Build vs build: SIDE 5.46 -> 5.35 ms, raw p50
-  3.71 -> 3.63, PVN equal at matched workload - no cost. Nimbostratus and the remaining families in
-  progress. [SC-005, SC-016]
+  3.71 -> 3.63, PVN equal at matched workload - no cost. **Nimbostratus - KEEP:** member tops flat in
+  the splat and the deck top tapers only where total coverage thins - the tall central capsule with thin
+  wings becomes one broad even deck (three instances). Rejected: earlier coverage saturation (exposes a
+  lathe-turned bottle), low-passed base / top (no effect). Storms, stratus, cirrus, stratocumulus: no
+  change. Final production gallery: `validation/t246-final-gallery`. **Open, needs a decision:** the
+  remaining panels on non-storm clouds are the T199 field's 16-block node density used as their light;
+  exact light density removes them but changes lighting and cost for every layered family. [SC-005, SC-016]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

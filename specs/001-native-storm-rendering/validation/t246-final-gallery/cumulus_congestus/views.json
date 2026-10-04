@@ -1,0 +1,386 @@
+{
+  "cloud_type": "cumulus_congestus",
+  "spawn": {
+    "ok": true,
+    "region": "384de0d2-c462-4597-8eb8-a71782324167",
+    "at": [
+      9146.752609062194,
+      36003.51907482147
+    ]
+  },
+  "renderer": "production lean FINAL (T243 shapes, T244 lighting, T226 rain/lower-trunk lighting), lighting mode 0, no experiment switches",
+  "views": {
+    "side": {
+      "type": "cumulus_congestus",
+      "view": "side",
+      "region": "384de0d2-c462-4597-8eb8-a71782324167",
+      "centre": [
+        9135.64064,
+        36003.63769
+      ],
+      "ext": 71.72898,
+      "base": 238.89999,
+      "top": 377.50223,
+      "downwind": [
+        -0.76111,
+        -0.64862
+      ],
+      "ground": 64.0,
+      "camera": [
+        9239.63528,
+        308.20111,
+        35881.60615
+      ],
+      "aim": [
+        9135.64064,
+        308.20111,
+        36003.63769
+      ],
+      "note": "",
+      "yaw": 40.43746,
+      "pitch": -0.0,
+      "source": "CG_cumulus_congestus__side.png"
+    },
+    "opposite_side": {
+      "type": "cumulus_congestus",
+      "view": "opposite_side",
+      "region": "384de0d2-c462-4597-8eb8-a71782324167",
+      "centre": [
+        9135.64064,
+        36003.63769
+      ],
+      "ext": 71.72898,
+      "base": 238.89999,
+      "top": 377.50223,
+      "downwind": [
+        -0.76111,
+        -0.64862
+      ],
+      "ground": 64.0,
+      "camera": [
+        9031.646,
+        308.20111,
+        36125.66924
+      ],
+      "aim": [
+        9135.64064,
+        308.20111,
+        36003.63769
+      ],
+      "note": "",
+      "yaw": -139.56255,
+      "pitch": -0.0,
+      "source": "CG_cumulus_congestus__opposite_side.png"
+    },
+    "front": {
+      "type": "cumulus_congestus",
+      "view": "front",
+      "region": "384de0d2-c462-4597-8eb8-a71782324167",
+      "centre": [
+        9135.64064,
+        36003.63769
+      ],
+      "ext": 71.72898,
+      "base": 238.89999,
+      "top": 377.50223,
+      "downwind": [
+        -0.76111,
+        -0.64862
+      ],
+      "ground": 64.0,
+      "camera": [
+        9257.67218,
+        308.20111,
+        36107.63233
+      ],
+      "aim": [
+        9135.64064,
+        308.20111,
+        36003.63769
+      ],
+      "note": "",
+      "yaw": -229.56255,
+      "pitch": -0.0,
+      "source": "CG_cumulus_congestus__front.png"
+    },
+    "back": {
+      "type": "cumulus_congestus",
+      "view": "back",
+      "region": "384de0d2-c462-4597-8eb8-a71782324167",
+      "centre": [
+        9135.64064,
+        36003.63769
+      ],
+      "ext": 71.72898,
+      "base": 238.89999,
+      "top": 377.50223,
+      "downwind": [
+        -0.76111,
+        -0.64862
+      ],
+      "ground": 64.0,
+      "camera": [
+        9013.60909,
+        308.20111,
+        35899.64305
+      ],
+      "aim": [
+        9135.64064,
+        308.20111,
+        36003.63769
+      ],
+      "note": "",
+      "yaw": -49.56254,
+      "pitch": -0.0,
+      "source": "CG_cumulus_congestus__back.png"
+    },
+    "above": {
+      "type": "cumulus_congestus",
+      "view": "above",
+      "region": "384de0d2-c462-4597-8eb8-a71782324167",
+      "centre": [
+        9135.64064,
+        36003.63769
+      ],
+      "ext": 71.72898,
+      "base": 238.89999,
+      "top": 377.50223,
+      "downwind": [
+        -0.76111,
+        -0.64862
+      ],
+      "ground": 70.0,
+      "camera": [
+        9172.2501,
+        473.70186,
+        36034.83608
+      ],
+      "aim": [
+        9135.64064,
+        308.20111,
+        36003.63769
+      ],
+      "note": "",
+      "yaw": -229.56255,
+      "pitch": 73.79444,
+      "source": "CG_cumulus_congestus__above.png"
+    },
+    "below": {
+      "type": "cumulus_congestus",
+      "view": "below",
+      "region": "384de0d2-c462-4597-8eb8-a71782324167",
+      "centre": [
+        9135.64064,
+        36003.63769
+      ],
+      "ext": 71.72898,
+      "base": 238.89999,
+      "top": 377.50223,
+      "downwind": [
+        -0.76111,
+        -0.64862
+      ],
+      "ground": 71.0,
+      "camera": [
+        9149.59804,
+        154.95,
+        35987.2595
+      ],
+      "aim": [
+        9135.64064,
+        273.55055,
+        36003.63769
+      ],
+      "note": "",
+      "yaw": 40.43746,
+      "pitch": -79.71622,
+      "source": "CG_cumulus_congestus__below.png"
+    },
+    "low_angle": {
+      "type": "cumulus_congestus",
+      "view": "low_angle",
+      "region": "384de0d2-c462-4597-8eb8-a71782324167",
+      "centre": [
+        9135.64064,
+        36003.63769
+      ],
+      "ext": 71.72898,
+      "base": 238.89999,
+      "top": 377.50223,
+      "downwind": [
+        -0.76111,
+        -0.64862
+      ],
+      "ground": 74.0,
+      "camera": [
+        9295.46528,
+        114.0,
+        35990.88367
+      ],
+      "aim": [
+        9135.64064,
+        308.20111,
+        36003.63769
+      ],
+      "note": "",
+      "yaw": 85.43746,
+      "pitch": -50.45687,
+      "source": "CG_cumulus_congestus__low_angle.png"
+    },
+    "far": {
+      "type": "cumulus_congestus",
+      "view": "far",
+      "region": "384de0d2-c462-4597-8eb8-a71782324167",
+      "centre": [
+        9135.64064,
+        36003.63769
+      ],
+      "ext": 71.72898,
+      "base": 238.89999,
+      "top": 377.50223,
+      "downwind": [
+        -0.76111,
+        -0.64862
+      ],
+      "ground": 64.0,
+      "camera": [
+        9264.72722,
+        308.20111,
+        35710.10237
+      ],
+      "aim": [
+        9135.64064,
+        308.20111,
+        36003.63769
+      ],
+      "note": "",
+      "yaw": 23.738216,
+      "pitch": -0.0,
+      "source": "CG_cumulus_congestus__far.png"
+    },
+    "close": {
+      "type": "cumulus_congestus",
+      "view": "close",
+      "region": "384de0d2-c462-4597-8eb8-a71782324167",
+      "centre": [
+        9135.64064,
+        36003.63769
+      ],
+      "ext": 71.72898,
+      "base": 238.89999,
+      "top": 377.50223,
+      "downwind": [
+        -0.76111,
+        -0.64862
+      ],
+      "ground": 64.0,
+      "camera": [
+        9198.03742,
+        308.20111,
+        35930.41877
+      ],
+      "aim": [
+        9135.64064,
+        308.20111,
+        36003.63769
+      ],
+      "note": "",
+      "yaw": 40.43746,
+      "pitch": -0.0,
+      "source": "CG_cumulus_congestus__close.png"
+    },
+    "lower_body": {
+      "type": "cumulus_congestus",
+      "view": "lower_body",
+      "region": "384de0d2-c462-4597-8eb8-a71782324167",
+      "centre": [
+        9135.64064,
+        36003.63769
+      ],
+      "ext": 71.72898,
+      "base": 238.89999,
+      "top": 377.50223,
+      "downwind": [
+        -0.76111,
+        -0.64862
+      ],
+      "ground": 70.0,
+      "camera": [
+        9239.63528,
+        259.69033,
+        35881.60615
+      ],
+      "aim": [
+        9135.64064,
+        259.69033,
+        36003.63769
+      ],
+      "note": "",
+      "yaw": 40.43746,
+      "pitch": -0.0,
+      "source": "CG_cumulus_congestus__lower_body.png"
+    },
+    "tower": {
+      "type": "cumulus_congestus",
+      "view": "tower",
+      "region": "384de0d2-c462-4597-8eb8-a71782324167",
+      "centre": [
+        9135.64064,
+        36003.63769
+      ],
+      "ext": 71.72898,
+      "base": 238.89999,
+      "top": 377.50223,
+      "downwind": [
+        -0.76111,
+        -0.64862
+      ],
+      "ground": 70.0,
+      "camera": [
+        9239.63528,
+        301.271,
+        35881.60615
+      ],
+      "aim": [
+        9135.64064,
+        301.271,
+        36003.63769
+      ],
+      "note": "",
+      "yaw": 40.43746,
+      "pitch": -0.0,
+      "source": "CG_cumulus_congestus__tower.png"
+    },
+    "transition": {
+      "type": "cumulus_congestus",
+      "view": "transition",
+      "region": "384de0d2-c462-4597-8eb8-a71782324167",
+      "centre": [
+        9135.64064,
+        36003.63769
+      ],
+      "ext": 71.72898,
+      "base": 238.89999,
+      "top": 377.50223,
+      "downwind": [
+        -0.76111,
+        -0.64862
+      ],
+      "ground": 70.0,
+      "camera": [
+        9239.63528,
+        342.85167,
+        35881.60615
+      ],
+      "aim": [
+        9135.64064,
+        338.6936,
+        36003.63769
+      ],
+      "note": "",
+      "yaw": 40.43746,
+      "pitch": 1.4855751,
+      "source": "CG_cumulus_congestus__transition.png"
+    }
+  }
+}

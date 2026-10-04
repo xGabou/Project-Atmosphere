@@ -1,0 +1,417 @@
+{
+  "cloud_type": "stratocumulus",
+  "spawn": {
+    "ok": true,
+    "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+    "at": [
+      9146.752609062194,
+      54003.51907482147
+    ]
+  },
+  "renderer": "production lean FINAL (T243 shapes, T244 lighting, T226 rain/lower-trunk lighting), lighting mode 0, no experiment switches",
+  "views": {
+    "side": {
+      "type": "stratocumulus",
+      "view": "side",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 64.0,
+      "camera": [
+        9090.33434,
+        265.79697,
+        54214.27618
+      ],
+      "aim": [
+        9124.61434,
+        265.79697,
+        54021.18342
+      ],
+      "note": "",
+      "yaw": -169.93309,
+      "pitch": -0.0,
+      "source": "CG_stratocumulus__side.png"
+    },
+    "opposite_side": {
+      "type": "stratocumulus",
+      "view": "opposite_side",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 64.0,
+      "camera": [
+        9158.89434,
+        265.79697,
+        53828.09066
+      ],
+      "aim": [
+        9124.61434,
+        265.79697,
+        54021.18342
+      ],
+      "note": "",
+      "yaw": 10.066905,
+      "pitch": -0.0,
+      "source": "CG_stratocumulus__opposite_side.png"
+    },
+    "front": {
+      "type": "stratocumulus",
+      "view": "front",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 64.0,
+      "camera": [
+        8931.52158,
+        265.79697,
+        53986.90342
+      ],
+      "aim": [
+        9124.61434,
+        265.79697,
+        54021.18342
+      ],
+      "note": "",
+      "yaw": -79.9331,
+      "pitch": -0.0,
+      "source": "CG_stratocumulus__front.png"
+    },
+    "back": {
+      "type": "stratocumulus",
+      "view": "back",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 64.0,
+      "camera": [
+        9317.7071,
+        265.79697,
+        54055.46342
+      ],
+      "aim": [
+        9124.61434,
+        265.79697,
+        54021.18342
+      ],
+      "note": "",
+      "yaw": -259.9331,
+      "pitch": -0.0,
+      "source": "CG_stratocumulus__back.png"
+    },
+    "above": {
+      "type": "stratocumulus",
+      "view": "above",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 64.0,
+      "camera": [
+        9066.68651,
+        401.34084,
+        54010.89942
+      ],
+      "aim": [
+        9124.61434,
+        265.79697,
+        54021.18342
+      ],
+      "note": "",
+      "yaw": -79.9331,
+      "pitch": 66.53646,
+      "source": "CG_stratocumulus__above.png"
+    },
+    "below": {
+      "type": "stratocumulus",
+      "view": "below",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 64.0,
+      "camera": [
+        9116.16572,
+        155.96017,
+        54068.7729
+      ],
+      "aim": [
+        9124.61434,
+        256.85865,
+        54021.18342
+      ],
+      "note": "",
+      "yaw": -169.93309,
+      "pitch": -64.40408,
+      "source": "CG_stratocumulus__below.png"
+    },
+    "low_angle": {
+      "type": "stratocumulus",
+      "view": "low_angle",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 64.0,
+      "camera": [
+        8963.83752,
+        104.0,
+        54133.481
+      ],
+      "aim": [
+        9124.61434,
+        265.79697,
+        54021.18342
+      ],
+      "note": "",
+      "yaw": -124.9331,
+      "pitch": -39.523422,
+      "source": "CG_stratocumulus__low_angle.png"
+    },
+    "far": {
+      "type": "stratocumulus",
+      "view": "far",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 64.0,
+      "camera": [
+        9169.91536,
+        265.79697,
+        54410.78263
+      ],
+      "aim": [
+        9124.61434,
+        265.79697,
+        54021.18342
+      ],
+      "note": "",
+      "yaw": -186.63234,
+      "pitch": -0.0,
+      "source": "CG_stratocumulus__far.png"
+    },
+    "close": {
+      "type": "stratocumulus",
+      "view": "close",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 75.0,
+      "camera": [
+        9092.95631,
+        265.79697,
+        54199.50711
+      ],
+      "aim": [
+        9124.61434,
+        265.79697,
+        54021.18342
+      ],
+      "note": "",
+      "yaw": -169.93309,
+      "pitch": -0.0,
+      "source": "CG_stratocumulus__close.png"
+    },
+    "sheet_extent": {
+      "type": "stratocumulus",
+      "view": "sheet_extent",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 64.0,
+      "camera": [
+        8833.71648,
+        401.34084,
+        54089.04708
+      ],
+      "aim": [
+        9124.61434,
+        265.79697,
+        54021.18342
+      ],
+      "note": "",
+      "yaw": -103.13168,
+      "pitch": 24.406916,
+      "source": "CG_stratocumulus__sheet_extent.png"
+    },
+    "underside": {
+      "type": "stratocumulus",
+      "view": "underside",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 64.0,
+      "camera": [
+        9120.39003,
+        155.96017,
+        54044.97816
+      ],
+      "aim": [
+        9219.7933,
+        247.92033,
+        54038.08066
+      ],
+      "note": "",
+      "yaw": -93.96934,
+      "pitch": -42.704006,
+      "source": "CG_stratocumulus__underside.png"
+    },
+    "edge_profile": {
+      "type": "stratocumulus",
+      "view": "edge_profile",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 64.0,
+      "camera": [
+        9076.62234,
+        265.79697,
+        54291.51328
+      ],
+      "aim": [
+        9124.61434,
+        265.79697,
+        54021.18342
+      ],
+      "note": "",
+      "yaw": -169.93309,
+      "pitch": -0.0,
+      "source": "CG_stratocumulus__edge_profile.png"
+    },
+    "top_profile": {
+      "type": "stratocumulus",
+      "view": "top_profile",
+      "region": "51ad68ac-e60e-4543-8f66-f027d1787862",
+      "centre": [
+        9124.61434,
+        54021.18342
+      ],
+      "ext": 161.11204,
+      "base": 247.92033,
+      "top": 283.67361,
+      "downwind": [
+        0.9846,
+        0.1748
+      ],
+      "ground": 64.0,
+      "camera": [
+        9083.47834,
+        298.67361,
+        54252.89473
+      ],
+      "aim": [
+        9124.61434,
+        276.52296,
+        54021.18342
+      ],
+      "note": "",
+      "yaw": -169.93309,
+      "pitch": 5.377075,
+      "source": "CG_stratocumulus__top_profile.png"
+    }
+  }
+}

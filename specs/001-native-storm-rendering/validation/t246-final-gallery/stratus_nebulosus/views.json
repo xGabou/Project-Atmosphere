@@ -1,0 +1,417 @@
+{
+  "cloud_type": "stratus_nebulosus",
+  "spawn": {
+    "ok": true,
+    "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+    "at": [
+      9146.752609062194,
+      45003.51907482147
+    ]
+  },
+  "renderer": "production lean FINAL (T243 shapes, T244 lighting, T226 rain/lower-trunk lighting), lighting mode 0, no experiment switches",
+  "views": {
+    "side": {
+      "type": "stratus_nebulosus",
+      "view": "side",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        9127.10971,
+        259.6,
+        45338.13239
+      ],
+      "aim": [
+        9127.10971,
+        259.6,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": -180.0,
+      "pitch": -0.0,
+      "source": "CG_stratus_nebulosus__side.png"
+    },
+    "opposite_side": {
+      "type": "stratus_nebulosus",
+      "view": "opposite_side",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        9127.10971,
+        259.6,
+        44653.73367
+      ],
+      "aim": [
+        9127.10971,
+        259.6,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": 0.0,
+      "pitch": -0.0,
+      "source": "CG_stratus_nebulosus__opposite_side.png"
+    },
+    "front": {
+      "type": "stratus_nebulosus",
+      "view": "front",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        8784.91035,
+        259.6,
+        44995.93303
+      ],
+      "aim": [
+        9127.10971,
+        259.6,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": -90.0,
+      "pitch": -0.0,
+      "source": "CG_stratus_nebulosus__front.png"
+    },
+    "back": {
+      "type": "stratus_nebulosus",
+      "view": "back",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        9469.30907,
+        259.6,
+        44995.93303
+      ],
+      "aim": [
+        9127.10971,
+        259.6,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": 90.0,
+      "pitch": -0.0,
+      "source": "CG_stratus_nebulosus__back.png"
+    },
+    "above": {
+      "type": "stratus_nebulosus",
+      "view": "above",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        9024.4499,
+        474.27961,
+        44995.93303
+      ],
+      "aim": [
+        9127.10971,
+        259.6,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": -90.0,
+      "pitch": 64.44287,
+      "source": "CG_stratus_nebulosus__above.png"
+    },
+    "below": {
+      "type": "stratus_nebulosus",
+      "view": "below",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        9127.10971,
+        157.12,
+        45088.09284
+      ],
+      "aim": [
+        9127.10971,
+        254.92,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": -180.0,
+      "pitch": -46.7007,
+      "source": "CG_stratus_nebulosus__below.png"
+    },
+    "low_angle": {
+      "type": "stratus_nebulosus",
+      "view": "low_angle",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        8885.13823,
+        104.0,
+        45237.90451
+      ],
+      "aim": [
+        9127.10971,
+        259.6,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": -135.0,
+      "pitch": -24.451563,
+      "source": "CG_stratus_nebulosus__low_angle.png"
+    },
+    "far": {
+      "type": "stratus_nebulosus",
+      "view": "far",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        9323.77023,
+        259.6,
+        45651.46811
+      ],
+      "aim": [
+        9127.10971,
+        259.6,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": -196.69925,
+      "pitch": -0.0,
+      "source": "CG_stratus_nebulosus__far.png"
+    },
+    "close": {
+      "type": "stratus_nebulosus",
+      "view": "close",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        9127.10971,
+        259.6,
+        45323.13239
+      ],
+      "aim": [
+        9127.10971,
+        259.6,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": -180.0,
+      "pitch": -0.0,
+      "source": "CG_stratus_nebulosus__close.png"
+    },
+    "sheet_extent": {
+      "type": "stratus_nebulosus",
+      "view": "sheet_extent",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        8648.03061,
+        474.27961,
+        45201.25264
+      ],
+      "aim": [
+        9127.10971,
+        259.6,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": -113.19859,
+      "pitch": 22.38564,
+      "source": "CG_stratus_nebulosus__sheet_extent.png"
+    },
+    "underside": {
+      "type": "stratus_nebulosus",
+      "view": "underside",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        9127.10971,
+        157.12,
+        45042.01293
+      ],
+      "aim": [
+        9311.42932,
+        250.24001,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": -104.03625,
+      "pitch": -26.110634,
+      "source": "CG_stratus_nebulosus__underside.png"
+    },
+    "edge_profile": {
+      "type": "stratus_nebulosus",
+      "view": "edge_profile",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        9127.10971,
+        259.6,
+        45475.01213
+      ],
+      "aim": [
+        9127.10971,
+        259.6,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": -180.0,
+      "pitch": -0.0,
+      "source": "CG_stratus_nebulosus__edge_profile.png"
+    },
+    "top_profile": {
+      "type": "stratus_nebulosus",
+      "view": "top_profile",
+      "region": "7232f2fd-9f7e-47d2-b09e-764fa4586fef",
+      "centre": [
+        9127.10971,
+        44995.93303
+      ],
+      "ext": 307.19936,
+      "base": 250.24001,
+      "top": 268.95999,
+      "downwind": [
+        1.0,
+        0.0
+      ],
+      "ground": 64.0,
+      "camera": [
+        9127.10971,
+        283.95999,
+        45406.57226
+      ],
+      "aim": [
+        9127.10971,
+        265.21599,
+        44995.93303
+      ],
+      "note": "",
+      "yaw": -180.0,
+      "pitch": 2.6135032,
+      "source": "CG_stratus_nebulosus__top_profile.png"
+    }
+  }
+}
