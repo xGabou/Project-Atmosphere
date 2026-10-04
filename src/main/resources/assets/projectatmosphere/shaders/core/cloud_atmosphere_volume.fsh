@@ -7039,8 +7039,30 @@ float cloudDensityImpl(
                 // T246: member tops are flat (per-member rim tapers averaged
                 // into a tall central capsule); the deck thins only where its
                 // total coverage thins - its outer rim.
-                float nsRimThin = 1.0 - saturate(coverageSignal / 0.5);
-                envelope = min(saturate(coverageSignal / 0.5),
+                // T248: that coverage is LOW-PASSED (3x3 at +-40 blocks). Each
+                // member paints its own coverage plateau with a steep edge, so
+                // the local value stepped the deck down member by member - a
+                // staircase of flat blocks with vertical walls toward the
+                // narrow end, and notches between members. The outline stays
+                // on the local coverage (the smoothstep(coverageMod) gate).
+                // Only the visible shape needs the smooth top: light taps (the
+                // field build, the cone) read the deck's mass and keep the
+                // local value.
+                float nsCoverage = coverageSignal;
+                if (paDensityConsumer != 2 && paDensityConsumer != 9 && !paStormFieldBuildNode) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        for (int dx = -1; dx <= 1; dx++) {
+                            if (dx == 0 && dz == 0) {
+                                continue;
+                            }
+                            nsCoverage += saturate(
+                                sampleWeather(p.xz + vec2(float(dx), float(dz)) * 40.0).r * CoverageMul);
+                        }
+                    }
+                    nsCoverage /= 9.0;
+                }
+                float nsRimThin = 1.0 - saturate(nsCoverage / 0.5);
+                envelope = min(saturate(nsCoverage / 0.5),
                     1.0 - smoothstep(0.82 - 0.45 * nsRimThin, 1.0 - 0.45 * nsRimThin, h01));
                 carveThreshold = mix(0.25, 0.55, hang);
                 carveAmplitude = mix(0.22, 0.75, hang);

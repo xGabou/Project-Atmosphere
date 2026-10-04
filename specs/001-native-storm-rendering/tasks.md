@@ -4482,6 +4482,13 @@ implementation, while visual polish remains independently active.
   stratocumulus and humilis error 0, motion pops gone (stratocumulus p99 107 -> 15). Build vs build: SIDE
   +0.09 ms (two call sites cost +0.25), PVN +0.13 at matched workload; non-storm scenes +0.1..0.6 ms at
   1.3..4.3 ms. Morphology, density, opacity, silhouettes and storm lighting unchanged. [SC-005, SC-016, SC-021]
+- [X] T248 [QUALITY] [US1] Nimbostratus deck end. **KEEP - production; see
+  `validation/t248-nimbostratus-deck-end.md`.** The profile-5 carve's top taper and coverage term read the LOCAL
+  weather coverage, whose per-member plateaus stepped the deck down member by member (vertical walls toward
+  the narrow end, notches, lumps). Both now read a coverage low-passed at +-40 blocks (9 taps; light taps and
+  the field build keep the local value); the outline stays on the local coverage. Three instances, every
+  required view, fixed-seed A/B on identical clouds: one broad even layer, no capsule. Nimbostratus skies
+  3.41 -> 4.00 ms (more deck volume, not fetches; 5 taps cost the same). [SC-005, SC-016]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
