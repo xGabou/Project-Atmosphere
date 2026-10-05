@@ -68,3 +68,18 @@ a coverage-independent, low-frequency field (so it thins gradually toward the ri
 the coverage-keyed carve. That is a change to the accepted T243 nimbostratus underside and needs a decision; it is
 not a tail fix. The seeded-spawn harness (`CG_SEED`, `CG_MEMBER`) and `t249_members.py` stay in
 `run/t226-harness/` for that work.
+
+## 10. Fractus-layer redesign (user-approved follow-up, not kept)
+
+After the nine candidates above, the redesign recommended in section 9 was approved and tried on the same seeded
+clouds: the hang carve sees a CONSTANT moderate envelope (decoupled from deck coverage) and the layer's depth comes
+from its own low-frequency field (`lowFbm`, z-scored) times a wide smooth rim fade on the averaged coverage, its
+bottom displaced by the carve noise.
+
+| id | hang envelope | floor ramp | result |
+|---|---|---|---|
+| F1 / F2 | 0.75 / 0.65 | -0.04..+0.06 | underside walls gone in side / back views, the tail joins gradually; the light torn wisps become dense rounded lobes with hard bottoms |
+| F3 / F4 | 0.60 / 0.55 | -0.10..+0.20 / -0.12..+0.28 | softer lobes (F4 most wispy), but the dark torn pannus under the base is still lost, and in `top_profile` (instances 1, 8) the deep central section still meets the thinner part with a near-vertical edge |
+
+Sheets: `t249f_out` (F1/F2), `t249g_z` (F3/F4). Not kept: the redesign trades the realistic torn pannus for a
+partial fix and the target step remains in some views. Production is unchanged.
