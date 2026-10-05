@@ -4500,6 +4500,12 @@ implementation, while visual polish remains independently active.
   field) softens the walls but turns the torn pannus into softer lobes; the user chose to ship F4 (hang envelope
   0.55, soft ragged floor): even lower layer fading to the rim, above / top unchanged; nimbostratus skies
   3.64 -> 4.30 ms (seeded, indicative). [SC-005, SC-016]
+- [X] T250 [QUALITY] [US1] Non-storm lighting-grid alignment. **KEEP - production; see
+  `validation/t250-field-grid-alignment.md`.** The weather origin snapped to 8-block texels while the storm
+  field / puff index use 16-block cells on the same origin, so every other re-centre moved the field lattice by
+  half a node and field-lit shading popped. The origin now snaps to max(texel, field node) (16 blocks), shared by
+  the weather and storm-descriptor origins. Fixed seed: phase always (0, 0); same-cloud arms visually identical;
+  stratocumulus motion pop 38 -> 17; shader unchanged, gpuMs equal. [SC-005, SC-016]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

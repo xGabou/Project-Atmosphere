@@ -123,6 +123,20 @@ public final class CloudWeatherMapRenderer {
         }
     }
 
+    /**
+     * T250. The step the weather origin snaps to: a whole number of map texels AND
+     * of storm-field nodes / puff tiles (both 256 cells over the extent). Snapping
+     * to single 8-block texels moved the 16-block field lattice by half a node on
+     * every other re-centre - the non-storm light grid changed phase as the camera
+     * moved. Texel centres stay on the same world lattice; the map only re-centres
+     * half as often.
+     */
+    public static double originSnap(int mapSize) {
+        double texel = WEATHER_EXTENT / Math.max(1, mapSize);
+        double node = WEATHER_EXTENT / StormFieldGeometry.DEFAULT_XZ;
+        return Math.max(texel, node);
+    }
+
     public static double lastOriginX() {
         return lastOriginX;
     }
@@ -235,10 +249,11 @@ public final class CloudWeatherMapRenderer {
             return Result.EMPTY;
         }
 
-        // Camera-snapped origin: the map scrolls in whole texels only.
+        // Camera-snapped origin: the map scrolls in whole snap steps only.
         float texelSize = WEATHER_EXTENT / mapSize;
-        double originX = Math.floor((cameraX - WEATHER_EXTENT * 0.5D) / texelSize) * texelSize;
-        double originZ = Math.floor((cameraZ - WEATHER_EXTENT * 0.5D) / texelSize) * texelSize;
+        double snap = originSnap(mapSize);
+        double originX = Math.floor((cameraX - WEATHER_EXTENT * 0.5D) / snap) * snap;
+        double originZ = Math.floor((cameraZ - WEATHER_EXTENT * 0.5D) / snap) * snap;
         lastOriginX = originX;
         lastOriginZ = originZ;
 

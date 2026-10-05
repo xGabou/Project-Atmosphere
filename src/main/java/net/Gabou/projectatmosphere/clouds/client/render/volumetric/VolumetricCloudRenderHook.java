@@ -262,14 +262,14 @@ public final class VolumetricCloudRenderHook {
         // field clouds never inherit the rain-coupled regional sheet, so they
         // stay identical when the camera moves between rain and clear air.
         boolean includeRegionalLayer = !renderingFields;
-        float stormTexelSize = CloudWeatherMapRenderer.WEATHER_EXTENT
-                / Math.max(1, profile.weatherMapSize());
+        // Must match CloudWeatherMapRenderer's origin exactly (same snap).
+        double stormSnap = CloudWeatherMapRenderer.originSnap(profile.weatherMapSize());
         double stormOriginX = Math.floor(
-                (cameraPos.x() - CloudWeatherMapRenderer.WEATHER_EXTENT * 0.5D) / stormTexelSize
-        ) * stormTexelSize;
+                (cameraPos.x() - CloudWeatherMapRenderer.WEATHER_EXTENT * 0.5D) / stormSnap
+        ) * stormSnap;
         double stormOriginZ = Math.floor(
-                (cameraPos.z() - CloudWeatherMapRenderer.WEATHER_EXTENT * 0.5D) / stormTexelSize
-        ) * stormTexelSize;
+                (cameraPos.z() - CloudWeatherMapRenderer.WEATHER_EXTENT * 0.5D) / stormSnap
+        ) * stormSnap;
         // Publish/refresh descriptor ownership before the weather-map bake.
         // The bake suppresses member rasters only for complete live groups;
         // omitted or sentinel-marked groups retain the legacy map fallback.
