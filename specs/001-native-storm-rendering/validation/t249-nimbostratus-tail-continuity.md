@@ -1,8 +1,9 @@
 # T249 - Nimbostratus outer-tail continuity
 
-Branch `quality/t217-deep-interior-lighting`, from `a7e5348e` (T248). **Outcome: NO CHANGE KEPT.** The remaining
-step was attributed, seven candidates were tested on seeded clouds, and none removes it without materially
-changing the accepted underside (stop condition of the brief). Production source is unchanged. Evidence:
+Branch `quality/t217-deep-interior-lighting`, from `a7e5348e` (T248). **Outcome: F4 fractus redesign SHIPPED (user
+decision, section 11).** The step was attributed; nine candidates and a four-variant fractus redesign were tested on
+seeded clouds, none removes it without changing the accepted underside, and the user chose the softer underside
+(F4) over keeping the step. Sections 1-10 record the investigation as it ran. Evidence:
 `validation/t249-campaign/`.
 
 ## 1. Outlier reproduction
@@ -81,5 +82,30 @@ bottom displaced by the carve noise.
 | F1 / F2 | 0.75 / 0.65 | -0.04..+0.06 | underside walls gone in side / back views, the tail joins gradually; the light torn wisps become dense rounded lobes with hard bottoms |
 | F3 / F4 | 0.60 / 0.55 | -0.10..+0.20 / -0.12..+0.28 | softer lobes (F4 most wispy), but the dark torn pannus under the base is still lost, and in `top_profile` (instances 1, 8) the deep central section still meets the thinner part with a near-vertical edge |
 
-Sheets: `t249f_out` (F1/F2), `t249g_z` (F3/F4). Not kept: the redesign trades the realistic torn pannus for a
-partial fix and the target step remains in some views. Production is unchanged.
+Sheets: `t249f_out` (F1/F2), `t249g_z` (F3/F4). Initially not kept (the torn pannus becomes softer lobes; a `top_profile` edge remains); the user then chose F4
+(section 11).
+
+## 11. Shipped: F4 (user decision)
+
+Given the trade-off (keep the step, or soften the underside), the user chose F4. Production
+(`cloud_atmosphere_volume.fsh`, profile-5 carve, no switch):
+
+* hang zone: `envelope = mix(envelope, 0.55 * smoothstep(0, 0.12, nsCoverage), hang)` - the fractus carve no
+  longer keys on the deck coverage;
+* depth: `nsDepth = smoothstep(0.03, 0.35, nsCoverage) * (0.55 + 0.45 * field)`, `field` = z-scored `lowFbm`;
+* soft ragged bottom: `floor = 0.40 (1 - nsDepth) - 0.10 carveNoise`,
+  `cloud *= smoothstep(floor - 0.12, floor + 0.28, h01)`.
+
+Validation (lean FINAL, `CG_SEED=5000`, eight instances = four outlier + four ordinary, 13 views each; HEAD
+`t249h` vs T249 `t249p`, sheet `t249_prod_ab`): the deep hanging section's near-vertical walls (instance 1 side /
+top_profile) become an even lower layer fading gradually toward the rim; instance 2 back and instance 3 side more
+even; the `above` outline and the deck top unchanged; the pannus is softer (accepted). Ordinary clouds change the
+same way (the underside model changed for every nimbostratus).
+
+Performance (same seeded clouds, mean of per-view median cloud-pass gpuMs, 13 views x 8 instances; the seeded
+spawns still drift slightly between sessions, so indicative): HEAD 3.64 ms, T249 4.30 ms (+0.65) - the hanging layer
+now fills more of the deck's underside. Nimbostratus skies remain below the storm scenes (~5.5 ms) and the 10 ms
+ceiling; the storm benchmark has no profile-5 material.
+
+Static: `campaignGate` 0, `check` 0, `stormMorphologySandbox` 0 (`gate-t249.log`, `check-build-t249.log`,
+`sandbox-t249.log`). Gallery: `validation/t246-final-gallery/nimbostratus` regenerated from `t249p`.

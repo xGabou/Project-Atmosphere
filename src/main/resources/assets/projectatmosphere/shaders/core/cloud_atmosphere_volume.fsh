@@ -7030,6 +7030,7 @@ float cloudDensityImpl(
             // Decks (stratus, nimbostratus) stay continuous: a lower carve
             // threshold and half the displacement.
             bool continuousDeck = profileId == 1 || profileId == 5;
+            float nsFractusFloor = -1.0;
             float carveThreshold = continuousDeck ? 0.30 : 0.5;
             float carveAmplitude = continuousDeck ? 0.22 : 0.45;
             if (profileId == 5) {
@@ -7066,9 +7067,24 @@ float cloudDensityImpl(
                     1.0 - smoothstep(0.82 - 0.45 * nsRimThin, 1.0 - 0.45 * nsRimThin, h01));
                 carveThreshold = mix(0.25, 0.55, hang);
                 carveAmplitude = mix(0.22, 0.75, hang);
+                // T249: the hanging fractus layer is decoupled from the deck
+                // coverage. Keyed on it, the layer survived only under the thick
+                // deck and ended on one coverage contour - a near-vertical
+                // underside wall, and a thin stepped tail under a lone outer
+                // member. The carve now sees a constant moderate envelope, and
+                // the layer's depth comes from its own low-frequency field times
+                // a wide smooth rim fade; its soft bottom is displaced by the
+                // carve noise, so it thins gradually toward the rim.
+                envelope = mix(envelope, 0.55 * smoothstep(0.0, 0.12, nsCoverage), hang);
+                float nsFractusField = 0.5 + 0.5 * clamp((lowFbm - 0.48) / 0.08, -1.0, 1.0);
+                float nsDepth = smoothstep(0.03, 0.35, nsCoverage) * (0.55 + 0.45 * nsFractusField);
+                nsFractusFloor = 0.40 * (1.0 - nsDepth) - 0.10 * carveNoise;
             }
             cloud *= smoothstep(-0.08, 0.12, envelope - carveThreshold + carveAmplitude * carveNoise)
                 * verticalGate;
+            if (nsFractusFloor > -0.5) {
+                cloud *= smoothstep(nsFractusFloor - 0.12, nsFractusFloor + 0.28, h01);
+            }
         }
 
         if (paTraceCapture) {
