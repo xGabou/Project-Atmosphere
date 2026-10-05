@@ -1,0 +1,43 @@
+== baseline
+instance                    area comp aspect  bilat rot120  rot90
+cumulus_mediocris          23969    1   1.29  0.726  0.557  0.539
+cumulus_mediocris_i2       26390    1   1.23  0.697  0.625  0.599
+cumulus_mediocris_i3       25538    1   1.36  0.703  0.553  0.525
+cumulus_mediocris_i4       26177    1   1.41  0.726  0.497  0.500
+cumulus_mediocris_i5       29630    1   1.38  0.627  0.562  0.520
+cumulus_mediocris_i6       26048    1   1.32  0.666  0.503  0.516
+
+member layout (offsets from the member centroid, blocks):
+cumulus_mediocris: (    79deg  12.9 r26.3 top  286) (   111deg  29.6 r23.0 top  279) (  -132deg   8.5 r24.7 top  285) (    38deg  29.4 r23.8 top  282) (   -66deg  16.6 r21.7 top  303) (  -171deg  21.4 r23.3 top  297) (   -40deg  27.2 r18.9 top  311) (  -134deg  22.7 r17.9 top  320)
+cumulus_mediocris_i2: (   150deg  14.5 r26.7 top  289) (    94deg  25.9 r27.0 top  282) (   179deg  33.8 r24.9 top  287) (   -68deg   8.3 r24.6 top  283) (  -101deg  22.5 r25.0 top  308) (     4deg  15.8 r22.3 top  309) (   -61deg  23.6 r20.6 top  321) (    35deg  27.2 r21.6 top  326)
+cumulus_mediocris_i3: (    54deg  11.9 r24.2 top  284) (   -91deg   8.5 r23.5 top  281) (    26deg  28.6 r23.3 top  281) (    94deg  28.1 r24.6 top  278) (   -56deg  19.4 r20.4 top  304) (  -153deg  15.8 r22.5 top  301) (   -95deg  20.8 r18.8 top  314) (   175deg  25.6 r18.7 top  308)
+cumulus_mediocris_i4: (  -137deg  12.5 r25.4 top  283) (    74deg   9.2 r22.7 top  278) (  -161deg  30.3 r23.0 top  279) (   -92deg  26.7 r21.5 top  276) (    12deg  15.4 r20.5 top  293) (   112deg  19.6 r21.1 top  295) (   -16deg  23.1 r15.9 top  305) (    74deg  21.9 r16.6 top  308)
+cumulus_mediocris_i5: (   120deg  13.7 r27.4 top  291) (   -86deg   9.5 r24.2 top  282) (    84deg  31.3 r24.4 top  288) (   154deg  32.5 r26.9 top  281) (  -126deg  21.4 r24.9 top  306) (   -25deg  17.6 r22.2 top  310) (   -89deg  23.5 r18.1 top  317) (     1deg  28.5 r20.6 top  319)
+cumulus_mediocris_i6: (   -10deg  12.0 r24.4 top  283) (    21deg  29.5 r22.3 top  281) (   143deg   8.6 r23.6 top  275) (   -50deg  27.6 r22.9 top  281) (   102deg  19.7 r19.9 top  294) (  -154deg  16.0 r20.2 top  294) (   139deg  22.5 r17.8 top  314) (  -128deg  24.5 r17.9 top  313)
+
+== B1 (crown separation tuck 0.85)
+instance                    area comp aspect  bilat rot120  rot90
+cumulus_mediocris          25108    1   1.23  0.682  0.565  0.548
+cumulus_mediocris_i2       24673    1   1.36  0.690  0.612  0.582
+cumulus_mediocris_i3       25000    1   1.41  0.724  0.528  0.478
+cumulus_mediocris_i4       27413    1   1.32  0.723  0.518  0.516
+cumulus_mediocris_i5       28692    1   1.31  0.666  0.580  0.531
+cumulus_mediocris_i6       25328    1   1.31  0.702  0.497  0.513
+
+
+== B3 (both crowns on the first middle)
+instance                    area comp aspect  bilat rot120  rot90
+cumulus_mediocris          24927    1   1.40  0.849  0.511  0.482
+cumulus_mediocris_i2       26051    1   1.36  0.715  0.563  0.570
+cumulus_mediocris_i3       25038    1   1.49  0.701  0.508  0.468
+cumulus_mediocris_i4       26460    1   1.45  0.746  0.511  0.504
+cumulus_mediocris_i5       28113    1   1.39  0.776  0.558  0.534
+cumulus_mediocris_i6       25361    1   1.54  0.618  0.478  0.463
+
+member layout (offsets from the member centroid, blocks):
+cumulus_mediocris: (    84deg  13.2 r26.3 top  286) (   113deg  30.5 r23.0 top  279) (  -140deg   9.1 r24.7 top  285) (    40deg  28.7 r23.8 top  282) (   -69deg  15.7 r21.7 top  303) (  -173deg  22.6 r23.3 top  297) (   -41deg  25.9 r18.9 top  311) (  -110deg  20.7 r17.9 top  320)
+cumulus_mediocris_i2: (   120deg  14.8 r26.7 top  289) (    84deg  31.7 r27.0 top  282) (   167deg  29.3 r24.9 top  287) (   -14deg   8.6 r24.6 top  283) (   -87deg  16.4 r25.0 top  308) (    18deg  22.0 r22.3 top  309) (   -42deg  22.4 r20.6 top  321) (  -120deg  28.1 r21.6 top  326)
+cumulus_mediocris_i3: (    87deg  12.1 r24.2 top  284) (  -137deg   8.9 r23.5 top  281) (    37deg  24.5 r23.3 top  281) (   105deg  31.5 r24.6 top  278) (   -72deg  14.4 r20.4 top  304) (  -167deg  20.9 r22.5 top  301) (  -114deg  20.1 r18.8 top  314) (   -38deg  23.6 r18.7 top  308)
+cumulus_mediocris_i4: (  -141deg  12.7 r25.4 top  283) (    80deg   9.5 r22.7 top  278) (  -162deg  30.9 r23.0 top  279) (   -94deg  26.2 r21.5 top  276) (    15deg  14.7 r20.5 top  293) (   113deg  20.4 r21.1 top  295) (   -15deg  22.1 r15.9 top  305) (    55deg  20.8 r16.6 top  308)
+cumulus_mediocris_i5: (    89deg  14.3 r27.4 top  291) (   -42deg  10.5 r24.2 top  282) (    73deg  35.1 r24.4 top  288) (   143deg  27.7 r26.9 top  281) (  -111deg  15.8 r24.9 top  306) (   -12deg  23.6 r22.2 top  310) (   -71deg  22.4 r18.1 top  317) (  -142deg  26.9 r20.6 top  319)
+cumulus_mediocris_i6: (   -40deg  12.5 r24.4 top  283) (    10deg  25.7 r22.3 top  281) (  -175deg   9.2 r23.6 top  275) (   -61deg  31.3 r22.9 top  281) (   116deg  14.7 r19.9 top  294) (  -142deg  21.2 r20.2 top  294) (   156deg  21.2 r17.8 top  314) (    86deg  22.8 r17.9 top  313)

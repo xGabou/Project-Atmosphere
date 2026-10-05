@@ -1005,7 +1005,16 @@ final class CloudMorphologyGenerators {
         int crownCount = upperCount - middleLobes.size();
         float crownTangentSign = random.nextBoolean() ? 1.0F : -1.0F;
         for (int crown = 0; crown < crownCount; crown++) {
-            PuffLobeSpec crownSupport = middleLobes.get(crown % middleLobes.size());
+            // T251: mediocris stacks both crowns on the first middle, on either
+            // side of it - one dominant turret mass and a lone middle. One
+            // crown per middle completed two matched pairs (the middles mirror
+            // each other about their shoulder, the crowns shared a tangent
+            // sign), and from above the four upper lobes - which own the top
+            // silhouette - read as a symmetric X / hourglass however the base
+            // was jittered.
+            PuffLobeSpec crownSupport = mediocris
+                    ? middleLobes.get(0)
+                    : middleLobes.get(crown % middleLobes.size());
             lobes.add(createUpperPuffLobe(
                     crownSupport,
                     condensationBase,
@@ -1021,7 +1030,7 @@ final class CloudMorphologyGenerators {
                     mediocris ? 0.76F : 0.58F,
                     0.55F,
                     CloudMorphologyMemberTier.CROWN,
-                    crownTangentSign
+                    mediocris && crown == 1 ? -crownTangentSign : crownTangentSign
             ));
         }
         return List.copyOf(lobes);

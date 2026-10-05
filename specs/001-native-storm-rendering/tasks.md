@@ -4506,6 +4506,13 @@ implementation, while visual polish remains independently active.
   half a node and field-lit shading popped. The origin now snaps to max(texel, field node) (16 blocks), shared by
   the weather and storm-descriptor origins. Fixed seed: phase always (0, 0); same-cloud arms visually identical;
   stratocumulus motion pop 38 -> 17; shader unchanged, gpuMs equal. [SC-005, SC-016]
+- [X] T251 [QUALITY] [US1] Cumulus mediocris top-down asymmetry. **KEEP - production; see
+  `validation/t251-mediocris-asymmetry.md`.** Seeded attribution: the X / hourglass from above came from the upper
+  lobes (which own the top silhouette) forming two matched pairs - mirrored middles on one shoulder and one crown
+  per middle - not from the base angles. Both crowns now stack on the first middle (opposite tangents): one dominant
+  turret mass and a lone middle. Radius / separation / tangent variants hit the topology bands (merging middles,
+  needle turrets, footprint) and were rejected without widening any band. Six seeded clouds: X broken in 4,
+  side / close / below natural, humilis identical, gpuMs equal. [SC-005, SC-016]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
