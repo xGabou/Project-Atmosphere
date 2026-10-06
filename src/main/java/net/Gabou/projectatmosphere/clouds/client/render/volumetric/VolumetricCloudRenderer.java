@@ -30,6 +30,7 @@ public final class VolumetricCloudRenderer {
     private static final int RAIN_FIELD_TEXTURE_UNIT = CloudTextureUnitContract.RAIN_FIELD_UNIT;
     private static final int STORM_FIELD_TEXTURE_UNIT = CloudTextureUnitContract.STORM_FIELD_UNIT;
     private static final int RAIN_PASS_TEXTURE_UNIT = CloudTextureUnitContract.RAIN_PASS_UNIT;
+    private static final int NS_COVERAGE_TEXTURE_UNIT = CloudTextureUnitContract.NS_COVERAGE_UNIT;
     /** T205. The rain pass's texture for the frame being drawn, or 0. */
     private static int rainPassTextureId;
     /** T210. The rain target the resolve/composite reads this frame (the lattice one when it ran). */
@@ -634,6 +635,8 @@ public final class VolumetricCloudRenderer {
                 || stormDescriptorTarget == null || puffCandidateTarget == null) {
             return false;
         }
+        // T253. Before the march target is bound: the blur pass binds its own.
+        CloudWeatherMapRenderer.refreshNsCoverage(weatherTarget, safeTuning.coverageMul());
 
         bindMarchTarget(cloudTarget, temporal);
         RenderSystem.disableBlend();
@@ -1452,6 +1455,13 @@ public final class VolumetricCloudRenderer {
                 RAIN_PASS_TEXTURE_UNIT,
                 rainPassTextureId
         );
+        // T253. The pre-blurred nimbostratus deck coverage.
+        bind2dSampler(
+                program,
+                "NsCoverageSampler",
+                NS_COVERAGE_TEXTURE_UNIT,
+                VolumetricCloudRenderTargets.nsCoverageTextureId()
+        );
         bind3dSampler(
                 program,
                 "BaseNoiseSampler",
@@ -1812,6 +1822,8 @@ public final class VolumetricCloudRenderer {
         GlStateManager._activeTexture(GL13.GL_TEXTURE0 + PUFF_CANDIDATE_TEXTURE_UNIT);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
         GlStateManager._activeTexture(GL13.GL_TEXTURE0 + RAIN_FIELD_TEXTURE_UNIT);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        GlStateManager._activeTexture(GL13.GL_TEXTURE0 + NS_COVERAGE_TEXTURE_UNIT);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
         GlStateManager._activeTexture(GL13.GL_TEXTURE0 + BASE_NOISE_TEXTURE_UNIT);
         GL11.glBindTexture(GL12.GL_TEXTURE_3D, 0);

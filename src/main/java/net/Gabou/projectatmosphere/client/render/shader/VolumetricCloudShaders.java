@@ -34,6 +34,8 @@ public final class VolumetricCloudShaders {
     private static final ResourceLocation LEAN_FINAL_VOLUME_ID =
             ResourceLocation.fromNamespaceAndPath(
                     ProjectAtmosphere.MODID, "cloud_atmosphere_volume_final");
+    private static final ResourceLocation COVERAGE_BLUR_ID =
+            ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_coverage_blur");
     private static final ResourceLocation SHADOW_MAP_ID =
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_shadow_map");
     private static final ResourceLocation SHADOW_APPLY_ID =
@@ -42,6 +44,7 @@ public final class VolumetricCloudShaders {
     private static ShaderInstance splatShader;
     private static ShaderInstance morphologySplatShader;
     private static ShaderInstance cumulusLayerSplatShader;
+    private static ShaderInstance coverageBlurShader;
     private static ShaderInstance volumeShader;
     private static ShaderInstance leanFinalVolumeShader;
     /**
@@ -71,6 +74,9 @@ public final class VolumetricCloudShaders {
         event.registerShader(new ShaderInstance(
                         event.getResourceProvider(), CUMULUS_LAYER_SPLAT_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> cumulusLayerSplatShader = loaded);
+        event.registerShader(new ShaderInstance(
+                        event.getResourceProvider(), COVERAGE_BLUR_ID, DefaultVertexFormat.POSITION_TEX),
+                loaded -> coverageBlurShader = loaded);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), VOLUME_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> {
                     volumeShader = loaded;
@@ -164,6 +170,11 @@ public final class VolumetricCloudShaders {
         net.Gabou.projectatmosphere.clouds.client.render.volumetric.CloudWeatherMapRenderer.invalidateCache();
         net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderer.invalidateHistory();
         ProjectAtmosphere.LOGGER.info("[VolumetricClouds] shader programs registered");
+    }
+
+    /** T253. Pre-blurs the nimbostratus deck coverage once per weather-map rebuild. */
+    public static ShaderInstance coverageBlurShader() {
+        return coverageBlurShader;
     }
 
     public static ShaderInstance splatShader() {

@@ -1,0 +1,97 @@
+== T253 equivalence (same session, monolith arms M=99 pre-blur, M2=95 pre-blur repeat, O=253 old nine-tap loop), seed 5000
+shot                               M-M2 rms  M-O rms M-O p99 M-O max IoU MM2  IoU MO dBright  dTop dBottom dLeft dRight (px, M-O)
+nimbostratus/below                     5.69     5.73    19.6    36.7  0.9837  0.9839    1.69     0   -1    0   18
+nimbostratus/close                     3.60     2.02    10.7    20.7  0.9827  0.9884    0.25     0   -2    0   -1
+nimbostratus/low_angle                20.06    20.05    86.6   165.6  0.9834  0.9829    0.57     0    0    0    0
+nimbostratus/side                      1.07     2.29    13.8    40.4  0.9932  0.9839   -0.20     0    2    0    0
+nimbostratus_i2/below                  4.69    12.22    80.0   128.1  0.9975  0.9903    0.61     0 -309    0    0
+nimbostratus_i2/close                  1.10     1.12     6.0    32.0  0.9901  0.9927    0.03     0    0    0    0
+nimbostratus_i2/low_angle             37.85    38.41   140.9   179.2  0.7260  0.7239    3.83    -3    0   29  256
+nimbostratus_i2/side                   3.55     5.76    13.8   180.0  0.9918  0.9769   -0.32     0    1   -1    0
+nimbostratus_i3/below                  6.99     6.60    22.7    54.8  0.9776  0.9767   -0.26     0    2    0  -23
+nimbostratus_i3/close                  2.07     1.69     8.9    37.5  0.9906  0.9912    0.08     0    0    0    0
+nimbostratus_i3/low_angle             25.84    25.84   152.4   192.3  0.9408  0.9408    0.94     0  -44   29  -18
+nimbostratus_i3/side                   1.52     3.82     6.8   176.6  0.9922  0.9738   -0.70     0 -231    0   -1
+nimbostratus_i4/below                  4.23     4.83    18.2    40.9  0.9984  0.9982   -0.08     0    0    0    0
+nimbostratus_i4/close                  2.83     1.49     8.7    36.2  0.9783  0.9881    0.10     0   -2    0    0
+nimbostratus_i4/low_angle             39.05    44.62   153.2   182.6  0.9970  0.9971   -0.36     0    0    0    0
+nimbostratus_i4/side                   1.79     1.30     6.8    35.2  0.9865  0.9880    0.04     0    3    0    0
+
+still views: median rms M-M2 3.91  M-O 5.28 | median p99 M-M2 17.8 M-O 16.0 | mean IoU M-M2 0.9694 M-O 0.9673
+
+motion: frame-to-frame rms per arm (mean over steps) | M-O rms per frame (mean)
+nimbostratus         step rms M 3.90 M2 3.72 O 3.86 | per-frame M-M2 2.07 M-O 1.89
+nimbostratus_i2      step rms M 7.71 M2 7.68 O 7.68 | per-frame M-M2 1.49 M-O 1.31
+nimbostratus_i3      step rms M 4.64 M2 4.53 O 4.72 | per-frame M-M2 1.50 M-O 1.75
+nimbostratus_i4      step rms M 2.69 M2 2.41 O 2.51 | per-frame M-M2 1.69 M-O 1.55
+
+== timing: H = HEAD f7b1e6b5 volume shader, T = T253 (Java identical, T253); order h1 t1 f1 h2 t2 f2 h3 t3 h4 t4 (f = T + blur-pass GPU timer)
+per shot: p50 ms (run spread) | primary density calls k | light taps k | material fraction | mean run | material-run rays k
+nimbostratus__below              H:11.77(1.69) 18078.8 41078.7 0.401   9.6  753.1  T:10.42(0.19) 18346.6 42200.5 0.406   9.7  767.5
+nimbostratus__close              H: 5.47(0.76) 6142.7 8973.6 0.270   9.0  187.4  T: 5.14(0.76) 6985.5 11917.7 0.298   9.4  222.5
+nimbostratus__low_angle          H: 3.67(0.46) 2275.0 5583.6 0.433   9.9   99.2  T: 3.24(0.19) 2354.9 5858.8 0.440   9.9  104.4
+nimbostratus__side               H: 4.53(0.23) 4041.7 5802.6 0.265   9.8  105.2  T: 4.15(0.38) 4708.8 6700.4 0.265   9.7  122.8
+nimbostratus_i2__below           H:13.31(2.10) 20342.6 50340.4 0.437   9.8  906.8  T:11.60(0.05) 20351.0 50559.7 0.438   9.8  909.1
+nimbostratus_i2__close           H: 3.51(0.63) 1333.7 2676.9 0.352  10.6   44.2  T: 3.20(0.29) 1397.2 2772.5 0.348  10.5   46.4
+nimbostratus_i2__low_angle       H: 3.31(0.57) 1520.3 4065.2 0.470   9.9   72.3  T: 2.81(0.08) 1492.9 4069.6 0.480   9.9   72.3
+nimbostratus_i2__side            H: 3.49(0.71) 1144.3 2343.2 0.359  10.7   38.6  T: 3.18(0.39) 1197.6 2432.7 0.356  10.6   40.4
+nimbostratus_i3__below           H:12.19(1.30) 19980.3 44478.9 0.393   9.8  806.2  T:10.82(0.13) 20267.4 45801.6 0.399   9.8  823.1
+nimbostratus_i3__close           H: 4.92(2.35) 5275.3 7714.4 0.264   9.7  141.2  T: 4.31(0.45) 4834.4 7790.0 0.288   9.2  154.0
+nimbostratus_i3__low_angle       H: 4.20(0.78) 2888.7 6701.4 0.410   9.8  121.4  T: 3.66(0.02) 2943.9 6893.5 0.414   9.8  124.5
+nimbostratus_i3__side            H: 4.38(1.33) 3434.6 5346.7 0.277   9.9   94.5  T: 3.77(0.52) 3287.4 5327.3 0.290   9.6   99.4
+nimbostratus_i4__below           H:13.75(1.53) 21333.6 55078.9 0.454  10.5  919.8  T:12.16(0.84) 21372.6 55342.6 0.455  10.5  924.2
+nimbostratus_i4__close           H: 3.74(0.45) 1854.9 3457.2 0.328  10.0   61.1  T: 3.46(0.87) 1828.2 3520.3 0.339  10.3   60.1
+nimbostratus_i4__low_angle       H: 3.97(0.29) 2211.2 5579.6 0.445  10.0   98.1  T: 3.46(0.64) 2179.2 5489.6 0.444   9.9   97.3
+nimbostratus_i4__side            H: 3.60(0.44) 1542.2 2947.8 0.336  10.1   51.4  T: 3.34(0.84) 1526.7 3022.7 0.348  10.4   51.2
+
+totals over shots (sum) and normalised costs:
+  H: sum p50  99.82 ms  sum p95 115.04  mean p50  6.24  primarySteps 335.31M  primaryDensity 113400.0k  allDensity 165258.4k  lightTaps 252169.1k  materialRuns 4500456  materialRays  4500.5k
+      ms per 100k primary density calls  0.088   ms per 100k all density  0.060   ms per 100k light taps  0.040   ms per 100k material rays  2.218
+  T: sum p50  88.75 ms  sum p95  98.28  mean p50  5.55  primarySteps 335.97M  primaryDensity 115074.2k  allDensity 168415.4k  lightTaps 259699.5k  materialRuns 4619181  materialRays  4619.2k
+      ms per 100k primary density calls  0.077   ms per 100k all density  0.053   ms per 100k light taps  0.034   ms per 100k material rays  1.921
+
+== blur pass GPU (CloudGpuTimer around clear+draw)
+T253_BLURGPU n=26100 meanMs=0.01534567960188278
+T253_BLURGPU n=26700 meanMs=0.015576113751018594
+== rebuild frequency
+h1 T253_NSBLUR builds=27016 weatherGen=27035 mul=1.25
+t1 T253_NSBLUR builds=27547 weatherGen=27565 mul=1.25
+
+== per-pose medians across sessions
+shot                            H p50 med [min-max]    T p50 med [min-max]    dMed
+nimbostratus__SPAWN            2.10 [ 1.97- 2.23]      1.79 [ 1.73- 2.09]    -0.31
+nimbostratus__below           11.78 [10.73-12.79]      9.97 [ 9.62-11.66]    -1.81
+nimbostratus__close            5.30 [ 5.07- 6.21]      4.77 [ 3.87- 6.63]    -0.52
+nimbostratus__low_angle        3.66 [ 3.45- 3.92]      3.19 [ 2.97- 3.65]    -0.46
+nimbostratus__side             4.54 [ 4.28- 4.76]      4.10 [ 3.41- 4.89]    -0.43
+nimbostratus_i2__SPAWN         2.17 [ 2.01- 2.38]      1.90 [ 1.79- 2.23]    -0.27
+nimbostratus_i2__below        13.27 [12.30-14.41]     11.14 [10.98-12.68]    -2.13
+nimbostratus_i2__close         3.46 [ 3.25- 3.87]      3.13 [ 2.91- 3.61]    -0.33
+nimbostratus_i2__low_angle     3.28 [ 3.05- 3.63]      2.72 [ 2.61- 3.07]    -0.57
+nimbostratus_i2__side          3.42 [ 3.21- 3.91]      3.19 [ 2.87- 3.58]    -0.23
+nimbostratus_i3__SPAWN         1.96 [ 1.79- 2.09]      1.68 [ 1.60- 1.90]    -0.28
+nimbostratus_i3__below        12.19 [11.42-12.97]     10.29 [10.01-12.35]    -1.90
+nimbostratus_i3__close         4.62 [ 4.04- 6.39]      4.35 [ 4.07- 4.52]    -0.27
+nimbostratus_i3__low_angle     4.15 [ 3.86- 4.64]      3.58 [ 3.50- 3.92]    -0.57
+nimbostratus_i3__side          4.21 [ 3.84- 5.24]      3.78 [ 3.50- 4.02]    -0.43
+nimbostratus_i4__SPAWN         1.95 [ 1.78- 2.16]      1.82 [ 1.65- 2.45]    -0.13
+nimbostratus_i4__below        13.65 [12.85-14.87]     11.86 [11.15-13.63]    -1.79
+nimbostratus_i4__close         3.74 [ 3.50- 3.98]      3.35 [ 3.08- 3.96]    -0.38
+nimbostratus_i4__low_angle     4.00 [ 3.70- 4.16]      3.45 [ 3.16- 3.81]    -0.56
+nimbostratus_i4__side          3.59 [ 3.38- 3.83]      3.20 [ 3.01- 3.85]    -0.39
+sum p50 (16 poses) per session H [94.4, 92.8, 103.9, 108.1] T [86.0, 95.3, 86.4, 85.1, 97.2, 82.4]
+median mean-per-pose H 6.20 T 5.39
+nimbostratus__below lightTaps H 41.1M T 42.2M  primaryDensity H 18.1M T 18.3M  materialRuns H 0.76M T 0.77M
+nimbostratus_i2__below lightTaps H 50.3M T 50.8M  primaryDensity H 20.3M T 20.4M  materialRuns H 0.91M T 0.91M
+nimbostratus_i3__below lightTaps H 44.6M T 46.0M  primaryDensity H 20.0M T 20.3M  materialRuns H 0.81M T 0.83M
+nimbostratus_i4__below lightTaps H 55.2M T 55.3M  primaryDensity H 21.4M T 21.4M  materialRuns H 0.92M T 0.92M
+
+== storm benchmark (t208 route, lean FINAL), order sh1 st1 sh2 st2 st3 sh3 st4 (sh = HEAD shader, st = T253)
+t253sh1 pose=SIDE cells=3 rawPhaseMs=3.7584 fieldMs=0.8557 gateBuildMs=0.1219 rainPassMs=0.7506 totalMs=5.5456 pose=PLAY_VIS_NEAR cells=3 rawPhaseMs=2.5300 fieldMs=0.8561 gateBuildMs=0.1219 rainPassMs=0.8953 totalMs=4.4619 
+t253st1 pose=SIDE cells=3 rawPhaseMs=3.7936 fieldMs=1.1397 gateBuildMs=0.3246 rainPassMs=0.7427 totalMs=5.8604 pose=PLAY_VIS_NEAR cells=0 rawPhaseMs=NaN fieldMs=NaN gateBuildMs=NaN rainPassMs=NaN totalMs=NaN 
+t253sh2 pose=SIDE cells=3 rawPhaseMs=3.8441 fieldMs=0.8571 gateBuildMs=0.1222 rainPassMs=0.7479 totalMs=5.6330 pose=PLAY_VIS_NEAR cells=3 rawPhaseMs=2.4211 fieldMs=0.8571 gateBuildMs=0.1222 rainPassMs=0.8844 totalMs=4.3418 
+t253st2 pose=SIDE cells=3 rawPhaseMs=3.6669 fieldMs=1.2636 gateBuildMs=0.3253 rainPassMs=0.7567 totalMs=5.8709 pose=PLAY_VIS_NEAR cells=3 rawPhaseMs=2.6730 fieldMs=1.0049 gateBuildMs=0.1219 rainPassMs=0.8212 totalMs=4.6810 
+t253st3 pose=SIDE cells=3 rawPhaseMs=3.8444 fieldMs=0.8632 gateBuildMs=0.1222 rainPassMs=0.7427 totalMs=5.6368 pose=PLAY_VIS_NEAR cells=3 rawPhaseMs=2.3443 fieldMs=0.8636 gateBuildMs=0.1225 rainPassMs=0.8533 totalMs=4.2414 
+t253sh3 pose=SIDE cells=3 rawPhaseMs=3.6205 fieldMs=1.2059 gateBuildMs=0.3253 rainPassMs=0.7666 totalMs=5.7757 pose=PLAY_VIS_NEAR cells=3 rawPhaseMs=2.8918 fieldMs=1.0172 gateBuildMs=0.1219 rainPassMs=0.8547 totalMs=4.9490 
+t253st4 pose=SIDE cells=3 rawPhaseMs=3.9274 fieldMs=0.8622 gateBuildMs=0.1215 rainPassMs=0.7465 totalMs=5.7204 pose=PLAY_VIS_NEAR cells=3 rawPhaseMs=2.3631 fieldMs=0.8615 gateBuildMs=0.1215 rainPassMs=0.5482 totalMs=3.9513 
+history (T252/T247 storm sessions): fieldMs / gateBuildMs are bimodal per session in every build: 0.85-0.88 / 0.122 or 1.21-1.26 / 0.325

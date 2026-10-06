@@ -1354,7 +1354,7 @@ public final class StormVolumetricGeometrySandbox {
                                 + " its JSON does not name, so the renderer could never set it");
             }
             for (String manual : new String[] {"PuffCandidateMapSampler", "BaseNoiseSampler",
-                    "DetailNoiseSampler", "RainFieldSampler", "StormFieldSampler", "RainPassSampler"}) {
+                    "DetailNoiseSampler", "RainFieldSampler", "StormFieldSampler", "RainPassSampler", "NsCoverageSampler"}) {
                 require(!jsonSamplers.contains(manual),
                         program[0] + ".json names the manually bound " + manual);
             }
@@ -1388,7 +1388,8 @@ public final class StormVolumetricGeometrySandbox {
         require(undeclared.isEmpty(),
                 "the renderer sets uniforms the monolith's JSON does not name, so set() is a"
                         + " silent no-op there: " + undeclared);
-        require(CloudTextureUnitContract.RAIN_PASS_UNIT == 17
+        require(CloudTextureUnitContract.NS_COVERAGE_UNIT == 18
+                        && CloudTextureUnitContract.RAIN_PASS_UNIT == 17
                         && CloudTextureUnitContract.STORM_FIELD_UNIT == 16
                         && CloudTextureUnitContract.RAIN_FIELD_UNIT == 15,
                 "the production texture units moved");

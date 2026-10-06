@@ -1,0 +1,22 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "one",
+    "dstrgb": "zero",
+    "srcalpha": "one",
+    "dstalpha": "zero"
+  },
+  "vertex": "projectatmosphere:cloud_volume",
+  "fragment": "projectatmosphere:cloud_coverage_blur",
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "samplers": [
+    { "name": "WeatherMapSampler" }
+  ],
+  "uniforms": [
+    { "name": "WeatherExtent", "type": "float", "count": 1, "values": [ 4096.0 ] },
+    { "name": "CoverageMul", "type": "float", "count": 1, "values": [ 1.0 ] }
+  ]
+}

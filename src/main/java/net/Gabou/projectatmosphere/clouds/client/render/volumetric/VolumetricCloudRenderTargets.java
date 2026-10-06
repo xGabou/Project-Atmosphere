@@ -80,6 +80,23 @@ public final class VolumetricCloudRenderTargets {
         return morphologyTarget;
     }
 
+    /**
+     * T253. The pre-blurred nimbostratus deck coverage: the weather map's extent
+     * at fixed 8-block texels (512), so the T248 kernel's 40-block offsets are
+     * whole texels. Half float, linear, clamped.
+     */
+    public static RenderTarget prepareNsCoverageTarget() {
+        if (nsCoverageTarget == null) {
+            nsCoverageTarget = createHalfFloatMap(NS_COVERAGE_SIZE);
+        }
+        return nsCoverageTarget;
+    }
+
+    /** T253. The pre-blurred coverage texture, or 0 before the first weather-map build. */
+    public static int nsCoverageTextureId() {
+        return nsCoverageTarget == null ? 0 : nsCoverageTarget.getColorTextureId();
+    }
+
     /** Eight packed native-PUFF descriptor indices per conservative world tile. */
     public static RenderTarget preparePuffCandidateTarget() {
         int size = PuffLobeSpatialIndex.GRID_SIZE;
@@ -465,6 +482,8 @@ public final class VolumetricCloudRenderTargets {
      * 4096x2048 (33.6 MB); a change of resolution reallocates both targets.
      */
     private static RenderTarget stormFieldTarget;
+    private static final int NS_COVERAGE_SIZE = 512;
+    private static RenderTarget nsCoverageTarget;
     private static int stormFieldTargetXZ;
     private static RenderTarget stormFieldOracleTarget;
     private static int stormFieldOracleTargetXZ;
@@ -719,6 +738,10 @@ public final class VolumetricCloudRenderTargets {
         if (rainFieldTarget != null) {
             rainFieldTarget.destroyBuffers();
             rainFieldTarget = null;
+        }
+        if (nsCoverageTarget != null) {
+            nsCoverageTarget.destroyBuffers();
+            nsCoverageTarget = null;
         }
         if (stormFieldTarget != null) {
             stormFieldTarget.destroyBuffers();

@@ -4521,6 +4521,16 @@ implementation, while visual polish remains independently active.
   already zero (exact; same-session arms within frame noise): 6.43 -> 5.81 ms. Under the deck (camera 90 blocks
   below, looking up) still 10.8-12.8 ms at 0.75 scale (A 7.0-9.5) - above the 10 ms ceiling; needs a decision.
   [SC-005, SC-021]
+- [X] T253 [PERFORMANCE] [US1] Pre-blurred nimbostratus coverage. **CASE B: kept (exact, clear win), under-deck still
+  over 10 ms - stopped before T249 morphology/lighting; see `validation/t253-preblurred-nimbostratus-coverage.md`.**
+  One `cloud_coverage_blur` pass writes T248's nine-tap mean of saturate(coverage * CoverageMul) into a 512^2 RGBA16F
+  map (weather-map extent, 8-block texels, T250-snapped origin), rebuilt per weather re-bake / CoverageMul change,
+  bound manually on unit 18 (`NsCoverageSampler`); the volume shader does one fetch. Same-session arms: cloud-mask
+  RMS old-vs-new 2.14 vs noise 2.30, IoU 0.991. Medians over 4 HEAD / 6 T253 sessions: every pose faster, mean per
+  pose 6.20 -> 5.39 ms, under the deck 11.8-13.7 -> 9.97 / 11.14 / 10.29 / 11.86 ms. Blur pass 0.015 ms GPU (runs
+  ~every frame: the weather raster re-bakes each frame). Storm benchmark raw march flat (field/gate build bimodal
+  per session in every build). Remaining under-deck cost = T249 workload (light taps +30-36 %, material rays
+  +20 % vs pre-T248). [SC-005, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

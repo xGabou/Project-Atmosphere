@@ -47,6 +47,12 @@ uniform sampler2D RainFieldSampler;
  * depth packed as two 12-bit values. Bound manually on its own unit.
  */
 uniform sampler2D RainPassSampler;
+/*
+ * T253. The nimbostratus deck coverage pre-blurred with T248's kernel (mean of
+ * saturate(coverage * CoverageMul) over the centre and eight 40-block
+ * neighbours), weather-map extent at 8-block texels. Bound manually.
+ */
+uniform sampler2D NsCoverageSampler;
 uniform sampler3D BaseNoiseSampler;   // bound manually (3D)
 uniform sampler3D DetailNoiseSampler; // bound manually (3D)
 
@@ -7053,19 +7059,12 @@ float cloudDensityImpl(
                 // multiplies; where the carve input is already zero, or the final
                 // smoothstep(coverageMod) gate zeroes it, the result is zero
                 // whatever the blur says - skip the eight taps (exact).
+                // T253: the nine taps are pre-averaged into NsCoverageSampler
+                // (one fetch at the same weather-map uv).
                 float nsCoverage = coverageSignal;
                 if (paDensityConsumer != 2 && paDensityConsumer != 9 && !paStormFieldBuildNode
                         && cloud > 0.0 && coverageMod > 0.010) {
-                    for (int dz = -1; dz <= 1; dz++) {
-                        for (int dx = -1; dx <= 1; dx++) {
-                            if (dx == 0 && dz == 0) {
-                                continue;
-                            }
-                            nsCoverage += saturate(
-                                sampleWeather(p.xz + vec2(float(dx), float(dz)) * 40.0).r * CoverageMul);
-                        }
-                    }
-                    nsCoverage /= 9.0;
+                    nsCoverage = texture(NsCoverageSampler, (p.xz - WeatherOrigin) / WeatherExtent).r;
                 }
                 float nsRimThin = 1.0 - saturate(nsCoverage / 0.5);
                 envelope = min(saturate(nsCoverage / 0.5),

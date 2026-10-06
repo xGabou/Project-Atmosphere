@@ -73,6 +73,12 @@ public final class CloudWeatherMapRenderer {
     private static Result lastResult = Result.EMPTY;
     private static long cacheHits;
     private static long cacheMisses;
+    // T253. The inputs the pre-blurred coverage was last built from.
+    private static long nsCoverageGeneration = Long.MIN_VALUE;
+    private static float nsCoverageMul = Float.NaN;
+    private static int nsCoverageWeatherId = -1;
+    private static int nsCoverageTargetId = -1;
+    private static long nsCoverageBuilds;
 
     private CloudWeatherMapRenderer() {
     }
@@ -143,6 +149,50 @@ public final class CloudWeatherMapRenderer {
 
     public static double lastOriginZ() {
         return lastOriginZ;
+    }
+
+    /**
+     * T253. Rebuilds the pre-blurred nimbostratus deck coverage (T248's nine
+     * 40-block taps of saturate(coverage * CoverageMul), averaged) when the
+     * weather raster was re-baked, the coverage multiplier changed, or either
+     * target was recreated; otherwise the previous map is still exact.
+     *
+     * @return the number of blur passes drawn (0 or 1), for diagnostics
+     */
+    public static int refreshNsCoverage(RenderTarget weatherTarget, float coverageMul) {
+        ShaderInstance blurShader = VolumetricCloudShaders.coverageBlurShader();
+        RenderTarget nsCoverageTarget = VolumetricCloudRenderTargets.prepareNsCoverageTarget();
+        if (blurShader == null || weatherTarget == null || nsCoverageTarget == null) {
+            return 0;
+        }
+        int weatherId = weatherTarget.getColorTextureId();
+        int nsId = nsCoverageTarget.getColorTextureId();
+        if (cacheMisses == nsCoverageGeneration && coverageMul == nsCoverageMul
+                && weatherId == nsCoverageWeatherId && nsId == nsCoverageTargetId) {
+            return 0;
+        }
+        nsCoverageGeneration = cacheMisses;
+        nsCoverageMul = coverageMul;
+        nsCoverageWeatherId = weatherId;
+        nsCoverageTargetId = nsId;
+        nsCoverageBuilds++;
+        VolumetricCloudRenderTargets.clearAndBind(nsCoverageTarget);
+        RenderSystem.setShader(() -> blurShader);
+        blurShader.setSampler("WeatherMapSampler", weatherId);
+        blurShader.safeGetUniform("WeatherExtent").set(WEATHER_EXTENT);
+        blurShader.safeGetUniform("CoverageMul").set(coverageMul);
+        blurShader.apply();
+        try {
+            FullscreenQuad.draw(blurShader);
+        } finally {
+            blurShader.clear();
+        }
+        return 1;
+    }
+
+    /** T253. Blur passes drawn since start-up. */
+    public static long nsCoverageBuilds() {
+        return nsCoverageBuilds;
     }
 
     /** T199. Every miss is a bake, so this counts the weather rasters' generations. */
