@@ -4513,6 +4513,14 @@ implementation, while visual polish remains independently active.
   turret mass and a lone middle. Radius / separation / tangent variants hit the topology bands (merging middles,
   needle turrets, footprint) and were rejected without widening any band. Six seeded clouds: X broken in 4,
   side / close / below natural, humilis identical, gpuMs equal. [SC-005, SC-016]
+- [X] T252 [PERFORMANCE] [US1] Nimbostratus fixed-seed cost attribution. **O1 KEPT (exact); under-deck budget OPEN;
+  see `validation/t252-nimbostratus-fixed-seed-cost.md`.** Seed 5000, four instances, 16 poses, builds A pre-T248 /
+  B T248 / C T249, two runs each, workload census per pose. Mean per pose 4.27 / 5.13 / 6.23 ms. T248 = code path
+  (workload flat, cost per density call +22 % - the 9-tap blur on live samples; storm benchmark flat). T249 =
+  workload (light taps +21 %, material rays +13 %, cost per light tap flat). O1 skips the blur where the sample is
+  already zero (exact; same-session arms within frame noise): 6.43 -> 5.81 ms. Under the deck (camera 90 blocks
+  below, looking up) still 10.8-12.8 ms at 0.75 scale (A 7.0-9.5) - above the 10 ms ceiling; needs a decision.
+  [SC-005, SC-021]
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

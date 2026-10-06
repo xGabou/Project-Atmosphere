@@ -1,0 +1,77 @@
+== A pre-T248 (e3a54fde shader) / B T248 (a7e5348e) / C T249 HEAD (6482a691..dddf0de8) - two runs each
+per shot: p50 ms (run spread) | primary density calls k | light taps k | material fraction | mean run | material-run rays k
+nimbostratus__below              a: 7.54(0.93) 15946.7 32445.6 0.365   9.2  632.8  b: 9.05(1.41) 16203.5 33730.0 0.374   9.2  658.0  c:11.81(1.81) 18091.8 41756.2 0.407   9.8  750.5
+nimbostratus__close              a: 5.22(2.86) 8653.0 13636.5 0.276   7.8  354.6  b: 4.99(0.24) 6031.1 8769.8 0.263   8.6  180.8  c: 4.37(0.39) 4695.0 6962.5 0.271   9.2  134.7
+nimbostratus__low_angle          a: 2.42(0.07) 1732.2 3905.9 0.405   9.2   76.1  b: 3.27(0.30) 2105.7 4846.2 0.412   9.2   94.3  c: 3.71(0.07) 2151.1 5539.8 0.454   9.9   99.0
+nimbostratus__side               a: 3.84(1.07) 5261.4 6170.7 0.234   8.2  144.0  b: 4.39(0.00) 3710.1 5826.0 0.278   9.5  108.4  c: 3.87(0.58) 3103.0 5065.7 0.292   9.4   94.9
+nimbostratus_i2__below           a: 8.16(1.55) 17449.1 37857.5 0.391   9.0  757.8  b: 9.79(1.70) 17443.9 38069.3 0.393   9.1  756.9  c:13.37(1.93) 20445.4 50677.2 0.437   9.8  912.3
+nimbostratus_i2__close           a: 2.35(0.22) 1177.0 2178.6 0.328  10.3   37.4  b: 2.92(0.21) 1154.5 2415.1 0.367  11.5   36.8  c: 3.83(0.60) 1363.9 2677.7 0.345  10.7   43.8
+nimbostratus_i2__low_angle       a: 2.29(0.28) 1256.1 2984.2 0.424   9.5   56.2  b: 2.70(0.46) 1220.8 3106.5 0.452   9.9   55.5  c: 3.42(0.53) 1498.0 4065.4 0.477  10.0   71.5
+nimbostratus_i2__side            a: 2.36(0.06) 1016.1 1918.8 0.335  10.4   32.7  b: 2.86(0.34) 1001.8 2134.4 0.374  11.6   32.3  c: 3.77(0.55) 1171.1 2363.2 0.355  10.7   38.6
+nimbostratus_i3__below           a: 8.18(2.32) 17518.5 33809.5 0.348   9.0  678.8  b: 9.75(0.90) 18252.4 38798.3 0.381   9.3  751.1  c:12.76(1.82) 20651.6 47304.3 0.404   9.8  849.1
+nimbostratus_i3__close           a: 3.33(0.58) 3433.7 5203.1 0.271   8.9  103.9  b: 4.82(0.58) 4412.1 6936.1 0.278   9.6  128.5  c: 4.38(0.30) 3831.6 6454.8 0.300   9.6  118.7
+nimbostratus_i3__low_angle       a: 3.02(0.60) 2605.7 5268.0 0.364   8.9  106.0  b: 3.76(0.05) 2901.6 6354.1 0.391   9.1  124.5  c: 4.15(0.27) 2775.7 6695.1 0.427   9.9  119.9
+nimbostratus_i3__side            a: 3.05(0.54) 2435.6 3865.7 0.283   9.1   75.7  b: 4.20(0.55) 3053.9 5054.6 0.292  10.1   89.2  c: 4.01(0.32) 2737.9 4753.6 0.308   9.8   85.8
+nimbostratus_i4__below           a: 8.70(1.64) 18137.1 41470.1 0.409   9.9  750.3  b: 9.90(1.06) 18193.5 41897.6 0.412  10.0  751.7  c:14.07(2.08) 21452.0 55790.8 0.457  10.7  918.3
+nimbostratus_i4__close           a: 2.62(0.53) 1594.2 2965.0 0.330   9.7   54.0  b: 3.19(0.32) 1564.0 3132.1 0.353  11.4   48.1  c: 4.13(0.00) 1909.3 3566.3 0.329  10.1   62.3
+nimbostratus_i4__low_angle       a: 2.73(0.32) 2015.8 4356.7 0.388   9.1   86.0  b: 3.50(0.26) 1957.7 4535.8 0.415   9.3   87.5  c: 4.15(0.01) 2319.7 5801.1 0.441   9.9  102.9
+nimbostratus_i4__side            a: 2.47(0.30) 1338.0 2541.6 0.337   9.8   46.0  b: 2.99(0.22) 1313.1 2711.4 0.363  11.5   41.3  c: 3.93(0.03) 1581.8 3029.8 0.337  10.1   52.7
+
+totals over shots (sum) and normalised costs:
+  a: sum p50  68.29 ms  sum p95  77.87  mean p50  4.27  primarySteps 321.45M  primaryDensity 101570.3k  allDensity 145328.1k  lightTaps 200577.6k  materialRuns 3992280  materialRays  3992.3k
+      ms per 100k primary density calls  0.067   ms per 100k all density  0.047   ms per 100k light taps  0.034   ms per 100k material rays  1.711
+  b: sum p50  82.09 ms  sum p95  94.53  mean p50  5.13  primarySteps 321.57M  primaryDensity 100519.5k  allDensity 145428.4k  lightTaps 208317.4k  materialRuns 3944841  materialRays  3944.8k
+      ms per 100k primary density calls  0.082   ms per 100k all density  0.056   ms per 100k light taps  0.039   ms per 100k material rays  2.081
+  c: sum p50  99.72 ms  sum p95 110.50  mean p50  6.23  primarySteps 335.10M  primaryDensity 109778.9k  allDensity 161601.8k  lightTaps 252503.4k  materialRuns 4455022  materialRays  4455.0k
+      ms per 100k primary density calls  0.091   ms per 100k all density  0.062   ms per 100k light taps  0.039   ms per 100k material rays  2.238
+
+== O1 (exact blur skip) vs HEAD - O1 two runs, HEAD four runs
+per shot: p50 ms (run spread) | primary density calls k | light taps k | material fraction | mean run | material-run rays k
+nimbostratus__below              c:12.14(0.26) 18022.2 41347.9 0.405   9.8  746.3  o:10.97(0.26) 18094.6 41900.8 0.409   9.8  754.8
+nimbostratus__close              c: 4.88(1.05) 5143.1 7685.5 0.268   9.4  145.4  o: 4.77(0.12) 4139.6 7117.1 0.303   9.6  130.2
+nimbostratus__low_angle          c: 3.81(0.32) 2242.8 5791.0 0.456  10.0  102.4  o: 3.39(0.07) 2105.3 5536.1 0.464   9.9   98.3
+nimbostratus__side               c: 4.20(0.68) 3380.6 5463.3 0.287   9.6  100.4  o: 4.10(0.04) 2896.5 5150.3 0.312   9.9   91.5
+nimbostratus_i2__below           c:13.82(0.29) 20451.7 50963.4 0.439   9.8  916.8  o:12.57(0.24) 20479.9 50682.9 0.437   9.8  911.8
+nimbostratus_i2__close           c: 3.89(0.31) 1402.7 2725.0 0.342  10.5   45.3  o: 3.68(0.16) 1475.2 2820.4 0.339  10.6   46.8
+nimbostratus_i2__low_angle       c: 3.52(0.16) 1522.2 4098.1 0.474   9.9   72.7  o: 3.17(0.08) 1522.9 4049.2 0.469   9.9   71.7
+nimbostratus_i2__side            c: 3.76(0.38) 1201.2 2396.2 0.350  10.6   39.7  o: 3.53(0.16) 1252.7 2471.5 0.349  10.6   40.7
+nimbostratus_i3__below           c:13.04(0.15) 20474.2 46983.2 0.405   9.9  839.2  o:11.38(0.84) 20081.0 45246.2 0.398   9.8  813.1
+nimbostratus_i3__close           c: 4.77(0.49) 3813.6 6402.6 0.299   9.3  122.1  o: 4.41(0.27) 4608.6 6456.1 0.252   9.7  117.4
+nimbostratus_i3__low_angle       c: 4.19(0.12) 2742.2 6555.0 0.423   9.8  118.0  o: 3.81(0.06) 2592.7 6166.0 0.421   9.8  111.3
+nimbostratus_i3__side            c: 4.27(0.14) 2735.5 4706.3 0.305   9.5   87.3  o: 3.96(0.19) 3077.2 4675.7 0.270   9.9   83.1
+nimbostratus_i4__below           c:14.49(0.28) 21463.3 55828.7 0.457  10.7  918.9  o:12.73(0.20) 21127.3 54346.7 0.452  10.4  915.8
+nimbostratus_i4__close           c: 4.08(0.01) 1866.2 3572.0 0.337  10.2   61.5  o: 3.45(0.20) 1683.8 3397.3 0.354  10.5   56.9
+nimbostratus_i4__low_angle       c: 4.15(0.05) 2293.5 5732.5 0.441  10.0  101.4  o: 3.73(0.18) 2154.2 5406.8 0.442  10.0   94.8
+nimbostratus_i4__side            c: 3.87(0.04) 1555.7 3047.6 0.344  10.3   52.1  o: 3.34(0.27) 1425.7 2933.9 0.361  10.5   48.9
+
+totals over shots (sum) and normalised costs:
+  c: sum p50 102.89 ms  sum p95 115.21  mean p50  6.43  primarySteps 334.99M  primaryDensity 110310.8k  allDensity 162298.9k  lightTaps 253298.3k  materialRuns 4469887  materialRays  4469.9k
+      ms per 100k primary density calls  0.093   ms per 100k all density  0.063   ms per 100k light taps  0.041   ms per 100k material rays  2.302
+  o: sum p50  92.98 ms  sum p95 101.67  mean p50  5.81  primarySteps 334.87M  primaryDensity 108717.2k  allDensity 159673.0k  lightTaps 248357.0k  materialRuns 4387201  materialRays  4387.2k
+      ms per 100k primary density calls  0.086   ms per 100k all density  0.058   ms per 100k light taps  0.037   ms per 100k material rays  2.119
+
+== storm benchmark (t208 route, lean FINAL): A B C A B C
+t252sa1 pose=SIDE rawPhaseMs=3.8540 totalMs=5.9938 pose=PLAY_VIS_NEAR rawPhaseMs=2.4726 totalMs=4.5459 cell=SIDE primaryRaySteps=4664612 cell=PLAY_VIS_NEAR primaryRaySteps=1477715
+t252sb1 pose=SIDE rawPhaseMs=3.6878 totalMs=5.4886 pose=PLAY_VIS_NEAR rawPhaseMs=2.6013 totalMs=4.5278 cell=SIDE primaryRaySteps=4613668 cell=PLAY_VIS_NEAR primaryRaySteps=1989534
+t252sc1 pose=SIDE rawPhaseMs=3.8755 totalMs=6.1621 pose=PLAY_VIS_NEAR rawPhaseMs=2.0466 totalMs=3.9100 cell=SIDE primaryRaySteps=5221489 cell=PLAY_VIS_NEAR primaryRaySteps=1101300
+t252sa2 pose=SIDE rawPhaseMs=3.8383 totalMs=5.6289 pose=PLAY_VIS_NEAR rawPhaseMs=2.5119 totalMs=4.4401 cell=SIDE primaryRaySteps=4664237 cell=PLAY_VIS_NEAR primaryRaySteps=1308069
+t252sb2 pose=SIDE rawPhaseMs=3.7123 totalMs=5.8890 pose=PLAY_VIS_NEAR rawPhaseMs=2.3723 totalMs=4.4564 cell=SIDE primaryRaySteps=4641433 cell=PLAY_VIS_NEAR primaryRaySteps=1758715
+t252sc2 pose=SIDE rawPhaseMs=3.8912 totalMs=5.7689 pose=PLAY_VIS_NEAR rawPhaseMs=2.4269 totalMs=4.2329 cell=SIDE primaryRaySteps=5240813 cell=PLAY_VIS_NEAR primaryRaySteps=1580780
+
+== camera poses (seed 5000)
+CG_POSE type=nimbostratus view=side ground=64.00000 cam=(9156.08344,271.12000,380.20378) aim=(9156.08344,271.12000,-11.60877)
+CG_POSE type=nimbostratus view=below ground=64.00000 cam=(9156.08344,153.52000,95.43500) aim=(9156.08344,257.08000,-11.60877)
+CG_POSE type=nimbostratus view=low_angle ground=64.00000 cam=(8879.03013,104.00000,265.44454) aim=(9156.08344,271.12000,-11.60877)
+CG_POSE type=nimbostratus view=close ground=64.00000 cam=(9156.08344,271.12000,365.20378) aim=(9156.08344,271.12000,-11.60877)
+CG_POSE type=nimbostratus view=side ground=64.00000 cam=(9159.97894,271.12000,9416.35698) aim=(9159.97894,271.12000,9007.08694)
+CG_POSE type=nimbostratus view=below ground=64.00000 cam=(9159.97894,153.52000,9119.36795) aim=(9159.97894,257.08000,9007.08694)
+CG_POSE type=nimbostratus view=low_angle ground=64.00000 cam=(8870.58132,104.00000,9296.48456) aim=(9159.97894,271.12000,9007.08694)
+CG_POSE type=nimbostratus view=close ground=64.00000 cam=(9159.97894,271.12000,9401.35698) aim=(9159.97894,271.12000,9007.08694)
+CG_POSE type=nimbostratus view=side ground=64.00000 cam=(9152.57582,271.12000,18326.14961) aim=(9152.57582,271.12000,18003.45720)
+CG_POSE type=nimbostratus view=below ground=64.00000 cam=(9152.57582,153.52000,18089.76492) aim=(9152.57582,257.08000,18003.45720)
+CG_POSE type=nimbostratus view=low_angle ground=64.00000 cam=(8924.39783,104.00000,18231.63519) aim=(9152.57582,271.12000,18003.45720)
+CG_POSE type=nimbostratus view=close ground=64.00000 cam=(9152.57582,271.12000,18311.14961) aim=(9152.57582,271.12000,18003.45720)
+CG_POSE type=nimbostratus view=side ground=64.00000 cam=(9135.56004,271.12000,27375.04581) aim=(9135.56004,271.12000,26995.72893)
+CG_POSE type=nimbostratus view=below ground=64.00000 cam=(9135.56004,153.52000,27099.02399) aim=(9135.56004,257.08000,26995.72893)
+CG_POSE type=nimbostratus view=low_angle ground=64.00000 cam=(8867.34249,104.00000,27263.94647) aim=(9135.56004,271.12000,26995.72893)
+CG_POSE type=nimbostratus view=close ground=64.00000 cam=(9135.56004,271.12000,27360.04581) aim=(9135.56004,271.12000,26995.72893)

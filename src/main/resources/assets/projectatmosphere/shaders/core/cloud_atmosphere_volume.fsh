@@ -7049,8 +7049,13 @@ float cloudDensityImpl(
                 // Only the visible shape needs the smooth top: light taps (the
                 // field build, the cone) read the deck's mass and keep the
                 // local value.
+                // T252: the blur only scales a sample that every later term
+                // multiplies; where the carve input is already zero, or the final
+                // smoothstep(coverageMod) gate zeroes it, the result is zero
+                // whatever the blur says - skip the eight taps (exact).
                 float nsCoverage = coverageSignal;
-                if (paDensityConsumer != 2 && paDensityConsumer != 9 && !paStormFieldBuildNode) {
+                if (paDensityConsumer != 2 && paDensityConsumer != 9 && !paStormFieldBuildNode
+                        && cloud > 0.0 && coverageMod > 0.010) {
                     for (int dz = -1; dz <= 1; dz++) {
                         for (int dx = -1; dx <= 1; dx++) {
                             if (dx == 0 && dz == 0) {
