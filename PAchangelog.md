@@ -1,6 +1,7 @@
 # Project Atmosphere 0.9.4
 ## Shader Crash Fix
 * Fixed a startup crash where one of the mod's shader programs failed to compile on stricter GPU drivers, which aborted mod loading.
+* Fixed a biome config issue
 ---
 # Project Atmosphere 0.9.3.1
 ## Compat with Project Landscape

@@ -36,6 +36,31 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 public enum CoreCostDiagnosticProgram {
     /** The unmodified program retaining every dormant diagnostic path. */
     DIAGNOSTIC_MONOLITH("diagnostic_monolith"),
+    /** T255 default-off fixture builds; same geometry/march without dormant legacy branches. */
+    MORPHOLOGY_PROTOTYPE("morphology_prototype"),
+    MORPHOLOGY_PARITY("morphology_parity"),
+    GROWTH_MORPHOLOGY_PROTOTYPE("growth_morphology_prototype"),
+    GROWTH_MORPHOLOGY_PARITY("growth_morphology_parity"),
+    GROWTH_MORPHOLOGY_COUNTS("growth_morphology_counts"),
+    GROWTH_MORPHOLOGY_NO_CANOPY("growth_morphology_no_canopy"),
+    GROWTH_MORPHOLOGY_NO_ICE("growth_morphology_no_ice"),
+    GROWTH_MORPHOLOGY_HARD_MERGE("growth_morphology_hard_merge"),
+    /** T257 continuous convective growth field fixture builds (experimental). */
+    CONVECTIVE_MORPHOLOGY_PROTOTYPE("growth_morphology_convective_prototype"),
+    CONVECTIVE_MORPHOLOGY_PARITY("growth_morphology_convective_parity"),
+    /** T257 rejected candidate A, kept only for identical-pose comparison. */
+    CONVECTIVE_A_MORPHOLOGY_PROTOTYPE("growth_morphology_convective_a_prototype"),
+    CONVECTIVE_A_MORPHOLOGY_PARITY("growth_morphology_convective_a_parity"),
+    /** T258 candidate C hierarchical storm anatomy fixture builds (experimental). */
+    CONVECTIVE_C_MORPHOLOGY_PROTOTYPE("growth_morphology_convective_c_prototype"),
+    CONVECTIVE_C_MORPHOLOGY_PARITY("growth_morphology_convective_c_parity"),
+    // T260 convective-system sparse-brick fixtures (experimental, never production).
+    CONVECTIVE_SYSTEM_PROTOTYPE("growth_morphology_convective_system_prototype"),
+    CONVECTIVE_SYSTEM_PARITY("growth_morphology_convective_system_parity"),
+    /** T260.5: the convective-system fixture with the lighting mode as a uniform (neutral volumetric lighting). */
+    CONVECTIVE_SYSTEM_NEUTRAL("growth_morphology_convective_system_neutral"),
+    /** T260.5: the neutral fixture with mode 20 (final volumetric lighting) compiled as a constant. */
+    CONVECTIVE_SYSTEM_NEUTRAL_FINAL("growth_morphology_convective_system_neutral_final"),
     /**
      * The compile-time-specialized normal renderer used by FINAL frames.
      * T206: the split cloud program - the rain family compiled out, the rain
@@ -1164,6 +1189,12 @@ public enum CoreCostDiagnosticProgram {
     public boolean isProductionProgram() {
         return this == DIAGNOSTIC_MONOLITH || this == LEAN_FINAL
                 || this == RAIN_PASS || this == RAIN_GATE_BUILD;
+    }
+
+    /** Isolated environment-gated fixture authority, not a historical weather campaign. */
+    public boolean fixtureOnlyProgram() {
+        return this == MORPHOLOGY_PROTOTYPE || this == MORPHOLOGY_PARITY
+                || serializedName.startsWith("growth_morphology_");
     }
 
     /**

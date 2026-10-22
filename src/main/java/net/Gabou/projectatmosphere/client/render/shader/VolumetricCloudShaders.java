@@ -135,6 +135,19 @@ public final class VolumetricCloudShaders {
                 if (program.isProductionProgram()) {
                     continue;
                 }
+                if (program.fixtureOnlyProgram()) {
+                    if ("1".equals(System.getenv("PA_T255_CAPTURE")) || "1".equals(System.getenv("PA_T256_CAPTURE"))
+                            || "1".equals(System.getenv("PA_T258_CAPTURE"))
+                            || "1".equals(System.getenv("PA_T260_CAPTURE"))
+                            || "1".equals(System.getenv("PA_T257_CAPTURE"))
+                            || net.Gabou.projectatmosphere.clouds.client.render.volumetric.ExperimentalCloudPreview.enabled()) {
+                        registerDiagnosticVolumeProgram(event, program);
+                        registered++;
+                    } else {
+                        skipped++;
+                    }
+                    continue;
+                }
                 if (!activeCampaigns.contains(program.campaignId())
                         && !selectable.contains(program)) {
                     skipped++;

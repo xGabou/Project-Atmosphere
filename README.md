@@ -52,6 +52,9 @@
 
 ## 🛠️ Compatibility
 
+For source, documentation, and local test-output conventions, see
+[what belongs in Git](docs/repository-layout.md).
+
 - ✅ **Minecraft Forge 1.20.1**
 - ✅ **Serene Seasons** (seasonal logic)
 - ✅ **Serene Seasons Extended**

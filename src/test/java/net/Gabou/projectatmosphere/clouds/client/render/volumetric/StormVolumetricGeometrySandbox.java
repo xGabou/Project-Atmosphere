@@ -2298,6 +2298,14 @@ public final class StormVolumetricGeometrySandbox {
                                 + " whenever that campaign is not armed");
                 continue;
             }
+            if (program.fixtureOnlyProgram()) {
+                require(program.campaignId() == null && !program.isProductionProgram(),
+                        "T255 fixture program must never become production or weather-campaign authority");
+                String fixtureShaders = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/client/render/shader/VolumetricCloudShaders.java");
+                require(fixtureShaders.contains("program.fixtureOnlyProgram()") && fixtureShaders.contains("PA_T255_CAPTURE"),
+                        "T255 fixtures must stay explicitly environment gated");
+                continue;
+            }
             String campaign = program.campaignId();
             boolean registeredCampaign = false;
             for (StormCampaignRegistry.Campaign known

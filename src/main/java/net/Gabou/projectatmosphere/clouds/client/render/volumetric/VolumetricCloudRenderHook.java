@@ -157,10 +157,15 @@ public final class VolumetricCloudRenderHook {
     }
 
     private static void renderFrame(RenderLevelStageEvent event, Minecraft minecraft, ClientLevel level) {
+        ExperimentalStormMorphologyState.beginFrame();
+        try {
         frameCounter++;
         float partialTick = event.getPartialTick();
         Vec3 cameraPos = event.getCamera().getPosition();
         String dimensionId = level.dimension().location().toString();
+        if (ExperimentalStormMorphologyState.enabled() && !ExperimentalStormMorphologyState.belongsTo(dimensionId)) {
+            ExperimentalStormMorphologyState.clear();
+        }
         long gameTime = level.getGameTime();
         float worldTimeTicks = (gameTime % 1_728_000L) + partialTick;
 
@@ -230,7 +235,7 @@ public final class VolumetricCloudRenderHook {
         float regionalCoverage = Mth.clamp((atmosphere.cloudCover() - 0.45F) * 1.4F, 0.0F, 1.0F);
         float regionalEnergy = Mth.clamp(atmosphere.rainIntensity() * 0.8F, 0.0F, 1.0F);
 
-        if (renderCells.isEmpty() && regionalCoverage <= 0.01F) {
+        if (renderCells.isEmpty() && regionalCoverage <= 0.01F && !ExperimentalStormMorphologyState.enabled()) {
             setStatus("no_clouds", "cloudCover=" + atmosphere.cloudCover()
                     + " cells=" + presentedCells.size()
                     + " fields=" + fieldSnapshots.size()
@@ -460,7 +465,9 @@ public final class VolumetricCloudRenderHook {
         );
         if (composited) {
             StormGeometryBuildCoordinator.publishSuccessfulFrame();
-            ClientCloudVisualDensity.publishVolumetric(
+            if (ExperimentalStormMorphologyState.enabled()) {
+                ClientCloudVisualDensity.publishMorphologyPrototype(dimensionId);
+            } else ClientCloudVisualDensity.publishVolumetric(
                     dimensionId,
                     renderingFields
                             ? ClientCloudVisualDensity.Source.VOLUMETRIC_FIELDS
@@ -590,6 +597,9 @@ public final class VolumetricCloudRenderHook {
                  + " " + VolumetricMaterialDomainDiagnostics.status()
                 + " " + materialAdvection.summary()
                 + " gpuMs=" + VolumetricCloudRenderer.lastGpuMilliseconds());
+        } finally {
+            ExperimentalStormMorphologyState.endFrame();
+        }
     }
 
     private static String summarizeEnvelopeRoles(List<VolumetricRenderCell> renderCells) {

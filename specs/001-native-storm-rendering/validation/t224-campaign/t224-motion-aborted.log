@@ -1,8 +1,0 @@
-[20:36:22] [Render thread/INFO] [projectatmosphere/]: T191_VARIANT_SCOPE declared=184 activeCampaigns=T224M registered=0 skipped=184 crossCampaignControls=0 productionAlwaysLoaded=4
-[20:37:23] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL cloudMovementFrozen=true priorValue=true restoredOnExit=true
-[20:37:23] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL daylightCycleFrozen=true dayTime=6000 restoredOnExit=true
-[20:37:23] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL fixedResolutionScale=0.75000 priorValue=adaptive restoredOnExit=true
-[20:37:23] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL raymarchQuality=ULTRA(96/6) priorValue=ULTRA restoredOnExit=true
-[20:38:39] [Render thread/INFO] [projectatmosphere/]: T132_AUTORUN_FIXTURE_CONTROL fixedResolutionScaleRestored=adaptive
-[20:38:39] [Render thread/INFO] [projectatmosphere/]: T224M_ALTITUDE boundary=RAY_VOLUME_FLOOR centre=43.12099 amplitude=45.00000 rayFloorY=43.12099 slabBaseY=130.00000 slabTopY=1013.62506 maxPrecip=0.42540 groundY=-64
-[20:38:49] [Render thread/INFO] [projectatmosphere/]: T224M_ALTITUDE boundary=RAY_VOLUME_FLOOR centre=33.74736 amplitude=45.00000 rayFloorY=33.74736 slabBaseY=130.00000 slabTopY=1013.62506 maxPrecip=0.45423 groundY=-64

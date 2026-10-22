@@ -25,7 +25,8 @@ public final class ClientCloudVisualDensity {
         NONE,
         VOLUMETRIC_FIELDS,
         VOLUMETRIC_CELLS,
-        FIELD_FALLBACK
+        FIELD_FALLBACK,
+        MORPHOLOGY_PROTOTYPE
     }
 
     private static volatile Frame current = Frame.EMPTY;
@@ -105,6 +106,16 @@ public final class ClientCloudVisualDensity {
         );
     }
 
+    /** Fixture-only authority, published after its successful native composite. */
+    static void publishMorphologyPrototype(String dimensionId) {
+        if (!ExperimentalStormMorphologyState.belongsTo(dimensionId)) {
+            clear();
+            return;
+        }
+        current = new Frame(normalizeDimension(dimensionId), Source.MORPHOLOGY_PROTOTYPE, List.of(),
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, true, StormRenderSnapshot.EMPTY);
+    }
+
     public static float densityAt(Level level, double x, double y, double z) {
         if (level == null) {
             return 0.0F;
@@ -142,6 +153,10 @@ public final class ClientCloudVisualDensity {
     }
 
     private static float sample(Frame frame, double x, double y, double z) {
+        if (frame.source() == Source.MORPHOLOGY_PROTOTYPE) {
+            return ExperimentalStormMorphologyState.belongsTo(frame.dimensionId())
+                    ? ExperimentalStormMorphologyState.density(x, y, z) : 0;
+        }
         float directStorm = (float) sampleStormSnapshot(frame.stormSnapshot(), x, y, z);
         float stormVisualDensity = clamp01(directStorm * frame.densityMul() * 0.72F);
         float broadDensity = sampleBroad(frame, x, y, z);

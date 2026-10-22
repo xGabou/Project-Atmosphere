@@ -27,6 +27,12 @@
     { "name": "OracleIntervalSampler" }
   ],
   "uniforms": [
+    { "name": "PaMorphologyPrototype", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PaMorphologyScale", "type": "int", "count": 1, "values": [ 1 ] },
+    { "name": "PaMorphologyIntervals", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PaMorphologyOrigin", "type": "float", "count": 3, "values": [ 0, 0, 0 ] },
+    { "name": "PaMorphologyMin", "type": "float", "count": 3, "values": [ 0, 0, 0 ] },
+    { "name": "PaMorphologyMax", "type": "float", "count": 3, "values": [ 0, 0, 0 ] },
     { "name": "CloudProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
     { "name": "ViewRotMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
     { "name": "InvProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },

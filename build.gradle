@@ -58,6 +58,19 @@ minecraft {
             if (project.hasProperty('paBenchHeap')) {
                 jvmArgs '-Xms1G', "-Xmx${project.property('paBenchHeap')}".toString()
             }
+            // Experimental in-game cloud preview (development tool, OFF by default):
+            // -PpaCloudPreview enables /cloudpreview; -PpaCloudPreviewWorld=<save
+            // folder> joins that singleplayer world directly; -PpaCloudPreviewDemo
+            // runs the unattended screenshot demonstration and then quits.
+            if (project.hasProperty('paCloudPreview')) {
+                environment 'PA_CLOUD_PREVIEW', '1'
+                if (project.hasProperty('paCloudPreviewWorld')) {
+                    args '--quickPlaySingleplayer', project.property('paCloudPreviewWorld').toString()
+                }
+                if (project.hasProperty('paCloudPreviewDemo')) {
+                    environment 'PA_CLOUD_PREVIEW_DEMO', '1'
+                }
+            }
             if (project.hasProperty('paBenchGcLog')) {
                 jvmArg('-Xlog:gc*:file='
                         + rootProject.file(project.property('paBenchGcLog')).absolutePath
@@ -284,6 +297,12 @@ def leanFinalDefines = ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE_EDG
 // uniform is only read behind a diagnostic gate that is itself literalized off,
 // the value is the shader's own inert default.
 def leanFinalConstants = [
+        'uniform int PaMorphologyPrototype;'       : 'const int PaMorphologyPrototype = 0;',
+        'uniform int PaMorphologyScale;'           : 'const int PaMorphologyScale = 0;',
+        'uniform int PaMorphologyIntervals;'       : 'const int PaMorphologyIntervals = 0;',
+        'uniform vec3 PaMorphologyOrigin;'         : 'const vec3 PaMorphologyOrigin = vec3(0.0);',
+        'uniform vec3 PaMorphologyMin;'            : 'const vec3 PaMorphologyMin = vec3(0.0);',
+        'uniform vec3 PaMorphologyMax;'            : 'const vec3 PaMorphologyMax = vec3(0.0);',
         'uniform int PaDiagnosticStepBudget;'      : 'const int PaDiagnosticStepBudget = 0;',
         'uniform int PuffDensityStage;'            : 'const int PuffDensityStage = 0;',
         'uniform int PuffTierFilter;'              : 'const int PuffTierFilter = -1;',
@@ -403,6 +422,112 @@ def leanFinalRemovedUniforms = leanFinalConstants.keySet().collect {
 // already carries it every frame; PaOraclePass stays baked to 0, so the oracle
 // capture path it normally serves remains dead.
 def leanProgramVariants = [
+        [name: 'cloud_atmosphere_volume_growth_morphology_prototype',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_GROWTH_DEFINED_STORM 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
+        [name: 'cloud_atmosphere_volume_growth_morphology_parity',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_GROWTH_DEFINED_STORM 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 2;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
+        // T257 continuous convective growth field fixtures (experimental, never production).
+        // Rejected candidate A, frozen for identical-pose comparison with candidate B.
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_a_prototype',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_GROWTH_FIELD_A 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_a_parity',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_GROWTH_FIELD_A 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 2;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_prototype',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_GROWTH_FIELD 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_parity',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_GROWTH_FIELD 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 2;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
+        // T258 candidate C hierarchical storm anatomy fixtures (experimental, never production).
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_c_prototype',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_STORM_ANATOMY_C 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_c_parity',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_STORM_ANATOMY_C 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 2;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
+        // T260 convective-system sparse-brick fixtures (experimental, never production).
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_prototype',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
+        // T260.5: the same fixture with PaDiagnosticLightingMode kept as a uniform (20-24 = neutral volumetric lighting and
+        // its diagnostics); the flat program above stays the T260.4 evidence program byte for byte.
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_neutral',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize', 'PaDiagnosticLightingMode'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
+        // T260.5: B itself (mode 20) compiled as a constant, as the flat program is - the budgeted path.
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_neutral_final',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 20;']],
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_parity',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 2;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
+        // T255 isolated fixtures: same raymarch/equations, no dormant legacy density/lighting.
+        [name: 'cloud_atmosphere_volume_morphology_prototype',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
+        [name: 'cloud_atmosphere_volume_morphology_parity',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 2;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']],
         // T163: FINAL no longer carries the unreachable precipitation branch.
         //
         // T174 productionizes the T172 descriptor-invariant precompute.
@@ -1624,6 +1749,20 @@ def leanProgramVariants = [
          keepUniforms: ['PaOracleBaseSize']]
 ]
 
+// T256 image-invalid attribution builds remain fixture-only. Separate links avoid
+// charging counters or ablation switches to the anatomy candidate.
+['counts': 'PA_GROWTH_COST_COUNTS 1', 'no_canopy': 'PA_GROWTH_NO_CANOPY 1',
+ 'no_ice': 'PA_GROWTH_NO_ICE 1', 'hard_merge': 'PA_GROWTH_HARD_MERGE 1'].each { arm, define ->
+    leanProgramVariants.add([
+        name: 'cloud_atmosphere_volume_growth_morphology_' + arm,
+        defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_GROWTH_DEFINED_STORM 1', define, 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+        keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+        overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                    'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                    'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                    'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 1;']])
+}
+
 tasks.register('generateLeanFinalShader') {
     description = 'Generates the lean FINAL cloud program and the T140 oracle variants.'
     inputs.files(leanFinalShaderSource, leanFinalShaderJson)
@@ -1892,6 +2031,186 @@ tasks.register('cloudMorphologyTopologySandbox', JavaExec) {
     dependsOn 'testClasses'
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'net.Gabou.projectatmosphere.clouds.simulation.CloudMorphologyTopologySandbox'
+    workingDir = project.rootDir
+}
+
+tasks.register('stormMorphologyPrototypeSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T255: checks shape-only experimental storm anatomy and independent control responses.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.StormMorphologyPrototypeSandbox'
+    workingDir = project.rootDir
+}
+
+tasks.register('growthDefinedStormSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T256: growth-body ownership, independent canopy and controlled envelope contracts.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.GrowthDefinedStormSandbox'
+    workingDir = project.rootDir
+}
+tasks.named('check') { dependsOn 'growthDefinedStormSandbox' }
+
+tasks.register('growthDefinedStormCaptureReplay', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T256: reconstructs all193 native capture recipes from final source.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.GrowthDefinedStormCaptureReplay'
+    workingDir = project.rootDir
+}
+
+tasks.register('growthDefinedStormPreview', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T256: CPU diagnostics plus identical-frame T255/envelope A/B comparisons.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.GrowthDefinedStormPreview'
+    workingDir = project.rootDir
+    if (project.hasProperty('growthPreviewSmoke')) args 'smoke'
+}
+
+tasks.register('convectiveGrowthFieldPreview', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T257: CPU orthographic iteration preview of the continuous convective growth field (not native evidence).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.ConvectiveGrowthFieldPreview'
+    workingDir = project.rootDir
+    args project.findProperty('t257PreviewOut') ?: 'build/t257-preview'
+}
+
+tasks.register('convectiveGrowthFieldFingerprint', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T257: candidate-B geometry fingerprints (header signature + SHA-256 of the complete fixture texture).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.ConvectiveGrowthFieldFingerprint'
+    workingDir = project.rootDir
+}
+
+tasks.register('convectiveGrowthFieldDiagnostics', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T257: D0/D1/D2 native attribution plus D3 exact-field crease/contour analysis of the complete B v3 geometry.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.ConvectiveGrowthFieldDiagnostics'
+    workingDir = project.rootDir
+    maxHeapSize = '6g'
+    args((project.findProperty('t257DiagArgs') ?: '').toString().split(';').findAll { it })
+}
+
+tasks.register('stormAnatomyCPreview', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T258: native-camera CPU flat silhouettes of B v3 vs candidate C (iteration evidence, not native).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.StormAnatomyCPreview'
+    workingDir = project.rootDir
+    maxHeapSize = '6g'
+    args((project.findProperty('t258PreviewArgs') ?: 'build/t258-preview').toString().split(';').findAll { it })
+}
+
+tasks.register('stormAnatomyCProbe', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T258: scratch canopy profile probe (iteration only).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.StormAnatomyCProbe'
+    workingDir = project.rootDir
+}
+
+tasks.register('stormAnatomyCSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T258: candidate C determinism, level nesting, conservative bounds/grid, GPU-mirror packing, connectivity, topology, controls and B v3 fingerprints.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.StormAnatomyCSandbox'
+    workingDir = project.rootDir
+    maxHeapSize = '6g'
+}
+
+tasks.register('stormAnatomyCFingerprint', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T258: candidate C geometry fingerprints for every level.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.StormAnatomyCFingerprint'
+    workingDir = project.rootDir
+    maxHeapSize = '4g'
+}
+
+tasks.register('stormAnatomyCDiagnostics', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T258: B v3 vs candidate C0-C3 native silhouette metrics, CPU geometry metrics and comparison panels.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.StormAnatomyCDiagnostics'
+    workingDir = project.rootDir
+    maxHeapSize = '8g'
+    args((project.findProperty('t258DiagArgs') ?: '').toString().split(';').findAll { it })
+}
+
+tasks.register('convectiveSystemT260Sandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T260: sparse-brick feasibility (addressing, packing, seams, conservative skipping, boxes, occupancy ladder, incremental updates).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.ConvectiveSystemT260Sandbox'
+    workingDir = project.rootDir
+    maxHeapSize = '8g'
+    args((project.findProperty('t260SandboxArgs') ?: 'build/t260-sandbox').toString().split(';').findAll { it })
+}
+
+tasks.register('convectiveSystemT260Gallery', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T260: CPU calvus-system gallery at the native cameras (components, top-down, hi-res silhouettes, sections) and gates A/B.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.ConvectiveSystemT260Gallery'
+    workingDir = project.rootDir
+    maxHeapSize = '10g'
+    args((project.findProperty('t260GalleryArgs') ?: 'build/t260-gallery').toString().split(';').findAll { it })
+}
+
+tasks.register('convectiveVolumeT2606', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T260.6: CPU preview and checks of the convective volume reconstruction arms (D, A, B, C, combinations).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.T2606Preview'
+    workingDir = project.rootDir
+    maxHeapSize = '12g'
+    args((project.findProperty('t2606Args') ?: 'verify;20261015;D').toString().split(';').findAll { it })
+}
+
+tasks.register('convectiveGrowthFieldSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T257: continuity, bounded-cost, gate exactness and control-response contracts of the convective growth field.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.ConvectiveGrowthFieldSandbox'
+    workingDir = project.rootDir
+}
+
+tasks.register('stormMorphologyCapturePlanSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T257: capture-only paired resume selection and conservative matching-camera framing.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormMorphologyCapturePlanSandbox'
+    workingDir = project.rootDir
+    if (project.hasProperty('t257CaptureLogs')) args project.property('t257CaptureLogs').split(',')
+}
+
+tasks.register('stormMorphologyPrototypePreview', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T255: writes preliminary CPU flat-radiance diagnostics (not native/GPU acceptance).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.morphology.StormMorphologyPreview'
     workingDir = project.rootDir
 }
 

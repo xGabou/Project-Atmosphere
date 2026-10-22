@@ -1,3 +1,0 @@
-@echo off
-cd /d C:\Users\matga\Downloads\Project-Atmosphere
-call "C:\Users\matga\Downloads\Project-Atmosphere\gradlew.bat" runClient --offline -PsimpleCloudsMandatory=false > runClient-t203.out.log 2> runClient-t203.err.log

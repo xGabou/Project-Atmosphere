@@ -135,6 +135,10 @@ public final class StormT098CaptureDriver {
     private static List<Shot> shots = List.of();
     private static int shotIndex;
     private static int settleFrames;
+    private static double[] morphologyPose;
+    private static float morphologyYaw, morphologyPitch;
+    private static boolean morphologyAcknowledged;
+    private static long morphologyPresentedMark;
     private static String fixtureGroupId = "";
     private static int fixtureDescriptors;
     private static String fixtureFingerprint = "";
@@ -240,7 +244,7 @@ public final class StormT098CaptureDriver {
         if (!checkedMarker) {
             checkedMarker = true;
             resolutionLadder = Files.exists(RESOLUTION_MARKER);
-            enabled = resolutionLadder || Files.exists(MARKER);
+            enabled = (resolutionLadder || Files.exists(MARKER)) && !ExperimentalCloudPreview.enabled(); // preview sessions stay interactive
         }
         return enabled;
     }
@@ -373,6 +377,15 @@ public final class StormT098CaptureDriver {
      * regardless of its size.
      */
     private static List<Shot> buildShots(StormPerformanceBaseline.SuiteFixture fixture) {
+        if (StormMorphologyCapture.enabled()) {
+            List<Shot> morphology = new ArrayList<>();
+            for (int i = 0; i < StormMorphologyCapture.SHOTS.size(); i++) {
+                morphology.add(new Shot(StormMorphologyCapture.SHOTS.get(i).name(), fixture.centerX(),
+                        1790, fixture.centerZ(), StormMorphologyCapture.campaign() + " experimental flat-lit morphology",
+                        VolumetricCloudRaymarchDebugView.FINAL, false, false, false, .75F, false, 7000 + i));
+            }
+            return List.copyOf(morphology);
+        }
         double centreX = fixture.centerX();
         double centreZ = fixture.centerZ();
         double baseY = fixture.baseY();
@@ -613,6 +626,7 @@ public final class StormT098CaptureDriver {
     }
 
     private static void restoreCaptureMode() {
+        if (StormMorphologyCapture.enabled()) ExperimentalStormMorphologyState.clear();
         if (!captureModeApplied) {
             return;
         }
@@ -698,7 +712,7 @@ public final class StormT098CaptureDriver {
                 // window so the captured frame really is that arm's. -1 leaves
                 // production. (The field is reused per defect; it carried the
                 // origin-jitter A/B before that was rejected under motion.)
-                if (shot.originJitter() >= 0) {
+                if (shot.originJitter() >= 0 && shot.originJitter() < 7000) {
                     VolumetricCloudDebugConfig.setMacroEnvelopeMode(3);
                     VolumetricCloudDebugConfig.setLowerBodyMode(1);
                     VolumetricCloudDebugConfig.setDeepScatterMode(shot.originJitter());
@@ -719,15 +733,55 @@ public final class StormT098CaptureDriver {
                         StormPerformanceBaseline.suiteFixture() == null ? shot.z()
                                 : StormPerformanceBaseline.suiteFixture().centerZ());
                 float pitch = pitchTo(shot);
+                double moveX = shot.x(), moveY = shot.y(), moveZ = shot.z();
+                if (StormMorphologyCapture.enabled()) {
+                    morphologyPose = StormMorphologyCapture.move(shot.originJitter() - 7000);
+                    ExperimentalStormMorphologyState.parity(StormMorphologyCapture.wantsParity(shot.originJitter() - 7000));
+                    moveX = morphologyPose[0]; moveY = morphologyPose[1]; moveZ = morphologyPose[2];
+                    yaw = yawTo(moveX, moveZ, morphologyPose[3], morphologyPose[5]);
+                    pitch = (float) -Math.toDegrees(Math.atan2(morphologyPose[4] - moveY,
+                            Math.max(1, Math.hypot(morphologyPose[3] - moveX, morphologyPose[5] - moveZ))));
+                    morphologyYaw = yaw; morphologyPitch = pitch; morphologyAcknowledged = false;
+                }
                 player.connection.sendCommand(String.format(Locale.ROOT,
                         "tp @s %.5f %.5f %.5f %.3f %.3f",
-                        shot.x(), shot.y(), shot.z(), yaw, pitch));
+                        moveX, moveY, moveZ, yaw, pitch));
                 VolumetricCloudRenderer.invalidateHistory();
                 settleFrames = 0;
                 state = State.SETTLE;
             }
             case SETTLE -> {
-                if (++settleFrames >= (resolutionLadder ? LADDER_SETTLE_FRAMES : SETTLE_FRAMES)) {
+                if (StormMorphologyCapture.enabled()) {
+                    if (!morphologyAcknowledged) {
+                        double distance = Math.sqrt(Math.pow(player.getX() - morphologyPose[0], 2)
+                                + Math.pow(player.getY() - morphologyPose[1], 2) + Math.pow(player.getZ() - morphologyPose[2], 2));
+                        if (distance > .1 || Math.abs(net.minecraft.util.Mth.wrapDegrees(player.getYRot() - morphologyYaw)) > .1
+                                || Math.abs(player.getXRot() - morphologyPitch) > .1) return;
+                        morphologyAcknowledged = true;
+                        morphologyPresentedMark = VolumetricCloudRenderHook.presentedFrames();
+                        settleFrames = 0;
+                        ProjectAtmosphere.LOGGER.info(StormMorphologyCapture.campaign() + "_ACK shot={} error={} yaw={} pitch={}", shot.name(), distance, player.getYRot(), player.getXRot());
+                    }
+                    int frames = (int) (VolumetricCloudRenderHook.presentedFrames() - morphologyPresentedMark);
+                    if (ExperimentalStormMorphologyState.parity()) {
+                        if (frames < 4) return;
+                        try {
+                            StormMorphologyCapture.captureParity(shot.originJitter() - 7000);
+                        } catch (RuntimeException failure) {
+                            // Failed evidence is terminal, not a repeated render-event exception.
+                            ProjectAtmosphere.LOGGER.error(StormMorphologyCapture.campaign() + "_CAPTURE_REJECTED shot={} reason={}", shot.name(), failure.toString());
+                            state = State.DONE;
+                            restoreCaptureMode();
+                            return;
+                        }
+                        ExperimentalStormMorphologyState.parity(false);
+                        morphologyPresentedMark = VolumetricCloudRenderHook.presentedFrames();
+                        return;
+                    }
+                    StormMorphologyCapture.sample(frames);
+                    if (frames < 160) return;
+                }
+                if (++settleFrames >= (StormMorphologyCapture.enabled() ? 80 : resolutionLadder ? LADDER_SETTLE_FRAMES : SETTLE_FRAMES)) {
                     state = State.GRAB;
                 }
             }
@@ -790,6 +844,7 @@ public final class StormT098CaptureDriver {
             }
             case GRAB -> {
                 grab(minecraft, shot);
+                if (StormMorphologyCapture.enabled() && state == State.DONE) return;
                 if (shot.temporalPair()) {
                     temporalPairFrames = 0;
                     state = State.TEMPORAL_PAIR;
@@ -865,12 +920,17 @@ public final class StormT098CaptureDriver {
         try (NativeImage image = takeScreenshot(minecraft)) {
             Path target = outputDirectory.resolve(shot.name() + suffix + ".png");
             image.writeToFile(target.toFile());
+            if (StormMorphologyCapture.enabled()) {
+                StormMorphologyCapture.captured(shot.originJitter() - 7000, outputDirectory);
+            }
             ProjectAtmosphere.LOGGER.info(
                     "T098_CAPTURE shot={} group={} fingerprint={} camera=({},{},{}) intent={}"
                             + " mainTarget={}x{} cloudTarget={}x{} effectiveResolutionScale={}"
                             + " file={}",
                     shot.name() + suffix, fixtureGroupId, fixtureFingerprint,
-                    fmt(shot.x()), fmt(shot.y()), fmt(shot.z()), shot.intent(),
+                    fmt(StormMorphologyCapture.enabled() ? minecraft.player.getX() : shot.x()),
+                    fmt(StormMorphologyCapture.enabled() ? minecraft.player.getY() : shot.y()),
+                    fmt(StormMorphologyCapture.enabled() ? minecraft.player.getZ() : shot.z()), shot.intent(),
                     minecraft.getMainRenderTarget().width,
                     minecraft.getMainRenderTarget().height,
                     VolumetricCloudRenderTargets.currentCloudTarget() == null
@@ -879,6 +939,11 @@ public final class StormT098CaptureDriver {
                             ? 0 : VolumetricCloudRenderTargets.currentCloudTarget().height,
                     fmt(VolumetricCloudRenderer.lastResolutionScale()),
                     target.toAbsolutePath());
+            if (StormMorphologyCapture.enabled()) {
+                ProjectAtmosphere.LOGGER.info(StormMorphologyCapture.campaign() + "_EFFECTIVE shot={} fixture=true legacyDescriptors=not_applicable flat=1 scale=MESO micro=off history=off step=4 budget=2048 packedVersion={}",
+                        shot.name(), StormMorphologyCapture.version());
+                return; // Legacy descriptor/material assertions are not this arm's geometry authority.
+            }
             // T220. The composite's actual source is the temporal lattice at
             // TWICE the phase size, not the phase target; recording only the
             // phase target is what let T219 under-count the samples an edge is
@@ -934,6 +999,11 @@ public final class StormT098CaptureDriver {
         } catch (Throwable throwable) {
             ProjectAtmosphere.LOGGER.warn("T098_CAPTURE_FAILED shot={} error={}",
                     shot.name(), throwable.toString());
+            if (StormMorphologyCapture.enabled()) {
+                ProjectAtmosphere.LOGGER.error(StormMorphologyCapture.campaign() + "_CAPTURE_REJECTED shot={} reason=readback_failed", shot.name());
+                state = State.DONE;
+                restoreCaptureMode();
+            }
         }
     }
 

@@ -228,6 +228,9 @@ public final class VolumetricCloudRenderer {
         return GPU_TIMER.getLastResultSerial();
     }
 
+    static float currentGpuQueryMilliseconds() { return GPU_TIMER.getLastMilliseconds(); }
+    static int currentGpuQueryAge() { return GPU_TIMER.getLastResultAgeFrames(); }
+
     public static float governorStepScale() {
         return GOVERNOR.stepScale();
     }
@@ -290,6 +293,7 @@ public final class VolumetricCloudRenderer {
 
     /** Clears timing and temporal state owned by the native volumetric pass. */
     public static void shutdown() {
+        ExperimentalStormMorphologyState.clear();
         invalidateHistory();
         GOVERNOR.reset();
         GPU_TIMER.close();
@@ -559,7 +563,8 @@ public final class VolumetricCloudRenderer {
         // subpixel offset, and the hook resolves the four phases afterwards.
         // Only a FINAL-class frame is a phase: a debug view or a campaign
         // program that is not FINAL's image must not enter the phase set.
-        boolean temporal = VolumetricCloudDebugConfig.temporalMode() != 0
+        boolean temporal = !ExperimentalStormMorphologyState.enabled()
+                && VolumetricCloudDebugConfig.temporalMode() != 0
                 && profile.temporalEnabled()
                 && program.normalProductionOutput()
                 && debugView == VolumetricCloudRaymarchDebugView.FINAL
@@ -657,6 +662,9 @@ public final class VolumetricCloudRenderer {
         frameSamplers.put("CumulusStageTopMapSampler", cumulusStageTopTarget.getColorTextureId());
         frameSamplers.put("StormCandidateMapSampler", stormCandidateTarget.getColorTextureId());
         frameSamplers.put("StormDescriptorSampler", stormDescriptorTarget.getColorTextureId());
+        if (ExperimentalStormMorphologyState.enabled()) {
+            frameSamplers.put("StormDescriptorSampler", ExperimentalStormMorphologyState.textureId());
+        }
         frameSamplers.put("BlueNoiseSampler", CloudNoiseTextureManager.blueNoiseTextureId());
         frameSamplers.put("SceneDepthSampler", safeSceneDepth.valid() ? safeSceneDepth.textureId() : 0);
         frameSamplers.put("HistorySampler", historyValid ? historyTarget.getColorTextureId() : 0);
@@ -868,6 +876,7 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("Funnel0B").set(safeFunnels.f0b());
         shader.safeGetUniform("Funnel1A").set(safeFunnels.f1a());
         shader.safeGetUniform("Funnel1B").set(safeFunnels.f1b());
+        ExperimentalStormMorphologyState.bind(shader, cameraPos.x, cameraPos.y, cameraPos.z);
 
         if (t153Oracle) {
             // T153's ground-truth pass deliberately sits outside the timestamp
@@ -1045,7 +1054,7 @@ public final class VolumetricCloudRenderer {
         // baked on), the monolith runs it at production's bits unless a
         // campaign overrides them, so the counters describe the post-field
         // workload and a debug view renders FINAL's image.
-        if (stormFieldProgram(program)) {
+        if (!ExperimentalStormMorphologyState.enabled() && stormFieldProgram(program)) {
             RenderTarget stormFieldTarget =
                     VolumetricCloudRenderTargets.prepareStormFieldTarget(stormFieldXZ);
             if (stormFieldTarget == null
@@ -1312,6 +1321,9 @@ public final class VolumetricCloudRenderer {
             StormOptimizationDiagnosticMode optimizationMode
     ) {
         CoreCostDiagnosticProgram override = VolumetricCloudDebugConfig.finalProgramOverride();
+        if (ExperimentalStormMorphologyState.enabled()) {
+            return ExperimentalStormMorphologyState.program();
+        }
         if (override != null) {
             return override;
         }
@@ -1325,7 +1337,8 @@ public final class VolumetricCloudRenderer {
             VolumetricCloudRaymarchDebugView debugView,
             StormOptimizationDiagnosticMode optimizationMode
     ) {
-        return debugView == VolumetricCloudRaymarchDebugView.FINAL
+        return !ExperimentalStormMorphologyState.enabled()
+                && debugView == VolumetricCloudRaymarchDebugView.FINAL
                 && diagnosticStepBudget == 0
                 && VolumetricCloudDebugConfig.puffDensityStage()
                         == VolumetricPuffDensityStage.FINAL

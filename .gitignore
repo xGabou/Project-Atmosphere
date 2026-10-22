@@ -61,6 +61,8 @@ docs/decompiled-mods/Dynamic Trees/.tmp_dynamictrees_full/
 
 # Local Java/compiler and editor artifacts (tracked dependency jars remain visible).
 *.class
+# Java build output; repository dependency jars are intentionally tracked.
+target/
 out/
 Thumbs.db
 *.tmp
@@ -70,3 +72,47 @@ Thumbs.db
 /phase2a-*.log
 # Local multi-account Codex CLI homes and helper scripts.
 /.pa-agents/
+
+# Machine-local runtime, downloaded tooling, and reference material.
+/run-data/
+/.gradle-tools/
+/.cursor/
+/docs/decompiled-mods/
+
+# Logs, profiler exports, and scratch launchers are local development output.
+*.log
+*.log.*
+__pycache__/
+*.py[cod]
+launch-t*.cmd
+/launch-cgallery*.cmd
+/gpu-t*.csv
+/mem-t*.csv
+/gates-t*.txt
+/ai-trainning/uselesslogs/
+/ai-trainning/datasets/
+
+# Feature validation output stays local, including reports and preview docs.
+# Traverse directories so validation code remains eligible for version control.
+/specs/*/validation/**
+!/specs/*/validation/**/
+!/specs/*/validation/**/*.py
+!/specs/*/validation/**/*.ps1
+!/specs/*/validation/**/*.sh
+!/specs/*/validation/**/*.java
+!/specs/*/validation/**/*.glsl
+!/specs/*/validation/**/*.frag
+!/specs/*/validation/**/*.vert
+!/specs/*/validation/**/*.fsh
+!/specs/*/validation/**/*.vsh
+# Frozen source copies are capture artifacts; authoritative code lives in src/.
+/specs/*/validation/**/frozen/sources/
+/specs/*/validation/**/frozen/prefix-sources/
+
+# API build evidence and future documentation previews stay local.
+/docs/phase2a/evidence/*
+!/docs/phase2a/evidence/.gitignore
+/docs/**/previews/
+/docs/**/preview/
+/docs/**/results/
+/docs/**/captures/

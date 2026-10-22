@@ -397,7 +397,8 @@ final class StormT132AutoDriver {
     static void tick() {
         if (!checkedMarker) {
             checkedMarker = true;
-            enabled = Files.exists(MARKER);
+            // The experimental cloud preview is an interactive session: campaign markers left in run/ stay inert.
+            enabled = Files.exists(MARKER) && !ExperimentalCloudPreview.enabled();
             if (enabled) {
                 phase = Phase.BOOTSTRAP_PREPARE;
                 ProjectAtmosphere.LOGGER.info("T132_AUTORUN armed by {}", MARKER.toAbsolutePath());

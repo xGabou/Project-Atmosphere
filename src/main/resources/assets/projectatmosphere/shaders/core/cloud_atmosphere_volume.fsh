@@ -15,6 +15,39 @@
 #moj_import <projectatmosphere:cloud_ray_origin_jitter.glsl>
 #moj_import <projectatmosphere:cloud_storm_tower_taper.glsl>
 
+// Imports stay in the header: Minecraft's regex preprocessor cannot safely
+// scan a late import after thousands of lines of this diagnostic monolith.
+uniform sampler2D StormDescriptorSampler;
+#ifdef PA_MORPHOLOGY_EXPERIMENT
+uniform int PaMorphologyPrototype;
+uniform int PaMorphologyScale;
+uniform int PaMorphologyIntervals;
+uniform vec3 PaMorphologyOrigin;
+uniform vec3 PaMorphologyMin;
+uniform vec3 PaMorphologyMax;
+#else
+// Experiment code and all gates are compile-time absent from the ordinary monolith too.
+const int PaMorphologyPrototype = 0;
+const int PaMorphologyScale = 0;
+const int PaMorphologyIntervals = 0;
+const vec3 PaMorphologyOrigin = vec3(0.0);
+const vec3 PaMorphologyMin = vec3(0.0);
+const vec3 PaMorphologyMax = vec3(0.0);
+#endif
+#if defined(PA_CONVECTIVE_GROWTH_FIELD_A)
+#moj_import <projectatmosphere:cloud_convective_growth_field_a.glsl>
+#elif defined(PA_STORM_ANATOMY_C)
+#moj_import <projectatmosphere:cloud_storm_anatomy_c.glsl>
+#elif defined(PA_CONVECTIVE_SYSTEM_T260)
+#moj_import <projectatmosphere:cloud_convective_system_t260.glsl>
+#elif defined(PA_CONVECTIVE_GROWTH_FIELD)
+#moj_import <projectatmosphere:cloud_convective_growth_field.glsl>
+#elif !defined(PA_GROWTH_DEFINED_STORM)
+#moj_import <projectatmosphere:cloud_storm_morphology_prototype.glsl>
+#else
+#moj_import <projectatmosphere:cloud_growth_defined_storm.glsl>
+#endif
+
 // Project Atmosphere volumetric cloud raymarch.
 // One fullscreen pass marches a single global density field driven by the
 // cell weather map, baked Perlin-Worley / Worley 3D noise, real sun lighting
@@ -27,7 +60,6 @@ uniform sampler2D CumulusStageSupportMapSampler;
 uniform sampler2D CumulusStageBaseMapSampler;
 uniform sampler2D CumulusStageTopMapSampler;
 uniform sampler2D StormCandidateMapSampler;
-uniform sampler2D StormDescriptorSampler;
 uniform sampler2D PuffCandidateMapSampler;
 uniform sampler2D BlueNoiseSampler;
 uniform sampler2D SceneDepthSampler;
@@ -599,6 +631,17 @@ bool paT153Replay() {
 float paLodDistance01 = 0.0;
 float paLodTransmittance = 1.0;
 float paLodRayVerticality = 0.0;
+/**
+ * T254. The nimbostratus lower-fractus weight of the sample being lit (0 for
+ * every other sample and caller) and its column's deck top, published by the
+ * primary march beside the T149 inputs. Both come from the weather map at the
+ * sample, so the region is world-fixed: 1 below 30 % of the layer height, 0
+ * above 45 % (the T243/T249 hang layer is the lower 40 %).
+ */
+float paLightFractus = 0.0;
+float paLightFractusTopY = 0.0;
+/** T254. Set by paStormFieldLightDensityAt: the last tap read an uncovered node pair. */
+bool paStormFieldLightUncovered = false;
 bool paLightingDensityTap = false;
 float paLightingDetailWeight = 1.0;
 #ifdef PA_ARM_LIGHT_CHEAP
@@ -1973,6 +2016,11 @@ float stratusHorizontalMaterialSignal(
 // ---------------------------------------------------------------------------
 
 vec4 sampleWeather(vec2 worldXZ) {
+#ifdef PA_CONVECTIVE_SYSTEM_T260
+    // T260.5 contamination probe (PaMorphologyIntervals bit 2): point-reflect the lookup through the map centre, so
+    // any fixture term that still read the world maps would change between the probe arm and its control.
+    if (PaMorphologyPrototype != 0 && (PaMorphologyIntervals & 4) != 0) worldXZ = 2.0 * WeatherOrigin + WeatherExtent - worldXZ;
+#endif
     vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
         return vec4(0.0, 0.35, 0.45, 0.0);
@@ -2052,6 +2100,11 @@ bool hasMorphologyCategory(float encodedCategory) {
 }
 
 vec4 sampleMorphology(vec2 worldXZ) {
+#ifdef PA_CONVECTIVE_SYSTEM_T260
+    // T260.5 contamination probe (PaMorphologyIntervals bit 2): point-reflect the lookup through the map centre, so
+    // any fixture term that still read the world maps would change between the probe arm and its control.
+    if (PaMorphologyPrototype != 0 && (PaMorphologyIntervals & 4) != 0) worldXZ = 2.0 * WeatherOrigin + WeatherExtent - worldXZ;
+#endif
     vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
         return vec4(0.0);
@@ -6545,6 +6598,9 @@ float cloudDensityImpl(
         bool includePrecipitation,
         out float reliefForm) {
     reliefForm = 0.0;
+    if (PaMorphologyPrototype != 0) {
+        return paMorphDensity(p);
+    }
     if (paWorkloadCaptureActive()) {
         paCloudDensityCalls++;
     }
@@ -7628,6 +7684,7 @@ float paStormFieldUncoveredDensity(float x, float z, int k) {
 // T247: exactUncovered asks for the exact density of non-storm material: the
 // lookup then returns -1 on an uncovered node and the caller evaluates it.
 float paStormFieldLightDensityAt(vec3 p, bool detailTap, bool exactUncovered) {
+    paStormFieldLightUncovered = false;
     vec3 c = paStormFieldCoord(p);
     if (c.y < 0.0 || c.y > float(PA_STORM_FIELD_Y)) {
         return 0.0;
@@ -7641,9 +7698,17 @@ float paStormFieldLightDensityAt(vec3 p, bool detailTap, bool exactUncovered) {
     }
     vec4 f0 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k0));
     vec4 f1 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k1));
-    if (min(f0.r, f1.r) <= PA_STORM_FIELD_UNCOVERED * 0.5) {
+    paStormFieldLightUncovered = min(f0.r, f1.r) <= PA_STORM_FIELD_UNCOVERED * 0.5;
+    if (paStormFieldLightUncovered) {
         if (exactUncovered) {
             return -1.0;
+        }
+        // T254. Filtered R sits exactly at the sentinel only when every node
+        // with a non-zero (1/256-quantised) filter weight is uncovered; the
+        // hardware bilinear of A is then the covered-excluding bilinear below.
+        // Lower-fractus taps only (the region T254 prices).
+        if (paLightFractus > 0.0 && max(f0.r, f1.r) <= PA_STORM_FIELD_UNCOVERED + 0.01) {
+            return mix(f0.a, f1.a, t);
         }
         return mix(paStormFieldUncoveredDensity(c.x, c.z, k0),
             paStormFieldUncoveredDensity(c.x, c.z, k1), t);
@@ -8198,6 +8263,17 @@ float lightMarchOpticalDepth(
         // at full strength as the earlier rounded prototype did.
         steps = clamp(int(ceil(desiredSteps - 0.0001)), 2, steps);
     }
+    // T254. The nimbostratus lower fractus (T249) sits under a ~56-block deck,
+    // so its 240-block cone leaves the deck after two or three taps and its
+    // nearest tap is the exact density walk that dominates the cone's cost.
+    // For those samples only: taps past the column's deck top fade out over
+    // 2 / weight blocks and the cone stops (above the top the deck has no
+    // material - the profile-5 envelope ends at h01 = 1); the first tap blends
+    // from the exact walk to the field read over the middle of the weight.
+    // Both transitions are continuous in the world-fixed weight; weight 0
+    // leaves the cone exactly as it was.
+    float fractusFieldFirst = smoothstep(0.25, 0.75, paLightFractus);
+    float fractusExitMargin = 2.0 / max(paLightFractus, 1.0e-4);
     // "Already opaque" uses the same 0.045 floor the validated early
     // termination arm uses, so the two readings are commensurable.
     if (paWorkloadCaptureActive()) {
@@ -8233,11 +8309,19 @@ float lightMarchOpticalDepth(
         // fine streak noise would otherwise be paid at every light tap and
         // would over-darken the parent cloud.
         pos += LightDir * stepLength;
+        float aboveDeck = 0.0;
+        if (paLightFractus > 0.0) {
+            aboveDeck = smoothstep(paLightFractusTopY, paLightFractusTopY + fractusExitMargin,
+                pos.y + offset.y);
+            if (aboveDeck >= 1.0) {
+                break;
+            }
+        }
         if (paWorkloadCaptureActive()) {
             paLightMarchDensityEvaluations++;
             paLightConeTaps++;
         }
-        float tapWeight = 1.0;
+        float tapWeight = 1.0 - aboveDeck;
         if (gradedLight && float(i + 1) > desiredSteps) {
             tapWeight = clamp(desiredSteps - float(i), 0.0, 1.0);
         }
@@ -8324,14 +8408,26 @@ float lightMarchOpticalDepth(
         // carries most of the local shading, the rest stay on the field. One
         // cloudDensity call site serves both the field-off path and the exact
         // tap: a second inlined call cost ~0.16 ms at SIDE in codegen alone.
+        // T254: a lower-fractus first tap takes the field read (weight 1) or
+        // a blend of it with the exact walk (0 < weight < 1); the exact walk
+        // keeps its single call site.
         float density = (PaStormFieldEnabled & 1) != 0
             ? ((PaStormFieldEnabled & 8) != 0
-                ? paStormFieldLightDensityAt(pos + offset, detailTap, i == 0)
+                ? paStormFieldLightDensityAt(pos + offset, detailTap, i == 0 && fractusFieldFirst <= 0.0)
                 : paStormFieldDensityAt(pos + offset))
             : -1.0;
+        float fieldFirstDensity = 0.0;
+        float fieldFirstWeight = 0.0;
+        if (i == 0 && fractusFieldFirst > 0.0 && fractusFieldFirst < 1.0
+                && (PaStormFieldEnabled & 9) == 9 && paStormFieldLightUncovered) {
+            fieldFirstDensity = density;
+            fieldFirstWeight = fractusFieldFirst;
+            density = -1.0;
+        }
         if (density < 0.0) {
             density = cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
         }
+        density = mix(density, fieldFirstDensity, fieldFirstWeight);
 #endif
 #endif
         paDensityConsumer = 0;
@@ -8831,6 +8927,119 @@ float rainOverheadOpticalDepth(vec3 p) {
     return 2.2 * (1.0 - exp(-overhead / 2.2));
 }
 
+#ifdef PA_CONVECTIVE_SYSTEM_T260
+// T260.5 controlled neutral volumetric lighting (experimental fixture only, PaDiagnosticLightingMode 20-25). It reads
+// the frozen fixture texture and constants and nothing else: no weather or morphology map, no LightDir / LightColor /
+// ambient uniforms, no rain, no history. Single scattering with an isotropic phase; Beer-Lambert extinction with the
+// march's own ExtinctionScale (shadows and alpha see one medium); a white sun with volumetric self-shadowing; a white
+// sky / grey ground ambient whose visibility is marched through the same density; one fixed exposure, no tone curve.
+// The light inputs (sun optical depth, ambient radiance) are baked per frozen system on the CPU through the same density
+// (NeutralLightVolume) and appended to the fixture texture; 25 marches the identical estimator per sample instead.
+// 20 final, 21 local density, 22 direct sun only, 23 ambient only, 24 sun optical depth log(1+od)/log(65),
+// 25 reference (per-sample marches, cost not budgeted).
+const vec3 PA_NEUTRAL_SUN = vec3(-0.579228, 0.573576, 0.579228); // elevation 35 deg, from +z rotated 45 deg toward -x
+const float PA_NEUTRAL_SUN_E = 3.14159265; // irradiance: a white Lambert surface facing the sun has radiance 1
+const float PA_NEUTRAL_SKY_L = 0.15;       // uniform white sky radiance, upper hemisphere
+const float PA_NEUTRAL_GROUND_L = 0.145;   // albedo-0.2 ground lit by that sun and sky (unshadowed)
+const float PA_NEUTRAL_EXPOSURE = 3.2;     // one fixed linear exposure for every seed and view
+
+// paMorphDensity in fixture-local coordinates (same lookups, same arithmetic).
+float paNeutralDensity(vec3 p) { return paMorphDensity(p + PaMorphologyOrigin); }
+
+// Farthest exit of the ray from the fixture's skip boxes (they enclose every non-zero density).
+float paNeutralExit(vec3 local, vec3 inv) {
+    int count = int(paCsTexel(2).z + 0.5);
+    if (count == 0) {
+        vec3 ta = (PaMorphologyMin - local) * inv, tb = (PaMorphologyMax - local) * inv;
+        return max(min(min(max(ta.x, tb.x), max(ta.y, tb.y)), max(ta.z, tb.z)), 0.0);
+    }
+    float far = 0.0;
+    for (int i = 0; i < 3; i++) {
+        if (i >= count) break;
+        vec3 ta = (paCsTexel(4 + i * 2).xyz - local) * inv, tb = (paCsTexel(5 + i * 2).xyz - local) * inv;
+        float a = max(max(min(ta.x, tb.x), min(ta.y, tb.y)), min(ta.z, tb.z));
+        float b = min(min(max(ta.x, tb.x), max(ta.y, tb.y)), max(ta.z, tb.z));
+        if (b >= max(a, 0.0)) far = max(far, b);
+    }
+    return far;
+}
+
+// Optical depth from local point q toward dir until the last skip-box exit; steps grow geometrically from `first` to
+// `maxStep`, sampled at midpoints; stops once od > odCap. NeutralLightVolume.opticalDepth is the CPU mirror.
+float paNeutralOpticalDepth(vec3 q, vec3 dir, float first, float growth, float maxStep, int steps, float odCap) {
+    float exitT = paNeutralExit(q, 1.0 / dir);
+    float raw = 0.0, s = 0.0, h = first, cap = odCap / ExtinctionScale;
+    for (int i = 0; i < steps; i++) {
+        if (s >= exitT || raw > cap) break;
+        float hh = min(h, exitT - s);
+        raw += paNeutralDensity(q + dir * (s + 0.5 * hh)) * hh;
+        s += hh;
+        h = min(h * growth, maxStep);
+    }
+    return raw * ExtinctionScale;
+}
+
+// The reference estimator: sun od (2 blocks x1.4 to 40, od cap 8) and six-direction ambient (6 .. 192, cap 8).
+vec2 paNeutralMarched(vec3 q) {
+    float od = paNeutralOpticalDepth(q, PA_NEUTRAL_SUN, 2.0, 1.4, 40.0, 72, 8.0);
+    float ambient = 0.0;
+    for (int k = 0; k < 6; k++) {
+        float az = radians(37.0 + 60.0 * float(k)), el = radians((k & 1) == 0 ? 30.0 : -30.0);
+        vec3 d = vec3(cos(el) * sin(az), sin(el), cos(el) * cos(az));
+        ambient += (d.y > 0.0 ? PA_NEUTRAL_SKY_L : PA_NEUTRAL_GROUND_L) * exp(-paNeutralOpticalDepth(q, d, 6.0, 2.0, 192.0, 6, 8.0));
+    }
+    return vec2(min(od, 8.0), min(ambient / 6.0, 0.16));
+}
+
+vec2 paNeutralDecode(float v) {
+    float hi = floor(v / 4096.0);
+    return vec2(hi / 4095.0 * 8.0, (v - hi * 4096.0) / 4095.0 * 0.16);
+}
+
+// Points i and i+1 of lattice row (j, k), x-interpolated: one texel unless the pair straddles two.
+vec2 paNeutralRow(int t, int i, float fx) {
+    int lane = i - (i / 4) * 4;
+    vec4 a = paCsFetch(t);
+    float second = lane == 3 ? paCsFetch(t + 1).x : a[lane + 1];
+    return mix(paNeutralDecode(a[lane]), paNeutralDecode(second), fx);
+}
+
+// The light lattice header (last texture row), fetched once per pixel.
+bool paNeutralHeaderLoaded = false;
+vec4 paNeutralHeaderA, paNeutralHeaderB;
+
+// Baked (sun od, ambient) trilinearly interpolated at local point q.
+vec2 paNeutralBaked(vec3 q) {
+    if (!paNeutralHeaderLoaded) {
+        int row = textureSize(StormDescriptorSampler, 0).y - 1;
+        paNeutralHeaderA = texelFetch(StormDescriptorSampler, ivec2(0, row), 0);
+        paNeutralHeaderB = texelFetch(StormDescriptorSampler, ivec2(1, row), 0);
+        paNeutralHeaderLoaded = true;
+    }
+    ivec3 n = ivec3(paNeutralHeaderB.xyz + 0.5);
+    int base = int(paNeutralHeaderB.w + 0.5), nxp = (n.x + 3) / 4;
+    vec3 g = (q - paNeutralHeaderA.xyz) / paNeutralHeaderA.w;
+    ivec3 c = clamp(ivec3(floor(g)), ivec3(0), n - 2);
+    vec3 f = clamp(g - vec3(c), 0.0, 1.0);
+    int t = base + (c.z * n.y + c.y) * nxp + c.x / 4;
+    vec2 v00 = paNeutralRow(t, c.x, f.x), v10 = paNeutralRow(t + nxp, c.x, f.x);
+    vec2 v01 = paNeutralRow(t + n.y * nxp, c.x, f.x), v11 = paNeutralRow(t + n.y * nxp + nxp, c.x, f.x);
+    return mix(mix(v00, v10, f.y), mix(v01, v11, f.y), f.z);
+}
+
+vec3 paNeutralLighting(vec3 p, float localDensity, out float sunOpticalDepth) {
+    if (PaDiagnosticLightingMode == 21) { sunOpticalDepth = 0.0; return vec3(saturate(localDensity)); }
+    vec3 q = p - PaMorphologyOrigin;
+    vec2 light = PaDiagnosticLightingMode == 25 ? paNeutralMarched(q) : paNeutralBaked(q);
+    sunOpticalDepth = light.x;
+    if (PaDiagnosticLightingMode == 24) return vec3(saturate(log(1.0 + light.x) / log(65.0)));
+    float direct = PA_NEUTRAL_SUN_E / (4.0 * 3.14159265) * exp(-light.x);
+    if (PaDiagnosticLightingMode == 22) return vec3(PA_NEUTRAL_EXPOSURE * direct);
+    if (PaDiagnosticLightingMode == 23) return vec3(PA_NEUTRAL_EXPOSURE * light.y);
+    return vec3(PA_NEUTRAL_EXPOSURE * (direct + light.y));
+}
+#endif
+
 vec3 sampleLighting(
         vec3 p,
         float localDensity,
@@ -8860,6 +9069,11 @@ vec3 sampleLighting(
             : PaDiagnosticLightingMode == 7 ? paSigB0 : paSigB1;
         return vec3(saturate(stage));
     }
+#ifdef PA_CONVECTIVE_SYSTEM_T260
+    if (PaDiagnosticLightingMode >= 20 && PaDiagnosticLightingMode <= 25) {
+        return paNeutralLighting(p, localDensity, diagnosticLightOpticalDepth); // T260.5 neutral volumetric lighting
+    }
+#endif
     if (PaDiagnosticLightingMode == 1) {
         // T136 attribution arm: no light cone, no scatter chain, no tone curve.
         // A plausible mid-grey so the march still integrates a real colour.
@@ -9514,6 +9728,16 @@ void paT162FixedWorkMain() {
 #endif
 
 void main() {
+    if (PaMorphologyPrototype == 2) {
+        // Actual GPU kernel parity, independent of projection/lighting/composite.
+        vec3 unitPoint = vec3((floor(gl_FragCoord.x) + 0.5) / PaOracleBaseSize.x,
+            (mod(floor(gl_FragCoord.y), 64.0) + 0.5) / 64.0,
+            (floor(gl_FragCoord.y / 64.0) + 0.5) / ceil(PaOracleBaseSize.y / 64.0));
+        float value = paMorphDensity(PaMorphologyOrigin + mix(PaMorphologyMin, PaMorphologyMax, unitPoint));
+        fragColor = vec4(value, value, value, 1.0);
+        gl_FragDepth = 1.0;
+        return;
+    }
 #ifdef PA_T162_FIXED_WORK
     // Fixed-work attribution ladder. Everything below is unreachable in
     // these programs and the driver eliminates it.
@@ -9800,6 +10024,21 @@ void main() {
     }
     t0 = max(t0, 0.0);
     t1 = min(t1, MaxRenderDistance);
+    if (PaMorphologyPrototype != 0) {
+        // Conservative whole-program AABB, not old member/candidate bounds.
+        vec3 localCamera = CameraPos - PaMorphologyOrigin;
+        for (int axis = 0; axis < 3; axis++) {
+            if (abs(rayDir[axis]) < 0.00001) {
+                if (localCamera[axis] < PaMorphologyMin[axis]
+                        || localCamera[axis] > PaMorphologyMax[axis]) t1 = -1.0;
+            } else {
+                float a = (PaMorphologyMin[axis] - localCamera[axis]) / rayDir[axis];
+                float b = (PaMorphologyMax[axis] - localCamera[axis]) / rayDir[axis];
+                t0 = max(t0, min(a, b));
+                t1 = min(t1, max(a, b));
+            }
+        }
+    }
     bool cameraStartsInsideSlab = t0 <= 1.0;
     bool cameraInsideCloud = cameraStartsInsideSlab && CameraCloudDensity > 0.08;
     if (paRayTraceActive()) {
@@ -9866,7 +10105,7 @@ void main() {
 #endif
 #endif
 
-    bool analyticPuffDiagnostic = PuffDensityStage == 1
+    bool analyticPuffDiagnostic = PaMorphologyPrototype != 0 || PuffDensityStage == 1
         || PuffDensityStage == 2
         || (PuffDensityStage >= 7 && PuffDensityStage <= 12);
 
@@ -9937,6 +10176,8 @@ void main() {
     int paStepCap = PaDiagnosticStepBudget > 0
         ? min(PaDiagnosticStepBudget, PA_MAX_DIAGNOSTIC_STEPS)
         : MAX_STEPS;
+    // Prototype alone: conservative exact traversal without legacy SDF skipping.
+    if (PaMorphologyPrototype != 0) paStepCap = 2048;
     int stepBudget = int(float(clamp(RaymarchSteps, 8, MAX_STEPS)) * clamp(StepScale, 0.4, 1.0));
     stepBudget = clamp(stepBudget, 8, MAX_STEPS);
     float span = t1 - t0;
@@ -10000,6 +10241,25 @@ void main() {
         span
     );
     float t = t0 + searchBlue * originJitterDistance;
+    vec2 paMorphIntervals[3];
+    bool paMorphIntervalSkip = PaMorphologyPrototype != 0 && PaMorphologyIntervals != 0 && !cameraInsideCloud;
+    int paMorphIntervalIndex = 0;
+    if (paMorphIntervalSkip) paMorphRayIntervals(CameraPos, rayDir, t0, t1, paMorphIntervals);
+    // T260.4: PaMorphologyIntervals bit 0 = interval skip; bit 1 = the pre-T260.4 fixture march (midpoint box test,
+    // accumulated t, world-map stratus relief), kept only as the attribution arm.
+#ifdef PA_CONVECTIVE_SYSTEM_T260
+    bool paMorphLegacy = PaMorphologyPrototype != 0 && (PaMorphologyIntervals & 2) != 0;
+#else
+    bool paMorphLegacy = PaMorphologyPrototype != 0; // T255-T258 fixtures keep their frozen march unchanged
+#endif
+    if ((PaMorphologyIntervals & 1) == 0) paMorphIntervalSkip = false;
+    bool paMorphSampleSkip = paMorphIntervalSkip && !paMorphLegacy;
+    if (paMorphSampleSkip) paMorphIntervalSkip = false; // the midpoint skip in the loop now runs for the legacy arm only
+    // T260.4: exterior fixture samples sit on one integer lattice t = base + k * fineStep. The skip and the exact
+    // traversal then evaluate bit-identical positions; accumulating t drifted by float rounding between the two.
+    bool paMorphLattice = PaMorphologyPrototype != 0 && !cameraInsideCloud && !paMorphLegacy;
+    float paMorphLatticeBase = t;
+    int paMorphLatticeK = 0;
     if (paRayTraceActive()) {
         paMrStepCap = float(paStepCap);
         paMrStepBudget = float(stepBudget);
@@ -10289,6 +10549,29 @@ void main() {
             break;
 #endif
         }
+        if (paMorphSampleSkip) {
+            // T260.4. Skip only samples outside every box (zero density there by construction), tested at the
+            // sample itself: the midpoint test below dropped in-box samples within half a step of an exit face.
+            // The 0.05-block margin keeps samples within float error of a face: taken, never skipped.
+            while (paMorphIntervalIndex < 3 && t > paMorphIntervals[paMorphIntervalIndex].y + 0.05) paMorphIntervalIndex++;
+            if (paMorphIntervalIndex >= 3) break;
+            float paMorphEntry = paMorphIntervals[paMorphIntervalIndex].x - 0.05;
+            if (t < paMorphEntry) {
+                paMorphLatticeK = max(paMorphLatticeK, int(ceil((paMorphEntry - paMorphLatticeBase) / fineStep)));
+                t = paMorphLatticeBase + float(paMorphLatticeK) * fineStep;
+                if (t >= t1) break;
+            }
+        }
+        if (paMorphIntervalSkip) {
+            // Skip only zero-density lattice samples, preserving the exact exterior fine-step phase.
+            float sampleT = t + min(fineStep, t1 - t) * 0.5;
+            while (paMorphIntervalIndex < 3 && sampleT > paMorphIntervals[paMorphIntervalIndex].y) paMorphIntervalIndex++;
+            if (paMorphIntervalIndex >= 3) break;
+            if (sampleT < paMorphIntervals[paMorphIntervalIndex].x) {
+                t += ceil((paMorphIntervals[paMorphIntervalIndex].x - sampleT) / fineStep) * fineStep;
+                if (t >= t1) break;
+            }
+        }
         if (paT153OpticalRelevance()
                 && paOracleOpticalCutoff < t1
                 && t >= paOracleOpticalCutoff) {
@@ -10308,6 +10591,7 @@ void main() {
             paMrIterationsExecuted = float(i + 1);
         }
         bool fine = sinceHit < 6;
+        if (PaMorphologyPrototype != 0) fine = true;
         if (paCap) {
             paMrTBefore = t;
             paMrSinceHit = float(sinceHit);
@@ -10863,7 +11147,7 @@ void main() {
         // actually contributes, so a bound only.
         bool localRainSegment = false;
 #else
-        bool localRainSegment = PuffDensityStage == 0
+        bool localRainSegment = PaMorphologyPrototype == 0 && PuffDensityStage == 0
             && rainSegmentMayContribute(p, segmentEnd);
 #endif
         if (paCap) {
@@ -11304,6 +11588,9 @@ void main() {
             if (!firstMaterialResolved && !precipitationSample) {
                 firstMaterialResolved = true;
                 firstMaterialIsStratus = profileId == 1;
+                // T260.4: the fixture is a frozen object, not world weather. The live world's morphology map under
+                // it must not switch on the stratus relief (vertical streaks under bases, rings seen from above).
+                if (PaMorphologyPrototype != 0 && !paMorphLegacy) firstMaterialIsStratus = false;
                 stratusSurfaceSide = rayDir.y < 0.0 ? 1.0 : 0.0;
                 float rayVerticality = smoothstep(0.08, 0.25, abs(rayDir.y));
                 if (firstMaterialIsStratus
@@ -11470,6 +11757,8 @@ void main() {
             paLodDistance01 = saturate(t / MaxRenderDistance);
             paLodTransmittance = transmittance;
             paLodRayVerticality = abs(rayDir.y);
+            paLightFractus = profileId == 5 ? 1.0 - smoothstep(0.30, 0.45, h01) : 0.0;
+            paLightFractusTopY = topY;
             vec3 radiance = sampleLighting(
                 p,
                 density,
@@ -11483,6 +11772,7 @@ void main() {
                 cameraInsideCloud,
                 diagnosticLightOpticalDepth
             );
+            paLightFractus = 0.0;
 
             // Pure lighting-position control. B retains production density,
             // Beer opacity, local morphology scalars, prefix and termination;
@@ -11830,6 +12120,7 @@ void main() {
             paOracleDetailBefore
         );
         t += stepLength;
+        if (paMorphLattice) t = paMorphLatticeBase + float(++paMorphLatticeK) * fineStep; // T260.4 sample lattice
         if (paCap) {
             paMrTAfter = t;
         }
@@ -13033,6 +13324,12 @@ void main() {
             : vec4(0.0);
     }
 
+#ifdef PA_GROWTH_COST_COUNTS
+    // Separate image-invalid measurement build, never a timed anatomy candidate.
+    gl_FragDepth = 1.0;
+    fragColor = paGrowthCounts;
+    return;
+#endif
     if (result.a < 0.002) {
         gl_FragDepth = 1.0;
         fragColor = vec4(0.0);
