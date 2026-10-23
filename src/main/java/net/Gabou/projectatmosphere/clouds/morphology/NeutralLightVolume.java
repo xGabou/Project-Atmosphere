@@ -28,13 +28,19 @@ public final class NeutralLightVolume {
     private final SparseBrickVolume volume;
     private final float extinction, minX, minY, minZ, maxX, maxY, maxZ;
     private final int nx, ny, nz, nxp;
+    private final float spacing;
     private final float[] points;
     private final float[][] boxes;
     private final int computed;
     private final double bakeMs;
 
-    public NeutralLightVolume(SparseBrickVolume volume, float extinction) {
+    public NeutralLightVolume(SparseBrickVolume volume, float extinction) { this(volume, extinction, SPACING); }
+
+    /** T260.11: a coarser lattice for km-wide region assemblies (the shader reads the spacing from the header). */
+    public NeutralLightVolume(SparseBrickVolume volume, float extinction, float spacing) {
         long t0 = System.nanoTime();
+        this.spacing = spacing;
+        final float SPACING = spacing;
         this.volume = volume;
         this.extinction = extinction;
         var b = volume.bounds();
@@ -118,7 +124,7 @@ public final class NeutralLightVolume {
         float[] out = java.util.Arrays.copyOf(base, rows * W * 4);
         System.arraycopy(points, 0, out, baseTexels * 4, points.length);
         int header = (rows - 1) * W * 4;
-        out[header] = minX; out[header + 1] = minY; out[header + 2] = minZ; out[header + 3] = SPACING;
+        out[header] = minX; out[header + 1] = minY; out[header + 2] = minZ; out[header + 3] = spacing;
         out[header + 4] = nx; out[header + 5] = ny; out[header + 6] = nz; out[header + 7] = baseTexels;
         return out;
     }
@@ -130,6 +136,6 @@ public final class NeutralLightVolume {
         return h;
     }
     public String stats() {
-        return String.format(java.util.Locale.ROOT, "grid=%dx%dx%d spacing=%.1f computed=%d texels=%d bakeMs=%.0f", nx, ny, nz, SPACING, computed, points.length / 4, bakeMs);
+        return String.format(java.util.Locale.ROOT, "grid=%dx%dx%d spacing=%.1f computed=%d texels=%d bakeMs=%.0f", nx, ny, nz, spacing, computed, points.length / 4, bakeMs);
     }
 }

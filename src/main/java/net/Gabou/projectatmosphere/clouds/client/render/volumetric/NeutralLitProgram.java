@@ -20,8 +20,13 @@ final class NeutralLitProgram implements StormGeometryProgram {
 
     /** T260.6: any sparse-brick program (the reconstruction arms), lit by the identical, frozen T260.5 bake. */
     NeutralLitProgram(StormGeometryProgram base, net.Gabou.projectatmosphere.clouds.morphology.SparseBrickVolume volume, float extinction) {
+        this(base, volume, extinction, NeutralLightVolume.SPACING);
+    }
+
+    /** T260.11: region assemblies light on a coarser lattice when km-wide. */
+    NeutralLitProgram(StormGeometryProgram base, net.Gabou.projectatmosphere.clouds.morphology.SparseBrickVolume volume, float extinction, float spacing) {
         this.base = base;
-        light = new NeutralLightVolume(volume, extinction);
+        light = new NeutralLightVolume(volume, extinction, spacing);
         texture = light.appendTo(base.textureData());
         rows = light.rows(base.textureHeight());
         signature = light.signature(base.signature());

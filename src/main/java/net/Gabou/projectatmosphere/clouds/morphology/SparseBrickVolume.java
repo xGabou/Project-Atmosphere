@@ -112,6 +112,78 @@ public final class SparseBrickVolume {
                 (long) TEX_W * texRows * 16, cpuBytes());
     }
 
+    /**
+     * T260.11 region assembly: the UNION of independently baked region volumes that share one global lattice (same
+     * voxel / feather, lattice origins a whole number of grid cells apart). No field is evaluated: bricks are copied,
+     * and where two regions both own a cell the result is FULL if either is, else the per-sample minimum code (codes
+     * are monotone in distance, so min(code) = code(min distance): exactly the hard union of the regions' fields).
+     */
+    public static SparseBrickVolume union(List<SparseBrickVolume> parts) {
+        if (parts.isEmpty()) throw new IllegalArgumentException("no regions");
+        long t0 = System.nanoTime();
+        SparseBrickVolume p0 = parts.get(0);
+        float cell = B * p0.voxel;
+        float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE, maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+        float lip = 0;
+        for (SparseBrickVolume p : parts) {
+            if (p.voxel != p0.voxel || p.feather != p0.feather) throw new IllegalArgumentException("regions on different lattices");
+            Bounds b = p.bounds();
+            minX = Math.min(minX, b.minX()); minY = Math.min(minY, b.minY()); minZ = Math.min(minZ, b.minZ());
+            maxX = Math.max(maxX, b.maxX()); maxY = Math.max(maxY, b.maxY()); maxZ = Math.max(maxZ, b.maxZ());
+            lip = Math.max(lip, p.lipschitz);
+        }
+        int gx = Math.round((maxX - minX) / cell), gy = Math.round((maxY - minY) / cell), gz = Math.round((maxZ - minZ) / cell);
+        int[] state = new int[gx * gy * gz];
+        List<short[]> pool = new ArrayList<>();
+        for (SparseBrickVolume p : parts) {
+            float fi = (p.minX - minX) / cell, fj = (p.minY - minY) / cell, fk = (p.minZ - minZ) / cell;
+            int oi = Math.round(fi), oj = Math.round(fj), ok = Math.round(fk);
+            if (Math.abs(fi - oi) > 1e-3f || Math.abs(fj - oj) > 1e-3f || Math.abs(fk - ok) > 1e-3f) throw new IllegalArgumentException("region not aligned to the shared lattice");
+            for (int k = 0; k < p.gz; k++) for (int j = 0; j < p.gy; j++) for (int i = 0; i < p.gx; i++) {
+                int s = p.state[(k * p.gy + j) * p.gx + i];
+                if (s == EMPTY) continue;
+                int c = ((k + ok) * gy + (j + oj)) * gx + (i + oi);
+                int cur = state[c];
+                if (cur == FULL) continue;
+                if (s == FULL) { if (cur >= 2) pool.set(cur - 2, null); state[c] = FULL; continue; }
+                short[] codes = p.bricks[s - 2];
+                if (cur == EMPTY) { pool.add(codes.clone()); state[c] = 2 + pool.size() - 1; continue; }
+                short[] m = pool.get(cur - 2);
+                for (int n = 0; n < m.length; n++) m[n] = (short) Math.min(m[n], codes[n]);
+            }
+        }
+        // Compact the pool (bricks overwritten by FULL cells are dropped).
+        short[][] bricks = new short[Math.max(1, pool.size())][];
+        int count = 0, full = 0, empty = 0;
+        for (int c = 0; c < state.length; c++) {
+            if (state[c] >= 2) { bricks[count] = pool.get(state[c] - 2); state[c] = 2 + count++; }
+            else if (state[c] == FULL) full++; else empty++;
+        }
+        return new SparseBrickVolume(p0.voxel, p0.feather, lip, minX, minY, minZ, gx, gy, gz, state, bricks, count, full, empty, t0);
+    }
+
+    private SparseBrickVolume(float voxel, float feather, float lipschitz, float minX, float minY, float minZ, int gx, int gy, int gz,
+                              int[] state, short[][] bricks, int count, int full, int empty, long t0) {
+        this.voxel = voxel;
+        this.feather = feather;
+        this.band = feather * 2.5f;
+        this.scale = 2 * band / CODE_MAX;
+        this.offset = -band;
+        this.lipschitz = lipschitz;
+        this.minX = minX; this.minY = minY; this.minZ = minZ;
+        this.gx = gx; this.gy = gy; this.gz = gz;
+        this.state = state;
+        this.bricks = bricks;
+        this.brickCount = count;
+        this.capacity = bricks.length;
+        indexStart = HEADER_TEXELS;
+        brickStart = indexStart + (state.length + 3) / 4;
+        computeBoxes();
+        buildTexture();
+        double ms = (System.nanoTime() - t0) / 1e6;
+        stats = new Stats(state.length, empty, full, count, 0, 0, 0, ms, (long) TEX_W * texRows * 16, cpuBytes());
+    }
+
     private record Result(int state, short[] codes, boolean coarse, long evaluations) {}
 
     private Result classify(Field field, int c) {

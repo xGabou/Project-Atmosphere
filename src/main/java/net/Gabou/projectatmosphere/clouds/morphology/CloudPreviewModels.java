@@ -4,6 +4,7 @@ import net.Gabou.projectatmosphere.clouds.morphology.PersistentConvectionT2608.S
 import net.Gabou.projectatmosphere.clouds.morphology.PersistentConvectionT2608.SystemState;
 import net.Gabou.projectatmosphere.clouds.morphology.StormMorphologyPrototype.Bounds;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -33,7 +34,13 @@ public final class CloudPreviewModels {
     public static final long MAX_VOXELS = 600_000_000L;
 
     public enum Candidate {
-        T10("t10", "T260.10 environment-driven vertical development (current experimental candidate)"),
+        T13A("t13a", "T260.13 A: one broad, strongly irregular lower mass between the strongest connected pair"),
+        T13B("t13b", "T260.13 B: several overlapping lower masses with partial gaps"),
+        T13C("t13c", "T260.13 C: growth tongues from both groups meeting asymmetrically"),
+        T12("t12", "T260.12 organic connections between T260.11 groups (not accepted; comparison)"),
+        T12_OFF("t12off", "T260.12 framework with connections disabled (WITH / WITHOUT comparison)"),
+        T11("t11", "T260.11 Minecraft-scale multicell organisation: persistent groups of T260.10 cells (experimental baseline)"),
+        T10("t10", "T260.10 environment-driven vertical development (single cluster)"),
         T9("t9", "T260.9 storm-scale growth (accepted experimental baseline, shallow)");
 
         public final String id, description;
@@ -41,7 +48,7 @@ public final class CloudPreviewModels {
 
         public static Candidate parse(String s) {
             for (Candidate c : values()) if (c.id.equalsIgnoreCase(s)) return c;
-            throw new IllegalArgumentException("Unknown candidate '" + s + "' (t10, t9)");
+            throw new IllegalArgumentException("Unknown candidate '" + s + "' (t13a, t13b, t13c, t12, t12off, t11, t10, t9)");
         }
     }
 
@@ -62,7 +69,27 @@ public final class CloudPreviewModels {
         public static Scale uniform(float s) { return new Scale(s, s); }
     }
 
-    /** Named growth stages (model minutes; the candidates develop until t = 46). */
+    /**
+     * Named growth stages per candidate (model minutes). T260.11 systems live longer than one cluster (groups keep
+     * initiating), so their stages are later: initial 10, developing 30, growing 50, mature 75, late 105 (up to 150).
+     */
+    public static float stage(Candidate c, String s) {
+        if (c == Candidate.T10 || c == Candidate.T9) return stage(s);
+        return switch (s.toLowerCase(Locale.ROOT)) {
+            case "initial", "early" -> 10;
+            case "developing" -> 30;
+            case "growing" -> 50;
+            case "mature" -> 75;
+            case "late", "weakening" -> 105;
+            default -> {
+                float t = Float.parseFloat(s);
+                if (t < -10 || t > MulticellSystemT26011.T_END) throw new IllegalArgumentException("stage minutes must be within -10..150");
+                yield t;
+            }
+        };
+    }
+
+    /** Named growth stages (model minutes; the single-cluster candidates develop until t = 46). */
     public static float stage(String s) {
         return switch (s.toLowerCase(Locale.ROOT)) {
             case "initial", "early" -> 4;
@@ -89,7 +116,29 @@ public final class CloudPreviewModels {
      * measured dimensions in blocks and the model's own dimensions in metres.
      */
     public record Baked(Request request, Program program, SparseBrickVolume volume, Dims blocks, Dims model, float baseAglMetres,
-                        int cells, double buildMs, double bakeMs, String environment) {}
+                        int cells, double buildMs, double bakeMs, String environment, List<GroupInfo> groups, double unionMs, int regionsBaked,
+                        List<ConnectionInfo> connections, List<ComponentBox> components) {
+        public Baked(Request request, Program program, SparseBrickVolume volume, Dims blocks, Dims model, float baseAglMetres, int cells, double buildMs,
+                     double bakeMs, String environment, List<GroupInfo> groups, double unionMs, int regionsBaked) {
+            this(request, program, volume, blocks, model, baseAglMetres, cells, buildMs, bakeMs, environment, groups, unionMs, regionsBaked, List.of(), List.of());
+        }
+        public Baked(Request request, Program program, SparseBrickVolume volume, Dims blocks, Dims model, float baseAglMetres, int cells, double buildMs,
+                     double bakeMs, String environment, List<GroupInfo> groups, double unionMs, int regionsBaked, List<ConnectionInfo> connections) {
+            this(request, program, volume, blocks, model, baseAglMetres, cells, buildMs, bakeMs, environment, groups, unionMs, regionsBaked, connections, List.of());
+        }
+    }
+
+    /** T260.13: a labelled component box in the system block frame {minX, minY, minZ, maxX, maxY, maxZ}. */
+    public record ComponentBox(String label, float[] box) {}
+
+    /**
+     * T260.12: one connection at the baked time (system block frame): strength, live / planned cells, centre of its
+     * live cells and the pair axis (unit, blocks) for the close inspection view.
+     */
+    public record ConnectionInfo(int a, int b, float strength, int liveCells, int cells, boolean merger, float x, float y, float z, float axisX, float axisZ) {}
+
+    /** T260.11: one convective group of a baked system (dimensions in the system's block frame). */
+    public record GroupInfo(int index, String role, int cells, float localTime, Dims blocks, long regionSignature, boolean cached) {}
 
     /** Occupied extent (density >= 0.5). */
     public record Dims(float width, float depth, float minY, float maxY, float centerX, float centerZ) {
@@ -101,6 +150,7 @@ public final class CloudPreviewModels {
         return switch (c) {
             case T10 -> VerticalGrowthT26010.build(seed, 46);
             case T9 -> SystemGrowthT2609.build(seed, 46);
+            case T11, T12, T12_OFF, T13A, T13B, T13C -> throw new IllegalArgumentException(c.id + " is a set of group scenarios (MulticellSystemT26011.plan)");
         };
     }
 
@@ -118,6 +168,9 @@ public final class CloudPreviewModels {
 
     /** Builds and bakes a preview. Thread: any (not the render thread); the T260.8 model statics are set during the bake. */
     public static synchronized Baked bake(Request r) {
+        if (r.candidate() == Candidate.T11) return bakeSystem(r);
+        if (r.candidate() == Candidate.T12 || r.candidate() == Candidate.T12_OFF) return bakeSystem12(r);
+        if (r.candidate() == Candidate.T13A || r.candidate() == Candidate.T13B || r.candidate() == Candidate.T13C) return bakeSystem13(r);
         long t0 = System.nanoTime();
         Scenario sc = scenario(r.candidate(), r.seed());
         SystemState st = sc.at(r.stage());
@@ -154,7 +207,347 @@ public final class CloudPreviewModels {
                 blocks.centerX() / s.horizontal(), blocks.centerZ() / s.horizontal());
         var env = SystemGrowthT2609.env(r.seed());
         var profile = VerticalGrowthT26010.profile(env);
-        return new Baked(r, new Program(v), v, blocks, metres, profile.baseAgl(), st.geoms.size(), buildMs, bakeMs, env.describe() + " " + profile.describe());
+        return new Baked(r, new Program(v), v, blocks, metres, profile.baseAgl(), st.geoms.size(), buildMs, bakeMs, env.describe() + " " + profile.describe(),
+                List.of(), 0, 1);
+    }
+
+    // ================================================================ T260.11 region volumes
+
+    /** Region volumes of individual groups, keyed by group identity, local time, scale, quality and placement. */
+    private static final java.util.Map<String, SparseBrickVolume> REGIONS = new java.util.LinkedHashMap<>(64, .75f, true) {
+        @Override protected boolean removeEldestEntry(java.util.Map.Entry<String, SparseBrickVolume> e) { return size() > 96; }
+    };
+
+    /** Drops every cached region volume (smoke checks: a cold re-bake must reproduce the same signatures). */
+    static synchronized void clearRegionCache() { REGIONS.clear(); }
+
+    /** Last T260.11 bake summary line (logged by the caller). */
+    public static volatile String lastSystemLog = "";
+
+    /**
+     * T260.11: every live group is baked as its OWN region volume (its own cells only, its own domain) on one shared
+     * global lattice, cached per group; the renderer then receives their brick union (no field evaluation, see
+     * {@link SparseBrickVolume#union}). Gaps between groups cost index entries only.
+     */
+    static Baked bakeSystem(Request r) {
+        long t0 = System.nanoTime();
+        Scale s = r.scale();
+        Quality q = r.quality();
+        float cell = SparseBrickVolume.B * q.voxel;
+        var plan = MulticellSystemT26011.plan(r.seed());
+        List<SparseBrickVolume> parts = new ArrayList<>();
+        List<GroupInfo> infos = new ArrayList<>();
+        int cells = 0, baked = 0;
+        double buildMs = 0, bakeMs = 0;
+        float savedBand = PersistentConvectionT2608.BAND;
+        try {
+            PersistentConvectionT2608.BAND = Math.max(savedBand, .75f * q.feather / s.min());
+            for (var g : plan.groups()) {
+                float tau = g.local(r.stage());
+                if (tau < -8) continue; // not initiated yet
+                long b0 = System.nanoTime();
+                SystemState st = MulticellSystemT26011.scenario(g).at(tau);
+                buildMs += (System.nanoTime() - b0) / 1e6;
+                if (st.geoms.isEmpty()) continue; // dissipated
+                // Placement in the steering-wind frame (the group's own cells drift with the shared wind).
+                float ox = (g.x() - plan.env().windX() * tau) * s.horizontal(), oz = (g.z() - plan.env().windZ() * tau) * s.horizontal();
+                ox = Math.round(ox / cell) * cell; // whole lattice cells: region bricks align with every other region
+                oz = Math.round(oz / cell) * cell;
+                String key = String.format(Locale.ROOT, "%x/%.3f/%.4f/%.4f/%s/%.0f/%.0f", g.seed(), tau, s.horizontal(), s.vertical(), q, ox, oz);
+                SparseBrickVolume v = REGIONS.get(key);
+                boolean cached = v != null;
+                if (!cached) {
+                    long b1 = System.nanoTime();
+                    v = region(st, s, q, ox, oz);
+                    bakeMs += (System.nanoTime() - b1) / 1e6;
+                    REGIONS.put(key, v);
+                    baked++;
+                }
+                parts.add(v);
+                cells += st.geoms.size();
+                infos.add(new GroupInfo(g.index(), role(g, tau, st), st.geoms.size(), tau, measure(v), v.signature(), cached));
+            }
+        } finally {
+            PersistentConvectionT2608.BAND = savedBand;
+        }
+        if (parts.isEmpty()) throw new IllegalStateException("no live groups at t=" + r.stage() + " (try a later stage)");
+        long u0 = System.nanoTime();
+        SparseBrickVolume v = SparseBrickVolume.union(parts);
+        double unionMs = (System.nanoTime() - u0) / 1e6;
+        float ex = Math.max(v.bounds().maxX() - v.bounds().minX(), v.bounds().maxZ() - v.bounds().minZ());
+        if (ex > MAX_EXTENT) throw new IllegalArgumentException(String.format(Locale.ROOT, "refused: compressed extent %.0f blocks exceeds the preview limit (%.0f)", ex, MAX_EXTENT));
+        Dims blocks = measure(v);
+        Dims metres = new Dims(blocks.width() / s.horizontal(), blocks.depth() / s.horizontal(), blocks.minY() / s.vertical(), blocks.maxY() / s.vertical(),
+                blocks.centerX() / s.horizontal(), blocks.centerZ() / s.horizontal());
+        lastSystemLog = String.format(Locale.ROOT, "T26011_SYSTEM %s %s live=%d regionsBaked=%d buildMs=%.0f bakeMs=%.0f unionMs=%.0f totalMs=%.0f",
+                r.describe(), plan.describe(), parts.size(), baked, buildMs, bakeMs, unionMs, (System.nanoTime() - t0) / 1e6);
+        return new Baked(r, new Program(v), v, blocks, metres, plan.profile().baseAgl(), cells, buildMs, bakeMs, plan.describe() + " " + plan.profile().describe(),
+                infos, unionMs, baked);
+    }
+
+    // ================================================================ T260.12 connected regions
+
+    /** One group region of a T260.12 bake (exposed for the smoke checks). */
+    record RegionSpec(MulticellSystemT26011.Group group, float tau, SystemState state, Scaled field, Bounds domain, float lipschitz, String key) {}
+
+    /**
+     * T260.12 regions: one per live group (its cells plus the cells of its connections), at the EXACT placement (only
+     * the domain is snapped to the shared lattice, so connection cells duplicated in two regions coincide exactly) and at
+     * the group's own cloud base.
+     */
+    static List<RegionSpec> regions12(Request r, MulticellSystemT26011.Plan plan, List<ConnectionsT26012.Connection> cs) {
+        Scale s = r.scale();
+        Quality q = r.quality();
+        float cell = SparseBrickVolume.B * q.voxel;
+        List<RegionSpec> out = new ArrayList<>();
+        for (var g : plan.groups()) {
+            float tau = g.local(r.stage());
+            if (tau < -8) continue;
+            SystemState st = MulticellSystemT26011.scenario(g, plan, cs).at(tau);
+            if (st.geoms.isEmpty()) continue;
+            float ox = (g.x() - plan.env().windX() * tau) * s.horizontal(), oz = (g.z() - plan.env().windZ() * tau) * s.horizontal();
+            float oy = ConnectionsT26012.baseOffset(plan, g) * s.vertical();
+            PersistentConvectionT2608.Field field = st.field();
+            Bounds content = st.bounds();
+            Bounds model = new Bounds(content.minX() - 260, content.minY() - 40, content.minZ() - 260, content.maxX() + 260, content.maxY() + 260, content.maxZ() + 260);
+            Bounds c = compress(model, s, 2 * q.voxel);
+            Bounds dom = new Bounds((float) Math.floor((c.minX() + ox) / cell) * cell, (float) Math.floor((c.minY() + oy) / cell) * cell,
+                    (float) Math.floor((c.minZ() + oz) / cell) * cell, (float) Math.ceil((c.maxX() + ox) / cell) * cell, (float) Math.ceil((c.maxY() + oy) / cell) * cell,
+                    (float) Math.ceil((c.maxZ() + oz) / cell) * cell);
+            float lip = field.floor > ConvectiveVolumeT2607.FULL_SKIP_FLOOR ? 3f : 2.5f;
+            String key = String.format(Locale.ROOT, "t12/%s/%x/%.3f/%.4f/%.4f/%s/%.3f/%.3f/%.3f", cs.isEmpty() ? "off" : "on", g.seed(), tau, s.horizontal(), s.vertical(), q, ox, oy, oz);
+            out.add(new RegionSpec(g, tau, st, new Scaled(field, s, ox, oy, oz), dom, lip, key));
+        }
+        return out;
+    }
+
+    static Baked bakeSystem12(Request r) {
+        long t0 = System.nanoTime();
+        Scale s = r.scale();
+        Quality q = r.quality();
+        var plan = MulticellSystemT26011.plan(r.seed());
+        List<ConnectionsT26012.Connection> cs = r.candidate() == Candidate.T12 ? ConnectionsT26012.plan(plan) : List.of();
+        List<SparseBrickVolume> parts = new ArrayList<>();
+        List<GroupInfo> infos = new ArrayList<>();
+        int cells = 0, baked = 0;
+        double buildMs, bakeMs = 0;
+        float savedBand = PersistentConvectionT2608.BAND;
+        try {
+            PersistentConvectionT2608.BAND = Math.max(savedBand, .75f * q.feather / s.min());
+            long b0 = System.nanoTime();
+            List<RegionSpec> regions = regions12(r, plan, cs);
+            buildMs = (System.nanoTime() - b0) / 1e6;
+            for (RegionSpec rs : regions) {
+                SparseBrickVolume v = REGIONS.get(rs.key());
+                boolean cached = v != null;
+                if (!cached) {
+                    long b1 = System.nanoTime();
+                    v = new SparseBrickVolume(rs.field(), rs.domain(), q.voxel, q.feather, rs.lipschitz(), 0f);
+                    bakeMs += (System.nanoTime() - b1) / 1e6;
+                    REGIONS.put(rs.key(), v);
+                    baked++;
+                }
+                parts.add(v);
+                int own = 0;
+                for (var gc : rs.state().geoms) if (!gc.spec.name.startsWith("X")) own++;
+                cells += own;
+                infos.add(new GroupInfo(rs.group().index(), own == 0 ? "connection-only" : role(rs.group(), rs.tau(), rs.state()), own, rs.tau(), measure(v), v.signature(), cached));
+            }
+        } finally {
+            PersistentConvectionT2608.BAND = savedBand;
+        }
+        if (parts.isEmpty()) throw new IllegalStateException("no live groups at t=" + r.stage() + " (try a later stage)");
+        long u0 = System.nanoTime();
+        SparseBrickVolume v = SparseBrickVolume.union(parts);
+        double unionMs = (System.nanoTime() - u0) / 1e6;
+        float ex = Math.max(v.bounds().maxX() - v.bounds().minX(), v.bounds().maxZ() - v.bounds().minZ());
+        if (ex > MAX_EXTENT) throw new IllegalArgumentException(String.format(Locale.ROOT, "refused: compressed extent %.0f blocks exceeds the preview limit (%.0f)", ex, MAX_EXTENT));
+        // Connections at this time (each counted once, though its cells live in two regions).
+        List<ConnectionInfo> ci = new ArrayList<>();
+        int connCells = 0;
+        for (var c : cs) {
+            int live = 0;
+            float sx = 0, sz = 0, sh = 0;
+            for (var cp : c.cells()) {
+                if (cp.birth() > r.stage() || r.stage() > cp.decay() + 14) continue;
+                live++;
+                sx += cp.x(); sz += cp.z(); sh += cp.hPot();
+            }
+            connCells += live;
+            var ga = plan.groups().get(c.a()); var gb = plan.groups().get(c.b());
+            float ax = gb.x() - ga.x(), az = gb.z() - ga.z(), al = (float) Math.hypot(ax, az);
+            float base = .5f * (ConnectionsT26012.baseOffset(plan, ga) + ConnectionsT26012.baseOffset(plan, gb));
+            if (live > 0) ci.add(new ConnectionInfo(c.a(), c.b(), c.at(r.stage()), live, c.cells().size(), c.merger(), sx / live * s.horizontal(),
+                    (base + .5f * sh / live) * s.vertical(), sz / live * s.horizontal(), ax / al, az / al));
+        }
+        Dims blocks = measure(v);
+        Dims metres = new Dims(blocks.width() / s.horizontal(), blocks.depth() / s.horizontal(), blocks.minY() / s.vertical(), blocks.maxY() / s.vertical(),
+                blocks.centerX() / s.horizontal(), blocks.centerZ() / s.horizontal());
+        lastSystemLog = String.format(Locale.ROOT, "T26012_SYSTEM %s %s live=%d regionsBaked=%d connectionsPlanned=%d connectionsLive=%d connectionCellsLive=%d buildMs=%.0f bakeMs=%.0f unionMs=%.0f totalMs=%.0f",
+                r.describe(), plan.describe(), parts.size(), baked, cs.size(), ci.size(), connCells, buildMs, bakeMs, unionMs, (System.nanoTime() - t0) / 1e6);
+        return new Baked(r, new Program(v), v, blocks, metres, plan.profile().baseAgl(), cells, buildMs, bakeMs, plan.describe() + " " + plan.profile().describe(),
+                infos, unionMs, baked, ci);
+    }
+
+    // ================================================================ T260.13 lower-mass region
+
+    public static LowerMassT26013.Variant variant(Candidate c) {
+        return c == Candidate.T13A ? LowerMassT26013.Variant.A : c == Candidate.T13B ? LowerMassT26013.Variant.B : LowerMassT26013.Variant.C;
+    }
+
+    /** Smooth-union blend of the lower mass with the two groups' region fields (blocks). */
+    static final float LM_BLEND = 22;
+
+    /**
+     * T260.13 lower-mass region: its own volume whose field is min(smin(lower mass, group a), smin(lower mass, group b)) (exact group region
+     * fields, blocks), so the component grows INTO the towers' bases with a fillet. Outside the blend range the region
+     * equals min(group a, group b), i.e. exactly what the group regions hold: no seam at its boundary.
+     */
+    record LowerRegion(LowerMassT26013.Spec spec, SparseBrickVolume.Field field, Bounds domain, String key) {}
+
+    static LowerRegion lowerRegion(Request r, MulticellSystemT26011.Plan plan, List<RegionSpec> groups) {
+        var cs = ConnectionsT26012.plan(plan);
+        var spec = LowerMassT26013.spec(plan, cs, r.stage(), variant(r.candidate()));
+        if (spec == null || spec.bounds() == null) return null;
+        Scale s = r.scale();
+        float cell = SparseBrickVolume.B * r.quality().voxel;
+        var lm = new Scaled(LowerMassT26013.field(spec), s);
+        List<SparseBrickVolume.Field> gf = new ArrayList<>();
+        for (RegionSpec rs : groups) if (rs.group().index() == spec.a || rs.group().index() == spec.b) gf.add(rs.field());
+        SparseBrickVolume.Field f = new SparseBrickVolume.Field() {
+            // Blend the lower mass with EACH group separately (never the groups with each other): away from the lower mass
+            // this is exactly min(group a, group b), i.e. what the group regions hold, so the region boundary is seamless.
+            @Override public float distance(float x, float y, float z) {
+                float l = lm.distance(x, y, z), d = l;
+                for (var g : gf) d = Math.min(d, ConvectiveSystemT260.smin(l, g.distance(x, y, z), LM_BLEND));
+                return d;
+            }
+            @Override public SparseBrickVolume.Field local(Bounds box) {
+                var l = lm.local(box);
+                List<SparseBrickVolume.Field> ls = new ArrayList<>();
+                for (var g : gf) ls.add(g.local(box));
+                return (x, y, z) -> {
+                    float lv = l.distance(x, y, z), d = lv;
+                    for (var g : ls) d = Math.min(d, ConvectiveSystemT260.smin(lv, g.distance(x, y, z), LM_BLEND));
+                    return d;
+                };
+            }
+        };
+        Bounds c = compress(spec.bounds(), s, LM_BLEND + 2 * r.quality().voxel);
+        Bounds dom = new Bounds((float) Math.floor(c.minX() / cell) * cell, (float) Math.floor(c.minY() / cell) * cell, (float) Math.floor(c.minZ() / cell) * cell,
+                (float) Math.ceil(c.maxX() / cell) * cell, (float) Math.ceil(c.maxY() / cell) * cell, (float) Math.ceil(c.maxZ() / cell) * cell);
+        String key = String.format(Locale.ROOT, "t13/%s/%x/%.3f/%.4f/%.4f/%s", spec.variant, spec.seed, r.stage(), s.horizontal(), s.vertical(), r.quality());
+        return new LowerRegion(spec, f, dom, key);
+    }
+
+    /** Lipschitz bound used for the lower-mass region (pseudo-distance with warped outline and folds; audited). */
+    static final float LM_LIPSCHITZ = 3.5f;
+
+    static Baked bakeSystem13(Request r) {
+        long t0 = System.nanoTime();
+        Scale s = r.scale();
+        Quality q = r.quality();
+        var plan = MulticellSystemT26011.plan(r.seed());
+        List<SparseBrickVolume> parts = new ArrayList<>();
+        List<GroupInfo> infos = new ArrayList<>();
+        List<ComponentBox> comps = new ArrayList<>();
+        List<ConnectionInfo> ci = new ArrayList<>();
+        int cells = 0, baked = 0;
+        double buildMs, bakeMs = 0, lmMs = 0;
+        float savedBand = PersistentConvectionT2608.BAND;
+        String lmInfo = "none";
+        long lmBricks = 0;
+        try {
+            PersistentConvectionT2608.BAND = Math.max(savedBand, .75f * q.feather / s.min());
+            long b0 = System.nanoTime();
+            List<RegionSpec> regions = regions12(r, plan, List.of());
+            buildMs = (System.nanoTime() - b0) / 1e6;
+            for (RegionSpec rs : regions) {
+                SparseBrickVolume v = REGIONS.get(rs.key());
+                boolean cached = v != null;
+                if (!cached) {
+                    long b1 = System.nanoTime();
+                    v = new SparseBrickVolume(rs.field(), rs.domain(), q.voxel, q.feather, rs.lipschitz(), 0f);
+                    bakeMs += (System.nanoTime() - b1) / 1e6;
+                    REGIONS.put(rs.key(), v);
+                    baked++;
+                }
+                parts.add(v);
+                cells += rs.state().geoms.size();
+                infos.add(new GroupInfo(rs.group().index(), role(rs.group(), rs.tau(), rs.state()), rs.state().geoms.size(), rs.tau(), measure(v), v.signature(), cached));
+            }
+            // The group fields inside the blend must be exact a little further out than the density ramp.
+            PersistentConvectionT2608.BAND = Math.max(savedBand, (LM_BLEND + q.feather) / s.min());
+            LowerRegion lr = lowerRegion(r, plan, regions);
+            if (lr != null) {
+                SparseBrickVolume v = REGIONS.get(lr.key());
+                if (v == null) {
+                    long b1 = System.nanoTime();
+                    v = new SparseBrickVolume(lr.field(), lr.domain(), q.voxel, q.feather, LM_LIPSCHITZ, 0f);
+                    lmMs = (System.nanoTime() - b1) / 1e6;
+                    REGIONS.put(lr.key(), v);
+                    baked++;
+                }
+                parts.add(v);
+                lmBricks = v.liveBricks();
+                lmInfo = lr.spec().describe() + String.format(Locale.ROOT, " regionBricks=%d regionMB=%.1f", v.liveBricks(), v.cpuBytes() / 1048576.0);
+                for (var part : lr.spec().parts) {
+                    float[] bx = part.box();
+                    comps.add(new ComponentBox(part.label(), new float[]{bx[0] * s.horizontal(), bx[1] * s.vertical(), bx[2] * s.horizontal(), bx[3] * s.horizontal(),
+                            bx[4] * s.vertical(), bx[5] * s.horizontal()}));
+                }
+                comps.add(new ComponentBox("lower-mass region", new float[]{lr.domain().minX(), lr.domain().minY(), lr.domain().minZ(), lr.domain().maxX(), lr.domain().maxY(),
+                        lr.domain().maxZ()}));
+                float[] c = lr.spec().centre();
+                ci.add(new ConnectionInfo(lr.spec().a, lr.spec().b, lr.spec().strength, lr.spec().parts.size(), lr.spec().parts.size(), false, c[0] * s.horizontal(),
+                        c[1] * s.vertical(), c[2] * s.horizontal(), c[3], c[4]));
+            }
+        } finally {
+            PersistentConvectionT2608.BAND = savedBand;
+        }
+        if (parts.isEmpty()) throw new IllegalStateException("no live groups at t=" + r.stage() + " (try a later stage)");
+        long u0 = System.nanoTime();
+        SparseBrickVolume v = SparseBrickVolume.union(parts);
+        double unionMs = (System.nanoTime() - u0) / 1e6;
+        Dims blocks = measure(v);
+        Dims metres = new Dims(blocks.width() / s.horizontal(), blocks.depth() / s.horizontal(), blocks.minY() / s.vertical(), blocks.maxY() / s.vertical(),
+                blocks.centerX() / s.horizontal(), blocks.centerZ() / s.horizontal());
+        lastSystemLog = String.format(Locale.ROOT, "T26013_SYSTEM %s groups=%d regionsBaked=%d groupBakeMs=%.0f lowerMassBakeMs=%.0f lowerMassBricks=%d unionMs=%.0f totalMs=%.0f unionBricks=%d textureMB=%.1f lowerMass=[%s]",
+                r.describe(), regions12Count(infos), baked, bakeMs, lmMs, lmBricks, unionMs, (System.nanoTime() - t0) / 1e6, v.liveBricks(),
+                v.textureWidth() * (double) v.textureHeight() * 16 / 1048576, lmInfo);
+        return new Baked(r, new Program(v), v, blocks, metres, plan.profile().baseAgl(), cells, buildMs, bakeMs + lmMs, plan.describe() + " " + plan.profile().describe(),
+                infos, unionMs, baked, ci, comps);
+    }
+
+    private static int regions12Count(List<GroupInfo> infos) { return infos.size(); }
+
+    /** Lifecycle label of a group at local time tau (from its cells' own states). */
+    static String role(MulticellSystemT26011.Group g, float tau, SystemState st) {
+        if (g.failed()) return "shallow";
+        if (tau < 14) return "developing";
+        int dd = 0;
+        for (var c : st.geoms) if (c.st[2] > .3f) dd++;
+        return dd * 2 > st.geoms.size() ? "weakening" : "mature";
+    }
+
+    /** One group's region volume at a lattice-aligned placement (blocks). */
+    static SparseBrickVolume region(SystemState st, Scale s, Quality q, float ox, float oz) {
+        PersistentConvectionT2608.Field field = st.field();
+        Bounds content = st.bounds();
+        float cell = SparseBrickVolume.B * q.voxel;
+        Bounds model = new Bounds(content.minX() - 260, content.minY() - 40, content.minZ() - 260, content.maxX() + 260, content.maxY() + 260, content.maxZ() + 260);
+        Bounds c = compress(model, s, 2 * q.voxel);
+        Bounds dom = new Bounds((float) Math.floor((c.minX() + ox) / cell) * cell, (float) Math.floor(c.minY() / cell) * cell, (float) Math.floor((c.minZ() + oz) / cell) * cell,
+                (float) Math.ceil((c.maxX() + ox) / cell) * cell, (float) Math.ceil(c.maxY() / cell) * cell, (float) Math.ceil((c.maxZ() + oz) / cell) * cell);
+        float lip = field.floor > ConvectiveVolumeT2607.FULL_SKIP_FLOOR ? 3f : 2.5f;
+        return new SparseBrickVolume(new Scaled(field, s, ox, oz), dom, q.voxel, q.feather, lip, 0f);
+    }
+
+    /** Light lattice spacing for a volume: 10 blocks, coarser for km-wide assemblies (about 6 M lattice points). */
+    public static float lightSpacing(SparseBrickVolume v) {
+        Bounds b = v.bounds();
+        double vol = (double) (b.maxX() - b.minX()) * (b.maxY() - b.minY()) * (b.maxZ() - b.minZ());
+        return (float) Math.max(10, Math.ceil(Math.cbrt(vol / 6e6)));
     }
 
     /** Occupied extent of a baked volume: every voxel-lattice point with density >= 0.5 in a non-empty coarse cell. */
@@ -182,19 +575,29 @@ public final class CloudPreviewModels {
         private final Scale s;
         private final float ih, iv, m;
 
-        Scaled(SparseBrickVolume.Field inner, Scale s) {
+        private final float ox, oy, oz;
+
+        Scaled(SparseBrickVolume.Field inner, Scale s) { this(inner, s, 0, 0, 0); }
+
+        /** T260.11: placed at a block offset (x, z) in the system frame. */
+        Scaled(SparseBrickVolume.Field inner, Scale s, float ox, float oz) { this(inner, s, ox, 0, oz); }
+
+        /** T260.12: and at a vertical block offset (the group's own cloud base). */
+        Scaled(SparseBrickVolume.Field inner, Scale s, float ox, float oy, float oz) {
             this.inner = inner;
             this.s = s;
+            this.ox = ox; this.oy = oy; this.oz = oz;
             ih = 1 / s.horizontal(); iv = 1 / s.vertical(); m = s.min();
         }
 
         @Override public float distance(float x, float y, float z) {
-            return m * inner.distance(x * ih, PersistentConvectionT2608.BASE_Y + y * iv, z * ih);
+            return m * inner.distance((x - ox) * ih, PersistentConvectionT2608.BASE_Y + (y - oy) * iv, (z - oz) * ih);
         }
 
         @Override public SparseBrickVolume.Field local(Bounds box) {
             float base = PersistentConvectionT2608.BASE_Y;
-            return new Scaled(inner.local(new Bounds(box.minX() * ih, base + box.minY() * iv, box.minZ() * ih, box.maxX() * ih, base + box.maxY() * iv, box.maxZ() * ih)), s);
+            return new Scaled(inner.local(new Bounds((box.minX() - ox) * ih, base + (box.minY() - oy) * iv, (box.minZ() - oz) * ih, (box.maxX() - ox) * ih,
+                    base + (box.maxY() - oy) * iv, (box.maxZ() - oz) * ih)), s, ox, oy, oz);
         }
     }
 

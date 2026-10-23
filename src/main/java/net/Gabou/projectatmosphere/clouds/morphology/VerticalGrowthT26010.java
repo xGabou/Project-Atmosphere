@@ -60,8 +60,13 @@ public final class VerticalGrowthT26010 {
         return new Profile(base, trop, dn, cape, glac);
     }
 
-    public static Scenario build(long seed, float tEnd) {
-        Env e = SystemGrowthT2609.env(seed);
+    public static Scenario build(long seed, float tEnd) { return build(seed, SystemGrowthT2609.env(seed), tEnd); }
+
+    /** T260.11: the same build in a given environment (a convective group inside a larger organised system). */
+    public static Scenario build(long seed, Env e, float tEnd) { return build(seed, e, tEnd, null); }
+
+    /** T260.12: the same build; {@code beforePrepare} may add cells (connections) before attachment is integrated. */
+    public static Scenario build(long seed, Env e, float tEnd, java.util.function.Consumer<Scenario> beforePrepare) {
         Profile pr = profile(e);
         Scenario s = new Scenario("deep", seed);
         s.tEnd = tEnd;
@@ -104,6 +109,7 @@ public final class VerticalGrowthT26010 {
                 cell(e, pr, c, x, z, tb, favour);
             }
         }
+        if (beforePrepare != null) beforePrepare.accept(s);
         return s.prepare();
     }
 
