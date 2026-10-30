@@ -34,6 +34,25 @@ public final class CloudPreviewModels {
     public static final long MAX_VOXELS = 600_000_000L;
 
     public enum Candidate {
+        T18A("t18a", "T260.18 A: T260.15 with deep asymmetric hanging masses instead of the shallow underside lobes"),
+        T18AF("t18af", "T260.18 A foundation geometry alone, without the towers (diagnostic only)"),
+        T18B("t18b", "T260.18 B: T260.15 with an uneven foundation depth (raised and lowered portions, deep recesses, open bays)"),
+        T18BF("t18bf", "T260.18 B foundation geometry alone, without the towers (diagnostic only)"),
+        T18C("t18c", "T260.18 C: T260.15 with integrated tower roots on a thinner lens (instead of the sleeves)"),
+        T18CF("t18cf", "T260.18 C foundation geometry alone, without the towers (diagnostic only)"),
+        T18D("t18d", "T260.18 D: broad compound hanging masses (asymmetric, merging into the base) with integrated tower roots"),
+        T18DF("t18df", "T260.18 D foundation geometry alone, without the towers (diagnostic only)"),
+        T18E("t18e", "T260.18 E: asymmetric continuously lowered base downshear of the towers, recesses, integrated tower roots"),
+        T18EF("t18ef", "T260.18 E foundation geometry alone, without the towers (diagnostic only)"),
+        T18D2("t18d2", "T260.18 D2: deeper broad compound hanging masses (up to 1.7 km, never a pendant) with integrated tower roots"),
+        T18D2F("t18d2f", "T260.18 D2 foundation geometry alone, without the towers (diagnostic only)"),
+        T19("t19", "Stabilisation S7a: D2 with a base that sags under each mass (no shared flat cut)"),
+        T18F("t18g", "T260.18 F: D2 masses on the asymmetric lowered base of E, recesses, integrated tower roots"),
+        T18FF("t18gf", "T260.18 F foundation geometry alone, without the towers (diagnostic only)"),
+        T15("t15", "T260.15 shared foundation vertical anatomy: underside relief, tower sleeves, compact outer extensions"),
+        T15F("t15f", "T260.15 foundation geometry alone, without the towers (diagnostic only)"),
+        T14("t14", "T260.14 shared lower convective foundation under organised neighbouring groups"),
+        T14F("t14f", "T260.14 foundation geometry alone, without the towers (diagnostic only)"),
         T13A("t13a", "T260.13 A: one broad, strongly irregular lower mass between the strongest connected pair"),
         T13B("t13b", "T260.13 B: several overlapping lower masses with partial gaps"),
         T13C("t13c", "T260.13 C: growth tongues from both groups meeting asymmetrically"),
@@ -48,7 +67,7 @@ public final class CloudPreviewModels {
 
         public static Candidate parse(String s) {
             for (Candidate c : values()) if (c.id.equalsIgnoreCase(s)) return c;
-            throw new IllegalArgumentException("Unknown candidate '" + s + "' (t13a, t13b, t13c, t12, t12off, t11, t10, t9)");
+            throw new IllegalArgumentException("Unknown candidate '" + s + "' (t18d2, t18d2f, t18g, t18gf, t18d, t18df, t18e, t18ef, t18a, t18af, t18b, t18bf, t18c, t18cf, t15, t15f, t14, t14f, t13a, t13b, t13c, t12, t12off, t11, t10, t9)");
         }
     }
 
@@ -150,7 +169,7 @@ public final class CloudPreviewModels {
         return switch (c) {
             case T10 -> VerticalGrowthT26010.build(seed, 46);
             case T9 -> SystemGrowthT2609.build(seed, 46);
-            case T11, T12, T12_OFF, T13A, T13B, T13C -> throw new IllegalArgumentException(c.id + " is a set of group scenarios (MulticellSystemT26011.plan)");
+            case T11, T12, T12_OFF, T13A, T13B, T13C, T14, T14F, T15, T15F, T18A, T18AF, T18B, T18BF, T18C, T18CF, T18D, T18DF, T18E, T18EF, T18D2, T18D2F, T18F, T18FF, T19 -> throw new IllegalArgumentException(c.id + " is a set of group scenarios (MulticellSystemT26011.plan)");
         };
     }
 
@@ -171,6 +190,7 @@ public final class CloudPreviewModels {
         if (r.candidate() == Candidate.T11) return bakeSystem(r);
         if (r.candidate() == Candidate.T12 || r.candidate() == Candidate.T12_OFF) return bakeSystem12(r);
         if (r.candidate() == Candidate.T13A || r.candidate() == Candidate.T13B || r.candidate() == Candidate.T13C) return bakeSystem13(r);
+        if (foundationVersion(r.candidate()) > 0) return bakeSystem14(r);
         long t0 = System.nanoTime();
         Scenario sc = scenario(r.candidate(), r.seed());
         SystemState st = sc.at(r.stage());
@@ -520,6 +540,179 @@ public final class CloudPreviewModels {
     }
 
     private static int regions12Count(List<GroupInfo> infos) { return infos.size(); }
+
+    // ================================================================ T260.14 shared lower foundation
+
+    /** Smooth-union blend of the foundation with every group region it touches (blocks; larger than T260.13's fillet). */
+    static final float FND_BLEND = 30;
+    /** Lipschitz bound used for the foundation region (warped outlines, folds, billows; audited). */
+    static final float FND_LIPSCHITZ = 3.5f;
+    /** T260.15 (underside masses, depressions, sleeves): measured max gradient 3.34 (lip14 ... 15), bound with margin. */
+    static final float FND15_LIPSCHITZ = 4f;
+    /** T260.18 A / B / C: measured max gradient (lip14 ... 181-183), bound with margin. */
+    static final float FND18_LIPSCHITZ = 4f;
+    static float fndLipschitz(Candidate c) { return foundationVersion(c) > 15 ? FND18_LIPSCHITZ : foundationVersion(c) >= 15 ? FND15_LIPSCHITZ : FND_LIPSCHITZ; }
+
+    /**
+     * T260.14 foundation region: its own volume (cached separately; the group regions are never re-baked when only the
+     * foundation changes). Field = min over the groups whose region overlaps it of smin(foundation, group), so every
+     * tower rises out of the foundation with a fillet, and away from the foundation the region equals the min of the
+     * group fields (what the group regions hold): no seam at the region boundary.
+     */
+    record FoundationRegion(FoundationT26014.Spec spec, SparseBrickVolume.Field field, Bounds domain, String key, int blendedGroups) {}
+
+    static FoundationRegion foundationRegion(Request r, MulticellSystemT26011.Plan plan, List<RegionSpec> groups) {
+        var spec = FoundationT26014.spec(plan, r.stage(), foundationVersion(r.candidate()));
+        if (spec == null) return null;
+        boolean solo = isolated(r.candidate());
+        Scale s = r.scale();
+        float cell = SparseBrickVolume.B * r.quality().voxel;
+        var fnd = new Scaled(FoundationT26014.field(spec), s);
+        Bounds c = compress(spec.bounds(), s, FND_BLEND + 2 * r.quality().voxel);
+        Bounds dom = new Bounds((float) Math.floor(c.minX() / cell) * cell, (float) Math.floor(c.minY() / cell) * cell, (float) Math.floor(c.minZ() / cell) * cell,
+                (float) Math.ceil(c.maxX() / cell) * cell, (float) Math.ceil(c.maxY() / cell) * cell, (float) Math.ceil(c.maxZ() / cell) * cell);
+        List<SparseBrickVolume.Field> gf = new ArrayList<>();
+        List<Bounds> gd = new ArrayList<>();
+        for (RegionSpec rs : groups) {
+            Bounds b = rs.domain();
+            if (solo || Boolean.getBoolean("pa.t14.noblend")) break; // the foundation alone (diagnostic candidates / debug)
+            if (b.maxX() < dom.minX() || b.minX() > dom.maxX() || b.maxY() < dom.minY() || b.minY() > dom.maxY() || b.maxZ() < dom.minZ() || b.minZ() > dom.maxZ()) continue;
+            gf.add(rs.field());
+            gd.add(b);
+        }
+        // Group fields are needed only near the foundation. With F = min_g smin(l, g, k) the region holds
+        // F' = max(F, l - L1) where l < L0 and l - L1 beyond (L1 = 1.25 k + feather, L0 = L1 + feather): F' >= F, and
+        // wherever min(groups, F') < feather it equals min(groups, F) (F' > F only where F comes from a group lying
+        // deeper than L1 - k / 4, which the group regions hold anyway), so the UNION is unchanged while the group fields
+        // are skipped wherever the foundation is far (F' never decreases across the switch: coarse skips stay valid).
+        float feather = r.quality().feather, l1 = 1.25f * FND_BLEND + feather, l0 = l1 + feather;
+        SparseBrickVolume.Field f = new SparseBrickVolume.Field() {
+            @Override public float distance(float x, float y, float z) {
+                float l = fnd.distance(x, y, z);
+                if (l >= l0) return l - l1;
+                if (l <= -feather) return l; // solid foundation: density saturated whatever the groups are
+                float d = l;
+                for (var g : gf) d = Math.min(d, ConvectiveSystemT260.smin(l, g.distance(x, y, z), FND_BLEND));
+                return Math.max(d, l - l1);
+            }
+            @Override public SparseBrickVolume.Field local(Bounds box) {
+                var l = fnd.local(box);
+                List<SparseBrickVolume.Field> ls = new ArrayList<>();
+                for (var g : gf) ls.add(g.local(box));
+                return (x, y, z) -> {
+                    float lv = l.distance(x, y, z);
+                    if (lv >= l0) return lv - l1;
+                    if (lv <= -feather) return lv;
+                    float d = lv;
+                    for (var g : ls) d = Math.min(d, ConvectiveSystemT260.smin(lv, g.distance(x, y, z), FND_BLEND));
+                    return Math.max(d, lv - l1);
+                };
+            }
+        };
+        String key = String.format(Locale.ROOT, "t%d%s/%x/%.3f/%.4f/%.4f/%s", spec.version, solo ? "f" : "", spec.seed, r.stage(), s.horizontal(), s.vertical(), r.quality());
+        return new FoundationRegion(spec, f, dom, key, gf.size());
+    }
+
+    /** Foundation version of a T260.14 / T260.15 / T260.18 candidate (0: not a foundation candidate). */
+    public static int foundationVersion(Candidate c) {
+        return switch (c) {
+            case T14, T14F -> 14;
+            case T15, T15F -> 15;
+            case T18A, T18AF -> FoundationT26014.V18A;
+            case T18B, T18BF -> FoundationT26014.V18B;
+            case T18C, T18CF -> FoundationT26014.V18C;
+            case T18D, T18DF -> FoundationT26014.V18D;
+            case T18E, T18EF -> FoundationT26014.V18E;
+            case T18D2, T18D2F -> FoundationT26014.V18D2;
+            case T19 -> FoundationT26014.V19;
+            case T18F, T18FF -> FoundationT26014.V18F;
+            default -> 0;
+        };
+    }
+    /** Diagnostic candidates: the foundation geometry alone (no tower blend, no group regions shown). */
+    public static boolean isolated(Candidate c) { return c == Candidate.T14F || c == Candidate.T15F || c == Candidate.T18AF || c == Candidate.T18BF || c == Candidate.T18CF || c == Candidate.T18DF || c == Candidate.T18EF || c == Candidate.T18D2F || c == Candidate.T18FF; }
+    /** System log label: T26014 / T26015 / T26018A-C. */
+    static String foundationLabel(Candidate c) { int v = foundationVersion(c); return v > 15 ? "T26018" + FoundationT26014.variant18(v) : "T2601" + v % 10; }
+
+    static Baked bakeSystem14(Request r) {
+        long t0 = System.nanoTime();
+        Scale s = r.scale();
+        Quality q = r.quality();
+        var plan = MulticellSystemT26011.plan(r.seed());
+        List<SparseBrickVolume> parts = new ArrayList<>();
+        List<GroupInfo> infos = new ArrayList<>();
+        List<ComponentBox> comps = new ArrayList<>();
+        List<ConnectionInfo> ci = new ArrayList<>();
+        int cells = 0, baked = 0;
+        double buildMs, bakeMs = 0, fMs = 0;
+        float savedBand = PersistentConvectionT2608.BAND;
+        String fInfo = "none (no organised pair: the group regions only, as T260.12 / T260.13 place them)";
+        long fBricks = 0;
+        try {
+            PersistentConvectionT2608.BAND = Math.max(savedBand, .75f * q.feather / s.min());
+            long b0 = System.nanoTime();
+            List<RegionSpec> regions = regions12(r, plan, List.of());
+            buildMs = (System.nanoTime() - b0) / 1e6;
+            for (RegionSpec rs : regions) {
+                SparseBrickVolume v = REGIONS.get(rs.key());
+                boolean cached = v != null;
+                if (!cached) {
+                    long b1 = System.nanoTime();
+                    v = new SparseBrickVolume(rs.field(), rs.domain(), q.voxel, q.feather, rs.lipschitz(), 0f);
+                    bakeMs += (System.nanoTime() - b1) / 1e6;
+                    REGIONS.put(rs.key(), v);
+                    baked++;
+                }
+                parts.add(v);
+                cells += rs.state().geoms.size();
+                infos.add(new GroupInfo(rs.group().index(), role(rs.group(), rs.tau(), rs.state()), rs.state().geoms.size(), rs.tau(), measure(v), v.signature(), cached));
+            }
+            PersistentConvectionT2608.BAND = Math.max(savedBand, (FND_BLEND + q.feather) / s.min());
+            FoundationRegion fr = foundationRegion(r, plan, regions);
+            if (fr != null) {
+                SparseBrickVolume v = REGIONS.get(fr.key());
+                boolean cached = v != null;
+                if (!cached) {
+                    long b1 = System.nanoTime();
+                    v = new SparseBrickVolume(fr.field(), fr.domain(), q.voxel, q.feather, fndLipschitz(r.candidate()), 0f);
+                    fMs = (System.nanoTime() - b1) / 1e6;
+                    REGIONS.put(fr.key(), v);
+                    baked++;
+                }
+                if (isolated(r.candidate()) || Boolean.getBoolean("pa.t14.only")) parts.clear(); // the foundation region alone
+                parts.add(v);
+                fBricks = v.liveBricks();
+                fInfo = fr.spec().describe() + String.format(Locale.ROOT, " blendedGroups=%d regionBricks=%d regionMB=%.1f cached=%s", fr.blendedGroups(), v.liveBricks(),
+                        v.cpuBytes() / 1048576.0, cached);
+                for (var part : fr.spec().parts) {
+                    float[] bx = part.box();
+                    comps.add(new ComponentBox(part.label(), new float[]{bx[0] * s.horizontal(), bx[1] * s.vertical(), bx[2] * s.horizontal(), bx[3] * s.horizontal(),
+                            bx[4] * s.vertical(), bx[5] * s.horizontal()}));
+                }
+                comps.add(new ComponentBox("lower-mass region (foundation)", new float[]{fr.domain().minX(), fr.domain().minY(), fr.domain().minZ(), fr.domain().maxX(),
+                        fr.domain().maxY(), fr.domain().maxZ()}));
+                float[] c = fr.spec().focus();
+                for (float[] l : fr.spec().links)
+                    ci.add(new ConnectionInfo((int) l[0], (int) l[1], l[2], fr.spec().masses.size(), fr.spec().masses.size(), false, c[0] * s.horizontal(), c[1] * s.vertical(),
+                            c[2] * s.horizontal(), c[3], c[4]));
+                ci.sort((a, b) -> Float.compare(b.strength(), a.strength()));
+            }
+        } finally {
+            PersistentConvectionT2608.BAND = savedBand;
+        }
+        if (parts.isEmpty()) throw new IllegalStateException("no live groups at t=" + r.stage() + " (try a later stage)");
+        long u0 = System.nanoTime();
+        SparseBrickVolume v = SparseBrickVolume.union(parts);
+        double unionMs = (System.nanoTime() - u0) / 1e6;
+        Dims blocks = measure(v);
+        Dims metres = new Dims(blocks.width() / s.horizontal(), blocks.depth() / s.horizontal(), blocks.minY() / s.vertical(), blocks.maxY() / s.vertical(),
+                blocks.centerX() / s.horizontal(), blocks.centerZ() / s.horizontal());
+        lastSystemLog = String.format(Locale.ROOT, foundationLabel(r.candidate()) + "_SYSTEM %s groups=%d regionsBaked=%d groupBakeMs=%.0f foundationBakeMs=%.0f foundationBricks=%d unionMs=%.0f totalMs=%.0f unionBricks=%d textureMB=%.1f foundation=[%s]",
+                r.describe(), infos.size(), baked, bakeMs, fMs, fBricks, unionMs, (System.nanoTime() - t0) / 1e6, v.liveBricks(),
+                v.textureWidth() * (double) v.textureHeight() * 16 / 1048576, fInfo);
+        return new Baked(r, new Program(v), v, blocks, metres, plan.profile().baseAgl(), cells, buildMs, bakeMs + fMs, plan.describe() + " " + plan.profile().describe(),
+                infos, unionMs, baked, ci, comps);
+    }
 
     /** Lifecycle label of a group at local time tau (from its cells' own states). */
     static String role(MulticellSystemT26011.Group g, float tau, SystemState st) {

@@ -33,6 +33,11 @@ public final class CloudTemporalResolveRenderer {
     private static volatile boolean lastFrameResolved;
     private static volatile int lastValidPhases;
     private static volatile float lastGpuMilliseconds = -1.0F;
+    // E41. The camera of the frame the motion history holds, and the phase generation it belongs to.
+    private static final Matrix4f motionPrevViewProj = new Matrix4f();
+    private static final Vector3f motionPrevCamera = new Vector3f();
+    private static long motionPrevGeneration = Long.MIN_VALUE;
+    private static volatile float lastMotionWeight;
 
     private CloudTemporalResolveRenderer() {
     }
@@ -95,6 +100,27 @@ public final class CloudTemporalResolveRenderer {
         }
         shader.setSampler("RainPassSampler",
                 rainPassTarget == null ? 0 : rainPassTarget.getColorTextureId());
+        // E41. Motion history: only when the camera moved since the frame the copy holds, and that copy belongs
+        // to the same phase generation (no cut, resize or reload since). A static frame takes weight 0 - the
+        // exact T207 + E39 output.
+        RenderTarget motionHistory = VolumetricCloudRenderTargets.prepareMotionHistoryTarget(
+                resolved.width, resolved.height);
+        // The history is needed while the phase averages have not converged - under motion every phase is
+        // replaced each frame (convergence 0), and for the frames after a stop until they have caught up.
+        boolean moved = motionPrevCamera.distanceSquared(cameraPos) >= 1.0e-4F
+                || !motionPrevViewProj.equals(viewProj, 1.0e-5F);
+        float unconverged = 1.0F - CloudTemporalPhaseState.convergence(frameIndex,
+                Math.round(1.0F / Math.max(VolumetricCloudDebugConfig.phaseAccumulateMinWeight(), 0.02F)));
+        float motionWeight = motionHistory != null
+                && motionPrevGeneration == CloudTemporalPhaseState.generation()
+                ? VolumetricCloudDebugConfig.motionHistoryWeight() * (moved ? 1.0F : unconverged) : 0.0F;
+        lastMotionWeight = motionWeight;
+        shader.setSampler("MotionHistoryColor", motionHistory == null ? 0 : motionHistory.getColorTextureId());
+        shader.setSampler("MotionHistoryDepth", motionHistory == null ? 0 : motionHistory.getDepthTextureId());
+        shader.safeGetUniform("MotionHistoryWeight").set(motionWeight);
+        shader.safeGetUniform("MotionPrevViewProj").set(motionPrevViewProj);
+        shader.safeGetUniform("MotionPrevCamDelta").set(
+                cameraPos.x - motionPrevCamera.x, cameraPos.y - motionPrevCamera.y, cameraPos.z - motionPrevCamera.z);
         shader.safeGetUniform("InvProjMat").set(invProj);
         shader.safeGetUniform("InvViewRotMat").set(invViewRot);
         shader.safeGetUniform("CloudViewProjMat").set(viewProj);
@@ -135,6 +161,11 @@ public final class CloudTemporalResolveRenderer {
             GlStateManager._activeTexture(GL13.GL_TEXTURE0);
             shader.clear();
         }
+        // E41. This frame becomes the motion history (a copy; the resolved target is never read back).
+        VolumetricCloudRenderTargets.copyIntoMotionHistory(resolved);
+        motionPrevViewProj.set(viewProj);
+        motionPrevCamera.set(cameraPos);
+        motionPrevGeneration = CloudTemporalPhaseState.generation();
         lastFrameResolved = true;
         lastValidPhases = CloudTemporalPhaseState.validCount(frameIndex);
         return resolved;
@@ -143,6 +174,11 @@ public final class CloudTemporalResolveRenderer {
     /** Milliseconds the last resolve cost on the GPU, or -1 with no result. */
     public static float lastGpuMilliseconds() {
         return lastGpuMilliseconds;
+    }
+
+    /** E41: the motion-history weight the last resolve used (0 = static camera / off). */
+    public static float lastMotionWeight() {
+        return lastMotionWeight;
     }
 
     public static boolean lastFrameResolved() {

@@ -137,12 +137,79 @@ uniform int PuffShapeMode; // 0=fallback, 1=legacy hybrid, 2=direct-only diagnos
 uniform int PuffDensityStage; // 0=final, 1=analytic-all, 2=analytic-indexed, 3=envelope, 4=pre-erosion, 7=continuous-all, 12=carrier-billow
 uniform int PuffTierFilter; // -1=all, 0=base, 1=middle, 2=crown, 3=legacy/unknown
 
-const int MAX_PUFF_LOBES = 32;
-const int PUFF_CANDIDATES_PER_TILE = 8;
-const int PUFF_PACK_BASE = 33;
-uniform vec4 PuffPosRadius[MAX_PUFF_LOBES];
-uniform vec4 PuffShape[MAX_PUFF_LOBES];
-uniform vec4 PuffMedia[MAX_PUFF_LOBES];
+// C2 (stabilisation capacity): 256 detailed lobes (was 32, about 4 cumulus). The descriptors are no longer
+// uniform arrays: they sit in rows PUFF_DESC_ROW.. of PuffCandidateMapSampler (RGBA32F, 3 texels per lobe:
+// posRadius, shape, media), and rows PUFF_LIST_ROW.. hold, per 128-block occupancy tile, the lobes that can
+// touch it (dilated one tile; PuffLobeSpatialIndex). Keep in step with PuffLobeSpatialIndex.
+const int MAX_PUFF_LOBES = 256;
+// S20: 16 candidates per tile; ranks 8-15 in a second packed grid at PUFF_CANDIDATE2_ROW (fetched only when
+// rank 7 is used).
+const int PUFF_CANDIDATES_PER_TILE = 16;
+const int PUFF_CANDIDATE2_ROW = 295;
+const int PUFF_PACK_BASE = 257;
+const int PUFF_GRID = 256;
+const int PUFF_DESC_ROW = 256;
+const int PUFF_LIST_ROW = 259;
+const int PUFF_LIST_TEXELS = 9;
+const int PUFF_LIST_CAP = 35;
+// P1 (stabilisation perf): 32 x 32 lobe occupancy bits over the weather extent, dilated one tile on the CPU
+// (PuffLobeSpatialIndex.OCCUPANCY). PaPuffOccupancy 1: the per-step segment test rejects a short segment whose
+// start tile is clear instead of looping over every lobe. 0 = legacy loop only.
+uniform int PuffOccupancy[32];
+uniform int PaPuffOccupancy;
+// PERF-TEMP (stabilisation perf attribution, remove after): 0 production. 1 = ceiling: the outer weather skip
+// treats every covered coarse step as empty (image invalid; prices cumulus density on empty steps).
+// 3 = no puff segment promotion; 4 = 3 and no direct-puff density path (both image invalid).
+// 2 = candidate: cumulus / direct-puff "inside the shape" uses the column's base / top with a margin instead
+// of the whole slab.
+uniform int PaPerfArm;
+// P3 (stabilisation perf): 1 = an empty coarse step jumps along the ray through every 64-block tile whose
+// weather occupancy (NsCoverageSampler.g, mip 3) and puff occupancy bits are clear, instead of ~35 fixed coarse
+// steps per pixel. The storm / puff segment tests and the storm clearance still check the longer segment.
+uniform int PaEmptySkip;
+// L5 (stabilisation lighting resolution, item b): light taps i < PaExactLightTaps read exact density even where the
+// storm field covers them (the field interpolates thresholds between 16-block nodes, so shadows cannot resolve the
+// S11 billows). 0 = production (non-storm first taps are exact since T247).
+uniform int PaExactLightTaps;
+// S12 (stabilisation, cumulus shape): amplitude of a low-frequency domain warp applied to each puff lobe, in
+// lobe radii (0 = legacy round, vertically stacked lobes; at most PA_PUFF_WARP_MAX, which every puff bound
+// below and in PuffLobeSpatialIndex is padded for).
+uniform float PaPuffWarp;
+// S13 (stabilisation, cumulus shape): smooth-maximum width for the two strongest lobes, in envelope units. 0 = legacy
+// (max + a 0.25 bridge: a sharp crease - the "rings" and "rims" - wherever two lobes meet). k > 0 fills only where the
+// two lobes are within k of each other, so creases become fillets without the old summed-monolith.
+uniform float PaPuffBlend;
+// S27-TEMP (flat surfaces): lighting decomposition. 1 = sun only (no sky ambient), 2 = sky ambient only,
+// 3 = one scattering octave, 4 = no Beer-powder. Remove with the S27 verdict.
+uniform int PaLightSplit;
+// S33-TEMP (cauliflower): strength of the lobe-surface bubble creases (0 = production).
+uniform float PaPuffBubbles;
+// S33-TEMP: 0 = wide undulating creases, 1 = narrow creases between round heads (9 / 16 around).
+uniform float PaPuffBubbleSharp;
+// S31-TEMP (grain): the detail noise is also filtered to PaDetailStepFilter x the march step the sample stands
+// for (0 = screen footprint only, the E36 production).
+uniform float PaDetailStepFilter;
+// S32-TEMP (grain): < 0 = production (blue-noise phase inside the refined surface bracket), else this fixed phase.
+uniform float PaIntegrationPhase;
+// E33 near-field light (player setting Cloud Surface Detail): exact light samples in the first 12 blocks toward
+// the sun - 0 none, 1 one (6), 2 two (3 / 8.5), 3 three (2 / 5 / 9) - with tap 0 shortened to 12-14 blocks.
+// The cone otherwise starts 14 blocks out, so relief under ~15 blocks cannot shade itself (flat surfaces).
+uniform int PaNearLight;
+// S26-TEMP (one-body cumulus, E31): 0 = lobe union (legacy), 1 = one continuous body (paPuffBodyShape), whose
+// light tap 0 also reads the shared field like storms. K = bump support in lobe radii, threshold = field value
+// of the surface, shell = density at the surface relative to the core, core depth = field rise to full density.
+uniform int PaPuffBody;
+uniform float PaPuffBodyK;
+uniform float PaPuffBodyThreshold;
+uniform float PaPuffBodyRelief;
+uniform float PaPuffBodyTurrets;
+uniform float PaPuffBodyErode;
+uniform float PaPuffBodyShell;
+uniform float PaPuffBodyCoreDepth;
+// S25-TEMP (cumulus rings): 1 = the nearest light tap of a non-storm sample reads the shared field like every
+// other tap (pre-T247) instead of the exact density walk. Remove with the S25 verdict.
+uniform int PaLightTap0Field;
+const float PA_PUFF_WARP_MAX = 0.25;
 
 const int MAX_STORM_LOBES = 64;
 const int STORM_CANDIDATES_PER_TILE = 8;
@@ -1535,6 +1602,10 @@ uniform vec2 PaSampleJitter;
 // resolve can composite the CURRENT frame's rain onto a history phase's body
 // exactly (rain is never reconstructed from history). 0 composites in-march.
 uniform int PaTemporalPhase;
+// E39 (grain): 1 when this phase march is blended into the same phase's previous result (per-phase
+// accumulation, CloudTemporalPhaseState.accumulationWeight); the sub-step jitter then animates every frame so
+// the average converges instead of freezing a per-pixel pattern.
+uniform int PaPhaseAccumulate;
 // T210. The rain pass's texel grid relative to this march's: 1 the same
 // grid (the rain texel of this fragment - production before T210); 2 the
 // lattice, twice the phase grid, and the split reads the texel of its own
@@ -1564,6 +1635,74 @@ uniform int PaLowerBodyFill;
 // off for the paired comparison. The ten exploratory modes the investigation
 // used did not survive into FINAL; this is the accepted term and its off arm.
 uniform int PaDeepScatter;
+// S1 (stabilisation, RC-01). 0: legacy - Minecraft colours used as radiance and a per-sample display curve
+// (1 - exp(-1.3 r)) returned here. 1: colour-managed - the Minecraft sun / sky colours are display values and are
+// linearised (gamma 2.2), lighting is linear radiance, and the composite applies the soft curve once and encodes.
+uniform int PaColorPipeline;
+// S2 (stabilisation, RC-08). 1: legacy - the Hillaire octaves are divided by their weight sum (removing the
+// multiple-scattering energy they model). 0: the octaves add their energy.
+uniform int PaOctaveNormalize;
+// S1b (stabilisation, RC-21). 0: legacy - deep shadow keeps 58-74 % of the sky ambient whatever the optical depth
+// (mix(retention, 1, exp(-od))). 1: the ambient reaching shadowed cloud is the diffuse two-stream transmission of
+// the light path, 1 / (1 + 0.75 (1 - g) od) with g = 0.85 - it falls with depth instead of stopping at a floor.
+uniform int PaAmbientTransmission;
+// S9 (stabilisation, shape root cause - SHAPE_ROOT_CAUSE.md). 0: legacy cumulus form (fixed-scale billow noise that
+// only nudges the surface threshold and is switched off at joins and cores). > 0: amplitude of a scale-relative
+// billow hierarchy added to the puff envelope (three Worley-bump octaves sized from the local lobe radius).
+uniform float PaShapeHierarchy;
+// E10 (stabilisation, Codex CR-05). 0: legacy light-tap coverage test on the FILTERED sentinel (R <= -5): wherever a
+// covered node (R in [1 - BODY_GAIN, 1]) meets an uncovered one (R = -10) the bilinear R lands in (-5, 1) and the tap
+// evaluates the storm-body formula with that meaningless lowerBound on non-storm cloud - grid-aligned dark boxes
+// through the slab. 1: a tap is covered only when every filtered node is, R > 1 - BODY_GAIN - 0.01; mixed taps take
+// the per-node non-storm path, which already excludes covered nodes.
+uniform int PaFieldCoverageFix;
+// E12 (stabilisation, user: big-cloud undersides not dark enough). Minecraft clouds are geometrically compressed:
+// a ~56-block nimbostratus deck stands for a 2-4 km one, so its light path has a fraction of the optical depth the
+// real cloud has. > 0 scales the light-path optical depth by 1 + gain * smoothstep(0.30, 0.90, materialDarkness):
+// dark, thick families (nimbostratus, cumulonimbus) transport light like the cloud they represent, cumulus (0.2)
+// and cirrus are untouched, lit skins (od ~ 0) stay lit. 0 = off.
+uniform float PaOpticalThicknessGain;
+// E13 (stabilisation, Codex CR-01/CR-02). CloudWeatherMapRenderer drops every member of a descriptor-owned storm
+// group from the weather and morphology maps (the descriptors own the body), but the march still takes the cloud
+// profile, material darkness and storm weight from those maps - all empty on a storm - and classifies everything
+// below the (empty) column base, i.e. below the slab floor, as rain: the pale "bolted-on" lower block. 1: a sample
+// the storm walk owns (paShadeUnionDistance < 1e8) with no map category takes the cumulonimbus profile and darkness,
+// and its body is rain-classified only where the rain field actually carries precipitation. 0 = legacy.
+uniform int PaStormMaterialFix;
+// E20 (stabilisation, lighting): PaStormMaterialFix 2 also gives storm-owned samples a continuous lighting height
+// (paStormLightHeight01) instead of the weather-map h01, which is a step at the slab base over a storm (l1, mode 40).
+// S11 (stabilisation, storm structure): see the paStruct* helpers before stormBodyGroupField. 0 = legacy body;
+// otherwise a bit mask of the parts: 1 seeded turrets, 2 base-rim billows, 4 flanking line, 8 billow
+// displacement (15 = all; the parts are separable for cost attribution).
+uniform int PaStormStructure;
+
+// E20. The weather and morphology maps are empty over a descriptor-owned storm, so the march's
+// h01 = (y - baseY) / (topY - baseY) collapses to a step at the slab base: every height term of the lighting (the
+// underside shade, the ambient bottom/top colour, the T244 low-cloud neutral) flipped at one altitude across the whole
+// storm (l1 mode 40: h01 1 above, 0 below a straight line) - the "two clouds" look. This is the storm's own height:
+// floor 0 to deck top 1, from the skeleton of the nearest group's AABB (continuous; no value leaves cloudDensity).
+float paStormLightHeight01(vec3 p, float fallback) {
+    float height = fallback;
+    float nearest = 1.0e9;
+    for (int groupSlot = 0; groupSlot < 8; groupSlot++) {
+        int row = MAX_STORM_LOBES + 2 * groupSlot;
+        if (texelFetch(StormDescriptorSampler, ivec2(4, row), 0).w < 0.0) {
+            continue;
+        }
+        vec4 aabbXZ = texelFetch(StormDescriptorSampler, ivec2(3, row + 1), 0);
+        vec4 aabbY = texelFetch(StormDescriptorSampler, ivec2(4, row + 1), 0);
+        vec3 lo = vec3(aabbXZ.x, aabbY.x, aabbXZ.y);
+        vec3 hi = vec3(aabbXZ.z, aabbY.y, aabbXZ.w);
+        float outside = length(max(max(lo - p, p - hi), vec3(0.0)));
+        if (outside < nearest) {
+            nearest = outside;
+            float floorY = texelFetch(StormDescriptorSampler, ivec2(1, row), 0).x;
+            float deckTop = texelFetch(StormDescriptorSampler, ivec2(1, row + 1), 0).y;
+            height = clamp((p.y - floorY) / max(deckTop - floorY, 1.0), 0.0, 1.0); // saturate() is declared later
+        }
+    }
+    return height;
+}
 
 bool paRayTraceActive() {
     return PaRayTraceMode != 0;
@@ -1940,6 +2079,22 @@ vec3 stormBaseNoiseDomain(vec3 worldPos) {
     );
     return rotated * STORM_BASE_NOISE_SCALE
         + lowFrequencyDomainWarp(worldPos) * warpAmplitude;
+}
+
+// E36. Mip level of the detail noise for a material-space sample: log2(texels per cloud-target pixel). The
+// detail texture (32^3, domain 0.022 / block) has ~1.4-block texels; at the 0.25-scale target a pixel spans
+// 1-3 blocks at normal ranges, so sampling level 0 aliased the finest octave into blocky speckle. Explicit
+// (no implicit derivatives inside the march). Callers add their own bias (light taps blur further out).
+// S31: length (blocks) of the march segment the current density sample stands for; 0 = a point query.
+float paDetailStep = 0.0;
+
+float paDetailLod(vec3 samplePos) {
+    vec3 world = samplePos;
+    world.xz += MaterialOffset;
+    float pixelsPerBlock = abs(CloudProjMat[1][1]) * float(textureSize(HistorySampler, 0).y)
+        / (2.0 * max(length(world - CameraPos), 1.0));
+    float footprint = max(1.0 / max(pixelsPerBlock, 1.0e-4), PaDetailStepFilter * paDetailStep);
+    return max(log2(0.022 * 32.0 * footprint), 0.0);
 }
 
 vec3 detailNoiseDomain(vec3 worldPos) {
@@ -2726,6 +2881,18 @@ void paBuildStormReachability() {
         // nowhere; a zero-radius disc at the origin would still admit one
         // column, so keep the gate disabled rather than invent a bound.
         return;
+    }
+    if ((PaStormStructure & 4) != 0) {
+        // S11: the flanking line reaches past the descriptors; every body lies inside its skeleton AABB.
+        for (int groupSlot = 0; groupSlot < 8; groupSlot++) {
+            int bodyRow = MAX_STORM_LOBES + 2 * groupSlot;
+            if (texelFetch(StormDescriptorSampler, ivec2(4, bodyRow), 0).w < 0.0) {
+                continue;
+            }
+            vec4 aabbXZ = texelFetch(StormDescriptorSampler, ivec2(3, bodyRow + 1), 0);
+            minimum = min(minimum, aabbXZ.xy);
+            maximum = max(maximum, aabbXZ.zw);
+        }
     }
     paStormReachCentre = (minimum + maximum) * 0.5;
     paStormReachRadius = length(maximum - paStormReachCentre);
@@ -3606,6 +3773,214 @@ float stormBodyAabbDistance(vec3 p, vec4 aabbXZ, vec4 aabbY) {
     return length(max(max(lo - p, p - hi), vec3(0.0)));
 }
 
+// S11 (stabilisation, storm structure - Codex CR-03, SHAPE_ROOT_CAUSE.md). 0: legacy T241 body (one fixed turret
+// lattice with no seed input: every storm is the same object). 1: the body is driven by the storm's own seed
+// (skeleton B2.z): turret rows of 4-7 turrets with varied size / push / height and some missing (pockets), smaller
+// billows on the two nearest turrets (bumps on bumps), billows around the base rim (no slab wall) and a flanking line
+// of 2-4 smaller towers stepping down on one upwind flank. All parts are exact spheres / capsules (distance kept).
+// The CPU mirror (StormBodyEvaluator) is still the legacy body. (Uniform PaStormStructure declared with PaStormMaterialFix.)
+
+// S11 v3: integer pcg3d (v2 used fract(sin()): ~60 transcendental calls per density sample). v4: one call gives
+// four values (paStructHash4) where a part needs several.
+uvec3 paStructPcg(float seed, float a, float b) {
+    uvec3 v = uvec3(ivec3(int(seed * 65536.0), int(a * 64.0) + 4096, int(b * 64.0) + 4096));
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v ^= v >> 16u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    return v;
+}
+
+float paStructHash(float seed, float a, float b) {
+    return float(paStructPcg(seed, a, b).x & 16777215u) * (1.0 / 16777216.0);
+}
+
+vec4 paStructHash4(float seed, float a, float b) {
+    uvec3 v = paStructPcg(seed, a, b);
+    return vec4(uvec4(v.x & 65535u, v.y & 65535u, v.z & 65535u, (v.x >> 16u) ^ (v.y >> 16u))) * (1.0 / 65536.0);
+}
+
+float paStructSmin(float a, float b, float k) {
+    return stormBodySmin(a, b, k, stormBodySminWeight(a, b, k));
+}
+
+// S11: the seeded turret lattice on the column (replaces the fixed 5-around lattice). v4: one hash per row and per
+// turret, three angle candidates (the two bracketing slots and the nearer outer one; jitter is +-0.15 step).
+float paStructTurrets(vec3 p, vec2 axis, float theta, float crown, float columnSpan, float towerRadius, float seed) {
+    float spacing = 0.80 * towerRadius;
+    int rows = max(int(columnSpan / spacing), 1);
+    int row0 = int(floor((p.y - crown) / spacing - 0.5));
+    float d = 1.0e9;
+    float d2 = 1.0e9;
+    for (int rowPick = 0; rowPick < 2; rowPick++) {
+        int row = clamp(row0 + rowPick, 0, rows - 1);
+        float fr = float(row);
+        vec4 rowHash = paStructHash4(seed, fr, 7.0);
+        float count = 4.0 + floor(rowHash.x * 3.999);
+        float angleStep = 6.2831853 / count;
+        float rowOffset = rowHash.y * 6.2831853;
+        float rowY = crown + (fr + 0.5) * spacing;
+        float rowRadius = towerRadius * (1.28 + 0.15 * smoothstep(0.3, 1.2, (rowY - crown) / columnSpan));
+        float position = (theta - rowOffset) / angleStep;
+        float around = floor(position);
+        float outer = position - around < 0.5 ? -1.0 : 2.0;
+        for (int anglePick = 0; anglePick < 3; anglePick++) {
+            float slot = around + (anglePick == 2 ? outer : float(anglePick));
+            float slotKey = mod(slot, count);
+            vec4 h = paStructHash4(seed, fr, slotKey + 19.0);
+            if (h.w < 0.12) {
+                continue; // a missing turret: a pocket between its neighbours
+            }
+            float angle = rowOffset + (slot + 0.30 * (h.x - 0.5)) * angleStep;
+            float radius = towerRadius * 0.42 * (0.70 + 0.65 * h.y);
+            float push = rowRadius * (0.88 + 0.22 * h.z);
+            vec3 centre = vec3(axis.x + push * cos(angle), rowY + (fract(h.w * 7.31) - 0.5) * 0.4 * spacing,
+                axis.y + push * sin(angle));
+            float ds = length(p - centre) - radius;
+            if (ds < d) {
+                d2 = d;
+                d = ds;
+            } else if (ds < d2) {
+                d2 = ds;
+            }
+        }
+    }
+    // (v1 also put three child spheres on the two nearest turrets; they read as more balls - the v2 billow
+    // displacement replaces them.)
+    return d2 < 1.0e8 ? paStructSmin(d, d2, 0.10 * towerRadius) : d;
+}
+
+// S11 v2: scale-relative billow displacement in blocks (positive = outward), three octaves of rounded Worley bumps
+// (BaseNoise.G, period 8 per tile) with cells 0.45 / 0.225 / 0.1125 Rt and amplitudes 0.40 of each cell, halving:
+// |result| <= 0.315 Rt (PA_STRUCT_BILLOW_REACH). In storm-local coordinates offset by the seed, so each storm has
+// its own pattern and the billows ride with it. (s11 run 2: the existing macro displacement only moves the
+// surface inside the 24-48 block edge band, nothing like the 0.1-0.3 Rt billows a 268-block updraft needs.)
+const float PA_STRUCT_BILLOW_REACH = 0.315;
+// S11 v5: the displacement's assumed slope bound (blocks per block). Used twice: the field dilation and, where the
+// displaced distance is known, its Lipschitz-scaled clearance d / (1 + slope). Checked by the field soundness audit
+// (stormFieldProbeFalseEmpty) rather than derived.
+const float PA_STRUCT_BILLOW_SLOPE = 2.0;
+
+float paStructBillows(vec3 local, float towerRadius) {
+    vec3 rotated = vec3(
+        dot(local, vec3(0.8138, 0.2962, -0.5000)),
+        dot(local, vec3(-0.1401, 0.9408, 0.3085)),
+        dot(local, vec3(0.5630, -0.1677, 0.8090)));
+    float cell = 0.45 * towerRadius;
+    float amplitude = 0.40 * cell;
+    float h = 0.0;
+    for (int k = 0; k < 3; k++) {
+        float g = texture(BaseNoiseSampler, rotated / (8.0 * cell) + vec3(0.37, 0.11, 0.73) * float(k + 1), 0.0).g;
+        h += amplitude * (2.0 * smoothstep(0.28, 0.68, g) - 1.0);
+        cell *= 0.5;
+        amplitude *= 0.5;
+    }
+    return h;
+}
+
+// S11: billows around the base rim, cut by the flat condensation floor.
+float paStructBaseRim(vec3 p, float w, float c, vec4 extents, float floorY, float baseHeight, float seed) {
+    float phi = atan(c / (c > 0.0 ? extents.w : extents.z), w / (w > 0.0 ? extents.y : extents.x));
+    const float RIM_COUNT = 10.0;
+    float angleStep = 6.2831853 / RIM_COUNT;
+    float rotation = paStructHash(seed, 101.0, 1.0) * 6.2831853;
+    float around = floor((phi - rotation) / angleStep);
+    float d = 1.0e9;
+    for (int pick = 0; pick < 2; pick++) {
+        float slot = around + float(pick);
+        float key = mod(slot, RIM_COUNT);
+        float h1 = paStructHash(seed, 103.0, key);
+        float h2 = paStructHash(seed, 107.0, key);
+        float h3 = paStructHash(seed, 109.0, key);
+        float angle = rotation + (slot + 0.30 * (h1 - 0.5)) * angleStep;
+        float ca = cos(angle);
+        float sa = sin(angle);
+        vec2 rim = 0.92 * vec2(ca * (ca > 0.0 ? extents.y : extents.x), sa * (sa > 0.0 ? extents.w : extents.z));
+        // Sized to the slab it breaks (s11 run 1: 0.5-0.95 h spheres made the whole lower body one ball).
+        float radius = min(baseHeight * (0.30 + 0.20 * h2),
+            0.33 * min(min(extents.x, extents.y), min(extents.z, extents.w)));
+        float centreY = floorY + radius * 0.90 + baseHeight * 0.20 * h3;
+        d = min(d, length(vec3(w - rim.x, p.y - centreY, c - rim.y)) - radius);
+    }
+    return max(d, floorY - p.y);
+}
+
+// S11: a flanking line - 2-4 smaller towers stepping down away from the updraft on one upwind flank, inside
+// PA_STRUCT_FLANK_REACH x the unscaled base reach (s11 run 2: own = 614 = 2.3 Rt left no room past 2 Rt). The
+// skeleton AABB (StormBodySkeleton.FLANK_REACH) and, under the arm, the reach bound cover it.
+const float PA_STRUCT_FLANK_REACH = 1.6;
+
+float paStructFlank(vec3 p, float w, float c, float floorY, float crown, float deckBottom, float baseHeight,
+        float towerRadius, float reach, float seed) {
+    float centreDistance = length(vec2(w, c));
+    if (centreDistance > reach + 2.0 * towerRadius) {
+        return centreDistance - reach; // a lower bound: every tower lies inside the reach
+    }
+    // v3 (s11 run 3: v2's 0.62 Rt towers smooth-joined at 0.35 Rt read as one smeared ridge): separate, narrower
+    // congestus towers (0.30-0.44 Rt, tops 0.75 x 0.72^i of the crown-to-deck span) standing apart on a low shelf.
+    vec4 lineHash = paStructHash4(seed, 211.0, 1.0);
+    float count = 2.0 + floor(lineHash.x * 2.999);
+    float flankSide = lineHash.y < 0.5 ? -1.0 : 1.0;
+    float heading = 3.14159265 + flankSide * (0.5 + 0.7 * lineHash.z);
+    vec2 direction = vec2(cos(heading), sin(heading));
+    vec2 normal = vec2(-direction.y, direction.x);
+    // v4: every tower and the shelf lie within 0.45 Rt (radius) + 0.25 Rt (lateral offset) + the heads of the
+    // segment [1.3 Rt, reach] along the line - outside that capsule return the distance to it (a lower bound).
+    {
+        vec2 rel = vec2(w, c);
+        float along = clamp(dot(rel, direction), 1.3 * towerRadius, reach);
+        float lineDistance = length(rel - direction * along) - 0.95 * towerRadius;
+        if (lineDistance > 0.5 * towerRadius) {
+            return lineDistance;
+        }
+    }
+    float d = 1.0e9;
+    float shelfEnd = 0.0;
+    float span = max(deckBottom - crown, 1.0);
+    for (int i = 0; i < 4; i++) {
+        float fi = float(i);
+        if (fi >= count) {
+            break;
+        }
+        vec4 th = paStructHash4(seed, 223.0 + fi, 1.0);
+        float radius = towerRadius * 0.37 * (1.0 - 0.12 * fi) * (0.82 + 0.36 * th.x);
+        float along = towerRadius * (1.9 + 1.1 * fi) * (0.90 + 0.20 * th.y);
+        if (along + radius > reach) {
+            break;
+        }
+        shelfEnd = along;
+        vec2 centre = direction * along + normal * (th.z - 0.5) * 0.5 * towerRadius;
+        float topY = crown + span * 0.75 * (1.0 - 0.28 * fi) * (0.80 + 0.40 * th.w);
+        topY = max(topY, floorY + 3.0 * radius);
+        float spineY = clamp(p.y, floorY + 0.5 * radius, topY - radius);
+        float tower = length(vec3(w - centre.x, p.y - spineY, c - centre.y)) - radius;
+        vec4 headHash = paStructHash4(seed, 229.0 + fi, 0.0);
+        for (int j = 0; j < 2; j++) {
+            float hj = j == 0 ? headHash.x : headHash.z;
+            float hk = j == 0 ? headHash.y : headHash.w;
+            vec3 head = vec3(centre.x + (hj - 0.5) * radius, topY - radius * (0.20 + 0.50 * hk),
+                centre.y + (hk - 0.5) * radius);
+            tower = paStructSmin(tower, length(vec3(w, p.y, c) - head) - radius * (0.55 + 0.20 * hj), 0.20 * radius);
+        }
+        d = min(d, tower);
+    }
+    if (shelfEnd < 0.0) {
+        // v4: disabled (shelfEnd >= 0 always) - eroded, the long low capsule read as streaks along the line (s11
+        // run 4 side views). Kept for reference: the low shelf the towers stand on, at a quarter of the base height.
+        float shelfRadius = 0.30 * baseHeight;
+        vec2 rel = vec2(w, c);
+        float t = clamp(dot(rel, direction), 0.0, shelfEnd);
+        float shelf = length(vec3(rel.x - direction.x * t, p.y - (floorY + 0.6 * shelfRadius), rel.y - direction.y * t))
+            - shelfRadius;
+        d = paStructSmin(d, shelf, 0.25 * towerRadius);
+    }
+    return max(d, floorY - p.y);
+}
+
 void stormBodyGroupField(
         vec3 p,
         int groupSlot,
@@ -3680,6 +4055,10 @@ void stormBodyGroupField(
     float baseRound = 0.18 * baseHeight;
     vec2 baseD = vec2(baseH, baseV) + baseRound;
     float dBase = length(max(baseD, 0.0)) + min(max(baseD.x, baseD.y), 0.0) - baseRound;
+    if ((PaStormStructure & 2) != 0) {
+        // S11: billows around the rim break the slab wall.
+        dBase = paStructSmin(dBase, paStructBaseRim(p, w, c, a2, floorY, baseHeight, b2.z), 0.15 * baseHeight);
+    }
 
     // Updraft column: no waist - the flared root width held to the deck and
     // widening a little into it - carrying cauliflower turrets: a staggered
@@ -3704,7 +4083,11 @@ void stormBodyGroupField(
     int turretRow0 = int(floor((p.y - crown) / turretSpacing - 0.5));
     const float TURRET_STEP = 6.2831853 / 5.0;
     float dTurrets = 1.0e9;
-    for (int rowPick = 0; rowPick < 2; rowPick++) {
+    if ((PaStormStructure & 1) != 0) {
+        // S11: the seeded lattice replaces the fixed one (the legacy loop below runs zero times).
+        dTurrets = paStructTurrets(p, axis, theta, crown, columnSpan, towerRadius, b2.z);
+    }
+    for (int rowPick = 0; rowPick < ((PaStormStructure & 1) != 0 ? 0 : 2); rowPick++) {
         int row = clamp(turretRow0 + rowPick, 0, turretRows - 1);
         float rowY = crown + (float(row) + 0.5) * turretSpacing;
         float rowRadius = towerRadius
@@ -3760,8 +4143,38 @@ void stormBodyGroupField(
     float k = 0.6 * towerRadius;
     float baseWeight = stormBodySminWeight(dBase, dColumn, k);
     float lower = stormBodySmin(dBase, dColumn, k, baseWeight);
+    float paFlankShare = 0.0;
+    if ((PaStormStructure & 4) != 0) {
+        // S11: the flanking line joins the lower mass (the region still follows baseWeight).
+        float dFlank = paStructFlank(p, w, c, floorY, crown, deckBottom, baseHeight, towerRadius,
+            PA_STRUCT_FLANK_REACH * b2.y, b2.z);
+        float flankK = 0.15 * towerRadius;
+        paFlankShare = stormBodySminWeight(dFlank, lower, flankK);
+        lower = stormBodySmin(dFlank, lower, flankK, paFlankShare);
+    }
     float lowerWeight = stormBodySminWeight(lower, dDeck, k);
     float d = stormBodySmin(lower, dDeck, k, lowerWeight);
+    float paClearanceDistance = d;
+    float paLipschitzDistance = -1.0e9; // S11 v5: the displaced distance, when known (else no second bound)
+    if ((PaStormStructure & 8) != 0) {
+        // S11 v2: billows on the whole body (full on the tower and base, 0.35 on the approved deck, 0.15 at the
+        // flat floor). |displacement| <= billowReach, so d - billowReach stays a lower bound for the safe advance;
+        // far outside or deep inside (|d| beyond the reach plus one band) the density cannot change, skip it.
+        float billowReach = PA_STRUCT_BILLOW_REACH * towerRadius;
+        bool paDisplaced = abs(d) < billowReach + band;
+        if (paDisplaced) {
+            vec3 local = vec3(p.x - a0.x, p.y - floorY, p.z - a0.y) + b2.z * vec3(4111.0, 977.0, 2903.0);
+            // v4: 0.4 on the flanking towers (~0.4 Rt wide; the full 0.315 Rt reach cut them into specks, s11 run 4).
+            float billowWeight = mix(0.35, 1.0, lowerWeight)
+                * mix(0.15, 1.0, smoothstep(floorY, floorY + 0.35 * baseHeight, p.y))
+                * mix(1.0, 0.4, paFlankShare);
+            d -= billowWeight * paStructBillows(local, towerRadius);
+        }
+        paClearanceDistance -= billowReach;
+        if (paDisplaced) {
+            paLipschitzDistance = d;
+        }
+    }
 
     int region;
     float heightUpdraft = clamp((p.y - floorY) / max(deckMid - floorY, 1.0), 0.0, 1.0);
@@ -3783,15 +4196,21 @@ void stormBodyGroupField(
     groupSoftness = mix(min(band, 0.30 * thickness), band, lowerWeight);
     groupDistance = d;
     groupActiveRoleMask = d <= groupSoftness ? region : 0;
-    float clearance = d - groupSoftness;
+    // S11 v5 (perf p1: the flat -billowReach turned an 84-block shell around every storm into 2.5-block fine
+    // steps, 5.6x the density calls): where the displaced distance is known, (d - softness) / (1 + slope) is also a
+    // valid clearance - take the larger of the two bounds.
+    float clearance = max(paClearanceDistance - groupSoftness,
+        (paLipschitzDistance - groupSoftness) / (1.0 + PA_STRUCT_BILLOW_SLOPE));
     groupMinClearance = clearance > 0.0 ? clearance * 0.8 : clearance;
     paBodyRegion = region;
     // The anvil is a solid sheet: every interior takes the structural fill.
     paBodyInteriorFill = d < -groupSoftness;
     if (paStormFieldBuildNode) {
+        // S11 v2: the billow displacement steepens the field (~2 per block worst case): wider field dilation.
+        float paStructSlope = (PaStormStructure & 8) != 0 ? PA_STRUCT_BILLOW_SLOPE : 0.0;
         paLastStormMaxVerticalSlope = max(paLastStormMaxVerticalSlope,
-            STORM_BODY_LIPSCHITZ_VERTICAL);
-        paLastStormMaxAspect = max(paLastStormMaxAspect, STORM_BODY_LIPSCHITZ_HORIZONTAL);
+            STORM_BODY_LIPSCHITZ_VERTICAL + paStructSlope);
+        paLastStormMaxAspect = max(paLastStormMaxAspect, STORM_BODY_LIPSCHITZ_HORIZONTAL + paStructSlope);
     }
 }
 
@@ -4150,7 +4569,7 @@ float stormBaseCarrierAt(vec3 samplePos, float mipBias, out float detailFbm) {
     float lowFbm = baseNoise.g * 0.625 + baseNoise.b * 0.25 + baseNoise.a * 0.125;
     vec3 detailPos = detailNoiseDomain(samplePos);
     detailPos += (baseNoise.gbr - 0.5) * 0.18;
-    vec4 detail = texture(DetailNoiseSampler, detailPos, mipBias);
+    vec4 detail = textureLod(DetailNoiseSampler, detailPos, paDetailLod(samplePos) + max(mipBias, 0.0));
     detailFbm = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
     return saturate(remap(baseNoise.r, -(1.0 - lowFbm), 1.0, 0.0, 1.0));
 }
@@ -4309,6 +4728,17 @@ bool directStormSegmentMayIntersect(vec3 segmentStart, vec3 segmentEnd) {
     return false;
 }
 
+// C2. Lobe descriptors and per-tile lobe lists, read from the candidate map's extra rows.
+vec4 puffDescriptor(int index, int texel) {
+    return texelFetch(PuffCandidateMapSampler,
+        ivec2(index - (index / PUFF_GRID) * PUFF_GRID, PUFF_DESC_ROW + 3 * (index / PUFF_GRID) + texel), 0);
+}
+
+vec4 puffListTexel(int linear) {
+    return texelFetch(PuffCandidateMapSampler,
+        ivec2(linear - (linear / PUFF_GRID) * PUFF_GRID, PUFF_LIST_ROW + linear / PUFF_GRID), 0);
+}
+
 int decodePuffCandidate(vec4 packedCandidates, int candidateRank) {
     float packedValue = candidateRank < 2
         ? packedCandidates.r
@@ -4323,6 +4753,16 @@ int decodePuffCandidate(vec4 packedCandidates, int candidateRank) {
     return digit - 1;
 }
 
+// S20: ranks 8-15 of the tile holding worldXZ, or empty when its first texel is not full.
+vec4 puffCandidates2At(vec2 worldXZ, vec4 firstTexel) {
+    if (firstTexel.a < float(PUFF_PACK_BASE) - 0.5) {
+        return vec4(0.0);
+    }
+    vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
+    ivec2 coord = clamp(ivec2(floor(uv * float(PUFF_GRID))), ivec2(0), ivec2(PUFF_GRID - 1));
+    return texelFetch(PuffCandidateMapSampler, coord + ivec2(0, PUFF_CANDIDATE2_ROW), 0);
+}
+
 vec4 puffCandidatesAt(vec2 worldXZ) {
     if (PuffLobeCount <= 0) {
         return vec4(0.0);
@@ -4331,11 +4771,11 @@ vec4 puffCandidatesAt(vec2 worldXZ) {
     if (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0) {
         return vec4(0.0);
     }
-    ivec2 size = textureSize(PuffCandidateMapSampler, 0);
+    // C2: the map is PUFF_GRID wide but taller (descriptor and list rows below the grid).
     ivec2 coord = clamp(
-        ivec2(floor(uv * vec2(size))),
+        ivec2(floor(uv * float(PUFF_GRID))),
         ivec2(0),
-        size - ivec2(1)
+        ivec2(PUFF_GRID - 1)
     );
     return texelFetch(PuffCandidateMapSampler, coord, 0);
 }
@@ -4346,13 +4786,59 @@ vec4 puffCandidatesAt(vec2 worldXZ) {
 // this prevents each descriptor from remaining visible as a final ellipsoid.
 // x=analytic mass, y=envelope depth, z=weighted envelope depth,
 // w=local descriptor height.
+// S12. One smooth displacement direction per sample (cached: every lobe of one sample shares the fetch), from
+// the base noise's three low Worley octaves at a ~160-block cell, centred and scaled to about [-1, 1].
+vec3 paPuffWarpP = vec3(1.0e30);
+vec3 paPuffWarpV = vec3(0.0);
+
+vec3 paPuffWarpVector(vec3 p) {
+    if (any(notEqual(p, paPuffWarpP))) {
+        paPuffWarpP = p;
+        vec3 q = p;
+        q.xz -= MaterialOffset;
+        vec3 n = texture(BaseNoiseSampler, q * (1.0 / 1280.0) + vec3(0.21, 0.47, 0.83), 0.0).gba;
+        paPuffWarpV = clamp((n - vec3(0.48)) / 0.12, vec3(-2.5), vec3(2.5)) / 2.5;
+    }
+    return paPuffWarpV;
+}
+
+// S33. Cellular "cauliflower" on a lobe's own surface: F1 distance of (theta, v) to a jittered cell lattice with
+// cellsAround cells around the lobe (the theta axis wraps), in cell units. Worked in the lobe's surface
+// coordinates rather than world space, every cell becomes one dome on the lobe (world-space 3D noise cut by a
+// surface gave blotches: S9, T242).
+float paBubbleF1(float theta, float v, float cellsAround, float seed) {
+    float n = max(cellsAround, 3.0);
+    vec2 q = vec2((theta / 6.2831853 + 0.5) * n, v * n / 6.2831853 * 2.0);
+    vec2 cell = floor(q);
+    float best = 9.0;
+    for (int j = -1; j <= 1; j++) {
+        for (int i = -1; i <= 1; i++) {
+            vec2 c = cell + vec2(float(i), float(j));
+            float wrapped = mod(c.x, n);
+            vec2 h = fract(sin(vec2(dot(vec2(wrapped, c.y) + seed, vec2(127.1, 311.7)),
+                dot(vec2(wrapped, c.y) + seed, vec2(269.5, 183.3)))) * 43758.5453);
+            vec2 site = c + 0.15 + 0.7 * h;
+            best = min(best, length(q - site));
+        }
+    }
+    return best;
+}
+
 vec4 directPuffLobeSample(vec3 p, int candidateIndex, out int puffTier) {
-    vec4 posRadius = PuffPosRadius[candidateIndex];
-    vec4 shape = PuffShape[candidateIndex];
-    vec4 media = PuffMedia[candidateIndex];
+    vec4 posRadius = puffDescriptor(candidateIndex, 0);
+    vec4 shape = puffDescriptor(candidateIndex, 1);
+    vec4 media = puffDescriptor(candidateIndex, 2);
     float span = max(shape.z - shape.y, 1.0);
-    float h = (p.y - shape.y) / span;
     puffTier = int(clamp(floor(media.w + 0.00001), 0.0, 3.0));
+    if (PaPuffWarp > 0.0) {
+        // S12: bend the lobe by its own size - drum sides lean and bulge, junction rings tilt and wave - while a
+        // BASE lobe keeps its flat condensation base (no vertical warp in its lower 15-45 %).
+        float warpBlocks = min(PaPuffWarp, PA_PUFF_WARP_MAX) * max(posRadius.z, posRadius.w);
+        float unwarpedH = (p.y - shape.y) / span;
+        float verticalShare = puffTier == 0 ? 0.6 * smoothstep(0.15, 0.45, unwarpedH) : 0.6;
+        p += paPuffWarpVector(p) * warpBlocks * vec3(1.0, verticalShare, 1.0);
+    }
+    float h = (p.y - shape.y) / span;
     if (h <= 0.0 || h >= 1.0) {
         return vec4(0.0);
     }
@@ -4501,6 +4987,20 @@ vec4 directPuffLobeSample(vec3 p, int candidateIndex, out int puffTier) {
                 ? turretHeadroom * (1.0 - exp(-turretRaw / turretHeadroom))
                 : 0.0;
             implicitRadius /= 1.0 + turretGrowth;
+            if (PaPuffBubbles > 0.0) {
+                // S33: creases between cauliflower heads, carved inward (centres stay, borders sink by up to
+                // ~12 % x strength of the radius), so the heads need no headroom and never leave the footprint.
+                // Two scales: ~11 and ~22 heads around the lobe. Sides and top; the flat base is spared.
+                bool sharpHeads = PaPuffBubbleSharp > 0.5;
+                float coarse = paBubbleF1(lobeTheta, verticalCoordinate, sharpHeads ? 9.0 : 11.0, lobeSeed);
+                float fine = paBubbleF1(lobeTheta, verticalCoordinate, sharpHeads ? 16.0 : 22.0, lobeSeed + 17.3);
+                // Narrow: each head stays round to ~0.55 of a cell, the crease is the last ~0.25 (a dome profile).
+                float creaseLo = sharpHeads ? 0.50 : 0.25;
+                float creaseHi = sharpHeads ? 0.80 : 0.75;
+                float crease = 0.65 * smoothstep(creaseLo, creaseHi, coarse) + 0.35 * smoothstep(creaseLo, creaseHi, fine);
+                float bubbleZone = smoothstep(peakHeight * 0.3, peakHeight, h);
+                implicitRadius *= 1.0 + 0.12 * PaPuffBubbles * crease * bubbleZone;
+            }
         }
         envelopeDepth = max(1.0 - implicitRadius, 0.0);
         if (puffTier == 0) {
@@ -4560,7 +5060,15 @@ void accumulatePuffShape(inout vec2 accumulated, float candidate) {
 float resolvePuffShape(vec2 accumulated) {
     // One lobe remains exact. The second strongest can bridge a seam by at
     // most 0.0625, while no support is created outside either input.
-    return accumulated.x + 0.25 * accumulated.y * (1.0 - accumulated.x);
+    float legacy = accumulated.x + 0.25 * accumulated.y * (1.0 - accumulated.x);
+    if (PaPuffBlend > 0.0 && accumulated.y > 0.0) {
+        // S13: polynomial smooth max of the top two, only where they are within PaPuffBlend of each other
+        // (and only where both lobes have support, so no material appears outside them).
+        float k = PaPuffBlend;
+        float t = max(k - (accumulated.x - accumulated.y), 0.0) / k;
+        legacy = max(legacy, accumulated.x + t * t * k * 0.25);
+    }
+    return legacy;
 }
 
 // Exhaustive descriptor evaluation is intentionally expensive and is selected
@@ -4586,6 +5094,7 @@ float directPuffShape(
         out bool indexedTile,
         out float dominantHeight01) {
     vec4 candidateTexel = puffCandidatesAt(p.xz);
+    vec4 candidateTexel2 = puffCandidates2At(p.xz, candidateTexel);
     indexedTile = false;
     dominantHeight01 = 0.0;
     vec2 accumulated = vec2(0.0);
@@ -4593,7 +5102,9 @@ float directPuffShape(
     for (int candidateRank = 0;
             candidateRank < PUFF_CANDIDATES_PER_TILE;
             candidateRank++) {
-        int candidateIndex = decodePuffCandidate(candidateTexel, candidateRank);
+        int candidateIndex = candidateRank < 8
+            ? decodePuffCandidate(candidateTexel, candidateRank)
+            : decodePuffCandidate(candidateTexel2, candidateRank - 8);
         if (candidateIndex < 0
                 || candidateIndex >= PuffLobeCount
                 || candidateIndex >= MAX_PUFF_LOBES) {
@@ -4603,7 +5114,7 @@ float directPuffShape(
         float candidateShape = directPuffLobeShape(p, candidateIndex);
         if (candidateShape > strongestShape) {
             strongestShape = candidateShape;
-            vec4 candidateBounds = PuffShape[candidateIndex];
+            vec4 candidateBounds = puffDescriptor(candidateIndex, 1);
             dominantHeight01 = saturate(
                 (p.y - candidateBounds.y)
                     / max(candidateBounds.z - candidateBounds.y, 1.0)
@@ -4614,13 +5125,31 @@ float directPuffShape(
     return resolvePuffShape(accumulated);
 }
 
+// S9: bumps on bumps. Three octaves of rounded Worley bumps (BaseNoise.G, base period 8 per tile, so a cell of c
+// blocks needs domain scale 1 / (8 c)), each half the size and ~0.55 of the amplitude of the previous, with the
+// largest cell 0.45 of the local lobe radius - every cloud gets billows proportional to itself. Zero-mean in the
+// measured G distribution (p05/p95 0.28/0.68), in puff-envelope units.
+float paBillowHierarchy(vec3 p, float lobeRadius) {
+    float h = 0.0;
+    float amplitude = 0.20;
+    float cell = max(lobeRadius, 8.0) * 0.45;
+    for (int k = 0; k < 3; k++) {
+        float g = texture(BaseNoiseSampler, baseNoiseDomain(p, 1.0 / (8.0 * cell)), 0.0).g;
+        h += amplitude * (smoothstep(0.28, 0.68, g) - 0.5);
+        cell *= 0.5;
+        amplitude *= 0.55;
+    }
+    return h;
+}
+
 float resolvePuffContinuousField(
         vec2 envelopeAccumulated,
         vec2 weightedAccumulated,
         vec2 baseRootAccumulated,
         float carrierSignal,
         float billowSignal,
-        float billowStrength) {
+        float billowStrength,
+        float hierarchy) {
     float envelope = resolvePuffShape(envelopeAccumulated);
     if (envelope <= 0.0) {
         return 0.0;
@@ -4663,6 +5192,11 @@ float resolvePuffContinuousField(
         0.40
     );
     float surfaceIso = mix(billowIso, 0.012, protection);
+    if (PaShapeHierarchy > 0.0) {
+        // S9: the hierarchy acts everywhere except the flat base corridor, and at half strength across real lobe
+        // junctions (it may indent them, but must not detach a crown).
+        envelope += hierarchy * (1.0 - baseJunctionProtection) * (1.0 - 0.5 * junctionProtection);
+    }
     // T242: a cumulus has a defined edge - full density within 0.18 of lobe
     // depth inside its surface, not a linear ramp from the surface to the core
     // (which rendered every puff as a soft blur).
@@ -4716,7 +5250,8 @@ float directPuffContinuousShapeAll(
         baseRootAccumulated,
         carrierSignal,
         billowSignal,
-        billowStrength
+        billowStrength,
+        0.0 // S9 hierarchy: the exhaustive diagnostic keeps the legacy form
     );
 }
 
@@ -4742,6 +5277,217 @@ float directPuffEnvelopeShapeAll(vec3 p) {
 
 // Production carrier: candidate selection remains indexed, but the selected
 // descriptors contribute to one continuous field before the surface is cut.
+// S26 (one-body cumulus, E31). The lobes are the skeleton only. Each adds a smooth bump (1 - q^2)^3 that falls to
+// exactly zero at q = PaPuffBodyK lobe radii - inside the lobe's registered tile footprint, so no tile can drop a
+// contribution that is still non-zero - and the cloud is ONE implicit surface where the sum crosses a threshold
+// (metaballs). Cauliflower relief perturbs that one field and the density keeps rising above the threshold, so
+// light is attenuated by the cloud as a whole instead of stepping at every lobe surface.
+float paPuffLobeField(vec3 p, int candidateIndex) {
+    vec4 posRadius = puffDescriptor(candidateIndex, 0);
+    vec4 shape = puffDescriptor(candidateIndex, 1);
+    vec4 media = puffDescriptor(candidateIndex, 2);
+    float span = max(shape.z - shape.y, 1.0);
+    int tier = int(clamp(floor(media.w + 0.00001), 0.0, 3.0));
+    float lobePhase = fract(media.z * 0.754877666 + 0.17320508);
+    float peak = tier == 0 ? mix(0.32, 0.38, lobePhase)
+        : (tier == 1 ? mix(0.38, 0.44, lobePhase)
+        : (tier == 2 ? mix(0.43, 0.50, lobePhase) : mix(0.33, 0.43, lobePhase)));
+    vec2 delta = p.xz - posRadius.xy;
+    float cosO = cos(-shape.x);
+    float sinO = sin(-shape.x);
+    vec2 local = vec2(delta.x * cosO - delta.y * sinO, delta.x * sinO + delta.y * cosO);
+    vec2 radii = max(posRadius.zw, vec2(1.0));
+    float h = (p.y - shape.y) / span;
+    // Equator at peak; lower semi-axis span * peak, upper span * (1 - peak) (the lobe spans [base, top]).
+    float axis = span * (h < peak ? peak : 1.0 - peak);
+    float vertical = (p.y - (shape.y + span * peak)) / max(axis, 1.0);
+    // Turrets on the upper half (T243 / T246) widen the lobe locally.
+    float theta = atan(local.y, local.x);
+    float seed = lobePhase * 6.2831853;
+    float aroundA = 0.5 + 0.5 * sin(3.0 * theta + seed);
+    float aroundB = 0.5 + 0.5 * sin(5.0 * theta - seed * 2.3);
+    float upA = 0.5 + 0.5 * sin(10.05 * h + seed * 1.7);
+    float upB = 0.5 + 0.5 * sin(15.08 * h - seed);
+    float turret = (0.40 * aroundA * aroundA * upA + 0.25 * aroundB * aroundB * upB)
+        * smoothstep(peak * 0.6, peak + 0.1, h);
+    // Turret growth <= 0.12 x 0.65: support x growth stays inside the 1.25-radius tile footprint.
+    float q = length(vec2(length(local / radii), vertical)) / (1.0 + 0.12 * turret * (1.0 - min(PaPuffBodyTurrets, 1.0)));
+    float support = max(PaPuffBodyK, 1.0);
+    float x = saturate(1.0 - (q * q) / (support * support));
+    float f = x * x * x;
+    if (PaPuffBodyTurrets > 0.0) {
+        // E45. Heads within heads (E44: a real cumulus is rounded heads at ~30 % / ~12 % of the cloud, ours were
+        // only the lobes). Level 1: seven seeded spheres of 0.36 lobe radii, centred 0.72 out from the sides to
+        // the top; level 2: three spheres of 0.16 on the outer side of each. Explicit spheres in the summed field
+        // (domes, not noise blotches), so they melt into the lobe and each other with soft creases. Reach
+        // <= 1.18 lobe radii (inside the 1.25 tile footprint); evaluated only near the lobe surface, level 2
+        // only near its parent.
+        vec3 n = vec3(local.x / radii.x, vertical, local.y / radii.y);
+        float qn = length(n);
+        if (PaPuffBodyTurrets >= 2.0 && qn > 0.40 && qn < 1.25) {
+            // E45b dense mode: 16 heads tile the sides and top evenly (Fibonacci spiral over y in [-0.1, 0.98],
+            // rotated by the lobe seed), sizes 0.30-0.40; the parent ball is weakened so the heads, not its smooth
+            // surface, make the outline. Small heads only on the three large heads nearest the sample.
+            float headAmp = PaPuffBodyTurrets - 1.0;
+            f *= 0.8;
+            float best0 = 9.0, best1 = 9.0, best2 = 9.0;
+            vec3 c0 = vec3(0.0), cA = vec3(0.0), cB = vec3(0.0);
+            vec3 dir0 = vec3(0.0, 1.0, 0.0), dirA = dir0, dirB = dir0;
+            for (int j = 0; j < 16; j++) {
+                float hj = fract(sin(float(j) * 12.9898 + seed * 78.233) * 43758.5453);
+                float y = mix(-0.10, 0.98, (float(j) + 0.5) / 16.0);
+                float rr = sqrt(max(1.0 - y * y, 0.0));
+                float a = float(j) * 2.3999632 + seed + 0.35 * hj;
+                vec3 dir = vec3(cos(a) * rr, y, sin(a) * rr);
+                float radius = mix(0.30, 0.40, hj);
+                vec3 c = (0.70 + 0.06 * hj) * dir;
+                vec3 d = (n - c) / radius;
+                float dsq = dot(d, d);
+                float t = saturate(1.0 - dsq);
+                f += headAmp * 0.6 * t * t * t;
+                if (dsq < best0) { best2 = best1; cB = cA; dirB = dirA; best1 = best0; cA = c0; dirA = dir0;
+                    best0 = dsq; c0 = c; dir0 = dir; }
+                else if (dsq < best1) { best2 = best1; cB = cA; dirB = dirA; best1 = dsq; cA = c; dirA = dir; }
+                else if (dsq < best2) { best2 = dsq; cB = c; dirB = dir; }
+            }
+            for (int m = 0; m < 3; m++) {
+                vec3 cp = m == 0 ? c0 : (m == 1 ? cA : cB);
+                vec3 dp = m == 0 ? dir0 : (m == 1 ? dirA : dirB);
+                float bm = m == 0 ? best0 : (m == 1 ? best1 : best2);
+                if (bm > 2.6) {
+                    continue;
+                }
+                vec3 side = normalize(cross(dp, abs(dp.y) > 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
+                vec3 side2 = cross(dp, side);
+                for (int k = 0; k < 3; k++) {
+                    float ak = float(k) * 2.0943951 + seed * (1.3 + float(m));
+                    vec3 off = normalize(dp * 0.8 + (side * cos(ak) + side2 * sin(ak)) * 0.7);
+                    vec3 d2 = (n - (cp + 0.28 * off)) / 0.15;
+                    float t2 = saturate(1.0 - dot(d2, d2));
+                    f += headAmp * 0.6 * t2 * t2 * t2;
+                }
+            }
+        } else if (qn > 0.40 && qn < 1.25) {
+            for (int j = 0; j < 7; j++) {
+                float a = seed + float(j) * 0.8975979 + 0.5 * sin(seed * 3.1 + float(j) * 2.3);
+                float e = mix(-0.05, 1.25, fract(lobePhase * 7.13 + float(j) * 0.618034));
+                vec3 dir = vec3(cos(a) * cos(e), sin(e), sin(a) * cos(e));
+                vec3 c1 = 0.72 * dir;
+                vec3 d1 = (n - c1) / 0.36;
+                float d1sq = dot(d1, d1);
+                float t1 = saturate(1.0 - d1sq);
+                f += PaPuffBodyTurrets * 0.6 * t1 * t1 * t1;
+                if (d1sq < 2.6) {
+                    vec3 side = normalize(cross(dir, abs(dir.y) > 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
+                    vec3 side2 = cross(dir, side);
+                    for (int k = 0; k < 3; k++) {
+                        float ak = float(k) * 2.0943951 + seed * (1.7 + float(j));
+                        vec3 off = normalize(dir * 0.8 + (side * cos(ak) + side2 * sin(ak)) * 0.7);
+                        vec3 d2 = (n - (c1 + 0.30 * off)) / 0.16;
+                        float t2 = saturate(1.0 - dot(d2, d2));
+                        f += PaPuffBodyTurrets * 0.6 * t2 * t2 * t2;
+                    }
+                }
+            }
+        }
+    }
+    if (tier == 0) {
+        // BASE: one flat condensation level (4-block fade, no material below it).
+        f *= smoothstep(0.0, 4.0, p.y - shape.y);
+    }
+    return f;
+}
+
+// S26: one lobe's share of the body field and of the body-wide height.
+void paPuffBodyAccumulate(vec3 p, int candidateIndex, inout float field, inout float heightSum,
+        inout float heightWeight) {
+    float f = paPuffLobeField(p, candidateIndex);
+    if (f <= 0.0) {
+        return;
+    }
+    field += f;
+    vec4 shape = puffDescriptor(candidateIndex, 1);
+    heightSum += f * (p.y - shape.y);
+    heightWeight += f * max(shape.z - shape.y, 1.0);
+}
+
+float paPuffBodyShape(vec3 p, vec4 candidateTexel, float carrierSignal, float billowSignal,
+        out bool indexedTile, out float dominantHeight01) {
+    indexedTile = false;
+    dominantHeight01 = 0.0;
+    // S20 (restored for the S26 body: a summed field must see every lobe that reaches the tile).
+    vec4 candidateTexel2 = puffCandidates2At(p.xz, candidateTexel);
+    float field = 0.0;
+    float heightSum = 0.0;
+    float heightWeight = 0.0;
+    // A FULL 16-block tile may have dropped a lobe; a summed body must not lose one (a cut along the tile
+    // edge), so such samples read the 128-block lobe list instead (every lobe touching that tile or a
+    // neighbour; past its cap, every lobe). Body-wide height: lobe intervals weighted by their field.
+    bool tileFull = decodePuffCandidate(candidateTexel2, 7) >= 0;
+    if (tileFull) {
+        indexedTile = true;
+        vec2 occupancyUv = (p.xz - WeatherOrigin) / WeatherExtent;
+        ivec2 occupancyCell = clamp(ivec2(floor(occupancyUv * 32.0)), ivec2(0), ivec2(31));
+        int listBase = (occupancyCell.y * 32 + occupancyCell.x) * PUFF_LIST_TEXELS;
+        int listCount = int(puffListTexel(listBase).r + 0.5);
+        if (listCount <= PUFF_LIST_CAP) {
+            for (int k = 0; k < PUFF_LIST_CAP; k++) {
+                if (k >= listCount) {
+                    break;
+                }
+                int slot = k + 1;
+                vec4 listTexel = puffListTexel(listBase + slot / 4);
+                int lane = slot - (slot / 4) * 4;
+                float entry = lane == 0 ? listTexel.r : lane == 1 ? listTexel.g
+                    : lane == 2 ? listTexel.b : listTexel.a;
+                paPuffBodyAccumulate(p, int(entry + 0.5), field, heightSum, heightWeight);
+            }
+        } else {
+            for (int candidateIndex = 0; candidateIndex < MAX_PUFF_LOBES; candidateIndex++) {
+                if (candidateIndex >= PuffLobeCount) {
+                    break;
+                }
+                paPuffBodyAccumulate(p, candidateIndex, field, heightSum, heightWeight);
+            }
+        }
+    } else {
+        for (int candidateRank = 0; candidateRank < PUFF_CANDIDATES_PER_TILE; candidateRank++) {
+            int candidateIndex = candidateRank < 8
+                ? decodePuffCandidate(candidateTexel, candidateRank)
+                : decodePuffCandidate(candidateTexel2, candidateRank - 8);
+            if (candidateIndex < 0 || candidateIndex >= PuffLobeCount || candidateIndex >= MAX_PUFF_LOBES) {
+                continue;
+            }
+            indexedTile = true;
+            paPuffBodyAccumulate(p, candidateIndex, field, heightSum, heightWeight);
+        }
+    }
+    if (field <= 0.0) {
+        return 0.0;
+    }
+    dominantHeight01 = saturate(heightSum / max(heightWeight, 1.0e-4));
+    // Cauliflower relief on the one field: the world-stable carrier (BaseNoise.G) and the medium billows.
+    float carrier = smoothstep(0.28, 0.68, carrierSignal);
+    float billow = smoothstep(0.28, 0.68, billowSignal);
+    // Cauliflower = rounded bulges pushing OUT of the body. Worley cell centres (high carrier / billow) add
+    // field, one-sided, only where the body is already near (attach), so bulges grow from the surface and
+    // never float free; cell borders cut only shallow creases. Broad carrier cells make the big heads, the
+    // detail billows the small ones. Not on the flat base.
+    float threshold = PaPuffBodyThreshold;
+    float attach = smoothstep(0.35 * threshold, threshold, field);
+    float aboveBase = smoothstep(0.08, 0.25, dominantHeight01);
+    float bulge = 1.4 * smoothstep(0.50, 0.85, carrier) + 0.9 * smoothstep(0.50, 0.85, billow);
+    float crease = 0.5 * (1.0 - smoothstep(0.10, 0.40, carrier));
+    field += PaPuffBodyRelief * threshold * attach * aboveBase * (bulge - crease);
+    // Defined edge just above the threshold, then the density keeps rising toward the core.
+    // Fringe: detail billows erode the outer margin (not the core), so the edge is ragged, not a CG blob.
+    float above = field - threshold
+        - PaPuffBodyErode * threshold * (1.0 - billow) * (1.0 - smoothstep(threshold, 3.0 * threshold, field));
+    float edge = smoothstep(0.0, 0.035, above);
+    float core = mix(PaPuffBodyShell, 1.0, smoothstep(0.035, max(PaPuffBodyCoreDepth, 0.05), above));
+    return edge * core;
+}
+
 float directPuffContinuousShape(
         vec3 p,
         float carrierSignal,
@@ -4750,16 +5496,23 @@ float directPuffContinuousShape(
         out bool indexedTile,
         out float dominantHeight01) {
     vec4 candidateTexel = puffCandidatesAt(p.xz);
+    vec4 candidateTexel2 = puffCandidates2At(p.xz, candidateTexel);
+    if (PaPuffBody != 0) {
+        return paPuffBodyShape(p, candidateTexel, carrierSignal, billowSignal, indexedTile, dominantHeight01);
+    }
     indexedTile = false;
     dominantHeight01 = 0.0;
     vec2 envelopeAccumulated = vec2(0.0);
     vec2 weightedAccumulated = vec2(0.0);
     vec2 baseRootAccumulated = vec2(0.0);
     float strongestEnvelope = 0.0;
+    float s9RadiusSum = 0.0, s9RadiusWeight = 0.0;
     for (int candidateRank = 0;
             candidateRank < PUFF_CANDIDATES_PER_TILE;
             candidateRank++) {
-        int candidateIndex = decodePuffCandidate(candidateTexel, candidateRank);
+        int candidateIndex = candidateRank < 8
+            ? decodePuffCandidate(candidateTexel, candidateRank)
+            : decodePuffCandidate(candidateTexel2, candidateRank - 8);
         if (candidateIndex < 0
                 || candidateIndex >= PuffLobeCount
                 || candidateIndex >= MAX_PUFF_LOBES) {
@@ -4768,6 +5521,10 @@ float directPuffContinuousShape(
         indexedTile = true;
         int puffTier = 3;
         vec4 lobeSample = directPuffLobeSample(p, candidateIndex, puffTier);
+        // S9: envelope-weighted mean lobe radius (continuous across lobes, unlike the dominant lobe).
+        float paLobeR = max(puffDescriptor(candidateIndex, 0).z, puffDescriptor(candidateIndex, 0).w);
+        s9RadiusSum += lobeSample.y * paLobeR;
+        s9RadiusWeight += lobeSample.y;
         if (lobeSample.z > strongestEnvelope) {
             strongestEnvelope = lobeSample.z;
             dominantHeight01 = lobeSample.w;
@@ -4780,13 +5537,20 @@ float directPuffContinuousShape(
             puffTier
         );
     }
+    float hierarchy = 0.0;
+    if (PaShapeHierarchy > 0.0 && s9RadiusWeight > 0.0) {
+        vec3 paBillowPos = p;
+        paBillowPos.xz -= MaterialOffset; // move with the advected material, like the other cloud noise
+        hierarchy = PaShapeHierarchy * paBillowHierarchy(paBillowPos, s9RadiusSum / s9RadiusWeight);
+    }
     return resolvePuffContinuousField(
         envelopeAccumulated,
         weightedAccumulated,
         baseRootAccumulated,
         carrierSignal,
         billowSignal,
-        billowStrength
+        billowStrength,
+        hierarchy
     );
 }
 
@@ -4812,61 +5576,153 @@ bool puffBoundsClipAxis(
 // switch to fine traversal before advancing through a possible support volume.
 // This preserves long clear-air strides without tying silhouette visibility to
 // the screen-row-dependent ray/slab span.
+// P3. Length along the ray (from p, at most maxT) that crosses only provably empty 64-block weather tiles:
+// 0 when p's own tile may hold cloud. A 2D DDA over mip 3 of the occupancy pyramid; a tile also counts as
+// occupied when the puff occupancy bits (128-block, dilated) mark it, and leaving the weather extent stops.
+float paEmptyRunLength(vec3 p, vec3 dir, float maxT) {
+    vec2 uv = (p.xz - WeatherOrigin) / WeatherExtent;
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThanEqual(uv, vec2(1.0)))) {
+        return 0.0;
+    }
+    const float CELLS = 64.0;
+    float tileWorld = WeatherExtent / CELLS;
+    vec2 cellF = uv * CELLS;
+    ivec2 cell = ivec2(floor(cellF));
+    vec2 d = dir.xz;
+    vec2 invD = 1.0 / max(abs(d), vec2(1.0e-6));
+    ivec2 stepDir = ivec2(d.x >= 0.0 ? 1 : -1, d.y >= 0.0 ? 1 : -1);
+    vec2 frac = cellF - vec2(cell);
+    vec2 tMax = vec2(d.x >= 0.0 ? 1.0 - frac.x : frac.x, d.y >= 0.0 ? 1.0 - frac.y : frac.y) * tileWorld * invD;
+    vec2 tDelta = tileWorld * invD;
+    float run = 0.0;
+    for (int i = 0; i < 48; i++) {
+        bool puffTile = PuffLobeCount > 0
+            && ((PuffOccupancy[cell.y >> 1] >> (cell.x >> 1)) & 1) != 0;
+        if (puffTile || texelFetch(NsCoverageSampler, cell, 3).g > 0.0) {
+            return run;
+        }
+        run = min(tMax.x, tMax.y);
+        if (run >= maxT) {
+            return maxT;
+        }
+        if (tMax.x < tMax.y) {
+            cell.x += stepDir.x;
+            tMax.x += tDelta.x;
+        } else {
+            cell.y += stepDir.y;
+            tMax.y += tDelta.y;
+        }
+        if (cell.x < 0 || cell.y < 0 || cell.x >= 64 || cell.y >= 64) {
+            return run;
+        }
+    }
+    return run;
+}
+
+// C2. The per-lobe test of directPuffSegmentMayIntersect (padded AABB, tier filter), factored out so the
+// tile lists and the full loop share it.
+bool puffSegmentHitsLobe(vec3 segmentStart, vec3 delta, int candidateIndex) {
+    vec4 posRadius = puffDescriptor(candidateIndex, 0);
+    vec4 shape = puffDescriptor(candidateIndex, 1);
+    int puffTier = int(clamp(
+        floor(puffDescriptor(candidateIndex, 2).w + 0.00001),
+        0.0,
+        3.0
+    ));
+    if (PuffTierFilter >= 0 && puffTier != PuffTierFilter) {
+        return false;
+    }
+    // A rotated ellipse can extend by its major radius on either world
+    // axis. The former X=major/Z=minor box missed valid support whenever
+    // the major axis approached Z. max(major, minor) is a cheap, strictly
+    // conservative bound without per-step trigonometry.
+    // S12: padded for the largest lobe warp (horizontal 1, vertical 0.6 of PA_PUFF_WARP_MAX lobe radii).
+    float horizontalPadding = max(
+        max(posRadius.z, posRadius.w) * (1.05 + PA_PUFF_WARP_MAX),
+        1.0
+    );
+    // S26: a one-body bump reaches (support - 1) of the lobe's half-span past its base / top.
+    float verticalPadding = max(0.6 * PA_PUFF_WARP_MAX * max(posRadius.z, posRadius.w),
+        PaPuffBody != 0 ? max(max(PaPuffBodyK - 1.0, 0.0), PaPuffBodyTurrets > 0.0 ? 0.20 : 0.0)
+            * (shape.z - shape.y) : 0.0); // E45: heads reach 1.18 lobe radii
+    vec3 padding = vec3(horizontalPadding, 0.0, horizontalPadding);
+    vec3 minimumBounds = vec3(
+        posRadius.x - padding.x,
+        shape.y - verticalPadding,
+        posRadius.y - padding.z
+    );
+    vec3 maximumBounds = vec3(
+        posRadius.x + padding.x,
+        shape.z + verticalPadding,
+        posRadius.y + padding.z
+    );
+    float segmentMinimum = 0.0;
+    float segmentMaximum = 1.0;
+    bool intersects = puffBoundsClipAxis(
+        segmentStart.x, delta.x,
+        minimumBounds.x, maximumBounds.x,
+        segmentMinimum, segmentMaximum
+    );
+    intersects = intersects && puffBoundsClipAxis(
+        segmentStart.y, delta.y,
+        minimumBounds.y, maximumBounds.y,
+        segmentMinimum, segmentMaximum
+    );
+    intersects = intersects && puffBoundsClipAxis(
+        segmentStart.z, delta.z,
+        minimumBounds.z, maximumBounds.z,
+        segmentMinimum, segmentMaximum
+    );
+    return intersects;
+}
+
 bool directPuffSegmentMayIntersect(vec3 segmentStart, vec3 segmentEnd) {
     vec3 delta = segmentEnd - segmentStart;
+    if (PaPerfArm == 3 || PaPerfArm == 4) {
+        return false; // PERF-TEMP: no puff promotion (image invalid)
+    }
+    if (PaPuffOccupancy != 0) {
+        // P1. A segment no longer than one occupancy tile stays in its start tile's 3 x 3 neighbourhood, which
+        // the CPU dilation folds into the start bit: clear = no lobe can be touched. Outside the extent, the
+        // loop decides.
+        float occupancyTile = WeatherExtent / 32.0;
+        vec2 occupancyUv = (segmentStart.xz - WeatherOrigin) / WeatherExtent;
+        if (dot(delta.xz, delta.xz) <= occupancyTile * occupancyTile
+                && all(greaterThanEqual(occupancyUv, vec2(0.0))) && all(lessThan(occupancyUv, vec2(1.0)))) {
+            ivec2 occupancyCell = ivec2(floor(occupancyUv * 32.0));
+            if (((PuffOccupancy[occupancyCell.y] >> occupancyCell.x) & 1) == 0) {
+                return false;
+            }
+            // C2. Only the lobes listed for this tile (dilated one tile) can touch so short a segment; a list
+            // past its cap reads PUFF_LIST_CAP + 1 and falls through to the full loop.
+            int listBase = (occupancyCell.y * 32 + occupancyCell.x) * PUFF_LIST_TEXELS;
+            vec4 listHead = puffListTexel(listBase);
+            int listCount = int(listHead.r + 0.5);
+            if (listCount <= PUFF_LIST_CAP) {
+                for (int k = 0; k < PUFF_LIST_CAP; k++) {
+                    if (k >= listCount) {
+                        break;
+                    }
+                    int slot = k + 1;
+                    vec4 listTexel = puffListTexel(listBase + slot / 4);
+                    int lane = slot - (slot / 4) * 4;
+                    float entry = lane == 0 ? listTexel.r : lane == 1 ? listTexel.g
+                        : lane == 2 ? listTexel.b : listTexel.a;
+                    if (puffSegmentHitsLobe(segmentStart, delta, int(entry + 0.5))) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+    }
     for (int candidateIndex = 0;
             candidateIndex < MAX_PUFF_LOBES;
             candidateIndex++) {
         if (candidateIndex >= PuffLobeCount) {
             break;
         }
-        vec4 posRadius = PuffPosRadius[candidateIndex];
-        vec4 shape = PuffShape[candidateIndex];
-        int puffTier = int(clamp(
-            floor(PuffMedia[candidateIndex].w + 0.00001),
-            0.0,
-            3.0
-        ));
-        if (PuffTierFilter >= 0 && puffTier != PuffTierFilter) {
-            continue;
-        }
-        // A rotated ellipse can extend by its major radius on either world
-        // axis. The former X=major/Z=minor box missed valid support whenever
-        // the major axis approached Z. max(major, minor) is a cheap, strictly
-        // conservative bound without per-step trigonometry.
-        float horizontalPadding = max(
-            max(posRadius.z, posRadius.w) * 1.05,
-            1.0
-        );
-        vec3 padding = vec3(horizontalPadding, 0.0, horizontalPadding);
-        vec3 minimumBounds = vec3(
-            posRadius.x - padding.x,
-            shape.y,
-            posRadius.y - padding.z
-        );
-        vec3 maximumBounds = vec3(
-            posRadius.x + padding.x,
-            shape.z,
-            posRadius.y + padding.z
-        );
-        float segmentMinimum = 0.0;
-        float segmentMaximum = 1.0;
-        bool intersects = puffBoundsClipAxis(
-            segmentStart.x, delta.x,
-            minimumBounds.x, maximumBounds.x,
-            segmentMinimum, segmentMaximum
-        );
-        intersects = intersects && puffBoundsClipAxis(
-            segmentStart.y, delta.y,
-            minimumBounds.y, maximumBounds.y,
-            segmentMinimum, segmentMaximum
-        );
-        intersects = intersects && puffBoundsClipAxis(
-            segmentStart.z, delta.z,
-            minimumBounds.z, maximumBounds.z,
-            segmentMinimum, segmentMaximum
-        );
-        if (intersects) {
+        if (puffSegmentHitsLobe(segmentStart, delta, candidateIndex)) {
             return true;
         }
     }
@@ -4897,12 +5753,15 @@ bool dominantDirectPuffHeightAt(vec3 p, out float localHeight01) {
         return false;
     }
     vec4 candidateTexel = puffCandidatesAt(p.xz);
+    vec4 candidateTexel2 = puffCandidates2At(p.xz, candidateTexel);
     float bestShape = 0.0;
     float dominantHeight = 0.0;
     for (int candidateRank = 0;
             candidateRank < PUFF_CANDIDATES_PER_TILE;
             candidateRank++) {
-        int candidateIndex = decodePuffCandidate(candidateTexel, candidateRank);
+        int candidateIndex = candidateRank < 8
+            ? decodePuffCandidate(candidateTexel, candidateRank)
+            : decodePuffCandidate(candidateTexel2, candidateRank - 8);
         if (candidateIndex < 0
                 || candidateIndex >= PuffLobeCount
                 || candidateIndex >= MAX_PUFF_LOBES) {
@@ -6425,7 +7284,7 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
     // the streak arithmetic live. Image-invalid; a bound.
     vec4 rainNoise = vec4(0.6, 0.5, 0.5, 0.5) + vec4(rainDomain.x, rainDomain.y, rainDomain.z, 0.0) * 1.0e-6;
 #else
-    vec4 rainNoise = texture(DetailNoiseSampler, rainDomain, mipBias + 0.75);
+    vec4 rainNoise = textureLod(DetailNoiseSampler, rainDomain, 0.0); // E36: level 0 = its look before mips
 #endif
     // R is the coherent low-frequency Worley channel; G/B only roughen real
     // columns.  The previous weighted average plus a 2% floor gave every
@@ -6891,11 +7750,13 @@ float cloudDensityImpl(
     );
     bool useCumulusStructure = cumulusProfile
         && cumulusRolePresence > 0.004
-        && cumulusHeightPresence > 0.0001;
+        && cumulusHeightPresence > 0.0001
+        && PaPerfArm != 5; // PERF-TEMP 5: no weather-map cumulus structure (direct puffs everywhere they exist)
     bool directPuffAvailable = cumulusProfile
         && !useCumulusStructure
         && PuffLobeCount > 0
-        && PuffShapeMode != 0;
+        && PuffShapeMode != 0
+        && PaPerfArm != 4; // PERF-TEMP
 
     float cloud = 0.0;
     // Direct descriptors already carry exact per-lobe Y bounds. The fused
@@ -6904,7 +7765,9 @@ float cloudDensityImpl(
     bool insideShapeBounds = directStormAvailable
         ? true
         : useCumulusStructure || directPuffAvailable
-            ? p.y > SlabBaseY - 2.0 && p.y < SlabTopY + 2.0
+            ? (PaPerfArm == 2
+                ? p.y > baseY - max(48.0, 0.30 * layerSpan) && p.y < topY + max(48.0, 0.30 * layerSpan)
+                : p.y > SlabBaseY - 2.0 && p.y < SlabTopY + 2.0)
             : h01 > -0.02 && h01 < 1.02;
     if (paTraceCapture && insideShapeBounds) {
         paCdFlags |= PA_CD_INSIDE_SHAPE_BOUNDS;
@@ -6964,7 +7827,8 @@ float cloudDensityImpl(
             // resolver's 0.28..0.68 remap. Strength 3 moves the exposed
             // shell's isovalue by up to +-0.18 of lobe depth; junctions,
             // cores and the base-root corridor stay protected (flat base).
-            vec4 billowTap = texture(DetailNoiseSampler, detailNoiseDomain(samplePos), mipBias);
+            vec4 billowTap = textureLod(DetailNoiseSampler, detailNoiseDomain(samplePos),
+                paDetailLod(samplePos) + max(mipBias, 0.0));
             float billowFbm = billowTap.r * 0.625 + billowTap.g * 0.25 + billowTap.b * 0.125;
             puffBillowSignal = 0.48 + (billowFbm - 0.48) * 1.333;
             puffBillowStrength = 3.0;
@@ -7329,7 +8193,7 @@ float shift = (deckWeight * blocksPerSd
                 : 1.0;
             float detailFbm = 0.5;
             if (detailWeight > 0.0001) {
-                vec4 detail = texture(DetailNoiseSampler, detailPos, mipBias);
+                vec4 detail = textureLod(DetailNoiseSampler, detailPos, paDetailLod(samplePos) + max(mipBias, 0.0));
                 // Which path paid for it decides which LOD could remove it.
                 if (paWorkloadCaptureActive()) {
                     paDetailOctaveEvaluations += 3;
@@ -7347,10 +8211,11 @@ float shift = (deckWeight * blocksPerSd
                     ? smoothstep(0.65, 1.65, paProjectedFeaturePixels(p, 8.4))
                     : 1.0;
                 if (fineWeight > 0.0001) {
-                    vec4 fine = texture(
+                    // E36: explicit level (2.71x the frequency = +1.44 levels).
+                    vec4 fine = textureLod(
                         DetailNoiseSampler,
                         detailPos * 2.71 + vec3(0.173, -0.291, 0.417),
-                        mipBias
+                        paDetailLod(samplePos) + 1.44 + max(mipBias, 0.0)
                     );
                     if (paWorkloadCaptureActive()) {
                         paDetailOctaveEvaluations += 3;
@@ -7683,6 +8548,22 @@ float paStormFieldUncoveredDensity(float x, float z, int k) {
 // node density in A.
 // T247: exactUncovered asks for the exact density of non-storm material: the
 // lookup then returns -1 on an uncovered node and the caller evaluates it.
+// E33: true where the shared field marks p as storm-covered (one fetch; same test as the light taps use).
+bool paStormFieldCoveredAt(vec3 p) {
+    if (StormLobeCount <= 0 || (PaStormFieldEnabled & 1) == 0) {
+        return false;
+    }
+    vec3 c = paStormFieldCoord(p);
+    if (c.y < 0.0 || c.y > float(PA_STORM_FIELD_Y)) {
+        return false;
+    }
+    int k = int(clamp(floor(c.y), 0.0, float(PA_STORM_FIELD_Y - 1)));
+    float floorR = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k)).r;
+    return floorR > (PaFieldCoverageFix != 0
+        ? 1.0 - PA_STORM_FIELD_BODY_GAIN - 0.01
+        : PA_STORM_FIELD_UNCOVERED * 0.5);
+}
+
 float paStormFieldLightDensityAt(vec3 p, bool detailTap, bool exactUncovered) {
     paStormFieldLightUncovered = false;
     vec3 c = paStormFieldCoord(p);
@@ -7698,7 +8579,12 @@ float paStormFieldLightDensityAt(vec3 p, bool detailTap, bool exactUncovered) {
     }
     vec4 f0 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k0));
     vec4 f1 = texture(StormFieldSampler, paStormFieldAtlasUv(c.x, c.z, k1));
-    paStormFieldLightUncovered = min(f0.r, f1.r) <= PA_STORM_FIELD_UNCOVERED * 0.5;
+    // E10: without storm lobes every covered node is exactly 1.0, so any filtered R below 0.999 carries uncovered
+    // weight (exact, free). With storms, covered floors span [1 - BODY_GAIN, 1]: below that range an uncovered node
+    // certainly contributes; a small uncovered weight on a covered floor can still pass (residual, storm scenes only).
+    paStormFieldLightUncovered = min(f0.r, f1.r) <= (PaFieldCoverageFix != 0
+        ? (StormLobeCount <= 0 ? 0.999 : 1.0 - PA_STORM_FIELD_BODY_GAIN - 0.01)
+        : PA_STORM_FIELD_UNCOVERED * 0.5);
     if (paStormFieldLightUncovered) {
         if (exactUncovered) {
             return -1.0;
@@ -7727,7 +8613,7 @@ float paStormFieldLightDensityAt(vec3 p, bool detailTap, bool exactUncovered) {
         / max(1.0 - lowerBound, 0.0001));
     if (detailTap && cloud > 0.003) {
         vec3 detailPos = detailNoiseDomain(samplePos) + (baseNoise.gbr - 0.5) * 0.18;
-        vec4 detail = texture(DetailNoiseSampler, detailPos, 0.0);
+        vec4 detail = textureLod(DetailNoiseSampler, detailPos, paDetailLod(samplePos));
         if (paWorkloadCaptureActive()) {
             paDetailOctaveEvaluations += 3;
             paDetailFetchLight++;
@@ -7957,7 +8843,7 @@ float paStormFieldBodyFromThreshold(vec3 p, float lowerBound, float height01,
         / max(1.0 - lowerBound, 0.0001));
     if (cloud > 0.003 && useDetail) {
         vec3 detailPos = detailNoiseDomain(samplePos) + (baseNoise.gbr - 0.5) * 0.18;
-        vec4 detail = texture(DetailNoiseSampler, detailPos, 0.0);
+        vec4 detail = textureLod(DetailNoiseSampler, detailPos, paDetailLod(samplePos));
         if (paWorkloadCaptureActive()) {
             paDetailOctaveEvaluations += 3;
             paDetailFetchPrimary++;
@@ -7968,10 +8854,10 @@ float paStormFieldBodyFromThreshold(vec3 p, float lowerBound, float height01,
                 ? smoothstep(0.65, 1.65, paProjectedFeaturePixels(p, 8.4))
                 : 1.0;
             if (fineWeight > 0.0001) {
-                vec4 fine = texture(
+                vec4 fine = textureLod( // E36: explicit level (+1.44 for the 2.71x frequency)
                     DetailNoiseSampler,
                     detailPos * 2.71 + vec3(0.173, -0.291, 0.417),
-                    0.0);
+                    paDetailLod(samplePos) + 1.44);
                 if (paWorkloadCaptureActive()) {
                     paDetailOctaveEvaluations += 3;
                     paDetailFetchSecondOctave++;
@@ -8281,6 +9167,9 @@ float lightMarchOpticalDepth(
         paLightMarchBelowFloor += paLodTransmittance < 0.045 ? 1 : 0;
     }
     float opticalDepth = 0.0;
+    // S26: a one-body cumulus reads every light tap from the shared field, as storms do.
+    bool paLightPuffBody = PaPuffBody != 0 && PuffLobeCount > 0
+        && decodePuffCandidate(puffCandidatesAt(p.xz), 0) >= 0;
 #ifdef PA_ARM_LIGHT_STEP_WIDE
     // PM idea C: same tap count, wider spacing, so the cone covers a longer
     // optical path at coarser resolution.
@@ -8288,6 +9177,29 @@ float lightMarchOpticalDepth(
 #else
     float stepLength = 14.0;
 #endif
+    float paNearTap0Scale = 1.0;
+    float paDetailStepPrimary = paDetailStep;
+    paDetailStep = 4.0; // S31: near-field light samples stand for 3.5-12 blocks
+    // E33: storms already carry dense surface noise and pay +1.5-2.2 ms for near light with little visible
+    // gain (s32), so Low / Medium leave storm-covered samples on the cone; High includes them.
+    if (PaNearLight != 0 && (PaNearLight >= 3 || !paStormFieldCoveredAt(p))) {
+        // E33: the first 12 blocks toward the sun, sampled exactly (the cone below starts at 14). E37: without the
+        // detail noise - these samples shade 5-15 block relief; one point of fine noise standing for up to 12
+        // blocks of path at the E35 extinction was the per-pixel grain (s43: near light off removed it).
+        paDensityConsumer = 2;
+        if (PaNearLight >= 3) {
+            opticalDepth += cloudDensity(p + LightDir * 2.0, 0.0, false, false, false) * 3.5;
+            opticalDepth += cloudDensity(p + LightDir * 5.0, 0.0, false, false, false) * 3.5;
+            opticalDepth += cloudDensity(p + LightDir * 9.0, 0.0, false, false, false) * 5.0;
+        } else if (PaNearLight == 2) {
+            opticalDepth += cloudDensity(p + LightDir * 3.0, 0.0, false, false, false) * 5.5;
+            opticalDepth += cloudDensity(p + LightDir * 8.5, 0.0, false, false, false) * 6.5;
+        } else {
+            opticalDepth += cloudDensity(p + LightDir * 6.0, 0.0, false, false, false) * 12.0;
+        }
+        paDensityConsumer = 0;
+        paNearTap0Scale = 2.0 / 14.0;
+    }
     vec3 pos = p;
     for (int i = 0; i < MAX_LIGHT_STEPS; i++) {
         if (i >= steps) {
@@ -8358,6 +9270,7 @@ float lightMarchOpticalDepth(
 #endif
         paLightTapOrdinal = i + 1;
         paDensityConsumer = 2;
+        paDetailStep = stepLength; // S31
 #ifdef PA_ARM_FIELD_LOOKUP
         // T195 Task 7. One fetch where the tap would have walked the
         // descriptors, the base noise and - on the first two taps - the
@@ -8413,9 +9326,13 @@ float lightMarchOpticalDepth(
         // keeps its single call site.
         float density = (PaStormFieldEnabled & 1) != 0
             ? ((PaStormFieldEnabled & 8) != 0
-                ? paStormFieldLightDensityAt(pos + offset, detailTap, i == 0 && fractusFieldFirst <= 0.0)
+                ? paStormFieldLightDensityAt(pos + offset, detailTap,
+                    i == 0 && fractusFieldFirst <= 0.0 && PaLightTap0Field == 0 && !paLightPuffBody)
                 : paStormFieldDensityAt(pos + offset))
             : -1.0;
+        if (i < PaExactLightTaps) {
+            density = -1.0; // L5: the exact walk below
+        }
         float fieldFirstDensity = 0.0;
         float fieldFirstWeight = 0.0;
         if (i == 0 && fractusFieldFirst > 0.0 && fractusFieldFirst < 1.0
@@ -8437,7 +9354,7 @@ float lightMarchOpticalDepth(
 #endif
         paLightingDensityTap = false;
         paLightingDetailWeight = 1.0;
-        opticalDepth += density * stepLength * tapWeight;
+        opticalDepth += density * stepLength * tapWeight * (i == 0 ? paNearTap0Scale : 1.0);
 #ifdef PA_ARM_LIGHT_EARLY_OUT
         // PM idea C, from PMWeather's light march: it stops a light ray once
         // Beer transmission through the cone falls below 0.05. PA only applies
@@ -8459,6 +9376,7 @@ float lightMarchOpticalDepth(
         }
         stepLength *= 1.42;
     }
+    paDetailStep = paDetailStepPrimary;
     return opticalDepth;
 }
 
@@ -8703,6 +9621,11 @@ float paUnpackDensityForm(float density) {
 #endif
 }
 
+// S1. A Minecraft colour (display-encoded) as linear radiance when the colour-managed pipeline is on.
+vec3 paInputColor(vec3 c) {
+    return PaColorPipeline != 0 ? pow(max(c, vec3(0.0)), vec3(2.2)) : c;
+}
+
 vec3 evaluateLightingComponents(
         float opticalDepth,
         float localDensity,
@@ -8716,13 +9639,19 @@ vec3 evaluateLightingComponents(
         out float diagnosticDirectContribution,
         out float diagnosticAmbientContribution,
         out float diagnosticPhaseShadow) {
+    if (PaOpticalThicknessGain > 0.0) {
+        opticalDepth *= 1.0 + PaOpticalThicknessGain * smoothstep(0.30, 0.90, materialDarkness);
+    }
+    vec3 paSunColor = paInputColor(LightColor);
+    vec3 paAmbientTop = paInputColor(AmbientTop);
+    vec3 paAmbientBottom = paInputColor(AmbientBottom);
     // Multi-scattering octaves (Hillaire): each octave sees weaker extinction
     // and a flatter phase, which keeps thick storm cores luminous.
     float scatter = 0.0;
     float scatterWeight = 0.0;
     float a = 1.0;
     float b = 1.0;
-    int octaves = clamp(ScatterOctaves, 1, 3);
+    int octaves = PaLightSplit == 3 ? 1 : clamp(ScatterOctaves, 1, 3);
     for (int o = 0; o < 3; o++) {
         if (o >= octaves) {
             break;
@@ -8736,14 +9665,20 @@ vec3 evaluateLightingComponents(
     // Each HG phase integrates to one over the sphere. The octave weights
     // must therefore be normalized; otherwise Ultra injects 1.7904 times the
     // single-scattering energy and changing quality changes exposure.
-    scatter /= max(scatterWeight, 0.0001);
+    // S2: PaOctaveNormalize 0 keeps the octaves' added energy (see the uniform).
+    if (PaOctaveNormalize != 0) {
+        scatter /= max(scatterWeight, 0.0001);
+    }
 
     // Beer-powder: dark creases where in-scattering has not built up yet.
     float powder = 1.0 - exp(-localDensity * 24.0);
     float powderTerm = mix(1.0, saturate(powder * 1.35), saturate(cosTheta * 0.5 + 0.5) * 0.72);
+    if (PaLightSplit == 4) {
+        powderTerm = 1.0;
+    }
 
     // Distant clouds redden more at sunset: longer light path through air.
-    vec3 sunTint = mix(vec3(1.0), vec3(1.0, 0.52, 0.30), SunsetStrength * distance01 * 0.65);
+    vec3 sunTint = paInputColor(mix(vec3(1.0), vec3(1.0, 0.52, 0.30), SunsetStrength * distance01 * 0.65)); // S1: display tint
 
     // T232. Only the primary march's density carries the relief form, and it
     // says so with localStorm + 4 (localStorm is saturated); every other
@@ -8761,7 +9696,7 @@ vec3 evaluateLightingComponents(
     );
     float directTransmission = exp(-opticalDepth);
     diagnosticLightOpticalDepth = opticalDepth;
-    vec3 sunTerm = LightColor * sunTint * scatter * powderTerm * (4.0 * PI);
+    vec3 sunTerm = paSunColor * sunTint * scatter * powderTerm * (4.0 * PI);
     sunTerm *= mix(1.0, 0.76, combinedStorm);
     sunTerm *= mix(1.0, mix(0.70, 0.82, combinedStorm), undersideShade);
     // T226 (D1). The rain-only darkening (sun, ambient, tint) acts at a
@@ -8770,7 +9705,7 @@ vec3 evaluateLightingComponents(
     // overhead shadow, the full darkening left it ~25 levels below the trunk.
     float rainShadeWeight = rainFraction * 0.25;
     sunTerm *= mix(1.0, 0.80, rainShadeWeight);
-    vec3 ambient = mix(AmbientBottom, AmbientTop, saturate(h01ForAmbient));
+    vec3 ambient = mix(paAmbientBottom, paAmbientTop, saturate(h01ForAmbient));
     // T217 uses the sky energy BEFORE the storm/underside/retention darkening:
     // multiple scattering delivers the sky the buried sample cannot see, and
     // the retention factor below is precisely the term that removes it.
@@ -8781,7 +9716,11 @@ vec3 evaluateLightingComponents(
     // fill while exposed edges remain open to the sky. The bounded retention
     // prevents thick or night-time clouds from collapsing to black.
     float ambientRetention = mix(0.74, 0.58, materialDarkness);
-    ambient *= mix(ambientRetention, 1.0, directTransmission);
+    if (PaAmbientTransmission != 0) {
+        ambient *= 1.0 / (1.0 + 0.1125 * max(opticalDepth, 0.0));
+    } else {
+        ambient *= mix(ambientRetention, 1.0, directTransmission);
+    }
     if (PaReliefShade > 0.0) {
         // T231. The lower anvil's form, from the SAME centred macro field that
         // displaces it (T230): a positive signal moves the surface inward -
@@ -8856,28 +9795,39 @@ vec3 evaluateLightingComponents(
         float camGate = smoothstep(
             STORM_MS_CAMERA_GATE_LO, STORM_MS_CAMERA_GATE_HI, CameraCloudDensity
         );
-        vec3 msSource = skyAmbient + LightColor * sunTint * STORM_MS_SUN_SHARE;
+        vec3 msSource = skyAmbient + paSunColor * sunTint * STORM_MS_SUN_SHARE;
         vec3 indirect = msSource * (STORM_MS_STRENGTH * msFill * camGate)
             * mix(1.0, 0.78, combinedStorm)
             * mix(1.0, 0.72, rainFraction);
         ambient += indirect / 0.86;
     }
-    vec3 radiance = sunTerm + ambient * 0.86 + LightColor * sunTint * silver * 0.48;
+    if (PaLightSplit == 1) {
+        ambient = vec3(0.0);
+    } else if (PaLightSplit == 2) {
+        sunTerm = vec3(0.0);
+        silver = 0.0;
+    }
+    vec3 radiance = sunTerm + ambient * 0.86 + paSunColor * sunTint * silver * 0.48;
 
     diagnosticDirectContribution = dot(
-        sunTerm + LightColor * sunTint * silver * 0.48,
+        sunTerm + paSunColor * sunTint * silver * 0.48,
         vec3(0.2126, 0.7152, 0.0722)
     );
     diagnosticAmbientContribution = dot(ambient * 0.86, vec3(0.2126, 0.7152, 0.0722));
     diagnosticPhaseShadow = scatter * powderTerm * directTransmission;
 
-    vec3 rainTint = mix(vec3(0.76, 0.80, 0.86), vec3(0.48, 0.54, 0.64), NightFactor);
+    vec3 rainTint = paInputColor(mix(vec3(0.76, 0.80, 0.86), vec3(0.48, 0.54, 0.64), NightFactor)); // S1: display tint
     radiance *= mix(vec3(1.0), rainTint, rainShadeWeight * 0.50);
     radiance = max(radiance, vec3(0.0));
     // A peak normalization mapped every energetic sample to exactly white.
     // Filmic exponential compression preserves highlight ordering and colour
     // while keeping the final LDR composite bounded.
     float toneExposure = mix(1.30, 1.48, NightFactor);
+    // S1: the colour-managed pipeline returns linear radiance (exposure applied); the composite applies the same
+    // curve once to the reconstructed colour and encodes it for the display.
+    if (PaColorPipeline != 0) {
+        return radiance * toneExposure;
+    }
     return vec3(1.0) - exp(-radiance * toneExposure);
 }
 
@@ -8924,11 +9874,16 @@ float rainOverheadOpticalDepth(vec3 p) {
     float columnBase = SlabBaseY + column.g * slabSpan;
     float overhead = max(columnTop - max(columnBase, p.y), 0.0)
         * 0.25 * DensityMul * ExtinctionScale;
-    return 2.2 * (1.0 - exp(-overhead / 2.2));
+    // S1b: with the ambient carried by the diffuse transmission of this depth, the cap that kept the legacy ambient
+    // floor from going dark must follow the tower's own light-path depth (~20 above the base, T226 mode-9 data), or
+    // the rain-classified lower trunk keeps ~80 % of the sky while the tower above it keeps ~30 % (a pale block).
+    float cap = PaAmbientTransmission != 0 ? 20.0 : 2.2;
+    return cap * (1.0 - exp(-overhead / cap));
 }
 
 #ifdef PA_CONVECTIVE_SYSTEM_T260
-// T260.5 controlled neutral volumetric lighting (experimental fixture only, PaDiagnosticLightingMode 20-25). It reads
+// T260.5 controlled neutral volumetric lighting (experimental fixture only, PaDiagnosticLightingMode 20-25; T260.16
+// diagnostics 26-30, T260.17 candidates and factors 31-37 below). It reads
 // the frozen fixture texture and constants and nothing else: no weather or morphology map, no LightDir / LightColor /
 // ambient uniforms, no rain, no history. Single scattering with an isotropic phase; Beer-Lambert extinction with the
 // march's own ExtinctionScale (shadows and alpha see one medium); a white sun with volumetric self-shadowing; a white
@@ -8942,6 +9897,8 @@ const float PA_NEUTRAL_SUN_E = 3.14159265; // irradiance: a white Lambert surfac
 const float PA_NEUTRAL_SKY_L = 0.15;       // uniform white sky radiance, upper hemisphere
 const float PA_NEUTRAL_GROUND_L = 0.145;   // albedo-0.2 ground lit by that sun and sky (unshadowed)
 const float PA_NEUTRAL_EXPOSURE = 3.2;     // one fixed linear exposure for every seed and view
+
+vec3 paNeutralSun(); // T260.17: the baked sun direction (defined with the lattice header below)
 
 // paMorphDensity in fixture-local coordinates (same lookups, same arithmetic).
 float paNeutralDensity(vec3 p) { return paMorphDensity(p + PaMorphologyOrigin); }
@@ -8981,7 +9938,7 @@ float paNeutralOpticalDepth(vec3 q, vec3 dir, float first, float growth, float m
 
 // The reference estimator: sun od (2 blocks x1.4 to 40, od cap 8) and six-direction ambient (6 .. 192, cap 8).
 vec2 paNeutralMarched(vec3 q) {
-    float od = paNeutralOpticalDepth(q, PA_NEUTRAL_SUN, 2.0, 1.4, 40.0, 72, 8.0);
+    float od = paNeutralOpticalDepth(q, paNeutralSun(), 2.0, 1.4, 40.0, 72, 8.0);
     float ambient = 0.0;
     for (int k = 0; k < 6; k++) {
         float az = radians(37.0 + 60.0 * float(k)), el = radians((k & 1) == 0 ? 30.0 : -30.0);
@@ -9004,18 +9961,29 @@ vec2 paNeutralRow(int t, int i, float fx) {
     return mix(paNeutralDecode(a[lane]), paNeutralDecode(second), fx);
 }
 
-// The light lattice header (last texture row), fetched once per pixel.
+// The light lattice header (last texture row), fetched once per pixel. T260.17: texel 2 = (sun xyz, first directional
+// texel); a bake without it (zero sun) keeps the T260.5 sun.
 bool paNeutralHeaderLoaded = false;
-vec4 paNeutralHeaderA, paNeutralHeaderB;
+vec4 paNeutralHeaderA, paNeutralHeaderB, paNeutralHeaderC, paNeutralHeaderD;
 
-// Baked (sun od, ambient) trilinearly interpolated at local point q.
-vec2 paNeutralBaked(vec3 q) {
+void paNeutralHeader() {
     if (!paNeutralHeaderLoaded) {
         int row = textureSize(StormDescriptorSampler, 0).y - 1;
         paNeutralHeaderA = texelFetch(StormDescriptorSampler, ivec2(0, row), 0);
         paNeutralHeaderB = texelFetch(StormDescriptorSampler, ivec2(1, row), 0);
+        paNeutralHeaderC = texelFetch(StormDescriptorSampler, ivec2(2, row), 0);
+        paNeutralHeaderD = texelFetch(StormDescriptorSampler, ivec2(3, row), 0);
+        if (dot(paNeutralHeaderC.xyz, paNeutralHeaderC.xyz) < 0.25) paNeutralHeaderC.xyz = PA_NEUTRAL_SUN;
         paNeutralHeaderLoaded = true;
     }
+}
+
+// The baked sun direction (the per-sample marches must use the sun the lattice was baked for).
+vec3 paNeutralSun() { paNeutralHeader(); return paNeutralHeaderC.xyz; }
+
+// Baked (sun od, ambient) trilinearly interpolated at local point q.
+vec2 paNeutralBaked(vec3 q) {
+    paNeutralHeader();
     ivec3 n = ivec3(paNeutralHeaderB.xyz + 0.5);
     int base = int(paNeutralHeaderB.w + 0.5), nxp = (n.x + 3) / 4;
     vec3 g = (q - paNeutralHeaderA.xyz) / paNeutralHeaderA.w;
@@ -9027,11 +9995,249 @@ vec2 paNeutralBaked(vec3 q) {
     return mix(mix(v00, v10, f.y), mix(v01, v11, f.y), f.z);
 }
 
+// T260.16 lighting diagnostics (experimental fixture only, same constants and exposure as T260.5):
+// 26 enhanced fill: T260.5 with the ambient tripled (brightness without any new shape information);
+// 27 raking: T260.5 ambient plus a white light from the sun azimuth 12 deg BELOW the horizon instead of the sun,
+//    marched per sample (non-physical under a deck; reveals underside relief by its cast shadows);
+// 28 gradient: outward density-gradient normal as colour 0.5 + 0.5 n (grey where the gradient vanishes);
+// 29 candidate: paT16Candidate;
+// 30 sun optical depth UNCAPPED (marched to the top): log(1 + od) / log(65), tinted red where od > 8 (the T260.5 cap).
+const vec3 PA_T16_RAKE = vec3(-0.691655, -0.207912, 0.691655);
+const float PA_T16_MS = 0.6;      // diffuse-transmission weight (single-scattering albedo x forward-scatter share)
+const float PA_T16_ALBEDO = 0.9;  // reflectance of the optically thick skin
+
+// Outward unit normal (xyz) and |grad density| (w) at local q, central differences at +-h blocks.
+vec4 paT16Gradient(vec3 q, float h) {
+    vec3 g = vec3(paNeutralDensity(q + vec3(h, 0.0, 0.0)) - paNeutralDensity(q - vec3(h, 0.0, 0.0)),
+                  paNeutralDensity(q + vec3(0.0, h, 0.0)) - paNeutralDensity(q - vec3(0.0, h, 0.0)),
+                  paNeutralDensity(q + vec3(0.0, 0.0, h)) - paNeutralDensity(q - vec3(0.0, 0.0, h))) / (2.0 * h);
+    float m = length(g);
+    return vec4(m > 1e-5 ? -g / m : vec3(0.0), m);
+}
+
+// Sun optical depth to the top of the cloud without the T260.5 cap of 8 (steps 4 blocks x1.5 to 64, ~700 blocks).
+float paT16SunDepth(vec3 q) { return paNeutralOpticalDepth(q, paNeutralSun(), 4.0, 1.5, 64.0, 14, 64.0); }
+
+// T260.16 physically motivated candidate: T260.5's single scattering (baked sun od and isotropic ambient) plus
+// (1) diffuse transmission of sunlight through the cloud, the two-stream (Eddington) slab transmission
+//     1 / (1 + 0.75 (1 - g) tau), g = 0.85, of the UNCAPPED sun optical depth, ramped in by (1 - exp(-tau)) so the lit
+//     skin keeps its single-scatter look - thinner columns pass more light, as real cloud bases do;
+// (2) the Lambertian response of the optically thick skin: sky above and ground below weighted by the outward normal and
+//     by their visibility marched along the normal-tilted up / down directions, replacing the isotropic ambient where
+//     the density gradient marks a surface - a flank facing sideways sees half the ground a downward face sees.
+vec3 paT16Candidate(vec3 q, vec2 light, out float tau) {
+    tau = paT16SunDepth(q);
+    float direct = PA_NEUTRAL_SUN_E / (4.0 * 3.14159265) * exp(-light.x);
+    float ms = PA_NEUTRAL_SUN_E / (4.0 * 3.14159265) * PA_T16_MS * (1.0 - exp(-tau)) / (1.0 + 0.1125 * tau);
+    vec4 n = paT16Gradient(q, 3.0);
+    float skin = smoothstep(0.015, 0.06, n.w);
+    vec3 up = normalize(n.xyz * 0.6 + vec3(0.0, 0.8, 0.0)), down = normalize(n.xyz * 0.6 - vec3(0.0, 0.8, 0.0));
+    float vUp = exp(-paNeutralOpticalDepth(q, up, 3.0, 2.0, 48.0, 5, 8.0));
+    float vDown = exp(-paNeutralOpticalDepth(q, down, 3.0, 2.0, 48.0, 5, 8.0));
+    float lambert = PA_T16_ALBEDO * (PA_NEUTRAL_SKY_L * vUp * (0.5 + 0.5 * n.y) + PA_NEUTRAL_GROUND_L * vDown * (0.5 - 0.5 * n.y));
+    return vec3(PA_NEUTRAL_EXPOSURE * (direct + ms + mix(light.y, lambert, skin)));
+}
+
+// ---- T260.17 efficient directional lighting (experimental fixture only; same constants and exposure as T260.5) ----
+// The directional lattice block (NeutralLightVolume, baked with the light on the worker thread) holds one 24-bit code
+// per lattice point: tau(7, log2) share(5) n(4, 4, 4) - the UNCAPPED sun optical depth, the sky share of the ambient
+// and a box-filtered outward normal scaled by the filtered gradient strength. Modes:
+// 31 A directional ambient: baked sky / ground split, orientation from a 4-tap tetrahedral density gradient;
+// 32 B gradient-aware: the ambient scaled by a filtered 6-tap density gradient against the open-air direction (the
+//    analytic gradient of the baked ambient lattice), no hemisphere split;
+// 33 C baked hybrid: baked normal + split + transmission, no density taps at all;
+// A, B and C all add the diffuse transmission of the baked uncapped sun depth (the T260.16 two-stream term).
+// Phase-1 factor modes, each ONE change to mode 20: 34 + diffuse transmission; 35 + baked directional ambient;
+// 36 display mapping (1 - exp(-2.5 c), gamma 1/2.2); 37 the baked normal as colour (grey = no filtered gradient).
+// 38 D grazing quadrature: C with the sky / ground hemisphere radiances baked from 22 rays including two grazing rings
+//    at +-10 deg (third lattice block), no density taps; 39 that quadrature's ambient alone.
+
+void paT17Decode(float v, out vec4 a, out float share) {
+    float qz = mod(v, 16.0); v = floor(v / 16.0);
+    float qy = mod(v, 16.0); v = floor(v / 16.0);
+    float qx = mod(v, 16.0); v = floor(v / 16.0);
+    float qs = mod(v, 32.0);
+    float qt = floor(v / 32.0);
+    a = vec4((vec3(qx, qy, qz) - 8.0) / 7.0, exp2(qt / 127.0 * 6.0) - 1.0);
+    share = qs / 31.0;
+}
+
+void paT17Row(int t, int i, float fx, out vec4 a, out float share) {
+    int lane = i - (i / 4) * 4;
+    vec4 tx = paCsFetch(t);
+    float second = lane == 3 ? paCsFetch(t + 1).x : tx[lane + 1];
+    vec4 a0, a1;
+    float s0, s1;
+    paT17Decode(tx[lane], a0, s0);
+    paT17Decode(second, a1, s1);
+    a = mix(a0, a1, fx);
+    share = mix(s0, s1, fx);
+}
+
+// Directional block at local q: (filtered normal x strength, tau) and the sky share; neutral values without a block.
+void paT17Baked(vec3 q, out vec4 a, out float share) {
+    paNeutralHeader();
+    int base = int(paNeutralHeaderC.w + 0.5);
+    if (base <= 0) { a = vec4(0.0); share = 0.5; return; }
+    ivec3 n = ivec3(paNeutralHeaderB.xyz + 0.5);
+    int nxp = (n.x + 3) / 4;
+    vec3 g = (q - paNeutralHeaderA.xyz) / paNeutralHeaderA.w;
+    ivec3 c = clamp(ivec3(floor(g)), ivec3(0), n - 2);
+    vec3 f = clamp(g - vec3(c), 0.0, 1.0);
+    int t = base + (c.z * n.y + c.y) * nxp + c.x / 4;
+    vec4 a00, a10, a01, a11;
+    float s00, s10, s01, s11;
+    paT17Row(t, c.x, f.x, a00, s00);
+    paT17Row(t + nxp, c.x, f.x, a10, s10);
+    paT17Row(t + n.y * nxp, c.x, f.x, a01, s01);
+    paT17Row(t + n.y * nxp + nxp, c.x, f.x, a11, s11);
+    a = mix(mix(a00, a10, f.y), mix(a01, a11, f.y), f.z);
+    share = mix(mix(s00, s10, f.y), mix(s01, s11, f.y), f.z);
+}
+
+// paNeutralBaked plus the analytic gradient of the baked ambient (per block) from the same eight corners.
+vec2 paT17BakedGrad(vec3 q, out vec3 gradAmbient) {
+    paNeutralHeader();
+    ivec3 n = ivec3(paNeutralHeaderB.xyz + 0.5);
+    int base = int(paNeutralHeaderB.w + 0.5), nxp = (n.x + 3) / 4;
+    vec3 g = (q - paNeutralHeaderA.xyz) / paNeutralHeaderA.w;
+    ivec3 c = clamp(ivec3(floor(g)), ivec3(0), n - 2);
+    vec3 f = clamp(g - vec3(c), 0.0, 1.0);
+    int t = base + (c.z * n.y + c.y) * nxp + c.x / 4;
+    int lane = c.x - (c.x / 4) * 4;
+    vec2 v[8];
+    for (int k = 0; k < 4; k++) {
+        int tt = t + (k & 1) * nxp + (k >> 1) * n.y * nxp;
+        vec4 tx = paCsFetch(tt);
+        float second = lane == 3 ? paCsFetch(tt + 1).x : tx[lane + 1];
+        v[k * 2] = paNeutralDecode(tx[lane]);
+        v[k * 2 + 1] = paNeutralDecode(second);
+    }
+    // v[2k + dx], k = dy + 2 dz
+    vec2 x00 = mix(v[0], v[1], f.x), x10 = mix(v[2], v[3], f.x), x01 = mix(v[4], v[5], f.x), x11 = mix(v[6], v[7], f.x);
+    float dx = mix(mix(v[1].y - v[0].y, v[3].y - v[2].y, f.y), mix(v[5].y - v[4].y, v[7].y - v[6].y, f.y), f.z);
+    float dy = mix(x10.y - x00.y, x11.y - x01.y, f.z);
+    float dz = mix(x01.y - x00.y, x11.y - x10.y, f.y);
+    gradAmbient = vec3(dx, dy, dz) / paNeutralHeaderA.w;
+    return mix(mix(x00, x10, f.y), mix(x01, x11, f.y), f.z);
+}
+
+float paT17Transmission(float tau) {
+    return PA_NEUTRAL_SUN_E / (4.0 * 3.14159265) * PA_T16_MS * (1.0 - exp(-tau)) / (1.0 + 0.1125 * tau);
+}
+
+// Lambertian sky-above / ground-below response for outward normal y-component ny, from the isotropic ambient and its
+// sky share: up radiance x visibility = 2 ambient share, down = 2 ambient (1 - share).
+float paT17DirectionalAmbient(float ambient, float share, float ny) {
+    return PA_T16_ALBEDO * 2.0 * ambient * (share * (0.5 + 0.5 * ny) + (1.0 - share) * (0.5 - 0.5 * ny));
+}
+
+// Outward unit normal (xyz) and |grad density| (w) from four tetrahedral taps at +-h.
+vec4 paT17Tetra(vec3 q, float h) {
+    vec3 g = vec3(1.0, -1.0, -1.0) * paNeutralDensity(q + h * vec3(1.0, -1.0, -1.0))
+           + vec3(-1.0, -1.0, 1.0) * paNeutralDensity(q + h * vec3(-1.0, -1.0, 1.0))
+           + vec3(-1.0, 1.0, -1.0) * paNeutralDensity(q + h * vec3(-1.0, 1.0, -1.0))
+           + vec3(1.0, 1.0, 1.0) * paNeutralDensity(q + h * vec3(1.0, 1.0, 1.0));
+    g /= 4.0 * h;
+    float m = length(g);
+    return vec4(m > 1e-5 ? -g / m : vec3(0.0), m);
+}
+
+// T260.17 D: the grazing-quadrature block at local q: (sky radiance x visibility up, ground radiance x visibility down),
+// each the mean over 11 directions of its hemisphere (six T260.5 rays + rings of eight at +-10 deg).
+vec2 paT17Grazing(vec3 q) {
+    paNeutralHeader();
+    int base = int(paNeutralHeaderD.x + 0.5);
+    if (base <= 0) return vec2(0.0);
+    ivec3 n = ivec3(paNeutralHeaderB.xyz + 0.5);
+    int nxp = (n.x + 3) / 4;
+    vec3 g = (q - paNeutralHeaderA.xyz) / paNeutralHeaderA.w;
+    ivec3 c = clamp(ivec3(floor(g)), ivec3(0), n - 2);
+    vec3 f = clamp(g - vec3(c), 0.0, 1.0);
+    int t = base + (c.z * n.y + c.y) * nxp + c.x / 4;
+    vec2 v00 = paNeutralRow(t, c.x, f.x), v10 = paNeutralRow(t + nxp, c.x, f.x);
+    vec2 v01 = paNeutralRow(t + n.y * nxp, c.x, f.x), v11 = paNeutralRow(t + n.y * nxp + nxp, c.x, f.x);
+    // paNeutralRow decodes as (od 0..8, ambient 0..0.16): rescale the first channel back to the 0..0.16 range
+    vec2 v = mix(mix(v00, v10, f.y), mix(v01, v11, f.y), f.z);
+    return vec2(v.x / 8.0 * 0.16, v.y);
+}
+
+vec3 paT17Lighting(vec3 q, vec2 light, vec3 gradAmbient) {
+    vec4 dir;
+    float share;
+    paT17Baked(q, dir, share);
+    float direct = PA_NEUTRAL_SUN_E / (4.0 * 3.14159265) * exp(-light.x);
+    float ms = paT17Transmission(dir.w);
+    if (PaDiagnosticLightingMode == 37) {
+        float m = length(dir.xyz);
+        return m > 0.05 ? 0.5 + 0.5 * dir.xyz / m : vec3(0.5);
+    }
+    if (PaDiagnosticLightingMode == 34) return vec3(PA_NEUTRAL_EXPOSURE * (direct + ms + light.y));
+    if (PaDiagnosticLightingMode == 38 || PaDiagnosticLightingMode == 39) {
+        // D: C with the hemisphere radiances from the grazing quadrature (Lambert on the baked filtered normal);
+        // 39 shows that quadrature's isotropic ambient alone (no sun, no transmission, no normal)
+        vec2 ud = paT17Grazing(q);
+        if (PaDiagnosticLightingMode == 39) return vec3(PA_NEUTRAL_EXPOSURE * 0.5 * (ud.x + ud.y));
+        float m = length(dir.xyz);
+        float nyd = m > 1e-3 ? dir.y / m : 0.0;
+        float lambert = PA_T16_ALBEDO * (ud.x * (0.5 + 0.5 * nyd) + ud.y * (0.5 - 0.5 * nyd));
+        float ambient = mix(0.5 * (ud.x + ud.y), lambert, saturate(1.5 * m));
+        return vec3(PA_NEUTRAL_EXPOSURE * (direct + ms + ambient));
+    }
+    if (PaDiagnosticLightingMode == 36) {
+        float c = PA_NEUTRAL_EXPOSURE * (direct + light.y);
+        return vec3(pow(1.0 - exp(-2.5 * c), 1.0 / 2.2));
+    }
+    if (PaDiagnosticLightingMode == 32) {
+        vec4 n = paT16Gradient(q, 5.0);
+        float skin = smoothstep(0.01, 0.05, n.w);
+        float ga = length(gradAmbient);
+        vec3 open = ga > 1e-7 ? gradAmbient / ga : vec3(0.0);
+        float k = clamp(1.0 + 0.8 * skin * dot(n.xyz, open), 0.25, 1.75);
+        return vec3(PA_NEUTRAL_EXPOSURE * (direct + ms + light.y * k));
+    }
+    float ny, skin;
+    if (PaDiagnosticLightingMode == 31) {
+        vec4 n = paT17Tetra(q, 3.0);
+        ny = n.y;
+        skin = smoothstep(0.015, 0.06, n.w);
+    } else { // 33, 35: the baked filtered normal
+        float m = length(dir.xyz);
+        ny = m > 1e-3 ? dir.y / m : 0.0;
+        skin = saturate(1.5 * m);
+    }
+    float ambient = mix(light.y, paT17DirectionalAmbient(light.y, share, ny), skin);
+    return vec3(PA_NEUTRAL_EXPOSURE * (direct + (PaDiagnosticLightingMode == 35 ? 0.0 : ms) + ambient));
+}
+
 vec3 paNeutralLighting(vec3 p, float localDensity, out float sunOpticalDepth) {
     if (PaDiagnosticLightingMode == 21) { sunOpticalDepth = 0.0; return vec3(saturate(localDensity)); }
     vec3 q = p - PaMorphologyOrigin;
-    vec2 light = PaDiagnosticLightingMode == 25 ? paNeutralMarched(q) : paNeutralBaked(q);
+    if (PaDiagnosticLightingMode == 28) {
+        sunOpticalDepth = 0.0;
+        vec4 n = paT16Gradient(q, 6.0);
+        return n.w > 1e-4 ? 0.5 + 0.5 * n.xyz : vec3(0.5);
+    }
+    if (PaDiagnosticLightingMode == 30) {
+        float tau = paT16SunDepth(q);
+        sunOpticalDepth = tau;
+        float v = saturate(log(1.0 + tau) / log(65.0));
+        return tau > 8.0 ? vec3(v, 0.3 * v, 0.3 * v) : vec3(v);
+    }
+    vec3 gradAmbient = vec3(0.0);
+    vec2 light = PaDiagnosticLightingMode == 25 ? paNeutralMarched(q)
+        : PaDiagnosticLightingMode == 32 ? paT17BakedGrad(q, gradAmbient) : paNeutralBaked(q);
     sunOpticalDepth = light.x;
+    if (PaDiagnosticLightingMode >= 31 && PaDiagnosticLightingMode <= 39) return paT17Lighting(q, light, gradAmbient);
+    if (PaDiagnosticLightingMode == 29) return paT16Candidate(q, light, sunOpticalDepth);
+    if (PaDiagnosticLightingMode == 26) {
+        return vec3(PA_NEUTRAL_EXPOSURE * (PA_NEUTRAL_SUN_E / (4.0 * 3.14159265) * exp(-light.x) + 3.0 * light.y));
+    }
+    if (PaDiagnosticLightingMode == 27) {
+        float rake = paNeutralOpticalDepth(q, PA_T16_RAKE, 2.0, 1.4, 40.0, 72, 8.0);
+        sunOpticalDepth = rake;
+        return vec3(PA_NEUTRAL_EXPOSURE * (PA_NEUTRAL_SUN_E / (4.0 * 3.14159265) * exp(-rake) + light.y));
+    }
     if (PaDiagnosticLightingMode == 24) return vec3(saturate(log(1.0 + light.x) / log(65.0)));
     float direct = PA_NEUTRAL_SUN_E / (4.0 * 3.14159265) * exp(-light.x);
     if (PaDiagnosticLightingMode == 22) return vec3(PA_NEUTRAL_EXPOSURE * direct);
@@ -9070,7 +10276,7 @@ vec3 sampleLighting(
         return vec3(saturate(stage));
     }
 #ifdef PA_CONVECTIVE_SYSTEM_T260
-    if (PaDiagnosticLightingMode >= 20 && PaDiagnosticLightingMode <= 25) {
+    if (PaDiagnosticLightingMode >= 20 && PaDiagnosticLightingMode <= 39) {
         return paNeutralLighting(p, localDensity, diagnosticLightOpticalDepth); // T260.5 neutral volumetric lighting
     }
 #endif
@@ -9146,6 +10352,29 @@ vec3 sampleLighting(
             return vec3(1.0, 0.0, 1.0);
         }
         return vec3(saturate((-paShadeUnionDistance + 150.0) / 600.0));
+    }
+    if (PaDiagnosticLightingMode == 40 || PaDiagnosticLightingMode == 41) {
+        // L-TEMP (stabilisation lighting investigation, remove after): what the production lighting receives.
+        // 40: R = h01ForAmbient (the height every underside / ambient-gradient term reads), G = materialDarkness,
+        //     B = rainFraction.
+        // 41: R = direct (sun) luminance d / (1 + d), G = ambient luminance a / (1 + a) x 4, B = the light-path
+        //     optical depth AFTER the thickness gain, log(1 + od) / log(65).
+        // Read with the colour pipeline OFF (diagnostic values pass the composite unencoded).
+        if (PaDiagnosticLightingMode == 40) {
+            diagnosticLightOpticalDepth = 0.0;
+            return vec3(saturate(h01ForAmbient), saturate(materialDarkness), saturate(rainFraction));
+        }
+        float paDiagDepth = rainFraction > 0.05
+            ? localDensity * 8.0 * ExtinctionScale + rainOverheadOpticalDepth(p)
+            : lightMarchOpticalDepth(p, localDensity, cameraStartsInsideSlab, cameraInsideCloud) * ExtinctionScale;
+        float paDiagDirect;
+        float paDiagAmbient;
+        float paDiagPhase;
+        evaluateLightingComponents(paDiagDepth, localDensity, h01ForAmbient, cosTheta, distance01, localStorm,
+            materialDarkness, rainFraction, diagnosticLightOpticalDepth, paDiagDirect, paDiagAmbient, paDiagPhase);
+        float paDiagGained = paDiagDepth * (1.0 + PaOpticalThicknessGain * smoothstep(0.30, 0.90, materialDarkness));
+        return vec3(paDiagDirect / (1.0 + paDiagDirect), saturate(4.0 * paDiagAmbient / (1.0 + paDiagAmbient)),
+            saturate(log(1.0 + paDiagGained) / log(65.0)));
     }
     if (PaDiagnosticLightingMode == 9) {
         // T228. The light-path optical depth, log-encoded over 0-64 so the
@@ -9232,7 +10461,7 @@ vec4 stormMaterialTraceAt(vec3 p, int stage) {
     float bodyBefore = owned ? stormBody(coverage, strength, baseField, false) : 0.0;
     float bodyAfter = owned ? stormBody(coverage, strength, baseField, embedded) : 0.0;
     vec3 detailPos = detailNoiseDomain(samplePos) + (baseNoise.gbr - 0.5) * 0.18;
-    vec4 detail = texture(DetailNoiseSampler, detailPos, 0.0);
+    vec4 detail = textureLod(DetailNoiseSampler, detailPos, paDetailLod(samplePos));
     float detailFbm = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
     float erosion = (1.0 - detailFbm) * STORM_EROSION;
     float bodyEroded = max(bodyAfter - erosion, 0.0);
@@ -9728,6 +10957,9 @@ void paT162FixedWorkMain() {
 #endif
 
 void main() {
+    // E39: the phase target is no longer cleared when it accumulates, so every return path must define the aux
+    // attachment; this is the value the clear used to give it ("no rain split": before 0, T 1).
+    fragTemporalAux = vec4(0.0, 0.0, 0.0, 1.0);
     if (PaMorphologyPrototype == 2) {
         // Actual GPU kernel parity, independent of projection/lighting/composite.
         vec3 unitPoint = vec3((floor(gl_FragCoord.x) + 0.5) / PaOracleBaseSize.x,
@@ -10162,7 +11394,15 @@ void main() {
     ivec2 blueSize = textureSize(BlueNoiseSampler, 0);
     vec2 searchBlueUv = paViewFragCoord / vec2(blueSize);
     float searchBlue = texture(BlueNoiseSampler, searchBlueUv).r;
-    float jitterFrame = HistoryValid == 1 && HistoryBlend > 0.001
+    if (PaPhaseAccumulate != 0) {
+        // E39: with per-phase accumulation a hit/miss alternation on a thin silhouette is simply averaged (a
+        // blended miss is a sample like any other), so the search phase animates too. Its frozen per-pixel
+        // pattern was the visible grain (s43: no blue noise at all turns the grain into step banding).
+        searchBlue = fract(texture(BlueNoiseSampler,
+            (paViewFragCoord + vec2(FrameIndex * 23.0, FrameIndex * 41.0)) / vec2(blueSize)).r
+            + FrameIndex * 0.75487766625);
+    }
+    float jitterFrame = (HistoryValid == 1 && HistoryBlend > 0.001) || PaPhaseAccumulate != 0
         ? FrameIndex
         : 0.0;
     vec2 integrationBlueUv = (
@@ -10197,7 +11437,7 @@ void main() {
     // +26 to +52 ms. The mid-field staircase is not march quantization - the
     // boundary is a real ~2.8-block band that lands on 1.5-1.7 pixels of the
     // 1200x675 cloud layer, which is below what an edge needs to be drawn.
-    float exteriorFineStep = clamp(ExteriorFineStep, 2.5, 8.0);
+    float exteriorFineStep = clamp(ExteriorFineStep, 1.0, 8.0); // S30-TEMP floor 2.5 -> 1.0 (CPU floors at 2.5)
     float fineStep = cameraInsideCloud ? legacyFineStep : exteriorFineStep;
     float coarseStep = max(baseStep * 1.5, fineStep * 3.0);
 #ifdef PA_ARM_EMPTY_JUMP
@@ -10209,6 +11449,31 @@ void main() {
 #else
     float coarseStepCap = min(112.0, fineStep * 16.0);
 #endif
+    // P3: the span of this ray (from the camera) that touches any storm AABB, once per ray: the empty-space jump
+    // stops at its entry, is off inside it, and is free again past its exit.
+    float paRayStormEnter = 1.0e9;
+    float paRayStormExit = -1.0e9;
+    if (PaEmptySkip != 0 && StormLobeCount > 0) {
+        vec3 paInverse = 1.0 / (abs(rayDir) + vec3(1.0e-6)) * sign(rayDir + vec3(1.0e-9));
+        for (int groupSlot = 0; groupSlot < 8; groupSlot++) {
+            int row = MAX_STORM_LOBES + 2 * groupSlot;
+            if (texelFetch(StormDescriptorSampler, ivec2(4, row), 0).w < 0.0) {
+                continue;
+            }
+            vec4 xz = texelFetch(StormDescriptorSampler, ivec2(3, row + 1), 0);
+            vec4 yRange = texelFetch(StormDescriptorSampler, ivec2(4, row + 1), 0);
+            vec3 ta = (vec3(xz.x, yRange.x, xz.y) - CameraPos) * paInverse;
+            vec3 tb = (vec3(xz.z, yRange.y, xz.w) - CameraPos) * paInverse;
+            vec3 tLo = min(ta, tb);
+            vec3 tHi = max(ta, tb);
+            float enter = max(max(tLo.x, tLo.y), max(tLo.z, 0.0));
+            float exit = min(min(tHi.x, tHi.y), tHi.z);
+            if (enter <= exit) {
+                paRayStormEnter = min(paRayStormEnter, enter);
+                paRayStormExit = max(paRayStormExit, exit);
+            }
+        }
+    }
 
 #ifdef PA_ARM_FOOTPRINT
     // Per fragment, not per step. This is the only division the footprint LOD
@@ -10240,7 +11505,8 @@ void main() {
         ),
         span
     );
-    float t = t0 + searchBlue * originJitterDistance;
+    // S32-TEMP: PaIntegrationPhase >= 2 also removes the per-pixel origin jitter (no blue noise in the march).
+    float t = t0 + (PaIntegrationPhase >= 2.0 ? 0.5 : searchBlue) * originJitterDistance;
     vec2 paMorphIntervals[3];
     bool paMorphIntervalSkip = PaMorphologyPrototype != 0 && PaMorphologyIntervals != 0 && !cameraInsideCloud;
     int paMorphIntervalIndex = 0;
@@ -10740,6 +12006,20 @@ void main() {
         int paOracleDetailBefore = paDetailOctaveEvaluations;
 
         vec3 p = CameraPos + rayDir * t;
+        if (!fine && PaEmptySkip != 0 && FunnelCount == 0 && !cameraInsideCloud) {
+            // P3. Jump the whole empty run; the tests below still see the longer segment and shorten it.
+            // p7: storms are not in the weather map, so around a storm every weather tile looks empty - the walk ran
+            // its full length and the jump then entered the storm (+2 ms). The run now ends where the ray first
+            // enters any storm AABB (0 inside one: no walk at all); puffs stop the walk through their own bits.
+            float paRunLimit = min(t1 - t, t < paRayStormEnter ? paRayStormEnter - t
+                : t > paRayStormExit ? 1.0e9 : 0.0);
+            if (paRunLimit > stepLength) {
+                float paEmptyRun = paEmptyRunLength(p, rayDir, paRunLimit);
+                if (paEmptyRun > stepLength) {
+                    stepLength = paEmptyRun;
+                }
+            }
+        }
         if (paCap) {
             // Camera-relative. World coordinates can reach five digits, where
             // half float quantizes to multiples of eight blocks; the offset is
@@ -11169,7 +12449,7 @@ void main() {
             // Arm B of the T098 weather-skip A/B removes ONLY this outer skip.
             // Every cloudDensity gate, including its own weather coverage cut,
             // stays exactly as production evaluates it.
-            if (coverageSignal <= 0.001 && !localRainSegment
+            if ((coverageSignal <= 0.001 || PaPerfArm == 1) && !localRainSegment
                     && !paRayTraceWeatherSkipDisabled()) {
                 if (paWorkloadCaptureActive()) {
                     paEmptySpaceRejects++;
@@ -11217,6 +12497,7 @@ void main() {
         // spawned from this sample could reuse.
         paCapturePrimaryGroups = true;
         paDensityConsumer = 1;
+        paDetailStep = stepLength; // S31: the primary sample stands for one march step
 #ifdef PA_ARM_DENSITY_EVERY_2
         // T175 ceiling. Every second primary step reuses the previous body
         // density instead of evaluating it. Halves primary density calls while
@@ -11552,7 +12833,7 @@ void main() {
                     }
                 }
                 lastClearT = bracketLow;
-                t = mix(bracketLow, bracketHigh, integrationBlue);
+                t = mix(bracketLow, bracketHigh, PaIntegrationPhase < 0.0 ? integrationBlue : min(PaIntegrationPhase, 0.5));
                 sinceHit = 0;
                 if (paCap) {
                     paMrFlags |= PA_MR_BRACKET_REFINED;
@@ -11720,6 +13001,16 @@ void main() {
                 }
             }
             float materialDarkness = morphology.b;
+            bool paStormOwnedBody = PaStormMaterialFix != 0
+                && paShadeUnionDistance < 1.0e8
+                && !hasMorphologyCategory(morphology.r);
+            if (paStormOwnedBody) {
+                profileId = 4;
+                materialDarkness = 0.78; // CUMULONIMBUS material darkness (VolumetricRenderCell)
+                if (PaStormMaterialFix >= 2) {
+                    h01 = paStormLightHeight01(p, h01); // E20
+                }
+            }
             float localStorm = 0.0;
             if (profileId == 4 || profileId == 7) {
                 localStorm = 0.20 + weather.a * 0.52;
@@ -11731,7 +13022,7 @@ void main() {
             // WeatherMap interval puts it below baseY. Classifying that dry
             // material as 25% rain caused the hard black underside slab.
             float rainFraction = !directPuffBody
-                    && (precipitationSample || p.y < baseY)
+                    && (precipitationSample || (p.y < baseY && !paStormOwnedBody))
                 ? saturate(0.25 + max(morphology.a, MaxPrecipitation) * 0.75)
                 : 0.0;
 
@@ -12223,7 +13514,8 @@ void main() {
         straightColour = clamp(
             straightColour * (1.0 + reliefResponse),
             vec3(0.0),
-            vec3(0.98)
+            // S1: 0.98 is a display-space cap; linear radiance is bounded by the composite's curve.
+            vec3(PaColorPipeline != 0 ? 1.0e4 : 0.98)
         );
         result.rgb = straightColour * result.a;
     }

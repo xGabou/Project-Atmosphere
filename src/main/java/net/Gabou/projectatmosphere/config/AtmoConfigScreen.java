@@ -74,6 +74,8 @@ public class AtmoConfigScreen extends Screen {
 
     private EditBox maxDebrisBox;
     private int cloudRenderDistance;
+    private AtmoCommonConfig.StormShadowDetail stormShadowDetail;
+    private AtmoCommonConfig.CloudSurfaceDetail cloudSurfaceDetail;
     private EditBox cloudDistanceBox;
     private EditBox tornadoCheckIntervalBox;
     private EditBox tornadoBaseSpawnRadiusBox;
@@ -170,6 +172,8 @@ public class AtmoConfigScreen extends Screen {
         this.hurricaneDropBrokenBlocks = AtmoCommonConfig.HURRICANE_DROP_BROKEN_BLOCKS.get();
         this.hurricaneDamageTrees = AtmoCommonConfig.HURRICANE_DAMAGE_TREES.get();
         this.cloudRenderDistance = AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get();
+        this.stormShadowDetail = AtmoCommonConfig.STORM_SHADOW_DETAIL.get();
+        this.cloudSurfaceDetail = AtmoCommonConfig.CLOUD_SURFACE_DETAIL.get();
         this.tornadoCheckIntervalSec = AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get();
         this.tornadoBaseSpawnRadiusM = AtmoCommonConfig.TORNADO_BASE_SPAWN_RADIUS_M.get();
         this.tornadoMinTempContrastC = AtmoCommonConfig.TORNADO_MIN_TEMP_CONTRAST_C.get();
@@ -276,6 +280,16 @@ public class AtmoConfigScreen extends Screen {
 
         this.cloudDistanceBox = addNumberField(center, y, "Cloud Render Distance", Integer.toString(cloudRenderDistance));
         y += 34;
+        addConfigWidget(Button.builder(stormShadowLabel(), b -> {
+            stormShadowDetail = stormShadowDetail.next();
+            b.setMessage(stormShadowLabel());
+        }).bounds(center - 100, y, 200, 20).build(), y);
+        y += 32;
+        addConfigWidget(Button.builder(cloudSurfaceLabel(), b -> {
+            cloudSurfaceDetail = cloudSurfaceDetail.next();
+            b.setMessage(cloudSurfaceLabel());
+        }).bounds(center - 100, y, 200, 20).build(), y);
+        y += 32;
 
         this.stormBoostMultiplierBox = addNumberField(center, y, "Storm Severity Booster", Double.toString(stormBoostMultiplier));
         y += 34;
@@ -463,6 +477,14 @@ public class AtmoConfigScreen extends Screen {
         }
     }
 
+    private Component cloudSurfaceLabel() {
+        return Component.literal("Cloud Surface Detail: " + cloudSurfaceDetail.displayName());
+    }
+
+    private Component stormShadowLabel() {
+        return Component.literal("Storm Shadow Detail: " + stormShadowDetail.displayName());
+    }
+
     private Component toggleLabel(String name, boolean enabled) {
         return Component.literal(name + ": " + (enabled ? "ON" : "OFF"));
     }
@@ -531,6 +553,8 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.FOG_ENABLED.set(fogEnabled);
         AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.set(maxStormDebrisPerChunk);
         AtmoCommonConfig.CLOUD_RENDER_DISTANCE.set(cloudRenderDistance);
+        AtmoCommonConfig.STORM_SHADOW_DETAIL.set(stormShadowDetail);
+        AtmoCommonConfig.CLOUD_SURFACE_DETAIL.set(cloudSurfaceDetail);
         AtmoCommonConfig.AUTO_REPAIR_GLASS.set(autoRepairGlass);
         AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.set(damageGlassOnTornado);
         AtmoCommonConfig.ENABLE_HURRICANE_DESTRUCTION.set(enableHurricaneDestruction);

@@ -100,13 +100,14 @@ public final class VolumetricCloudRenderTargets {
     /** Eight packed native-PUFF descriptor indices per conservative world tile. */
     public static RenderTarget preparePuffCandidateTarget() {
         int size = PuffLobeSpatialIndex.GRID_SIZE;
-        if (puffCandidateTarget == null || puffCandidateTarget.width != size) {
+        int height = PuffLobeSpatialIndex.TARGET_HEIGHT;
+        if (puffCandidateTarget == null || puffCandidateTarget.width != size || puffCandidateTarget.height != height) {
             if (puffCandidateTarget != null) {
                 puffCandidateTarget.destroyBuffers();
             }
-            puffCandidateTarget = createHalfFloatMap(size);
-            // Packed integer digits must never interpolate across tile edges.
-            puffCandidateTarget.setFilterMode(GL11.GL_NEAREST);
+            // C2: RGBA32F (packed pairs reach 257^2, past half-float's exact integers; descriptor rows hold world
+            // positions), with the descriptor and lobe-list rows below the candidate grid.
+            puffCandidateTarget = createFloatMap(size, height, GL11.GL_NEAREST);
         }
         return puffCandidateTarget;
     }
@@ -287,6 +288,8 @@ public final class VolumetricCloudRenderTargets {
      * (the sandbox asserts it).
      */
     private static RenderTarget temporalResolvedTarget;
+    /** E41. A copy of the last resolved frame, the resolve's motion history (never the resolved target itself). */
+    private static RenderTarget motionHistoryTarget;
     /**
      * T209. The spatial upscale's layer at the display size: RGBA16F
      * premultiplied + depth, the composite's one-to-one source when the
@@ -349,6 +352,18 @@ public final class VolumetricCloudRenderTargets {
         GL30.glClearBufferfv(GL11.GL_COLOR, 1, new float[] {0.0F, 0.0F, 0.0F, 1.0F});
     }
 
+    /** E39. Binds a phase target WITHOUT clearing it: the march is blended into its previous result. */
+    public static void bindPhaseForAccumulation(RenderTarget target) {
+        if (target == null) {
+            return;
+        }
+        RenderSystem.disableScissor();
+        RenderSystem.colorMask(true, true, true, true);
+        RenderSystem.depthMask(true);
+        target.bindWrite(true);
+        GL20.glDrawBuffers(new int[] {GL30.GL_COLOR_ATTACHMENT0, GL30.GL_COLOR_ATTACHMENT1});
+    }
+
     public static RenderTarget prepareTemporalResolvedTarget(int width, int height) {
         if (width <= 0 || height <= 0) {
             return null;
@@ -374,6 +389,50 @@ public final class VolumetricCloudRenderTargets {
                     width, height, (long) width * height * 12L);
         }
         return temporalResolvedTarget;
+    }
+
+    /** E41. The motion history copy, the resolved target's size and format; null when it cannot be made. */
+    public static RenderTarget prepareMotionHistoryTarget(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        if (motionHistoryTarget == null || motionHistoryTarget.width != width
+                || motionHistoryTarget.height != height) {
+            if (motionHistoryTarget != null) {
+                motionHistoryTarget.destroyBuffers();
+                motionHistoryTarget = null;
+            }
+            RenderTarget target = new TextureTarget(width, height, true, Minecraft.ON_OSX);
+            target.setFilterMode(GL11.GL_LINEAR);
+            configureClamp(target.getColorTextureId());
+            upgradeColorToRgba16f(target.getColorTextureId(), width, height);
+            configureDepth(target.getDepthTextureId());
+            target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+            motionHistoryTarget = target;
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "E41_MOTION_HISTORY_ALLOC format=RGBA16F+depth size={}x{}", width, height);
+        }
+        return motionHistoryTarget;
+    }
+
+    /** E41. Copies a resolved frame (colour and depth) into the motion history. */
+    public static void copyIntoMotionHistory(RenderTarget source) {
+        if (source == null || motionHistoryTarget == null || source.width != motionHistoryTarget.width
+                || source.height != motionHistoryTarget.height) {
+            return;
+        }
+        int previousRead = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+        int previousDraw = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
+        GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, source.frameBufferId);
+        GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, motionHistoryTarget.frameBufferId);
+        GL30.glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, source.width, source.height,
+                GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT, GL11.GL_NEAREST);
+        GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousRead);
+        GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousDraw);
+    }
+
+    public static RenderTarget motionHistoryTargetOrNull() {
+        return motionHistoryTarget;
     }
 
     public static RenderTarget temporalResolvedTargetOrNull() {
@@ -435,6 +494,12 @@ public final class VolumetricCloudRenderTargets {
                     temporalResolvedTarget.width, temporalResolvedTarget.height);
             temporalResolvedTarget.destroyBuffers();
             temporalResolvedTarget = null;
+        }
+        if (motionHistoryTarget != null) {
+            net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.info(
+                    "E41_MOTION_HISTORY_RELEASE reason={}", reason);
+            motionHistoryTarget.destroyBuffers();
+            motionHistoryTarget = null;
         }
     }
 

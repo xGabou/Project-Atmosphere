@@ -29,7 +29,7 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
  * <pre>
  *  A.0 originX originZ windX windZ      B.0 deckLo deckHi deckHalfWidth deckCrossMean
  *  A.1 floorY baseHeight deckMid band   B.1 deckBottom deckTop strengthBase strengthTower
- *  A.2 baseUp baseDown baseLeft baseRight B.2 strengthAnvil ownershipReach 0 0
+ *  A.2 baseUp baseDown baseLeft baseRight B.2 strengthAnvil ownershipReach seed01 0
  *  A.3 towerLoX towerLoZ towerHiX towerHiZ B.3 aabbMinX aabbMinZ aabbMaxX aabbMaxZ
  *  A.4 towerLoY towerHiY towerRadius valid B.4 aabbMinY aabbMaxY 0 0
  * </pre>
@@ -71,6 +71,8 @@ public final class StormBodySkeleton {
     public static final int STRENGTH_TOWER = 27;
     public static final int STRENGTH_ANVIL = 28;
     public static final int OWNERSHIP_REACH = 29;
+    /** S11: the storm's own seed (largest BASE member seed01, independent of descriptor order). */
+    public static final int SEED = 30;
     public static final int AABB_MIN_X = 32;
     public static final int AABB_MIN_Z = 33;
     public static final int AABB_MAX_X = 34;
@@ -93,8 +95,15 @@ public final class StormBodySkeleton {
     static final double DECK_UPWIND_REACH = 0.6D;
     static final double DECK_DOWNWIND_REACH = 1.2D;
     static final double DECK_CROSS_REACH = 1.4D;
-    /** Largest column reach over Rt: turret centres at 1.43 Rt plus their 0.42 Rt radius. */
-    static final double COLUMN_MAX_SCALE = 1.95D;
+    /**
+     * Largest column reach over Rt: turret centres at 1.43 Rt plus their 0.42 Rt radius (T241, 1.95). S11 seeded
+     * turrets reach 1.57 Rt + 0.57 Rt (2.15) and the v2 billow displacement 0.315 Rt beyond that (2.5).
+     */
+    static final double COLUMN_MAX_SCALE = 2.5D;
+    /** S11: the flanking line lies inside this multiple of the ownership reach (shader PA_STRUCT_FLANK_REACH). */
+    static final double FLANK_REACH = 1.6D;
+    /** S11 v2: largest billow displacement over Rt (shader PA_STRUCT_BILLOW_REACH). */
+    static final double BILLOW_REACH = 0.315D;
     /** Deck corner rounding cap and the AABB pad beyond the band. */
     static final double DECK_ROUND_MAX = 20.0D;
     static final double AABB_PAD = 8.0D;
@@ -121,6 +130,35 @@ public final class StormBodySkeleton {
         for (int slot = 0; slot < StormLobeSpatialIndex.MAX_GROUPS; slot++) {
             compute(texels, descriptorCount, slot, texels, offset(slot));
         }
+        // S11-TEMP (stabilisation diagnostic, remove with S11): the last skeleton blocks, logged per capture shot.
+        float[] copy = new float[StormLobeSpatialIndex.MAX_GROUPS * FLOATS_PER_GROUP];
+        for (int slot = 0; slot < StormLobeSpatialIndex.MAX_GROUPS; slot++) {
+            System.arraycopy(texels, offset(slot), copy, slot * FLOATS_PER_GROUP, FLOATS_PER_GROUP);
+        }
+        lastBlocks = copy;
+    }
+
+    /** S11-TEMP: see {@link #writeAll}. */
+    public static volatile float[] lastBlocks = new float[0];
+
+    /** S11-TEMP: one line per valid group - the dimensions the S11 recipe scales from. */
+    public static String describeLast() {
+        float[] b = lastBlocks;
+        StringBuilder out = new StringBuilder();
+        for (int g = 0; g * FLOATS_PER_GROUP < b.length; g++) {
+            int o = g * FLOATS_PER_GROUP;
+            if (b[o + VALID] <= 0.0F) {
+                continue;
+            }
+            out.append(String.format(java.util.Locale.ROOT,
+                    " [g%d seed=%.3f Rt=%.0f floor=%.0f baseH=%.0f base(up/down/l/r)=%.0f/%.0f/%.0f/%.0f own=%.0f"
+                            + " towerY=%.0f..%.0f deck=%.0f..%.0f deckW=%.0f..%.0f hw=%.0f]",
+                    g, b[o + SEED], b[o + TOWER_RADIUS], b[o + FLOOR_Y], b[o + BASE_HEIGHT], b[o + BASE_UP],
+                    b[o + BASE_DOWN], b[o + BASE_LEFT], b[o + BASE_RIGHT], b[o + OWNERSHIP_REACH], b[o + TOWER_LO_Y],
+                    b[o + TOWER_HI_Y], b[o + DECK_BOTTOM], b[o + DECK_TOP], b[o + DECK_LO], b[o + DECK_HI],
+                    b[o + DECK_HALF_WIDTH]));
+        }
+        return out.toString();
     }
 
     /**
@@ -151,6 +189,7 @@ public final class StormBodySkeleton {
         int baseCount = 0;
         int towerCount = 0;
         int anvilCount = 0;
+        double seed = 0.0D;
         for (int index = 0; index < descriptorCount; index++) {
             int o = index * stride;
             float packed = texels[o + 15];
@@ -173,6 +212,7 @@ public final class StormBodySkeleton {
                 baseTop = Math.max(baseTop, topY);
                 baseStrength += strength;
                 baseCount++;
+                seed = Math.max(seed, texels[o + 16]);
             } else if (role == 2) {
                 double mid = 0.5D * (baseY + topY);
                 if (mid < towerLoY) {
@@ -272,7 +312,7 @@ public final class StormBodySkeleton {
         // rotated into world space.
         // The smooth-minimum joins (k = 0.6 Rt) bulge the union by up to
         // k / 4 beyond its parts.
-        double pad = band + 0.15D * towerRadius + DECK_ROUND_MAX + AABB_PAD;
+        double pad = band + (0.15D + BILLOW_REACH) * towerRadius + DECK_ROUND_MAX + AABB_PAD;
         double columnReach = towerRadius * COLUMN_MAX_SCALE;
         // The deck wedge's own reach: [deckLo, deckHi] along the wind and its
         // widest half-width either side of the cross drift.
@@ -283,12 +323,16 @@ public final class StormBodySkeleton {
         double deckReachCMax = Math.max(0.0D, deckCrossMean) + tipHalf;
         double hiW = (towerHiX - originX) * windX + (towerHiZ - originZ) * windZ;
         double hiC = (towerHiX - originX) * crossX + (towerHiZ - originZ) * crossZ;
-        double wMin = Math.min(Math.min(-baseUp, deckReachLo), Math.min(0.0D, hiW) - columnReach) - pad;
-        double wMax = Math.max(Math.max(baseDown, deckReachHi), Math.max(0.0D, hiW) + columnReach) + pad;
-        double cMin = Math.min(Math.min(-baseLeft, deckReachCMin),
-                Math.min(0.0D, hiC) - columnReach) - pad;
-        double cMax = Math.max(Math.max(baseRight, deckReachCMax),
-                Math.max(0.0D, hiC) + columnReach) + pad;
+        // S11: the flanking line stays inside FLANK_REACH x the unscaled ownership reach around the origin.
+        double flankReach = FLANK_REACH * ownershipReach;
+        double wMin = Math.min(Math.min(Math.min(-baseUp, deckReachLo), Math.min(0.0D, hiW) - columnReach),
+                -flankReach) - pad;
+        double wMax = Math.max(Math.max(Math.max(baseDown, deckReachHi), Math.max(0.0D, hiW) + columnReach),
+                flankReach) + pad;
+        double cMin = Math.min(Math.min(Math.min(-baseLeft, deckReachCMin),
+                Math.min(0.0D, hiC) - columnReach), -flankReach) - pad;
+        double cMax = Math.max(Math.max(Math.max(baseRight, deckReachCMax),
+                Math.max(0.0D, hiC) + columnReach), flankReach) + pad;
         double minX = Double.POSITIVE_INFINITY;
         double maxX = Double.NEGATIVE_INFINITY;
         double minZ = Double.POSITIVE_INFINITY;
@@ -334,6 +378,7 @@ public final class StormBodySkeleton {
         out[outOffset + STRENGTH_TOWER] = (float) (towerStrength / towerCount);
         out[outOffset + STRENGTH_ANVIL] = (float) (anvilStrength / anvilCount);
         out[outOffset + OWNERSHIP_REACH] = (float) ownershipReach;
+        out[outOffset + SEED] = (float) seed;
         out[outOffset + AABB_MIN_X] = (float) minX;
         out[outOffset + AABB_MIN_Z] = (float) minZ;
         out[outOffset + AABB_MAX_X] = (float) maxX;

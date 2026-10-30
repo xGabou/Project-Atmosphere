@@ -982,9 +982,12 @@ public final class StormVolumetricGeometrySandbox {
         java.util.Set<String> jsonSamplers = jsonNames(resolveJson, "samplers");
         java.util.Set<String> jsonUniforms = jsonNames(resolveJson, "uniforms");
         java.util.Map<String, String> live = liveUniforms(resolveSource);
+        // E41 (29 Oct 2026, user-approved): plus the motion history - a COPY of last frame's output, weighted
+        // only while the camera moves; a static frame keeps the non-recursive T207 + E39 path exactly.
         java.util.Set<String> expectedSamplers = new java.util.LinkedHashSet<>(List.of(
                 "Phase0Color", "Phase1Color", "Phase2Color", "Phase3Color",
-                "Phase0Depth", "Phase1Depth", "Phase2Depth", "Phase3Depth", "RainPassSampler"));
+                "Phase0Depth", "Phase1Depth", "Phase2Depth", "Phase3Depth", "RainPassSampler",
+                "MotionHistoryColor", "MotionHistoryDepth"));
         require(jsonSamplers.equals(expectedSamplers),
                 "the resolve's JSON samplers are not exactly the four raw phases and the rain"
                         + " pass: " + jsonSamplers);
@@ -1018,6 +1021,11 @@ public final class StormVolumetricGeometrySandbox {
                         && !resolver.contains("temporalResolvedTargetOrNull")
                         && !resolver.contains("CloudTemporalPhaseState.record("),
                 "the resolve renderer binds something other than the raw phases, or records a phase");
+        require(resolver.contains("VolumetricCloudRenderTargets.copyIntoMotionHistory(resolved);")
+                        && resolver.contains("&& motionPrevGeneration == CloudTemporalPhaseState.generation()")
+                        && resolver.contains("boolean moved = ")
+                        && resolveSource.contains("if (MotionHistoryWeight > 0.0 && !rainPresent) {"),
+                "E41: the motion history is not a post-resolve copy gated on camera motion and the phase generation");
         java.util.regex.Matcher resolvedAsSampler = java.util.regex.Pattern
                 .compile("setSampler\\([^)]*[Rr]esolved").matcher(resolver);
         require(!resolvedAsSampler.find(), "the resolved target is bound as a sampler");

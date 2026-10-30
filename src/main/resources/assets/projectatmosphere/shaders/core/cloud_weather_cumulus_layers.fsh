@@ -16,11 +16,15 @@ uniform float WeatherCoverageScale;
 uniform int CellCount;
 uniform int OutputMode;
 
-const int MAX_CELLS = 96;
-uniform vec4 CellPosRadius[MAX_CELLS];
-uniform vec4 CellShape[MAX_CELLS];
-uniform vec4 CellMedia[MAX_CELLS];
-uniform vec4 CellDynamics[MAX_CELLS];
+// C1 (stabilisation capacity): the cells live in CellDataSampler (5 RGBA32F texels per cell: posRadius,
+// shape, media, morphology, dynamics) and each 128-block tile of the map lists the cells that can reach it
+// (CellTileSampler: row = tile, texel 0 = count, texels 1.. = cell indices in ascending order, binned on the
+// CPU with this loop's own cull radius). A texel loops only its tile's cells, in the old index order, so the
+// result is unchanged while the budget grows from 96 uniform-array cells to CloudWeatherMapRenderer.MAX_CELLS.
+uniform sampler2D CellDataSampler;
+uniform sampler2D CellTileSampler;
+const int CELL_TILE_GRID = 32;
+const int CELL_TILE_CAP = 64;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -60,14 +64,19 @@ void main() {
     vec4 weightedBase = vec4(0.0);
     vec4 weightedTop = vec4(0.0);
 
-    for (int i = 0; i < MAX_CELLS; i++) {
-        if (i >= CellCount) {
+    ivec2 cellTile = clamp(ivec2(floor((worldXZ - WeatherOrigin) / WeatherExtent * float(CELL_TILE_GRID))),
+        ivec2(0), ivec2(CELL_TILE_GRID - 1));
+    int cellTileRow = cellTile.y * CELL_TILE_GRID + cellTile.x;
+    int cellTileCount = int(texelFetch(CellTileSampler, ivec2(0, cellTileRow), 0).r + 0.5);
+    for (int k = 0; k < CELL_TILE_CAP; k++) {
+        if (k >= cellTileCount) {
             break;
         }
-        vec4 posRadius = CellPosRadius[i];
-        vec4 shape = CellShape[i];
-        vec4 media = CellMedia[i];
-        vec4 dynamics = CellDynamics[i];
+        int i = int(texelFetch(CellTileSampler, ivec2(k + 1, cellTileRow), 0).r + 0.5);
+        vec4 posRadius = texelFetch(CellDataSampler, ivec2(0, i), 0);
+        vec4 shape = texelFetch(CellDataSampler, ivec2(1, i), 0);
+        vec4 media = texelFetch(CellDataSampler, ivec2(2, i), 0);
+        vec4 dynamics = texelFetch(CellDataSampler, ivec2(4, i), 0);
         float packedProfileRole = clamp(dynamics.w, 0.0, 7.999);
         int profile = int(floor(packedProfileRole + 0.0001));
         int role = int(floor(fract(packedProfileRole) * 16.0 + 0.5));

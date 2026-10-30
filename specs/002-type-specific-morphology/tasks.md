@@ -292,3 +292,126 @@ The approved order supersedes the planned T260.1 to T260.4 above. The reference-
 ## T260.13 Organic lower cloud mass morphology (experimental)
 
 - [X] T260.13a T260.12 not accepted (kept for comparison); T260.11 stays the reference. `LowerMassT26013`: dedicated lower-cloud-mass geometry (pseudo-distance: footprint grown from both groups' lower regions, uneven base, variable thickness with folds, own-scale billows) in three constructions - A broad warped mass with a carved bay, B 4-6 overlapping pads activating at their own strength levels (gaps), C two curved tongues from both groups growing at different rates and meeting off-centre. Inputs: T260.12 pair strength with maturity from LIVE cells; pair chosen once per system, roots fixed at formation (persistent growth / dissipation). PROTOTYPE OVERRIDE: base-compatibility term ignored (no separated 2609196 pair connects under full rules); pair G3-G6. Own region volume, field min(smin(L, groupA), smin(L, groupB)) (seamless at the region boundary; the chained smin bug that blended the towers was found by the overlap check and fixed). Checks: deterministic, union vs monolithic <= 158 / 2.5M samples, none > 0.05, 0 bad skips; lower-mass bake 3.6-4.8 s, 5-6.5 MB, group regions reused from cache; GPU within ~0.3 ms. Result: clear in the close view, subtle at system scale. Gallery `specs/001-native-storm-rendering/validation/t260-lower-cloud-mass/`. **STOPPED: three variants compared, no winner selected.**
+
+## T260.14 Shared lower convective foundation (experimental)
+
+- [X] T260.14a T260.13 A used as reference only. `FoundationT26014`:
+  - **Organisation graph:** every neighbouring pair gets a persistent strength A(t) from measured cell gap, live
+    maturity, moisture, shear and a seeded threshold; base compatibility is soft (the T260.13 base override is no longer
+    needed). Groups without an active pair are untouched; components of active pairs form complexes.
+  - **Masses:** skirts under organised groups (footprint, moisture, downshear push), 2–4 link masses per active pair
+    (near the groups first, the middle last), 0–2 outer/downshear shelves.
+  - **Mass shape:** sloped half-ellipsoids on one coherent base interpolated from the groups' own bases; outline and
+    folds with mass-scaled wavelengths; seeded cumuliform domes and flank lobes; 3D warp and billows; 3D coverage
+    openings away from towers.
+  - **Region:** its own cached volume; field max(min_g smin(F, g, 30), F − L1) (fillets into every tower; group fields
+    evaluated only near the foundation surface; union-exact).
+  - **Fixed while building:** extruded-wall stripes, crumpled noise surface, steep outline (max gradient 27 → 2.6), and
+    a discontinuous early-out that drew fake tower fillets.
+  - **Checks:** union vs monolithic none > 0.05, 0 bad skips (2 seeds), deterministic t30–t105, grows / dissipates.
+  - **Preview:** `t14`, view `eside`, frozen close distance and daylight. Demo: 3 seeds × T260.11 / T260.13 A / T260.14
+    × 6 views + diagnostics + GPU (p95 +0.2–0.5 ms, 1.3–1.6 ms fixture pass).
+  - **Result:** reads as one structure at system scale. Close and from below it is a smooth flattened mass (slab-like),
+    which remains open. The dry seed stays disconnected.
+  - Gallery `specs/001-native-storm-rendering/validation/t260-shared-foundation/`. **STOPPED for visual review.**
+
+## T260.15 Shared foundation vertical anatomy (experimental)
+
+- [X] T260.15a `FoundationT26014` version 15 (preview `t15`; diagnostic `t15f` / `t14f` = foundation alone). T260.14
+  organisation, pair eligibility, lifecycle, caching and towers are unchanged; `t14` is bit-identical (regression union).
+  - **Underside relief:** descending flattened masses (0.3–1.3 km, 60–440 m deep, with irregular companions), broad
+    depressions (up to about 340 m), base undulation and weak billows, gated by a km-scale relief character (smooth
+    regions remain).
+  - **Vertical integration:** 2–4 tower sleeves per organised group, 34–55 % of the tower top (organisation, life,
+    density, facing a linked neighbour). Capped at 55 % of any comparable tower they reach; skirts 15 % thinner.
+  - **Outer boundary:** T260.14 shelves replaced by short shrinking chains of 2–3 masses (elongation 1.0–1.3,
+    length:thickness 0.7–2.7 instead of up to 6.4); protected from openings; skirt and link elongation reduced.
+  - **Checks:** union none > 0.05, 0 bad skips (2 seeds); max gradient 3.36 (bound 4.0 for v15); deterministic
+    t30–t105.
+  - **Cost:** foundation bake 18–31 s (T260.14 13–19 s), 24–30 MB; GPU p95 1.19–1.43 ms (fixture pass).
+  - **In-game:** 3 seeds × T260.11 / T260.14 / T260.15 × 8 views (adds directly-below and oblique-underneath, hovering
+    10 blocks under the system), plus foundation-only diagnostics.
+  - **Result:** the outer shelves are visibly more compact. The underside relief is real in the geometry (flat
+    fraction 90 % → 40 %) but nearly invisible under the preview lighting (uniform dark underside). Integration is
+    subtle; the close view is still a smooth mass. The dry seed stays disconnected.
+  - Gallery `specs/001-native-storm-rendering/validation/t260-foundation-anatomy/`. **STOPPED for visual review.**
+- [X] T260.16a Foundation lighting diagnostic (no geometry change). Preview lighting modes 26–30 inside the
+  `PA_CONVECTIVE_SYSTEM_T260` fixture block (production programs verified identical):
+  - enhanced fill, raking light from below, gradient normal, uncapped optical depth;
+  - a physically motivated candidate (mode 29, its own constant program): two-stream diffuse transmission plus a
+    Lambertian skin response.
+  - **Cameras:** lifted underside views `lunder` / `lounder` (system lifted 240 blocks, identical for every candidate);
+    `relift`; `/cloudpreview light|lift`; demo set `t16`.
+  - **CPU attribution** (`T26011Smoke light16`): 74–80 % of visible underside samples sit at the sun-od cap of 8; the
+    ambient is isotropic. T260.14 and T260.15 undersides render to the same radiance (≈ 25 / 255) and the same
+    contrast (≈ 1 / 255). The light lattice is 14–16 blocks.
+  - **In-game result:** raking light shows T260.15's rounded masses against T260.14's flat plates (neighbour gradient
+    +40–52 %). The slab silhouette, towers sitting on top and the 2609196 tongue are unchanged in every mode.
+    Decision: lighting first, then geometry.
+  - **Cost:** candidate +4–5.5 ms cloud pass, ≤ 7.56 ms complete p95.
+  - **Checks:** parity, fast = exact, determinism and union all pass.
+  - Gallery `specs/001-native-storm-rendering/validation/t260-foundation-lighting/`. **STOPPED for visual review.**
+- [X] T260.17a Efficient directional cloud lighting (no geometry change; experimental fixture only, production
+  programs verified identical).
+  - **Bake:** the light bake gains a sun parameter (header; low sun = 0.2–0.3 s re-bake), a directional block
+    (uncapped sun od, sky share, filtered normal) and a grazing block (22-ray sky / ground quadrature).
+  - **Diagnosis:** factor isolation, modes 22/23/28/30/34–37/39 plus 10-block lattice and full resolution.
+  - **Candidates:** A directional ambient (31), B gradient-aware (32), C baked hybrid (33), D grazing quadrature (38).
+  - **Comparison:** modes 20 / 29 / A–D × 9 views × suns 35° and 12° × 3 seeds, with T260.14 discrimination.
+  - **Result: no candidate meets both requirements.**
+    - C and D are cheap (complete p95 ≤ 2.5 ms, +0.2–0.8 ms) but only brighten; they do not reveal the relief
+      (T260.15 / T260.14 discrimination 0.9–1.06, same as mode 20).
+    - A and B are over 3 ms.
+    - The T260.16 candidate is at 6.7–9.5 ms.
+    - The relief only shows through per-sample grazing shadows.
+  - **Memory:** fixture texture +21 MB (A–C), +42 MB (D).
+  - **Checks:** parity, fast = exact, determinism and union all pass.
+  - Gallery `specs/001-native-storm-rendering/validation/t260-efficient-lighting/`. **STOPPED for review.**
+- [X] T260.18a Shared foundation large-scale geometry (experimental preview only; lighting, tower anatomy, group
+  organisation and production files unchanged).
+  - **Variants** (`FoundationT26014` v181–183, candidates `t18a/b/c` and foundation-alone `t18af/bf/cf`):
+    A deep asymmetric hanging masses (0.17–1.34 km, replacing the T260.15 lobes), B uneven base (+1.15 km raised
+    regions, −0.2–0.5 km under towers, deep recesses / open bays), C integrated tower roots (replacing sleeves, lens
+    × 0.62).
+  - **Comparison:** T260.14 / T260.15 / A / B / C × 9 views (incl. directly below, oblique and edge-on underside) ×
+    seeds 2609101, 2609196 (+ 2609102 control without foundation), mode 20 plus the mode-27 raking diagnostic at the
+    underside views; foundation-alone renders; frozen cameras, pinned origin, one +320-block lift for every view.
+  - **Result (no winner selected):** A is the only variant whose underside depth visibly changes, but its masses may
+    read as pendant fingers / boulders; B's depth variation exists in the geometry but barely reads at preview scale;
+    C moderately improves some tower-to-foundation transitions.
+  - **Performance:** complete-renderer p95 ≤ 1.98 ms for every candidate (A +0.15 ms below); bake and memory ≈ T260.15.
+  - **Checks:** gradient ≤ 3.61 (bound 4), 0 bad skips, union ≈ T15, growth deterministic, parity ≤ 0.00049, fast = exact.
+  - Gallery `specs/001-native-storm-rendering/validation/t260-foundation-geometry/`. **STOPPED for review.**
+- [X] T260.18b Natural foundation geometry, Stage 1 only (experimental preview; lighting frozen at mode 20; Stage 2 lighting
+  NOT started, awaiting explicit approval).
+  - **Candidates** (`FoundationT26014` v184/v185, `t18d/e` + `t18df/ef`): D broad compound hanging masses (A refined:
+    1.2–2.8 km primaries + 2–4 overlapping companions, ≤ 0.48 × narrow semi-axis deep, no lean, downshear-deeper) + roots;
+    E asymmetric continuously lowered base downshear of each group (≤ 1 km, warped outline, two-octave modulation) +
+    recesses + roots.
+  - **Comparison:** T260.15 / D / E × directly below, oblique underside, ground, elevated side, three-quarter, edge-on;
+    seeds 2609196, 2609101 mature, 2609102 control; mode 20 plus the mode-27 raking diagnostic at the underside views.
+  - **Result:** under mode 20 neither candidate visibly breaks the slab read from below (the T260.16 cause); under raking
+    light D shows broad, soft, irregular masses (no fingers), E a smooth lowered trough. No winner selected.
+  - **Performance:** complete-renderer p95 ≤ 2.00 ms (10 ms ceiling). **Checks:** gradient ≤ 2.96, 0 bad skips, growth
+    deterministic, parity ≤ 0.00048, fast = exact.
+  - Gallery `specs/001-native-storm-rendering/validation/t260-foundation-geometry/stage1-de/`. **STOPPED for review.**
+  - **Third pass** (v186 D2 deeper broad compound masses + roots, v187 F = D2 on E's lowered base + roots; demo `t18p`
+    with a new foundation-scale edge-on camera `fprofile`): D2 changes the silhouette under unchanged lighting (broad
+    masses visible from below on 2609101, an uneven sag on the edge-on profile; weak on 2609196); F changes more but risks
+    a smooth hull. CPU metrics: interior SD 126/136 m (T15) → 333/334 m (D2), 451/448 m (F). p95 ≤ 2.83 ms in a
+    memory-pressured session. All checks pass. Gallery `.../t260-foundation-geometry/stage1-p3/`. **STOPPED for review;
+    Stage 2 not started.**
+- [X] T260.18c Stage 2: lighting the D2 foundation (experimental preview; D2 v186 selected as the experimental geometry
+  baseline, F rejected as a smooth inverted hull, nothing promoted; geometry frozen throughout).
+  - **Candidates:** L-dir (mode 35, baked sky/ground split on the baked normal, no density taps); L-graz (mode 40, + six
+    bounded ±8° grazing-shadow rays per sample); L-graz-c (mode 41, the same rays once per surface). Modes 40/41 exist
+    only in their generated programs (`..._neutral_t18graz/_t18grazc`), injected from
+    `src/main/shader-experiments/t26018_grazing*.glsl` by checked build overrides; `cloud_atmosphere_volume.fsh` unchanged.
+  - **Comparison:** D2 at modes 20/35/40/41 × directly below, oblique underside, foundation edge-on, ground, elevated
+    side × suns 35° and 12° × seeds 2609196, 2609101 mature + 2609102 control; raking 27 as the relief reference.
+  - **Result (no winner selected):** every candidate follows the masses better (in-game corr with the raking relief
+    +0.28–0.47 → +0.37–0.55; CPU corr with hanging depth up to +0.66) but absolute mass-scale contrast stays ≈ 9 levels;
+    the rest is brightening. Distant views unchanged. Only L-dir fits the budget (p95 2.90 ms vs 2.65); L-graz 15.84 ms
+    and L-graz-c 11.73 ms exceed the 10 ms ceiling. **No candidate gives a meaningful visual improvement within budget.**
+  - **Checks:** parity ≤ 0.00048, fast = exact and repeat = identical for every mode, light bake deterministic at both
+    suns, eyeDensity 0. Gallery `.../t260-foundation-geometry/stage2-lighting/`. **STOPPED for review.**

@@ -712,6 +712,9 @@ public final class VolumetricCloudRenderHook {
      * been applied. In particular, FAR_PROCEDURAL and HAZE must stay at zero:
      * targetCloudletCount is a hydration target, not permission to bypass LOD.
      */
+    /** C1: native detail cloudlets per field-profile budget unit (ULTRA 64 x 12 = 768, about 100 cumulus). */
+    private static final int NATIVE_CLOUDLET_BUDGET_SCALE = 12;
+
     private static int requestedCloudletCount(CloudFieldSnapshot snapshot) {
         if (snapshot == null || !snapshot.hasVisibleClouds()
                 || snapshot.sourceKind() == CloudFieldSourceKind.PA_CLUSTER) {
@@ -766,9 +769,12 @@ public final class VolumetricCloudRenderHook {
         // truncated later by MAX_CELLS.
         int macroSlots = Math.min(visibleFields, CloudWeatherMapRenderer.MAX_CELLS);
         int detailCapacity = Math.max(0, CloudWeatherMapRenderer.MAX_CELLS - macroSlots);
+        // C1 (stabilisation capacity): the native map holds MAX_CELLS (1024) cells now, so the native detail budget
+        // is the field profile's (ULTRA 64, sized for the 96-cell map) x NATIVE_CLOUDLET_BUDGET_SCALE. The legacy
+        // field renderer keeps reading the profile value unchanged.
         int budget = Math.max(0, Math.min(
                 detailCapacity,
-                CloudFieldVolumeRenderConfig.cloudletBudget()
+                CloudFieldVolumeRenderConfig.cloudletBudget() * NATIVE_CLOUDLET_BUDGET_SCALE
         ));
 
         candidates.sort(Comparator

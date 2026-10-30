@@ -61,6 +61,23 @@ public enum CoreCostDiagnosticProgram {
     CONVECTIVE_SYSTEM_NEUTRAL("growth_morphology_convective_system_neutral"),
     /** T260.5: the neutral fixture with mode 20 (final volumetric lighting) compiled as a constant. */
     CONVECTIVE_SYSTEM_NEUTRAL_FINAL("growth_morphology_convective_system_neutral_final"),
+    /** T260.16: the neutral fixture with mode 29 (the physically motivated lighting candidate) compiled as a constant. */
+    CONVECTIVE_SYSTEM_NEUTRAL_T16("growth_morphology_convective_system_neutral_t16"),
+    /** T260.17: lighting candidates A / B / C (modes 31 / 32 / 33) compiled as constants. */
+    CONVECTIVE_SYSTEM_NEUTRAL_T17A("growth_morphology_convective_system_neutral_t17a"),
+    CONVECTIVE_SYSTEM_NEUTRAL_T17B("growth_morphology_convective_system_neutral_t17b"),
+    CONVECTIVE_SYSTEM_NEUTRAL_T17C("growth_morphology_convective_system_neutral_t17c"),
+    /** T260.17: candidate D (mode 38, grazing ambient quadrature) compiled as a constant. */
+    CONVECTIVE_SYSTEM_NEUTRAL_T17D("growth_morphology_convective_system_neutral_t17d"),
+    /** T260.18 stage 2: L-dir (mode 35) and L-graz (mode 40, injected into its generated program only) as constants. */
+    CONVECTIVE_SYSTEM_NEUTRAL_T18DIR("growth_morphology_convective_system_neutral_t18dir"),
+    CONVECTIVE_SYSTEM_NEUTRAL_T18GRAZ("growth_morphology_convective_system_neutral_t18graz"),
+    /** T260.18 stage 2: L-graz-c (mode 41), the per-surface budget form of L-graz. */
+    CONVECTIVE_SYSTEM_NEUTRAL_T18GRAZC("growth_morphology_convective_system_neutral_t18grazc"),
+    /** T260.L-family: the production lighting family (mode 42, injected into its generated program only). */
+    CONVECTIVE_SYSTEM_NEUTRAL_LFAM("growth_morphology_convective_system_neutral_lfam"),
+    /** T260.L-family controlled arm: mode 43 = 42 with a two-tap sun-ward skin cone. */
+    CONVECTIVE_SYSTEM_NEUTRAL_LFAM_CONE("growth_morphology_convective_system_neutral_lfam_cone"),
     /**
      * The compile-time-specialized normal renderer used by FINAL frames.
      * T206: the split cloud program - the rain family compiled out, the rain

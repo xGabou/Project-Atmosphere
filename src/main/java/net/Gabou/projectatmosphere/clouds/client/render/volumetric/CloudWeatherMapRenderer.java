@@ -5,7 +5,9 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.util.Mth;
-import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL30;
 
 import java.util.Arrays;
 import java.util.List;
@@ -16,7 +18,21 @@ import java.util.List;
  * cloud silhouettes never swim as the camera moves.
  */
 public final class CloudWeatherMapRenderer {
-    public static final int MAX_CELLS = 96;
+    /**
+     * C1 (stabilisation capacity): was 96, the uniform-array limit (about 12 cumulus). The cells are now a data
+     * texture with per-tile lists (see {@link #uploadCellTextures}), so the map can hold a whole cumulus field.
+     */
+    public static final int MAX_CELLS = 1024;
+    /** C1: 32 x 32 tiles of 128 blocks over the map, at most CELL_TILE_CAP cells each (shader constants). */
+    static final int CELL_TILE_GRID = 32;
+    static final int CELL_TILE_CAP = 64;
+    private static int cellDataTexture;
+    private static int cellTileTexture;
+    private static final java.nio.FloatBuffer CELL_DATA = org.lwjgl.BufferUtils.createFloatBuffer(MAX_CELLS * 5 * 4);
+    private static final java.nio.FloatBuffer CELL_TILES =
+            org.lwjgl.BufferUtils.createFloatBuffer(CELL_TILE_GRID * CELL_TILE_GRID * (CELL_TILE_CAP + 1));
+    private static final int[] CELL_TILE_COUNTS = new int[CELL_TILE_GRID * CELL_TILE_GRID];
+    private static long cellTileOverflows;
     public static final float WEATHER_EXTENT = 4096.0F;
     public static final float ADAPTIVE_TARGET_RADIUS_TEXELS = 2.25F;
     public static final float MAX_ADAPTIVE_FOOTPRINT_SCALE = 1.5F;
@@ -187,6 +203,12 @@ public final class CloudWeatherMapRenderer {
         } finally {
             blurShader.clear();
         }
+        // P3 (stabilisation perf): the occupancy pyramid the march's empty-space jump reads (level 3 = 64-block
+        // tiles). Only when the raster was re-baked, like the blur itself.
+        int previousTexture = org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL11.GL_TEXTURE_BINDING_2D);
+        RenderSystem.bindTexture(nsId);
+        org.lwjgl.opengl.GL30.glGenerateMipmap(org.lwjgl.opengl.GL11.GL_TEXTURE_2D);
+        RenderSystem.bindTexture(previousTexture);
         return 1;
     }
 
@@ -486,6 +508,7 @@ public final class CloudWeatherMapRenderer {
                 WEATHER_EXTENT
         );
 
+        uploadCellTextures(count, originX, originZ, manualCoverageScale);
         VolumetricCloudRenderTargets.clearAndBind(target);
         RenderSystem.disableBlend();
         RenderSystem.disableDepthTest();
@@ -505,8 +528,8 @@ public final class CloudWeatherMapRenderer {
         );
         shader.safeGetUniform("WorldTime").set(worldTime);
         shader.safeGetUniform("CellCount").set(count);
+        bindCellSamplers(shader);
         shader.apply();
-        uploadCellArrays(shader, false);
         try {
             FullscreenQuad.draw(shader);
         } finally {
@@ -522,8 +545,8 @@ public final class CloudWeatherMapRenderer {
         morphologyShader.safeGetUniform("WeatherCoverageScale").set(manualCoverageScale);
         morphologyShader.safeGetUniform("WorldTime").set(worldTime);
         morphologyShader.safeGetUniform("CellCount").set(count);
+        bindCellSamplers(morphologyShader);
         morphologyShader.apply();
-        uploadCellArrays(morphologyShader, true);
         try {
             FullscreenQuad.draw(morphologyShader);
         } finally {
@@ -606,8 +629,8 @@ public final class CloudWeatherMapRenderer {
         shader.safeGetUniform("WeatherCoverageScale").set(coverageScale);
         shader.safeGetUniform("CellCount").set(count);
         shader.safeGetUniform("OutputMode").set(outputMode);
+        bindCellSamplers(shader);
         shader.apply();
-        uploadCellArrays(shader, false);
         try {
             FullscreenQuad.draw(shader);
         } finally {
@@ -627,32 +650,95 @@ public final class CloudWeatherMapRenderer {
         );
     }
 
-    /**
-     * Uploads the per-cell arrays directly; the vanilla uniform system only
-     * supports vec4-sized uniforms, so array uniforms go through raw GL.
-     */
-    private static void uploadCellArrays(ShaderInstance shader, boolean includeMorphology) {
-        int program = shader.getId();
-        uploadVec4Array(program, "CellPosRadius", posRadiusArray);
-        uploadVec4Array(program, "CellShape", shapeArray);
-        uploadVec4Array(program, "CellMedia", mediaArray);
-        if (includeMorphology) {
-            uploadVec4Array(program, "CellMorphology", morphologyArray);
-        }
-        uploadVec4Array(program, "CellDynamics", dynamicsArray);
+    /** C1. The weather passes read the cells from these two textures (bound before apply()). */
+    private static void bindCellSamplers(ShaderInstance shader) {
+        shader.setSampler("CellDataSampler", cellDataTexture);
+        shader.setSampler("CellTileSampler", cellTileTexture);
     }
 
-    private static void uploadVec4Array(int program, String name, float[] values) {
-        int location = GL20.glGetUniformLocation(program, name);
-        if (location < 0) {
-            location = GL20.glGetUniformLocation(program, name + "[0]");
+    /**
+     * C1. Writes the cell data texture (5 RGBA32F texels per cell) and the per-tile cell lists. A cell is listed in
+     * every 128-block tile its influence disc touches: the passes' own cull radius (max radius x adaptive footprint
+     * x coverage scale x 1.45) or the splat's stratus anchor (1.35 x radius, evaluated before that cull), whichever
+     * is larger, plus 2 blocks. Lists keep ascending cell order, so each texel sums its cells in the old order.
+     */
+    private static void uploadCellTextures(int count, double originX, double originZ, float coverageScale) {
+        if (cellDataTexture == 0) {
+            cellDataTexture = createFloatTexture(GL30.GL_RGBA32F, 5, MAX_CELLS, GL11.GL_RGBA);
+            cellTileTexture = createFloatTexture(GL30.GL_R32F, CELL_TILE_CAP + 1, CELL_TILE_GRID * CELL_TILE_GRID,
+                    GL11.GL_RED);
         }
-        if (location < 0) {
-            return;
+        CELL_DATA.clear();
+        for (int i = 0; i < count; i++) {
+            int b = i * 4;
+            CELL_DATA.put(posRadiusArray, b, 4).put(shapeArray, b, 4).put(mediaArray, b, 4)
+                    .put(morphologyArray, b, 4).put(dynamicsArray, b, 4);
         }
-        // The shader gates access with CellCount. Uploading the preallocated
-        // backing array avoids five per-frame slice allocations.
-        GL20.glUniform4fv(location, values);
+        CELL_DATA.flip();
+        java.util.Arrays.fill(CELL_TILE_COUNTS, 0);
+        CELL_TILES.clear();
+        for (int i = 0; i < CELL_TILES.capacity(); i++) {
+            CELL_TILES.put(i, 0.0F);
+        }
+        float tile = WEATHER_EXTENT / CELL_TILE_GRID;
+        int overflow = 0;
+        for (int i = 0; i < count; i++) {
+            int b = i * 4;
+            float radius = Math.max(posRadiusArray[b + 2], posRadiusArray[b + 3]);
+            float footprint = Math.max(mediaArray[b + 3], 0.001F) * Math.max(coverageScale, 0.001F) * 1.45F;
+            float reach = radius * Math.max(footprint, 1.35F) + 2.0F;
+            int minX = Math.max(0, (int) Math.floor((posRadiusArray[b] - reach - originX) / tile));
+            int maxX = Math.min(CELL_TILE_GRID - 1, (int) Math.floor((posRadiusArray[b] + reach - originX) / tile));
+            int minZ = Math.max(0, (int) Math.floor((posRadiusArray[b + 1] - reach - originZ) / tile));
+            int maxZ = Math.min(CELL_TILE_GRID - 1, (int) Math.floor((posRadiusArray[b + 1] + reach - originZ) / tile));
+            for (int z = minZ; z <= maxZ; z++) {
+                for (int x = minX; x <= maxX; x++) {
+                    int t = z * CELL_TILE_GRID + x;
+                    int n = CELL_TILE_COUNTS[t];
+                    if (n >= CELL_TILE_CAP) {
+                        overflow++;
+                        continue;
+                    }
+                    CELL_TILES.put(t * (CELL_TILE_CAP + 1) + 1 + n, i);
+                    CELL_TILE_COUNTS[t] = n + 1;
+                }
+            }
+        }
+        for (int t = 0; t < CELL_TILE_COUNTS.length; t++) {
+            CELL_TILES.put(t * (CELL_TILE_CAP + 1), CELL_TILE_COUNTS[t]);
+        }
+        if (overflow > 0) {
+            cellTileOverflows += overflow;
+            if (Long.bitCount(cellTileOverflows) == 1) {
+                net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.warn(
+                        "C1 weather-map tile overflow: {} cell-tile entries dropped this bake ({} total)",
+                        overflow, cellTileOverflows);
+            }
+        }
+        int previous = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        RenderSystem.bindTexture(cellDataTexture);
+        if (count > 0) {
+            GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, 5, count, GL11.GL_RGBA, GL11.GL_FLOAT, CELL_DATA);
+        }
+        RenderSystem.bindTexture(cellTileTexture);
+        CELL_TILES.position(0);
+        GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, CELL_TILE_CAP + 1, CELL_TILE_GRID * CELL_TILE_GRID,
+                GL11.GL_RED, GL11.GL_FLOAT, CELL_TILES);
+        RenderSystem.bindTexture(previous);
+    }
+
+    private static int createFloatTexture(int internalFormat, int width, int height, int format) {
+        int previous = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        int id = GL11.glGenTextures();
+        RenderSystem.bindTexture(id);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
+        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL11.GL_FLOAT,
+                (java.nio.FloatBuffer) null);
+        RenderSystem.bindTexture(previous);
+        return id;
     }
 
     private static long inputSignature(

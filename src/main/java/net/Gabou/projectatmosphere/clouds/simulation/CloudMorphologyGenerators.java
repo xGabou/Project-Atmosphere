@@ -25,6 +25,15 @@ import java.util.Locale;
  */
 final class CloudMorphologyGenerators {
     private static final float PUFF_GROUP_RADIUS_MULTIPLIER = 1.65F;
+    /**
+     * S14 (stabilisation, cumulus shape). 1 = the tiered layout (4 BASE lobes in one plane, 2-3 MIDDLE, 1-2 CROWN:
+     * stacked round caps read as alternating lit rims / dark bands). 2 = clustered: 8-17 lobes of decreasing
+     * size, each attached to an existing lobe, around an off-centre updraft core and along a seeded axis.
+     * Tier meanings (and the persisted layout version) are unchanged, so saved clouds keep their geometry.
+     */
+    public static volatile int puffLayout = 0;
+    // 0 = production per type (E28, user-accepted 27 Oct 2026): humilis and mediocris clustered, congestus still
+    // tiered until its tower layout is accepted. 1 / 2 force tiered / clustered for every cumulus (A/B tools).
     private static final float PUFF_RADIAL_MIN = 0.30F;
     private static final float PUFF_RADIAL_MAX = 0.64F;
     private static final float PUFF_ANGULAR_JITTER_RADIANS = 0.28F;
@@ -405,6 +414,10 @@ final class CloudMorphologyGenerators {
         // almost full-size cushions. Keep the count deterministic so the
         // persisted membership layout and render descriptors cannot change
         // shape when the same field is rebuilt.
+        boolean clustered = puffLayout == 2 || (puffLayout == 0 && (humilis || mediocris));
+        if (clustered && (humilis || mediocris || congestus)) {
+            return clusteredPuffPlan(definition, random, humilis, mediocris, congestus);
+        }
         int minClusters = id.contains("vapor") ? 2 : humilis ? 7 : mediocris ? 8 : congestus ? 8 : 4;
         int maxClusters = id.contains("vapor") ? 4 : humilis ? 7 : mediocris ? 8 : congestus ? 8 : 7;
         float radius = shape.getBaseRadius() * (mediocris || congestus ? 0.98F : 0.82F);
@@ -418,6 +431,294 @@ final class CloudMorphologyGenerators {
             return basePlan;
         }
         return basePlan.withPuffLobes(createHierarchicalPuffLobes(basePlan, mediocris || congestus, congestus, random));
+    }
+
+    /** S14: the clustered cumulus plan (see {@link #puffLayout}). */
+    private static SpawnPlan clusteredPuffPlan(
+            @NotNull CloudTypeDefinition definition,
+            @NotNull RandomSource random,
+            boolean humilis,
+            boolean mediocris,
+            boolean congestus
+    ) {
+        CloudShapeProfile shape = definition.getShapeProfile();
+        CloudVisualProfile visual = definition.getVisualProfile();
+        int count = humilis ? 8 + random.nextInt(3) : mediocris ? 12 + random.nextInt(4) : 14 + random.nextInt(4);
+        float radius = shape.getBaseRadius() * (humilis ? 0.82F : 0.98F);
+        SpawnPlan basePlan = plan(definition, random, count, count, radius,
+                radius * PUFF_GROUP_RADIUS_MULTIPLIER,
+                shape.getBaseOffset() * 0.95F, shape.getTopOffset(),
+                0.38F + visual.getDensityMultiplier() * 0.25F,
+                0.42F + visual.getCoverageMultiplier() * 0.24F,
+                0.24F + visual.getEdgeErosionStrength() * 0.42F);
+        return basePlan.withPuffLobes(congestus
+                ? createClusteredCongestusLobes(basePlan, random)
+                : createClusteredPuffLobes(basePlan, humilis, false, random));
+    }
+
+    /**
+     * S14. Clustered cumulus lobes. BASE lobes share the flat condensation level (sub-2 % stagger) and form an
+     * irregular, elongated cluster, each one overlapping an earlier BASE lobe. MIDDLE lobes grow from BASE lobes
+     * near the updraft core, CROWN lobes from MIDDLE (and, for congestus, from other upper lobes, so the column
+     * stacks and leans). Every upper root starts inside its parent, below the parent's top, so the union stays
+     * connected; sizes shrink with height so the top reads as small billows on larger ones.
+     */
+    private static List<PuffLobeSpec> createClusteredPuffLobes(
+            SpawnPlan plan,
+            boolean humilis,
+            boolean congestus,
+            RandomSource random
+    ) {
+        int count = plan.clusterCount();
+        float r = plan.radius();
+        float base = -plan.baseDrop();
+        int baseCount = humilis ? Math.round(count * 0.55F) : congestus ? Math.round(count * 0.32F)
+                : Math.round(count * 0.42F);
+        int crownCount = humilis ? (count >= 10 ? 1 : 0) : congestus ? Math.round(count * 0.34F)
+                : Math.round(count * 0.24F);
+        int middleCount = count - baseCount - crownCount;
+        float axis = plan.orientationRadians() + randomRange(random, -0.6F, 0.6F);
+        // s17: wider; s17d: capped (1.7 grew long thin tails on mediocris).
+        float aspect = randomRange(random, humilis ? 1.3F : 1.1F, humilis ? 1.8F : 1.4F);
+        float axisX = (float) Math.cos(axis);
+        float axisZ = (float) Math.sin(axis);
+        float coreAngle = randomRange(random, 0.0F, (float) (Math.PI * 2.0D));
+        float coreDistance = r * randomRange(random, 0.05F, 0.22F);
+        float coreX = (float) Math.cos(coreAngle) * coreDistance;
+        float coreZ = (float) Math.sin(coreAngle) * coreDistance;
+        float heightScale = humilis ? 0.80F : 1.0F;
+        List<PuffLobeSpec> lobes = new ArrayList<>(count);
+        List<PuffLobeSpec> baseLobes = new ArrayList<>();
+        List<PuffLobeSpec> upperLobes = new ArrayList<>();
+
+        // BASE: an anchor, then lobes attached to earlier BASE lobes along the elongated axis.
+        float anchorRadius = r * randomRange(random, 0.42F, 0.50F);
+        PuffLobeSpec anchor = puffLobe(0.0F, 0.0F, anchorRadius, base,
+                base + anchorRadius * randomRange(random, 1.35F, 1.70F) * heightScale, CloudMorphologyMemberTier.BASE);
+        lobes.add(anchor);
+        baseLobes.add(anchor);
+        for (int i = 1; i < baseCount; i++) {
+            PuffLobeSpec parent = baseLobes.get(random.nextInt(baseLobes.size()));
+            float childRadius = r * randomRange(random, 0.30F, 0.48F);
+            float angle = randomRange(random, 0.0F, (float) (Math.PI * 2.0D));
+            float along = (float) Math.cos(angle) * aspect;
+            float across = (float) Math.sin(angle);
+            float length = (float) Math.sqrt(along * along + across * across);
+            float dirX = (axisX * along - axisZ * across) / length;
+            float dirZ = (axisZ * along + axisX * across) / length;
+            // s17: 0.40..0.56 collapsed the base into one compact ball; 0.50..0.70 still overlaps every parent.
+            float distance = (parent.targetRadius() + childRadius) * randomRange(random, 0.50F, 0.70F);
+            float lobeBase = base + r * randomRange(random, 0.0F, 0.018F);
+            PuffLobeSpec lobe = puffLobe(parent.offsetX() + dirX * distance, parent.offsetZ() + dirZ * distance,
+                    childRadius, lobeBase,
+                    lobeBase + childRadius * randomRange(random, 1.30F, 1.70F) * heightScale,
+                    CloudMorphologyMemberTier.BASE);
+            lobes.add(lobe);
+            baseLobes.add(lobe);
+        }
+
+        // MIDDLE and CROWN: grow from a parent near the core, roots inside the parent.
+        for (int i = 0; i < middleCount + crownCount; i++) {
+            boolean crown = i >= middleCount;
+            List<PuffLobeSpec> parents = crown && !upperLobes.isEmpty() ? upperLobes
+                    : congestus && !upperLobes.isEmpty() && random.nextFloat() < 0.6F ? upperLobes : baseLobes;
+            // s17c: preferring the highest parent (0.35) stacked congestus into one thin chain of beads.
+            PuffLobeSpec parent = nearestToCore(parents, coreX, coreZ, congestus ? 0.12F : 0.05F, random);
+            // s17b: small crowns stretched to 2.4 radii tall read as thin spires; crowns stay >= 0.22 R and a
+            // congestus chain shrinks slowly so its top stays a broad turret.
+            float childRadius = Math.min(parent.targetRadius()
+                            * (congestus ? randomRange(random, 0.85F, 1.00F) : randomRange(random, 0.70F, 0.92F)),
+                    r * (crown ? (congestus ? randomRange(random, 0.26F, 0.36F) : randomRange(random, 0.22F, 0.32F))
+                            : (congestus ? randomRange(random, 0.32F, 0.46F) : randomRange(random, 0.26F, 0.40F))));
+            childRadius = Math.max(childRadius, r * (crown ? 0.22F : 0.20F));
+            float toCoreX = coreX - parent.offsetX();
+            float toCoreZ = coreZ - parent.offsetZ();
+            float toCore = (float) Math.sqrt(toCoreX * toCoreX + toCoreZ * toCoreZ);
+            float angle = randomRange(random, 0.0F, (float) (Math.PI * 2.0D));
+            float dirX = (float) Math.cos(angle) + (toCore > 1.0F ? 0.8F * toCoreX / toCore : 0.0F);
+            float dirZ = (float) Math.sin(angle) + (toCore > 1.0F ? 0.8F * toCoreZ / toCore : 0.0F);
+            float dirLength = Math.max(0.001F, (float) Math.sqrt(dirX * dirX + dirZ * dirZ));
+            // s17: more offset so upper billows bulge out as distinct masses instead of nesting in the parent.
+            float distance = (parent.targetRadius() + childRadius)
+                    * randomRange(random, crown ? 0.20F : 0.26F, crown ? 0.34F : 0.42F);
+            float parentSpan = parent.topOffsetY() - parent.baseOffsetY();
+            float lobeBase = parent.baseOffsetY() + parentSpan * randomRange(random, crown ? 0.50F : 0.35F,
+                    crown ? 0.68F : 0.55F);
+            float lobeTop = lobeBase + childRadius * (crown
+                    ? randomRange(random, congestus ? 1.30F : 1.15F, congestus ? 1.80F : 1.55F)
+                    : randomRange(random, congestus ? 1.50F : 1.30F, congestus ? 2.10F : 1.80F)) * heightScale;
+            PuffLobeSpec lobe = puffLobe(parent.offsetX() + dirX / dirLength * distance,
+                    parent.offsetZ() + dirZ / dirLength * distance, childRadius, lobeBase, lobeTop,
+                    crown ? CloudMorphologyMemberTier.CROWN : CloudMorphologyMemberTier.MIDDLE);
+            lobes.add(lobe);
+            upperLobes.add(lobe);
+        }
+        return List.copyOf(lobes);
+    }
+
+    /**
+     * S14 congestus (E28). The chained clustered layout grew congestus into one thin chain of beads; a congestus
+     * is a broad tower: a compact BASE cluster, then three tower levels (3, 2, 2 lobes) clustered around a slightly
+     * leaning core axis, each rooted inside the level below and narrowing upward (0.42 -> 0.30 R), then CROWN
+     * billows on the top level.
+     */
+    private static List<PuffLobeSpec> createClusteredCongestusLobes(SpawnPlan plan, RandomSource random) {
+        int count = plan.clusterCount();
+        float r = plan.radius();
+        float base = -plan.baseDrop();
+        float axis = plan.orientationRadians() + randomRange(random, -0.6F, 0.6F);
+        float aspect = randomRange(random, 1.0F, 1.3F);
+        float axisX = (float) Math.cos(axis);
+        float axisZ = (float) Math.sin(axis);
+        List<PuffLobeSpec> lobes = new ArrayList<>(count);
+        List<PuffLobeSpec> baseLobes = new ArrayList<>();
+        float anchorRadius = r * randomRange(random, 0.46F, 0.54F);
+        PuffLobeSpec anchor = puffLobe(0.0F, 0.0F, anchorRadius, base,
+                base + anchorRadius * randomRange(random, 1.35F, 1.60F), CloudMorphologyMemberTier.BASE);
+        lobes.add(anchor);
+        baseLobes.add(anchor);
+        for (int i = 1; i < 5; i++) {
+            PuffLobeSpec parent = baseLobes.get(random.nextInt(baseLobes.size()));
+            float childRadius = r * randomRange(random, 0.34F, 0.48F);
+            float angle = randomRange(random, 0.0F, (float) (Math.PI * 2.0D));
+            float along = (float) Math.cos(angle) * aspect;
+            float across = (float) Math.sin(angle);
+            float length = (float) Math.sqrt(along * along + across * across);
+            float distance = (parent.targetRadius() + childRadius) * randomRange(random, 0.40F, 0.58F);
+            float lobeBase = base + r * randomRange(random, 0.0F, 0.018F);
+            PuffLobeSpec lobe = puffLobe(
+                    parent.offsetX() + (axisX * along - axisZ * across) / length * distance,
+                    parent.offsetZ() + (axisZ * along + axisX * across) / length * distance,
+                    childRadius, lobeBase, lobeBase + childRadius * randomRange(random, 1.35F, 1.65F),
+                    CloudMorphologyMemberTier.BASE);
+            lobes.add(lobe);
+            baseLobes.add(lobe);
+        }
+        // The tower core: the base centroid, leaning a little per level.
+        float coreX = 0.0F;
+        float coreZ = 0.0F;
+        for (PuffLobeSpec lobe : baseLobes) {
+            coreX += lobe.offsetX() / baseLobes.size();
+            coreZ += lobe.offsetZ() / baseLobes.size();
+        }
+        float leanAngle = randomRange(random, 0.0F, (float) (Math.PI * 2.0D));
+        float leanStep = r * randomRange(random, 0.04F, 0.10F);
+        float leanX = (float) Math.cos(leanAngle) * leanStep;
+        float leanZ = (float) Math.sin(leanAngle) * leanStep;
+        // s17d-2: lobes taller than ~1.6 radii read as straight-sided cylinders; the tower gains its height from
+        // more, shorter lobes instead (3 / 3 / 2 levels).
+        int[] levelCounts = {3, 3, 2};
+        float[] levelRadius = {0.42F, 0.37F, 0.32F};
+        List<PuffLobeSpec> below = baseLobes;
+        for (int level = 0; level < levelCounts.length && lobes.size() < count; level++) {
+            float belowBase = 0.0F;
+            float belowSpan = 0.0F;
+            for (PuffLobeSpec lobe : below) {
+                belowBase += lobe.baseOffsetY() / below.size();
+                belowSpan += (lobe.topOffsetY() - lobe.baseOffsetY()) / below.size();
+            }
+            coreX += leanX;
+            coreZ += leanZ;
+            List<PuffLobeSpec> levelLobes = new ArrayList<>();
+            float ringAngle = randomRange(random, 0.0F, (float) (Math.PI * 2.0D));
+            for (int i = 0; i < levelCounts[level] && lobes.size() < count; i++) {
+                // s17d: equal-height rings rebuilt the stacked bands; spread roots and sizes so levels interleave.
+                float childRadius = r * levelRadius[level] * randomRange(random, 0.80F, 1.20F);
+                float angle = ringAngle + i * (float) (Math.PI * 2.0D) / levelCounts[level]
+                        + randomRange(random, -0.5F, 0.5F);
+                float offset = r * randomRange(random, 0.10F, 0.34F) * (1.0F - 0.2F * level);
+                float x = coreX + (float) Math.cos(angle) * offset;
+                float z = coreZ + (float) Math.sin(angle) * offset;
+                // s22: an upper lobe reaching past the lobe below overhangs it, and under a high sun the
+                // overhang shades a dark ring onto the lower level (the bands and vertical cuts in s19-s22).
+                // Each level lobe now sits inside its nearest supporting lobe and is rooted deep in it.
+                PuffLobeSpec support = nearestLobe(below, x, z);
+                childRadius = Math.min(childRadius, support.targetRadius() * 0.85F);
+                float[] inside = insideSupport(support, x, z, childRadius, 0.92F);
+                float supportSpan = support.topOffsetY() - support.baseOffsetY();
+                float lobeBase = Math.max(belowBase + belowSpan * randomRange(random, 0.25F, 0.65F),
+                        support.baseOffsetY() + supportSpan * randomRange(random, 0.30F, 0.50F));
+                lobeBase = Math.min(lobeBase, support.baseOffsetY() + supportSpan * 0.55F);
+                PuffLobeSpec lobe = puffLobe(inside[0], inside[1], childRadius, lobeBase,
+                        lobeBase + childRadius * randomRange(random, 1.25F, 1.60F), CloudMorphologyMemberTier.MIDDLE);
+                lobes.add(lobe);
+                levelLobes.add(lobe);
+            }
+            below = levelLobes;
+        }
+        // CROWN billows on the top level.
+        while (lobes.size() < count) {
+            PuffLobeSpec parent = below.get(random.nextInt(below.size()));
+            float childRadius = Math.min(r * randomRange(random, 0.24F, 0.32F), parent.targetRadius() * 0.85F);
+            float angle = randomRange(random, 0.0F, (float) (Math.PI * 2.0D));
+            float distance = (parent.targetRadius() + childRadius) * randomRange(random, 0.20F, 0.36F);
+            float span = parent.topOffsetY() - parent.baseOffsetY();
+            float lobeBase = parent.baseOffsetY() + span * randomRange(random, 0.50F, 0.66F);
+            // s22: no overhang past the parent (see the tower levels above).
+            float[] inside = insideSupport(parent, parent.offsetX() + (float) Math.cos(angle) * distance,
+                    parent.offsetZ() + (float) Math.sin(angle) * distance, childRadius, 0.92F);
+            lobes.add(puffLobe(inside[0], inside[1], childRadius, lobeBase,
+                    lobeBase + childRadius * randomRange(random, 1.30F, 1.70F), CloudMorphologyMemberTier.CROWN));
+        }
+        return List.copyOf(lobes);
+    }
+
+    /** s22: the lobe of {@code lobes} whose centre is nearest (x, z). */
+    private static PuffLobeSpec nearestLobe(List<PuffLobeSpec> lobes, float x, float z) {
+        PuffLobeSpec nearest = lobes.get(0);
+        float best = Float.MAX_VALUE;
+        for (PuffLobeSpec lobe : lobes) {
+            float dx = lobe.offsetX() - x;
+            float dz = lobe.offsetZ() - z;
+            float d = dx * dx + dz * dz;
+            if (d < best) {
+                best = d;
+                nearest = lobe;
+            }
+        }
+        return nearest;
+    }
+
+    /** s22: (x, z) pulled toward the support centre until a lobe of {@code radius} ends within fill x its radius. */
+    private static float[] insideSupport(PuffLobeSpec support, float x, float z, float radius, float fill) {
+        float dx = x - support.offsetX();
+        float dz = z - support.offsetZ();
+        float distance = (float) Math.sqrt(dx * dx + dz * dz);
+        float limit = Math.max(0.0F, support.targetRadius() * fill - radius);
+        if (distance <= limit || distance < 1.0E-4F) {
+            return new float[] {x, z};
+        }
+        float scale = limit / distance;
+        return new float[] {support.offsetX() + dx * scale, support.offsetZ() + dz * scale};
+    }
+
+    private static PuffLobeSpec puffLobe(float x, float z, float radius, float base, float top,
+            CloudMorphologyMemberTier tier) {
+        return new PuffLobeSpec(x, (base + top) * 0.5F, z, radius, base, Math.max(top, base + 2.0F), tier);
+    }
+
+    /** S14: one of the two parents nearest the core (a random pick keeps layouts varied). */
+    private static PuffLobeSpec nearestToCore(List<PuffLobeSpec> parents, float coreX, float coreZ,
+            float heightPreference, RandomSource random) {
+        PuffLobeSpec best = parents.get(0);
+        PuffLobeSpec second = best;
+        float bestDistance = Float.MAX_VALUE;
+        float secondDistance = Float.MAX_VALUE;
+        for (PuffLobeSpec lobe : parents) {
+            float dx = lobe.offsetX() - coreX;
+            float dz = lobe.offsetZ() - coreZ;
+            float distance = dx * dx + dz * dz - lobe.topOffsetY() * lobe.topOffsetY() * heightPreference;
+            if (distance < bestDistance) {
+                second = best;
+                secondDistance = bestDistance;
+                best = lobe;
+                bestDistance = distance;
+            } else if (distance < secondDistance) {
+                second = lobe;
+                secondDistance = distance;
+            }
+        }
+        return random.nextFloat() < 0.6F ? best : second;
     }
 
     private static SpawnPlan towerPlan(@NotNull CloudTypeDefinition definition, @NotNull RandomSource random) {

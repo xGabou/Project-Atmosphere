@@ -21,7 +21,9 @@
     { "name": "Phase1Depth" },
     { "name": "Phase2Depth" },
     { "name": "Phase3Depth" },
-    { "name": "RainPassSampler" }
+    { "name": "RainPassSampler" },
+    { "name": "MotionHistoryColor" },
+    { "name": "MotionHistoryDepth" }
   ],
   "uniforms": [
     { "name": "InvProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
@@ -48,6 +50,9 @@
     { "name": "ResolveMode", "type": "int", "count": 1, "values": [ 1 ] },
     { "name": "DebugOutput", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "RainPassLattice", "type": "int", "count": 1, "values": [ 0 ] },
-    { "name": "CameraDensity", "type": "float", "count": 1, "values": [ 0.0 ] }
+    { "name": "CameraDensity", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "MotionHistoryWeight", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "MotionPrevViewProj", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "MotionPrevCamDelta", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] }
   ]
 }

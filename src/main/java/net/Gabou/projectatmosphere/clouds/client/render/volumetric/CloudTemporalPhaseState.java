@@ -49,6 +49,12 @@ public final class CloudTemporalPhaseState {
     private static final Vector3f[] cameraPos = new Vector3f[PHASES];
     private static final long[] frame = new long[PHASES];
     private static final boolean[] valid = new boolean[PHASES];
+    /** E39: samples averaged into each phase target since it was last replaced. */
+    private static final int[] accumulated = new int[PHASES];
+    private static final float[] materialX = new float[PHASES];
+    private static final float[] materialZ = new float[PHASES];
+    private static float pendingWeight = 1.0F;
+    public static String lastReason = "";
     private static int currentPhase;
     private static long generation;
     private static long invalidations;
@@ -106,6 +112,45 @@ public final class CloudTemporalPhaseState {
         cameraPos[index].set(camera);
         frame[index] = frameIndex;
         valid[index] = true;
+        accumulated[index] = pendingWeight >= 1.0F ? 1 : accumulated[index] + 1;
+    }
+
+    /**
+     * E39. The blend weight of this frame's march into the phase target: 1 replaces it (and restarts the
+     * average), below 1 averages it with the same phase's previous result. Averaging is only allowed when the
+     * phase's rays are the SAME rays - same camera, same projection, cloud material moved less than
+     * {@code maxMaterialDrift} blocks - so nothing is resampled (T165: a resampled accumulation buffer loses
+     * the lattice gain) and nothing ghosts. The weight never drops below {@code minWeight}, which bounds how
+     * long a slow change (wind, a growing cloud) takes to show.
+     */
+    public static float accumulationWeight(int phase, Matrix4f frameViewProj, Vector3f camera, long frameIndex,
+            float materialOffsetX, float materialOffsetZ, float minWeight, float maxMaterialDrift) {
+        int index = phase & 3;
+        // The phase about to be re-marched was last rendered one full cycle (PHASES frames) ago; valid()'s
+        // MAX_AGE_FRAMES is the resolve's bound after this frame's record, one frame too strict here.
+        boolean recent = valid[index] && frameIndex >= frame[index] && frameIndex - frame[index] <= PHASES;
+        boolean sameRays = recent
+                && cameraPos[index].distanceSquared(camera) < 1.0e-4F
+                && viewProj[index].equals(frameViewProj, 1.0e-5F)
+                && Math.abs(materialOffsetX - materialX[index]) < maxMaterialDrift
+                && Math.abs(materialOffsetZ - materialZ[index]) < maxMaterialDrift;
+        // E39: why a phase replaced instead of averaging (for a debug HUD / capture log).
+        lastReason = !recent ? "invalid"
+                : cameraPos[index].distanceSquared(camera) >= 1.0e-4F ? "camera"
+                : !viewProj[index].equals(frameViewProj, 1.0e-5F) ? "viewproj"
+                : (Math.abs(materialOffsetX - materialX[index]) >= maxMaterialDrift
+                        || Math.abs(materialOffsetZ - materialZ[index]) >= maxMaterialDrift) ? "drift"
+                : accumulated[index] <= 0 ? "empty" : "same";
+        float weight = sameRays && accumulated[index] > 0
+                ? Math.max(1.0F / (accumulated[index] + 1.0F), minWeight)
+                : 1.0F;
+        if (weight >= 1.0F) {
+            // A replaced phase starts its drift reference over.
+            materialX[index] = materialOffsetX;
+            materialZ[index] = materialOffsetZ;
+        }
+        pendingWeight = weight;
+        return weight;
     }
 
     /** Drops every phase; the next three frames resolve at single-phase quality. */
@@ -114,11 +159,30 @@ public final class CloudTemporalPhaseState {
         for (int i = 0; i < PHASES; i++) {
             any |= valid[i];
             valid[i] = false;
+            accumulated[i] = 0;
         }
         generation++;
         if (any) {
             invalidations++;
         }
+    }
+
+    /**
+     * E41. How far the per-phase averages have converged: 0 right after any phase was replaced (motion, a cut,
+     * drift), 1 once every valid phase averages {@code fullSamples} renders. The resolve's motion history fades
+     * out with it, so a camera that stops keeps the history until the phases have caught up, and a long-static
+     * camera is back on the exact non-recursive path.
+     */
+    public static float convergence(long currentFrame, int fullSamples) {
+        int least = Integer.MAX_VALUE;
+        for (int i = 0; i < PHASES; i++) {
+            least = Math.min(least, valid(i, currentFrame) ? accumulated[i] : 0);
+        }
+        return Math.max(0.0F, Math.min(1.0F, (least - 1.0F) / Math.max(1.0F, fullSamples - 1.0F)));
+    }
+
+    public static int accumulatedCount(int phase) {
+        return accumulated[phase & 3];
     }
 
     public static long generation() {

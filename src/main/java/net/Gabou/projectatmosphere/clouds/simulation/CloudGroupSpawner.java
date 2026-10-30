@@ -26,6 +26,15 @@ public final class CloudGroupSpawner {
      * T134/T127 layout, 1 the T237 layout) for the same-storm capture A/B.
      * Server thread only.
      */
+    /** S14 (stabilisation): the cumulus layout version new spawns use (see CloudMorphologyGenerators.puffLayout). */
+    public static int puffLayout() {
+        return CloudMorphologyGenerators.puffLayout;
+    }
+
+    public static void setPuffLayout(int layout) {
+        CloudMorphologyGenerators.puffLayout = Math.max(0, Math.min(2, layout));
+    }
+
     public static String relayoutStorms(ServerLevel level, int version) {
         return CloudMorphologyGenerators.relayoutStormRegions(level, version);
     }

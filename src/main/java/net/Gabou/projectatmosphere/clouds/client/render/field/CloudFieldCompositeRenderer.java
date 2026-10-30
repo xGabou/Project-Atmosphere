@@ -105,6 +105,10 @@ public final class CloudFieldCompositeRenderer {
         boolean oneToOne = source.width == destinationViewport[2]
                 && source.height == destinationViewport[3];
         shader.safeGetUniform("OneToOne").set(oneToOne ? 1 : 0);
+        // S1 (stabilisation): the same value the march received.
+        shader.safeGetUniform("ColorPipeline").set(
+                net.Gabou.projectatmosphere.clouds.client.render.volumetric
+                        .VolumetricCloudDebugConfig.colorPipeline());
         lastOneToOne = oneToOne;
         shader.apply();
 

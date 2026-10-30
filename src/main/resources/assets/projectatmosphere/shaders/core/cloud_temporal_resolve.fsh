@@ -45,6 +45,13 @@ uniform sampler2D Phase1Depth;
 uniform sampler2D Phase2Depth;
 uniform sampler2D Phase3Depth;
 uniform sampler2D RainPassSampler;
+// E41. Motion history: a COPY of last frame's output (never the resolved target itself), read only while
+// the camera moves (MotionHistoryWeight > 0). A static camera keeps the exact non-recursive T207 + E39 path:
+// its phases already average identical rays. Under motion every phase is replaced each frame and the
+// animated E39 dither would show as noise; this blends it out, as TAA does, where motion hides the sharpness
+// a resampled history costs (T165).
+uniform sampler2D MotionHistoryColor;
+uniform sampler2D MotionHistoryDepth;
 // Bound manually on the PA units (Minecraft tracks twelve JSON samplers).
 uniform sampler2D Phase0Aux;
 uniform sampler2D Phase1Aux;
@@ -101,6 +108,11 @@ uniform int RainPassLattice;
 // T210. The smoothed cloud density at the camera (CameraCloudDensityTracker):
 // the along-ray guard applies only with the camera inside the medium.
 uniform float CameraDensity;
+// E41. 0 = static camera (history unused); otherwise the history's weight. The previous frame's projection *
+// view rotation, and this camera minus the previous one (camera-relative, like the phases).
+uniform float MotionHistoryWeight;
+uniform mat4 MotionPrevViewProj;
+uniform vec3 MotionPrevCamDelta;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -492,6 +504,43 @@ void main() {
             vec3 viewDir = normalize(viewDir4.xyz / max(abs(viewDir4.w), 1e-6));
             vec3 rayDir = normalize((InvViewRotMat * vec4(viewDir, 0.0)).xyz);
             outDepth = depthAt(rayDir * rainT);
+        }
+    }
+
+    if (MotionHistoryWeight > 0.0 && !rainPresent) {
+        // E41. Reproject this pixel's representative point into the previous frame.
+        vec2 ndc = texCoord * 2.0 - 1.0;
+        vec4 viewDir4 = InvProjMat * vec4(ndc, -1.0, 1.0);
+        vec3 viewDir = normalize(viewDir4.xyz / max(abs(viewDir4.w), 1e-6));
+        vec3 rayDir = normalize((InvViewRotMat * vec4(viewDir, 0.0)).xyz);
+        float distance = outDepth < 1.0 ? rayDistance(ndc, outDepth) : MaxRenderDistance;
+        vec4 prevClip = MotionPrevViewProj * vec4(rayDir * distance + MotionPrevCamDelta, 1.0);
+        vec2 prevUv = prevClip.w > 1e-6 ? (prevClip.xy / prevClip.w) * 0.5 + 0.5 : vec2(-1.0);
+        if (all(greaterThanEqual(prevUv, vec2(0.0))) && all(lessThanEqual(prevUv, vec2(1.0)))) {
+            vec4 history = texture(MotionHistoryColor, prevUv);
+            // Neighbourhood clamp against the current phase's 3x3 (premultiplied colour and coverage): the
+            // history may only say what this frame could plausibly say here, so a moved silhouette, new sky
+            // or a changed depth order cannot ghost; the dither, which lies inside that range, averages out.
+            vec4 lo = vec4(1e9);
+            vec4 hi = vec4(-1e9);
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    ivec2 c = clamp(currentCoord + ivec2(dx, dy), ivec2(0), phaseSize - ivec2(1));
+                    vec4 v = phaseColorTexel(CurrentPhase, c);
+                    lo = min(lo, v);
+                    hi = max(hi, v);
+                }
+            }
+            vec4 pad = (hi - lo) * 0.1 + vec4(0.002);
+            history = clamp(history, lo - pad, hi + pad);
+            // Depth: a history point much nearer or farther than this pixel's is another surface.
+            float historyDepth = texture(MotionHistoryDepth, prevUv).r;
+            bool depthAgrees = (historyDepth >= 1.0) == (outDepth >= 1.0)
+                || abs(historyDepth - outDepth) < 0.002;
+            if (depthAgrees) {
+                outRgb = mix(outRgb, history.rgb, MotionHistoryWeight);
+                outAlpha = mix(outAlpha, history.a, MotionHistoryWeight);
+            }
         }
     }
 

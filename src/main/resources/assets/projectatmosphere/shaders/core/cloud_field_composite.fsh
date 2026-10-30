@@ -13,11 +13,23 @@ uniform int CoverageAlphaReconstruction;
 // upscale wrote it): one exact texel per pixel, the scene test, no filter -
 // so the layer is never reconstructed twice.
 uniform int OneToOne;
+// S1 (stabilisation, RC-01). 0: the cloud colour is already display-ready (legacy per-sample curve in the march).
+// 1: the cloud colour is linear radiance (exposure applied): soft-clip it once with 1 - exp(-c) and encode it for the
+// display (gamma 1/2.2), after reconstruction and the alpha divide, before blending over the scene.
+uniform int ColorPipeline;
 
 in vec2 texCoord;
 out vec4 fragColor;
 
 const float ALPHA_EPSILON = 0.001;
+
+vec3 displayColor(vec3 straight) {
+    if (ColorPipeline == 0) {
+        return straight;
+    }
+    vec3 clipped = vec3(1.0) - exp(-max(straight, vec3(0.0)));
+    return pow(clipped, vec3(1.0 / 2.2));
+}
 
 ivec2 clampCoord(ivec2 coord, ivec2 size) {
     return clamp(coord, ivec2(0), size - ivec2(1));
@@ -55,7 +67,7 @@ void main() {
                 }
             }
         }
-        fragColor = vec4(texel.rgb / max(texel.a, ALPHA_EPSILON), clamp(texel.a, 0.0, 1.0));
+        fragColor = vec4(displayColor(texel.rgb / max(texel.a, ALPHA_EPSILON)), clamp(texel.a, 0.0, 1.0));
         gl_FragDepth = depth;
         return;
     }
@@ -178,7 +190,7 @@ void main() {
             discard;
         }
         vec3 straightColor = rawColor.rgb / max(rawColor.a, ALPHA_EPSILON);
-        fragColor = vec4(straightColor, clamp(rawColor.a, 0.0, 1.0));
+        fragColor = vec4(displayColor(straightColor), clamp(rawColor.a, 0.0, 1.0));
         return;
     }
 
@@ -255,7 +267,7 @@ void main() {
     // discontinuity, and alpha is never divided by anything, so the halo the
     // shipped comment describes cannot reappear.
     float outputAlpha = CoverageAlphaReconstruction != 0 ? coverageAlpha : accumulated.a;
-    fragColor = vec4(straightColor, clamp(outputAlpha, 0.0, 1.0));
+    fragColor = vec4(displayColor(straightColor), clamp(outputAlpha, 0.0, 1.0));
     if (CompositeMode == 0 || CompositeMode == 5) {
         gl_FragDepth = selectedDepth;
     }

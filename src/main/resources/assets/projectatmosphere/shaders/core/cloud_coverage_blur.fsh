@@ -31,5 +31,20 @@ void main() {
             sum += rawCoverage(texCoord + vec2(float(dx), float(dz)) * offset);
         }
     }
-    fragColor = vec4(sum / 9.0, 0.0, 0.0, 1.0);
+    // P3 (stabilisation perf): G = occupancy, 1 where any weather texel within one texel (8 blocks) has
+    // coverage - covers sampleWeather's bilinear reach. The renderer mipmaps this target after the pass; a
+    // half-float average keeps any non-zero, so a coarse level answers "may anything be here" for a whole tile
+    // (the march's empty-space jump, PaEmptySkip).
+    vec2 texel = 1.0 / vec2(textureSize(WeatherMapSampler, 0));
+    float occupied = 0.0;
+    for (int dz = -1; dz <= 1; dz++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            vec2 uv = texCoord + vec2(float(dx), float(dz)) * texel;
+            if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0
+                    && texture(WeatherMapSampler, uv).r > 0.0) {
+                occupied = 1.0;
+            }
+        }
+    }
+    fragColor = vec4(sum / 9.0, occupied, 0.0, 1.0);
 }

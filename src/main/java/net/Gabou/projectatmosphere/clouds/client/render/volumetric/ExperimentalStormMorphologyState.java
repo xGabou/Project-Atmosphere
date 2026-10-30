@@ -30,6 +30,16 @@ final class ExperimentalStormMorphologyState {
         boolean growth = fixture != null && fixture.program.growthDefined();
         if (fixture != null && fixture.program instanceof NeutralLitProgram) { // T260.5 baked neutral light
             if (parity) return CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_PARITY;
+            if (lighting == 29) return CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_NEUTRAL_T16; // T260.16 candidate, constant
+            if (lighting == 31) return CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_NEUTRAL_T17A; // T260.17 candidates, constant
+            if (lighting == 32) return CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_NEUTRAL_T17B;
+            if (lighting == 33) return CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_NEUTRAL_T17C;
+            if (lighting == 38) return CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_NEUTRAL_T17D;
+            if (lighting == 35) return CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_NEUTRAL_T18DIR; // T260.18 L-dir, constant
+            if (lighting == 40) return CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_NEUTRAL_T18GRAZ; // T260.18 L-graz (only there)
+            if (lighting == 41) return CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_NEUTRAL_T18GRAZC; // T260.18 L-graz-c
+            if (lighting == 42) return CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_NEUTRAL_LFAM; // T260.L-family (only there)
+            if (lighting == 43) return CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_NEUTRAL_LFAM_CONE; // its skin-cone arm
             return lighting == 20 ? CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_NEUTRAL_FINAL : CoreCostDiagnosticProgram.CONVECTIVE_SYSTEM_NEUTRAL;
         }
         if (fixture != null && fixture.program instanceof net.Gabou.projectatmosphere.clouds.morphology.ConvectiveVolumeT2606.Program) { // T260.6 arms (flat)
@@ -75,6 +85,7 @@ final class ExperimentalStormMorphologyState {
     static boolean intervals() { return intervals; }
     static void legacy(boolean value) { legacy = value; }
     static void lighting(int mode) { lighting = mode; }
+    static int lighting() { return lighting; }
     static void poison(boolean value) { poison = value; }
     static void beginFrame() { if (enabled()) { PIPELINE_TIMER.poll(); PIPELINE_TIMER.begin(); } }
     static void endFrame() { if (enabled()) PIPELINE_TIMER.end(); }
@@ -183,7 +194,8 @@ final class ExperimentalStormMorphologyState {
             shader.safeGetUniform("StormDarkening").set(0.7f);
             shader.safeGetUniform("WorldTime").set(123457f);
         }
-        shader.safeGetUniform("ExtinctionScale").set(VolumetricCloudRenderer.Tuning.CELLS.extinctionScale());
+        // S5: the preview's scale-consistent extinction (ExperimentalCloudPreview.previewExtinction).
+        shader.safeGetUniform("ExtinctionScale").set(ExperimentalCloudPreview.previewExtinction());
     }
 
     static void clear() {

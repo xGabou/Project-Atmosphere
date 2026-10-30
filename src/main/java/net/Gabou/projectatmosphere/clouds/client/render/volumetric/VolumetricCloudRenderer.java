@@ -130,6 +130,9 @@ public final class VolumetricCloudRenderer {
     private static final Matrix4f lastInvProj = new Matrix4f();
     private static final Matrix4f lastInvViewRot = new Matrix4f();
     private static final Matrix4f lastViewProj = new Matrix4f();
+    /** E39: this frame's blend weight into the phase target (1 = replace / the T207 behaviour). */
+    private static float phaseBlendWeight = 1.0F;
+    private static final Matrix4f phaseBlendViewProj = new Matrix4f();
     private static float lastMaxRenderDistance = 2000.0F;
 
     private VolumetricCloudRenderer() {
@@ -399,7 +402,10 @@ public final class VolumetricCloudRenderer {
             float extinctionScale,
             float historyBlend
     ) {
-        public static final Tuning FIELDS = new Tuning(1.45F, 1.25F, 0.115F, 0.85F);
+        // E35 raised extinction x3 (0.115 -> 0.345) on a fine-scale contrast metric; E43 (29 Oct 2026, full-frame
+        // review with the user) found x2-x3 expose the lobe pile (stacked balls, dark blotches on layer clouds).
+        // x1.5 (0.1725): more form than 0.115 while the clouds still read as one mass at normal view (s49).
+        public static final Tuning FIELDS = new Tuning(1.45F, 1.25F, 0.1725F, 0.85F);
         public static final Tuning CELLS = new Tuning(1.05F, 1.25F, 0.055F, 0.85F);
 
         public String summary() {
@@ -480,6 +486,12 @@ public final class VolumetricCloudRenderer {
             denseCameraResolution = true;
         }
         float diagnosticResolutionScale = VolumetricCloudDebugConfig.fixedResolutionScale();
+        if (!Float.isFinite(diagnosticResolutionScale) && ExperimentalStormMorphologyState.enabled()) {
+            // S5 (stabilisation, RC-04): the fixture never runs the temporal lattice, so without this it reached the
+            // screen as the raw phase grid magnified 4x - a grid production never shows. Marching at the lattice's
+            // resolution (2x the phase scale) gives the preview production's effective sample density.
+            diagnosticResolutionScale = Math.min(1.0F, 2.0F * profile.resolutionScale());
+        }
         float resolutionScale = Float.isFinite(diagnosticResolutionScale)
                 ? diagnosticResolutionScale
                 : denseCameraResolution
@@ -643,6 +655,17 @@ public final class VolumetricCloudRenderer {
         // T253. Before the march target is bound: the blur pass binds its own.
         CloudWeatherMapRenderer.refreshNsCoverage(weatherTarget, safeTuning.coverageMul());
 
+        // E39. Per-phase accumulation: decided before the first bind, because a replace clears the target and an
+        // average must not.
+        phaseBlendWeight = 1.0F;
+        if (temporal && VolumetricCloudDebugConfig.phaseAccumulate() != 0) {
+            phaseBlendViewProj.set(projection).mul(viewRotation);
+            phaseBlendWeight = CloudTemporalPhaseState.accumulationWeight(
+                    CloudTemporalPhaseState.currentPhase(), phaseBlendViewProj, cameraPos, frameIndex,
+                    materialOffsetX, materialOffsetZ,
+                    VolumetricCloudDebugConfig.phaseAccumulateMinWeight(),
+                    VolumetricCloudDebugConfig.phaseAccumulateMaxDrift());
+        }
         bindMarchTarget(cloudTarget, temporal);
         RenderSystem.disableBlend();
         RenderSystem.enableDepthTest();
@@ -783,6 +806,8 @@ public final class VolumetricCloudRenderer {
         // with the split deferred and never composited.
         shader.safeGetUniform("PaTemporalPhase").set(
                 temporal || VolumetricCloudDebugConfig.deferredSplitForced() ? 1 : 0);
+        shader.safeGetUniform("PaPhaseAccumulate").set(
+                temporal && VolumetricCloudDebugConfig.phaseAccumulate() != 0 ? 1 : 0); // E39
         lastInvProj.set(invProj);
         lastInvViewRot.set(invViewRot);
         lastViewProj.set(projection).mul(viewRotation);
@@ -797,6 +822,7 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("StepScale").set(stepScale);
         shader.safeGetUniform("ExteriorFineStep").set(
                 PuffLobeSpatialIndex.exteriorFineStepWorld(profile.raymarchSteps(), stepScale)
+                        * VolumetricCloudDebugConfig.fineStepMul() // S30-TEMP (1 = production)
         );
         // T211. The exterior ray-origin phase width (0 fineStep, 1 coarseStep).
         shader.safeGetUniform("PaOriginJitterMode").set(
@@ -807,6 +833,36 @@ public final class VolumetricCloudRenderer {
                 VolumetricCloudDebugConfig.lowerBodyMode());
         shader.safeGetUniform("PaDeepScatter").set(
                 VolumetricCloudDebugConfig.deepScatterMode());
+        // S1 / S2 (stabilisation). Uploaded every frame: uniform state persists per program.
+        shader.safeGetUniform("PaColorPipeline").set(VolumetricCloudDebugConfig.colorPipeline());
+        shader.safeGetUniform("PaOctaveNormalize").set(VolumetricCloudDebugConfig.octaveNormalize());
+        shader.safeGetUniform("PaAmbientTransmission").set(VolumetricCloudDebugConfig.ambientTransmission());
+        shader.safeGetUniform("PaShapeHierarchy").set(VolumetricCloudDebugConfig.shapeHierarchy());
+        shader.safeGetUniform("PaFieldCoverageFix").set(VolumetricCloudDebugConfig.fieldCoverageFix());
+        shader.safeGetUniform("PaOpticalThicknessGain").set(VolumetricCloudDebugConfig.opticalThicknessGain());
+        shader.safeGetUniform("PaStormMaterialFix").set(VolumetricCloudDebugConfig.stormMaterialFix());
+        shader.safeGetUniform("PaStormStructure").set(VolumetricCloudDebugConfig.stormStructure());
+        shader.safeGetUniform("PaPuffOccupancy").set(VolumetricCloudDebugConfig.puffOccupancy());
+        shader.safeGetUniform("PaPerfArm").set(VolumetricCloudDebugConfig.perfArm()); // PERF-TEMP
+        shader.safeGetUniform("PaEmptySkip").set(VolumetricCloudDebugConfig.emptySkip());
+        shader.safeGetUniform("PaExactLightTaps").set(VolumetricCloudDebugConfig.exactLightTaps());
+        shader.safeGetUniform("PaPuffWarp").set(VolumetricCloudDebugConfig.puffWarp());
+        shader.safeGetUniform("PaPuffBlend").set(VolumetricCloudDebugConfig.puffBlend());
+        shader.safeGetUniform("PaLightTap0Field").set(VolumetricCloudDebugConfig.lightTap0Field()); // S25-TEMP
+        shader.safeGetUniform("PaLightSplit").set(VolumetricCloudDebugConfig.lightSplit()); // S27-TEMP
+        shader.safeGetUniform("PaPuffBubbles").set(VolumetricCloudDebugConfig.puffBubbles()); // S33-TEMP
+        shader.safeGetUniform("PaPuffBubbleSharp").set(VolumetricCloudDebugConfig.puffBubbleSharp());
+        shader.safeGetUniform("PaDetailStepFilter").set(VolumetricCloudDebugConfig.detailStepFilter()); // S31-TEMP
+        shader.safeGetUniform("PaIntegrationPhase").set(VolumetricCloudDebugConfig.integrationPhase()); // S32-TEMP
+        shader.safeGetUniform("PaNearLight").set(VolumetricCloudDebugConfig.nearLight()); // E33 Cloud Surface Detail
+        shader.safeGetUniform("PaPuffBody").set(VolumetricCloudDebugConfig.puffBody()); // S26-TEMP
+        shader.safeGetUniform("PaPuffBodyK").set(VolumetricCloudDebugConfig.puffBodyK());
+        shader.safeGetUniform("PaPuffBodyThreshold").set(VolumetricCloudDebugConfig.puffBodyThreshold());
+        shader.safeGetUniform("PaPuffBodyRelief").set(VolumetricCloudDebugConfig.puffBodyRelief());
+        shader.safeGetUniform("PaPuffBodyTurrets").set(VolumetricCloudDebugConfig.puffBodyTurrets());
+        shader.safeGetUniform("PaPuffBodyErode").set(VolumetricCloudDebugConfig.puffBodyErode());
+        shader.safeGetUniform("PaPuffBodyShell").set(VolumetricCloudDebugConfig.puffBodyShell());
+        shader.safeGetUniform("PaPuffBodyCoreDepth").set(VolumetricCloudDebugConfig.puffBodyCoreDepth());
         float uploadedMaxRenderDistance = Math.max(300.0F, maxRenderDistance);
         lastMaxRenderDistance = uploadedMaxRenderDistance;
         boolean uploadedUseSceneDepth = sceneRayLimitEnabled && safeSceneDepth.valid();
@@ -869,7 +925,8 @@ public final class VolumetricCloudRenderer {
         );
         shader.safeGetUniform("DensityMul").set(safeTuning.densityMul());
         shader.safeGetUniform("CoverageMul").set(safeTuning.coverageMul());
-        shader.safeGetUniform("ExtinctionScale").set(safeTuning.extinctionScale());
+        shader.safeGetUniform("ExtinctionScale").set(safeTuning.extinctionScale()
+                * VolumetricCloudDebugConfig.extinctionMul()); // S29-TEMP multiplier (1 = production)
         FunnelUniforms safeFunnels = funnels == null ? FunnelUniforms.NONE : funnels;
         shader.safeGetUniform("FunnelCount").set(safeFunnels.count());
         shader.safeGetUniform("Funnel0A").set(safeFunnels.f0a());
@@ -1076,10 +1133,24 @@ public final class VolumetricCloudRenderer {
                         // campaign selects; its consumer bits are live.
                         ? VolumetricCloudDebugConfig.lightAuditFieldBits()
                         : program.stormFieldEnabledBits();
-                if (VolumetricCloudDebugConfig.consumeStormFieldSoundnessRequest()) {
+                boolean paOracleThisFrame = VolumetricCloudDebugConfig.consumeStormFieldSoundnessRequest();
+                if (paOracleThisFrame) {
                     runStormFieldSoundnessOracle(shader, puffCandidateTarget, stormFieldXZ);
                 }
-                VolumetricCloudRenderTargets.clearAndBind(stormFieldTarget);
+                // P2 (stabilisation perf): the atlas rebuilt in bands. One band of tile rows per frame (1/N of the
+                // 32 slices), a full rebuild whenever its structure moved (origin snap, slab, descriptor / lobe
+                // counts, target or program change, the oracle) and at least every 16 frames. A node is then at
+                // most N - 1 frames old: storms and wind move well under a block per frame against 16-block
+                // nodes, and the noise is applied live at lookup (the atlas holds geometry thresholds).
+                int paBand = fieldBuildBand(stormFieldTarget, weather, program, paOracleThisFrame);
+                if (paBand < 0) {
+                    VolumetricCloudRenderTargets.clearAndBind(stormFieldTarget);
+                } else {
+                    int bandRows = StormFieldGeometry.TILES_Y / VolumetricCloudDebugConfig.fieldSlices();
+                    int bandHeight = stormFieldTarget.height / StormFieldGeometry.TILES_Y * bandRows;
+                    stormFieldTarget.bindWrite(true);
+                    RenderSystem.enableScissor(0, paBand * bandHeight, stormFieldTarget.width, bandHeight);
+                }
                 shader.safeGetUniform("PaStormFieldPass").set(1);
                 // T202. The build reads the consumer bits too: bit 32 decides
                 // what the node's A channel carries (the refinement's
@@ -1098,6 +1169,7 @@ public final class VolumetricCloudRenderer {
                     FullscreenQuad.draw(shader);
                 } finally {
                     RAIN_FIELD_TIMER.end();
+                    RenderSystem.disableScissor(); // P2: the band scissor (a no-op after a full build)
                     unbindManualTextures();
                     shader.clear();
                 }
@@ -1218,11 +1290,27 @@ public final class VolumetricCloudRenderer {
         shader.apply();
         PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
         bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
+        boolean phaseBlend = temporal && phaseBlendWeight < 1.0F;
+        if (phaseBlend) {
+            // E39: new = w * march + (1 - w) * previous, on both attachments (premultiplied colour and the rain-
+            // split aux are linear, so their averages are the averages of the samples). After apply(), which
+            // sets the program's own replace blend.
+            RenderSystem.enableBlend();
+            org.lwjgl.opengl.GL14.glBlendColor(0.0F, 0.0F, 0.0F, phaseBlendWeight);
+            RenderSystem.blendFuncSeparate(
+                    GlStateManager.SourceFactor.CONSTANT_ALPHA, GlStateManager.DestFactor.ONE_MINUS_CONSTANT_ALPHA,
+                    GlStateManager.SourceFactor.CONSTANT_ALPHA, GlStateManager.DestFactor.ONE_MINUS_CONSTANT_ALPHA);
+        }
         GPU_TIMER.begin();
         try {
             FullscreenQuad.draw(shader);
         } finally {
             GPU_TIMER.end();
+            if (phaseBlend) {
+                RenderSystem.defaultBlendFunc();
+                RenderSystem.disableBlend();
+                org.lwjgl.opengl.GL14.glBlendColor(0.0F, 0.0F, 0.0F, 0.0F);
+            }
             unbindManualTextures();
             shader.clear();
         }
@@ -1296,7 +1384,9 @@ public final class VolumetricCloudRenderer {
      * the raw phase target with its aux attachment drawn and cleared.
      */
     private static void bindMarchTarget(RenderTarget target, boolean temporal) {
-        if (temporal) {
+        if (temporal && phaseBlendWeight < 1.0F) {
+            VolumetricCloudRenderTargets.bindPhaseForAccumulation(target); // E39: averaged, never cleared
+        } else if (temporal) {
             VolumetricCloudRenderTargets.clearAndBindPhase(target);
         } else {
             VolumetricCloudRenderTargets.clearAndBind(target);
@@ -1373,7 +1463,23 @@ public final class VolumetricCloudRenderer {
                 && VolumetricCloudDebugConfig.lightAuditOutput() == 0
                 // T203. FINAL bakes the rain gate off; a campaign forcing it
                 // on the monolith is uploading a value FINAL cannot take.
-                && !VolumetricCloudDebugConfig.rainGateForcedOnMonolith();
+                && !VolumetricCloudDebugConfig.rainGateForcedOnMonolith()
+                // Stabilisation (27 Oct 2026): the accepted switches are baked into FINAL (build.gradle
+                // leanFinalConstants); any other value is an arm and takes the monolith, where they are live.
+                && VolumetricCloudDebugConfig.colorPipeline() == VolumetricCloudDebugConfig.PRODUCTION_COLOR_PIPELINE
+                && VolumetricCloudDebugConfig.octaveNormalize() == VolumetricCloudDebugConfig.PRODUCTION_OCTAVE_NORMALIZE
+                && VolumetricCloudDebugConfig.ambientTransmission()
+                        == VolumetricCloudDebugConfig.PRODUCTION_AMBIENT_TRANSMISSION
+                && VolumetricCloudDebugConfig.shapeHierarchy() == VolumetricCloudDebugConfig.PRODUCTION_SHAPE_HIERARCHY
+                && VolumetricCloudDebugConfig.fieldCoverageFix() == VolumetricCloudDebugConfig.PRODUCTION_FIELD_COVERAGE_FIX
+                && VolumetricCloudDebugConfig.opticalThicknessGain()
+                        == VolumetricCloudDebugConfig.PRODUCTION_OPTICAL_THICKNESS_GAIN
+                && VolumetricCloudDebugConfig.stormMaterialFix() == VolumetricCloudDebugConfig.PRODUCTION_STORM_MATERIAL_FIX
+                && VolumetricCloudDebugConfig.stormStructure() == VolumetricCloudDebugConfig.PRODUCTION_STORM_STRUCTURE
+                && VolumetricCloudDebugConfig.puffOccupancy() == VolumetricCloudDebugConfig.PRODUCTION_PUFF_OCCUPANCY
+                && VolumetricCloudDebugConfig.emptySkip() == VolumetricCloudDebugConfig.PRODUCTION_EMPTY_SKIP
+                && VolumetricCloudDebugConfig.perfArm() == 0;
+                // (PaExactLightTaps stays a live uniform in FINAL: it is the player's Storm Shadow Detail setting.)
     }
 
     /**
@@ -1563,6 +1669,48 @@ public final class VolumetricCloudRenderer {
         stormFieldBuildsInputsUnchanged = 0L;
         stormFieldBuildsDescriptorsUnchanged = 0L;
         stormFieldInputSignatureValid = false;
+    }
+
+    /** P2: the last full build's structural inputs, and the band schedule. */
+    private static Object fieldBandTarget;
+    private static CoreCostDiagnosticProgram fieldBandProgram;
+    private static double fieldBandOriginX = Double.NaN;
+    private static double fieldBandOriginZ = Double.NaN;
+    private static float fieldBandSlabBase = Float.NaN;
+    private static float fieldBandSlabTop = Float.NaN;
+    private static int fieldBandStormLobes = -1;
+    private static int fieldBandPuffLobes = -1;
+    private static int fieldBandSlices = -1;
+    private static int fieldBandFrame;
+
+    /**
+     * P2. -1 = build the whole atlas this frame; otherwise the band (0 .. N - 1) of tile rows to rebuild. Full builds
+     * when any structural input changed since the last full build, every 16 frames, and whenever bands are off.
+     */
+    private static int fieldBuildBand(RenderTarget target, CloudWeatherMapRenderer.Result weather,
+            CoreCostDiagnosticProgram program, boolean oracle) {
+        int slices = VolumetricCloudDebugConfig.fieldSlices();
+        int stormLobes = StormGeometryBuildCoordinator.lobeCount();
+        int puffLobes = PuffLobeSpatialIndex.lobeCount();
+        boolean full = slices <= 1 || oracle || target != fieldBandTarget || program != fieldBandProgram
+                || weather.originX() != fieldBandOriginX || weather.originZ() != fieldBandOriginZ
+                || weather.slabBaseY() != fieldBandSlabBase || weather.slabTopY() != fieldBandSlabTop
+                || stormLobes != fieldBandStormLobes || puffLobes != fieldBandPuffLobes
+                || slices != fieldBandSlices || fieldBandFrame >= 16;
+        if (full) {
+            fieldBandTarget = target;
+            fieldBandProgram = program;
+            fieldBandOriginX = weather.originX();
+            fieldBandOriginZ = weather.originZ();
+            fieldBandSlabBase = weather.slabBaseY();
+            fieldBandSlabTop = weather.slabTopY();
+            fieldBandStormLobes = stormLobes;
+            fieldBandPuffLobes = puffLobes;
+            fieldBandSlices = slices;
+            fieldBandFrame = 1;
+            return -1;
+        }
+        return fieldBandFrame++ % slices;
     }
 
     private static boolean stormFieldProgram(CoreCostDiagnosticProgram program) {

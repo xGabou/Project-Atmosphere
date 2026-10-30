@@ -71,8 +71,10 @@ public final class CloudNoiseTextureManager {
         int uploadedDetail = -1;
         int uploadedBlue = -1;
         try {
-            uploadedBase = upload3d(base, BASE_SIZE);
-            uploadedDetail = upload3d(detail, DETAIL_SIZE);
+            uploadedBase = upload3d(base, BASE_SIZE, false);
+            // E36: the detail noise is mipmapped and read at the pixel footprint (shader paDetailLod); without
+            // mips its finest octave (~1.4-block texels) aliased into per-pixel speckle on every lit face.
+            uploadedDetail = upload3d(detail, DETAIL_SIZE, true);
             uploadedBlue = upload2d(blue, BLUE_SIZE);
             // Publish the set atomically. A partial upload must never be
             // mistaken for a complete sampler set on the following frame.
@@ -259,7 +261,7 @@ public final class CloudNoiseTextureManager {
     // GL upload
     // -----------------------------------------------------------------
 
-    private static int upload3d(byte[] pixels, int size) {
+    private static int upload3d(byte[] pixels, int size, boolean mipmapped) {
         requirePixelLength(pixels, (long) size * size * size * 4L, "3D");
         int previousTexture = GL11.glGetInteger(GL12.GL_TEXTURE_BINDING_3D);
         int textureId = GL11.glGenTextures();
@@ -267,7 +269,8 @@ public final class CloudNoiseTextureManager {
         try {
             try (PixelUnpackState ignored = PixelUnpackState.beginTightCpuUpload()) {
                 GL11.glBindTexture(GL12.GL_TEXTURE_3D, textureId);
-                GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+                GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_MIN_FILTER,
+                        mipmapped ? GL11.GL_LINEAR_MIPMAP_LINEAR : GL11.GL_LINEAR);
                 GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
                 GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
                 GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_REPEAT);
@@ -277,6 +280,9 @@ public final class CloudNoiseTextureManager {
                     buffer.put(pixels).flip();
                     GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL11.GL_RGBA8, size, size, size, 0,
                             GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
+                    if (mipmapped) {
+                        org.lwjgl.opengl.GL30.glGenerateMipmap(GL12.GL_TEXTURE_3D);
+                    }
                 } finally {
                     MemoryUtil.memFree(buffer);
                 }

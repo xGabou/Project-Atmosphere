@@ -389,7 +389,8 @@ public final class VolumetricCloudDebugConfig {
     }
 
     public static void setDiagnosticLightingMode(int mode) {
-        diagnosticLightingMode = Math.max(0, Math.min(18, mode));
+        // L-TEMP: 40 / 41 (stabilisation lighting investigation) - the upper bound was 18.
+        diagnosticLightingMode = Math.max(0, Math.min(41, mode));
     }
 
     public static boolean t098LegacyFinePromotion() {
@@ -627,6 +628,408 @@ public final class VolumetricCloudDebugConfig {
 
     public static int deepScatterMode() {
         return deepScatterMode;
+    }
+
+    /**
+     * S1 (stabilisation, RC-01): 0 legacy (Minecraft colours used as radiance, per-sample display curve in the
+     * march), 1 colour-managed (linearised inputs, linear radiance, one curve + sRGB encode in the composite).
+     * The march (PaColorPipeline) and the composite (ColorPipeline) always receive the same value.
+     */
+    public static final int PRODUCTION_COLOR_PIPELINE = 1; // E16: user accepted the s10 full_g2 gallery
+    private static volatile int colorPipeline = PRODUCTION_COLOR_PIPELINE;
+    /** S2 (stabilisation, RC-08): 1 legacy (Hillaire octaves normalised), 0 the octaves add their energy. */
+    public static final int PRODUCTION_OCTAVE_NORMALIZE = 0; // E16
+    private static volatile int octaveNormalize = PRODUCTION_OCTAVE_NORMALIZE;
+
+    public static int colorPipeline() {
+        return colorPipeline;
+    }
+
+    public static void setColorPipeline(int mode) {
+        colorPipeline = Math.max(0, Math.min(1, mode));
+    }
+
+    public static int octaveNormalize() {
+        return octaveNormalize;
+    }
+
+    public static void setOctaveNormalize(int mode) {
+        octaveNormalize = Math.max(0, Math.min(1, mode));
+    }
+
+    /** S1b (stabilisation, RC-21): 0 legacy ambient retention floor, 1 diffuse two-stream transmission of the light path. */
+    public static final int PRODUCTION_AMBIENT_TRANSMISSION = 1; // E16
+    private static volatile int ambientTransmission = PRODUCTION_AMBIENT_TRANSMISSION;
+
+    public static int ambientTransmission() {
+        return ambientTransmission;
+    }
+
+    public static void setAmbientTransmission(int mode) {
+        ambientTransmission = Math.max(0, Math.min(1, mode));
+    }
+
+    /** S9 (stabilisation, shape root cause): amplitude of the cumulus billow hierarchy, 0 = legacy form. */
+    public static final float PRODUCTION_SHAPE_HIERARCHY = 0.0F;
+    private static volatile float shapeHierarchy = PRODUCTION_SHAPE_HIERARCHY;
+
+    public static float shapeHierarchy() {
+        return shapeHierarchy;
+    }
+
+    public static void setShapeHierarchy(float amplitude) {
+        shapeHierarchy = Math.max(0.0F, Math.min(4.0F, amplitude));
+    }
+
+    /** E10 (stabilisation, Codex CR-05): 1 = exact covered/uncovered test for field light taps (no fabricated boxes). */
+    public static final int PRODUCTION_FIELD_COVERAGE_FIX = 1; // E11: verified in game; correctness fix
+    private static volatile int fieldCoverageFix = PRODUCTION_FIELD_COVERAGE_FIX;
+
+    public static int fieldCoverageFix() {
+        return fieldCoverageFix;
+    }
+
+    public static void setFieldCoverageFix(int mode) {
+        fieldCoverageFix = Math.max(0, Math.min(1, mode));
+    }
+
+    /** E12 (stabilisation): light-path optical-thickness gain for dark / thick families, 0 = off. */
+    public static final float PRODUCTION_OPTICAL_THICKNESS_GAIN = 2.0F; // E16 (gain 2 chosen over 4)
+    private static volatile float opticalThicknessGain = PRODUCTION_OPTICAL_THICKNESS_GAIN;
+
+    public static float opticalThicknessGain() {
+        return opticalThicknessGain;
+    }
+
+    public static void setOpticalThicknessGain(float gain) {
+        opticalThicknessGain = Math.max(0.0F, Math.min(40.0F, gain));
+    }
+
+    /** E13 (stabilisation): descriptor-storm material from the storm walk instead of the empty map; 0 = legacy. */
+    public static final int PRODUCTION_STORM_MATERIAL_FIX = 2; // E16; 2 = E20 continuous storm lighting height (27 Oct)
+    private static volatile int stormMaterialFix = PRODUCTION_STORM_MATERIAL_FIX;
+
+    public static int stormMaterialFix() {
+        return stormMaterialFix;
+    }
+
+    public static void setStormMaterialFix(int mode) {
+        stormMaterialFix = Math.max(0, Math.min(2, mode)); // 2: E20 continuous storm lighting height
+    }
+
+    /** S25-TEMP (cumulus rings): 1 = nearest light tap of non-storm samples on the shared field (pre-T247). */
+    private static volatile int lightTap0Field = 0;
+
+    public static int lightTap0Field() {
+        return lightTap0Field;
+    }
+
+    public static void setLightTap0Field(int mode) {
+        lightTap0Field = mode != 0 ? 1 : 0;
+    }
+
+    /**
+     * S26-TEMP (one-body cumulus): mode 0 = lobe union, 1 = one body (metaball sum of lobe bumps); bump support in
+     * lobe radii, surface threshold, shell density, field rise to full density.
+     */
+    private static volatile int puffBody = 0;
+    private static volatile float puffBodyK = 1.15F;
+    private static volatile float puffBodyThreshold = 0.09F;
+    private static volatile float puffBodyRelief = 1.0F;
+    private static volatile float puffBodyTurrets = 0.0F;
+    private static volatile float puffBodyErode = 0.0F;
+    private static volatile float puffBodyShell = 0.45F;
+    private static volatile float puffBodyCoreDepth = 0.6F;
+
+    public static int puffBody() {
+        return puffBody;
+    }
+
+    public static float puffBodyK() {
+        return puffBodyK;
+    }
+
+    public static float puffBodyThreshold() {
+        return puffBodyThreshold;
+    }
+
+    public static float puffBodyRelief() {
+        return puffBodyRelief;
+    }
+
+    public static float puffBodyTurrets() {
+        return puffBodyTurrets;
+    }
+
+    public static float puffBodyErode() {
+        return puffBodyErode;
+    }
+
+    public static void setPuffBodyDetail(float turrets, float erode) {
+        puffBodyTurrets = Math.max(0.0F, Math.min(3.0F, turrets));
+        puffBodyErode = Math.max(0.0F, Math.min(2.0F, erode));
+    }
+
+    public static void setPuffBodyRelief(float relief) {
+        puffBodyRelief = Math.max(0.0F, Math.min(4.0F, relief));
+    }
+
+    public static float puffBodyShell() {
+        return puffBodyShell;
+    }
+
+    public static float puffBodyCoreDepth() {
+        return puffBodyCoreDepth;
+    }
+
+    public static void setPuffBody(int mode, float support, float threshold, float shell, float coreDepth) {
+        puffBody = mode != 0 ? 1 : 0;
+        puffBodyK = Math.max(1.0F, Math.min(1.25F, support)); // 1.25 = the tile footprint padding (PUFF_WARP_MAX)
+        puffBodyThreshold = Math.max(0.005F, Math.min(0.9F, threshold));
+        puffBodyShell = Math.max(0.0F, Math.min(1.0F, shell));
+        puffBodyCoreDepth = Math.max(0.05F, coreDepth);
+    }
+
+    /**
+     * E33 near-field light: exact light samples in the first 12 blocks toward the sun (0 - 3). Production follows
+     * the player's Cloud Surface Detail setting (AtmoCommonConfig.CLOUD_SURFACE_DETAIL); a capture arm overrides
+     * it (-1 = none).
+     */
+    public static final int PRODUCTION_NEAR_LIGHT = -1;
+    private static volatile int nearLight = PRODUCTION_NEAR_LIGHT;
+
+    public static int nearLight() {
+        return nearLight >= 0 ? nearLight
+                : net.Gabou.projectatmosphere.config.AtmoCommonConfig.CLOUD_SURFACE_DETAIL.get().nearLightSamples();
+    }
+
+    public static void setNearLight(int samples) {
+        nearLight = Math.max(-1, Math.min(3, samples));
+    }
+
+    /** S32-TEMP (grain): fixed surface-bracket integration phase; < 0 = production blue noise. */
+    private static volatile float integrationPhase = -1.0F;
+
+    public static float integrationPhase() {
+        return integrationPhase;
+    }
+
+    public static void setIntegrationPhase(float phase) {
+        integrationPhase = phase < 0.0F ? -1.0F : Math.min(2.0F, phase);
+    }
+
+    /**
+     * E39 per-phase accumulation (the temporal lattice's missing average): 0 off (T207 raw phases), 1 on.
+     * Minimum blend weight (1 / max samples averaged) and the material drift (blocks) beyond which a phase is
+     * replaced instead of averaged.
+     */
+    // E39 (28 Oct 2026, user-approved "the one that fixes it really"): on. s45: the frozen per-pixel grain is
+    // gone at identical cost; a static camera converges over 8 renders per phase (32 frames).
+    public static final int PRODUCTION_PHASE_ACCUMULATE = 1;
+    public static final float PRODUCTION_PHASE_ACCUMULATE_MIN_WEIGHT = 0.125F;
+    public static final float PRODUCTION_PHASE_ACCUMULATE_MAX_DRIFT = 2.0F;
+    private static volatile int phaseAccumulate = PRODUCTION_PHASE_ACCUMULATE;
+    private static volatile float phaseAccumulateMinWeight = PRODUCTION_PHASE_ACCUMULATE_MIN_WEIGHT;
+    private static volatile float phaseAccumulateMaxDrift = PRODUCTION_PHASE_ACCUMULATE_MAX_DRIFT;
+
+    public static int phaseAccumulate() {
+        return phaseAccumulate;
+    }
+
+    public static float phaseAccumulateMinWeight() {
+        return phaseAccumulateMinWeight;
+    }
+
+    public static float phaseAccumulateMaxDrift() {
+        return phaseAccumulateMaxDrift;
+    }
+
+    public static void setPhaseAccumulate(int mode, float minWeight, float maxDrift) {
+        phaseAccumulate = mode != 0 ? 1 : 0;
+        phaseAccumulateMinWeight = Math.max(0.02F, Math.min(1.0F, minWeight));
+        phaseAccumulateMaxDrift = Math.max(0.0F, maxDrift);
+    }
+
+    /**
+     * E41 motion history in the temporal resolve: the weight last frame's (reprojected, clamped) output keeps
+     * while the camera moves; 0 = off (the T207 + E39 path at every frame). A static camera never uses it.
+     */
+    public static final float PRODUCTION_MOTION_HISTORY_WEIGHT = 0.9F; // E41 s46: beats the pre-E39 grain on slow and fast pans
+    private static volatile float motionHistoryWeight = PRODUCTION_MOTION_HISTORY_WEIGHT;
+
+    public static float motionHistoryWeight() {
+        return motionHistoryWeight;
+    }
+
+    public static void setMotionHistoryWeight(float weight) {
+        motionHistoryWeight = Math.max(0.0F, Math.min(0.95F, weight));
+    }
+
+    /** S33-TEMP (cauliflower): lobe-surface bubble crease strength (0 = production). */
+    private static volatile float puffBubbles = 0.0F;
+
+    public static float puffBubbles() {
+        return puffBubbles;
+    }
+
+    public static void setPuffBubbles(float strength) {
+        puffBubbles = Math.max(0.0F, Math.min(3.0F, strength));
+    }
+
+    private static volatile float puffBubbleSharp = 0.0F;
+
+    public static float puffBubbleSharp() {
+        return puffBubbleSharp;
+    }
+
+    public static void setPuffBubbleSharp(float sharp) {
+        puffBubbleSharp = sharp;
+    }
+
+    /** S31-TEMP (grain): detail noise filtered to this x the march step (0 = production). */
+    private static volatile float detailStepFilter = 0.0F;
+
+    public static float detailStepFilter() {
+        return detailStepFilter;
+    }
+
+    public static void setDetailStepFilter(float factor) {
+        detailStepFilter = Math.max(0.0F, Math.min(2.0F, factor));
+    }
+
+    /** S30-TEMP (grain): multiplier on the exterior fine step (1 = production). */
+    private static volatile float fineStepMul = 1.0F;
+
+    public static float fineStepMul() {
+        return fineStepMul;
+    }
+
+    public static void setFineStepMul(float mul) {
+        fineStepMul = Math.max(0.25F, Math.min(2.0F, mul));
+    }
+
+    /** S29-TEMP (flat surfaces): multiplier on the global ExtinctionScale (1 = production). */
+    private static volatile float extinctionMul = 1.0F;
+
+    public static float extinctionMul() {
+        return extinctionMul;
+    }
+
+    public static void setExtinctionMul(float mul) {
+        extinctionMul = Math.max(0.25F, Math.min(8.0F, mul));
+    }
+
+    /** S27-TEMP (flat surfaces): 1 sun only, 2 ambient only, 3 one octave, 4 no powder; 0 = production. */
+    private static volatile int lightSplit = 0;
+
+    public static int lightSplit() {
+        return lightSplit;
+    }
+
+    public static void setLightSplit(int mode) {
+        lightSplit = Math.max(0, Math.min(4, mode));
+    }
+
+    /** S13 (stabilisation, cumulus shape): smooth-max width of the two strongest puff lobes; 0 = legacy crease. */
+    public static final float PRODUCTION_PUFF_BLEND = 0.0F;
+    private static volatile float puffBlend = PRODUCTION_PUFF_BLEND;
+
+    public static float puffBlend() {
+        return puffBlend;
+    }
+
+    public static void setPuffBlend(float k) {
+        puffBlend = Math.max(0.0F, Math.min(1.0F, k));
+    }
+
+    /** S12 (stabilisation, cumulus shape): puff lobe warp amplitude in lobe radii; 0 = legacy. */
+    public static final float PRODUCTION_PUFF_WARP = 0.0F;
+    private static volatile float puffWarp = PRODUCTION_PUFF_WARP;
+
+    public static float puffWarp() {
+        return puffWarp;
+    }
+
+    public static void setPuffWarp(float amplitude) {
+        puffWarp = Math.max(0.0F, Math.min(0.25F, amplitude));
+    }
+
+    /**
+     * L5 (stabilisation lighting resolution): light taps i < N read exact density over storms. Production follows
+     * the player's menu setting (AtmoCommonConfig.STORM_SHADOW_DETAIL); a capture arm overrides it (-1 = none).
+     */
+    public static final int PRODUCTION_EXACT_LIGHT_TAPS = -1;
+    private static volatile int exactLightTaps = PRODUCTION_EXACT_LIGHT_TAPS;
+
+    public static int exactLightTaps() {
+        return exactLightTaps >= 0 ? exactLightTaps
+                : net.Gabou.projectatmosphere.config.AtmoCommonConfig.STORM_SHADOW_DETAIL.get().exactLightTaps();
+    }
+
+    public static void setExactLightTaps(int taps) {
+        exactLightTaps = Math.max(-1, Math.min(8, taps));
+    }
+
+    /** P3 (stabilisation perf): 1 = the empty-space jump over clear 64-block weather tiles; 0 = legacy. */
+    public static final int PRODUCTION_EMPTY_SKIP = 1; // P3: empty view -0.9 ms, storm / cumulus neutral (p7, per-ray storm span)
+    private static volatile int emptySkip = PRODUCTION_EMPTY_SKIP;
+
+    public static int emptySkip() {
+        return emptySkip;
+    }
+
+    public static void setEmptySkip(int mode) {
+        emptySkip = Math.max(0, Math.min(1, mode));
+    }
+
+    /** P2 (stabilisation perf): the field atlas rebuilt in 1 (legacy, whole), 2 or 4 bands per frame. */
+    public static final int PRODUCTION_FIELD_SLICES = 4; // P2: p6 field 1.37->0.49 ms (storm), 0.62->0.19 (cumulus); audit 0
+    private static volatile int fieldSlices = PRODUCTION_FIELD_SLICES;
+
+    public static int fieldSlices() {
+        return fieldSlices;
+    }
+
+    public static void setFieldSlices(int slices) {
+        fieldSlices = slices >= 4 ? 4 : slices >= 2 ? 2 : 1;
+    }
+
+    /** PERF-TEMP (stabilisation perf attribution, remove after): see PaPerfArm in the volume shader. */
+    private static volatile int perfArm = 0;
+
+    public static int perfArm() {
+        return perfArm;
+    }
+
+    public static void setPerfArm(int arm) {
+        perfArm = Math.max(0, Math.min(15, arm));
+    }
+
+    /** P1 (stabilisation perf): 1 = the occupancy-bit early reject in the per-step puff segment test; 0 = legacy. */
+    public static final int PRODUCTION_PUFF_OCCUPANCY = 1; // P1: image-identical on clouds (p4), -0.1..0.25 ms
+    private static volatile int puffOccupancy = PRODUCTION_PUFF_OCCUPANCY;
+
+    public static int puffOccupancy() {
+        return puffOccupancy;
+    }
+
+    public static void setPuffOccupancy(int mode) {
+        puffOccupancy = Math.max(0, Math.min(1, mode));
+    }
+
+    /**
+     * S11 (stabilisation, Codex CR-03): seeded storm structure, a bit mask - 1 turrets, 2 base rim, 4 flanking
+     * line, 8 billow displacement (15 all); 0 = legacy T241 body.
+     */
+    public static final int PRODUCTION_STORM_STRUCTURE = 15; // E19: user accepted S11 (27 Oct); v5 clearance
+    private static volatile int stormStructure = PRODUCTION_STORM_STRUCTURE;
+
+    public static int stormStructure() {
+        return stormStructure;
+    }
+
+    public static void setStormStructure(int mode) {
+        stormStructure = Math.max(0, Math.min(15, mode));
     }
 
     public static void setDeepScatterMode(int mode) {

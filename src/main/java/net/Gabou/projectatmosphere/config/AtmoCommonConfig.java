@@ -34,6 +34,71 @@ public class AtmoCommonConfig {
      * using. Only the label and the performance record's "configured" field read these; no
      * rendering behaviour does.
      */
+    /**
+     * Storm shadow detail (stabilisation L5): how many of a storm sample's light-march taps read the exact
+     * cloud density instead of the 16-block storm field. More exact taps resolve the billows in the storm's
+     * self-shadowing (lit tops, shaded sides) at a GPU cost that only applies while storms are in view.
+     */
+    public enum StormShadowDetail {
+        FAST("Fast", 0),
+        BALANCED("Balanced", 1),
+        HIGH("High", 2),
+        ULTRA("Ultra", 8);
+
+        private final String displayName;
+        private final int exactLightTaps;
+
+        StormShadowDetail(String displayName, int exactLightTaps) {
+            this.displayName = displayName;
+            this.exactLightTaps = exactLightTaps;
+        }
+
+        public String displayName() {
+            return displayName;
+        }
+
+        public int exactLightTaps() {
+            return exactLightTaps;
+        }
+
+        public StormShadowDetail next() {
+            return values()[(ordinal() + 1) % values().length];
+        }
+    }
+
+    /**
+     * Cloud surface detail (stabilisation E33): exact light samples in the first 12 blocks toward the sun. The
+     * light march otherwise starts 14 blocks out, so cauliflower heads, turrets and any relief smaller than ~15
+     * blocks cannot shade themselves and every cloud surface reads flat. Each sample is one more density
+     * evaluation per lit cloud sample (all cloud families).
+     */
+    public enum CloudSurfaceDetail {
+        OFF("Off", 0),
+        LOW("Low", 1),
+        MEDIUM("Medium", 2),
+        HIGH("High", 3);
+
+        private final String displayName;
+        private final int nearLightSamples;
+
+        CloudSurfaceDetail(String displayName, int nearLightSamples) {
+            this.displayName = displayName;
+            this.nearLightSamples = nearLightSamples;
+        }
+
+        public String displayName() {
+            return displayName;
+        }
+
+        public int nearLightSamples() {
+            return nearLightSamples;
+        }
+
+        public CloudSurfaceDetail next() {
+            return values()[(ordinal() + 1) % values().length];
+        }
+    }
+
     public enum CloudRaymarchQuality {
         LOW("LOW", 24, 0.125F),
         LOW_24("LOW 32", 32, 0.125F),
@@ -96,6 +161,8 @@ public class AtmoCommonConfig {
 
     public static final ForgeConfigSpec.IntValue CLOUD_RENDER_DISTANCE;
     public static final ForgeConfigSpec.EnumValue<CloudRaymarchQuality> CLOUD_RAYMARCH_QUALITY;
+    public static final ForgeConfigSpec.EnumValue<StormShadowDetail> STORM_SHADOW_DETAIL;
+    public static final ForgeConfigSpec.EnumValue<CloudSurfaceDetail> CLOUD_SURFACE_DETAIL;
     public static final ForgeConfigSpec.BooleanValue CLOUD_FIELD_RENDERER_ENABLED;
     public static final ForgeConfigSpec.BooleanValue CLOUD_VOLUMETRIC_RENDERER_ENABLED;
     public static final ForgeConfigSpec.BooleanValue ENABLE_VOLUMETRIC_GROUND_SHADOWS;
@@ -240,6 +307,14 @@ public class AtmoCommonConfig {
         CLOUD_RAYMARCH_QUALITY = builder
                 .comment("Qualite du raymarch volumetrique PA: LOW=24 etapes a 12.5%, LOW_24=32 etapes a 12.5%, MEDIUM=40 etapes a 12.5%, HIGH=64 etapes a 18.75%, ULTRA=96 etapes a 25%")
                 .defineEnum("cloudRaymarchQuality", CloudRaymarchQuality.MEDIUM);
+        STORM_SHADOW_DETAIL = builder
+                .comment("Storm cloud shadow detail: FAST (cheapest), BALANCED, HIGH, ULTRA (most detailed billow shading,"
+                        + " most expensive). Only costs GPU time while storm clouds are on screen.")
+                .defineEnum("stormShadowDetail", StormShadowDetail.FAST);
+        CLOUD_SURFACE_DETAIL = builder
+                .comment("Cloud surface detail: how the light reveals bumps and billows on every cloud. OFF (flat,"
+                        + " cheapest), LOW, MEDIUM, HIGH (finest shading, most expensive).")
+                .defineEnum("cloudSurfaceDetail", CloudSurfaceDetail.LOW);
         CLOUD_FIELD_RENDERER_ENABLED = builder
                 .comment("Enable the Project Atmosphere CloudField volume renderer when Simple Clouds is not installed. Disable this as a persistent kill switch to fall back to vanilla clouds.")
                 .define("cloudFieldRendererEnabled", true);

@@ -25,8 +25,14 @@ final class NeutralLitProgram implements StormGeometryProgram {
 
     /** T260.11: region assemblies light on a coarser lattice when km-wide. */
     NeutralLitProgram(StormGeometryProgram base, net.Gabou.projectatmosphere.clouds.morphology.SparseBrickVolume volume, float extinction, float spacing) {
+        this(base, volume, extinction, spacing, NeutralLightVolume.SUN, false);
+    }
+
+    /** T260.17: any sun direction, optionally with the directional block (lighting modes 31-37). */
+    NeutralLitProgram(StormGeometryProgram base, net.Gabou.projectatmosphere.clouds.morphology.SparseBrickVolume volume, float extinction, float spacing,
+            float[] sun, boolean directional) {
         this.base = base;
-        light = new NeutralLightVolume(volume, extinction, spacing);
+        light = new NeutralLightVolume(volume, extinction, spacing, sun, directional);
         texture = light.appendTo(base.textureData());
         rows = light.rows(base.textureHeight());
         signature = light.signature(base.signature());

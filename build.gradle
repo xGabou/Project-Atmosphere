@@ -70,6 +70,18 @@ minecraft {
                 if (project.hasProperty('paCloudPreviewDemo')) {
                     environment 'PA_CLOUD_PREVIEW_DEMO', '1'
                 }
+                // -PpaCloudPreviewDemoSet=t16 picks a later shot list (default: the T260.15 comparison).
+                if (project.hasProperty('paCloudPreviewDemoSet')) {
+                    environment 'PA_CLOUD_PREVIEW_DEMO_SET', project.property('paCloudPreviewDemoSet').toString()
+                }
+            }
+            // Stabilisation S0: player-equivalent production capture (ProductionCloudCapture, OFF by default):
+            // -PpaProdCapture=<set> runs that capture set unattended in -PpaProdCaptureWorld=<save> and quits.
+            if (project.hasProperty('paProdCapture')) {
+                environment 'PA_PROD_CAPTURE_SET', project.property('paProdCapture').toString()
+                if (project.hasProperty('paProdCaptureWorld')) {
+                    args '--quickPlaySingleplayer', project.property('paProdCaptureWorld').toString()
+                }
             }
             if (project.hasProperty('paBenchGcLog')) {
                 jvmArg('-Xlog:gc*:file='
@@ -331,6 +343,20 @@ def leanFinalConstants = [
         // T230 relief, and so T231's relief shading).
         'uniform int PaBodyMacro;'                 : 'const int PaBodyMacro = 2;',
         'uniform float PaReliefShade;'             : 'const float PaReliefShade = 0.12;',
+        // Stabilisation (27 Oct 2026): the switches the user accepted, baked at their production values (T232: a
+        // live uniform's branches cannot fold). Any other value is an arm: leanFinalEligible sends it to the
+        // monolith, where they stay live. Keep in step with VolumetricCloudDebugConfig.PRODUCTION_*.
+        'uniform int PaColorPipeline;'             : 'const int PaColorPipeline = 1;',
+        'uniform int PaOctaveNormalize;'           : 'const int PaOctaveNormalize = 0;',
+        'uniform int PaAmbientTransmission;'       : 'const int PaAmbientTransmission = 1;',
+        'uniform float PaShapeHierarchy;'          : 'const float PaShapeHierarchy = 0.0;',
+        'uniform int PaFieldCoverageFix;'          : 'const int PaFieldCoverageFix = 1;',
+        'uniform float PaOpticalThicknessGain;'    : 'const float PaOpticalThicknessGain = 2.0;',
+        'uniform int PaStormMaterialFix;'          : 'const int PaStormMaterialFix = 2;',
+        'uniform int PaStormStructure;'            : 'const int PaStormStructure = 15;',
+        'uniform int PaPuffOccupancy;'             : 'const int PaPuffOccupancy = 1;',
+        'uniform int PaEmptySkip;'                 : 'const int PaEmptySkip = 1;',
+        'uniform int PaPerfArm;'                   : 'const int PaPerfArm = 0;',
         'uniform int PaRayTraceMode;'              : 'const int PaRayTraceMode = 0;',
         'uniform vec2 PaRayTraceNdc;'              : 'const vec2 PaRayTraceNdc = vec2(0.0);',
         'uniform vec2 PaRayTraceFragCoord;'        : 'const vec2 PaRayTraceFragCoord = vec2(0.0);',
@@ -421,6 +447,12 @@ def leanFinalRemovedUniforms = leanFinalConstants.keySet().collect {
 // the live cloud-target size to rebuild neighbouring rays, and PaOracleBaseSize
 // already carries it every frame; PaOraclePass stays baked to 0, so the oracle
 // capture path it normally serves remains dead.
+// T260.18 stage 2: the experimental L-graz lighting function, injected into its generated program only.
+def t18GrazingGlsl = file('src/main/shader-experiments/t26018_grazing.glsl').getText('UTF-8')
+def t18GrazingCachedGlsl = file('src/main/shader-experiments/t26018_grazing_cached.glsl').getText('UTF-8')
+// T260.L-family: the production lighting family on the frozen fixture, injected into its generated program only.
+def lFamilyGlsl = file('src/main/shader-experiments/t260_lighting_family.glsl').getText('UTF-8')
+
 def leanProgramVariants = [
         [name: 'cloud_atmosphere_volume_growth_morphology_prototype',
          defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_GROWTH_DEFINED_STORM 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
@@ -506,6 +538,111 @@ def leanProgramVariants = [
                      'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
                      'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
                      'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 20;']],
+        // T260.16: the physically motivated lighting candidate (mode 29) compiled as a constant, timed like mode 20.
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_neutral_t16',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 29;']],
+        // T260.17: candidates A / B / C (modes 31 / 32 / 33) compiled as constants, timed like modes 20 and 29.
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_neutral_t17a',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 31;']],
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_neutral_t17b',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 32;']],
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_neutral_t17c',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 33;']],
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_neutral_t17d',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 38;']],
+        // T260.18 stage 2: L-dir (mode 35, the baked directional ambient alone) and L-graz (mode 40, bounded grazing
+        // shadows) compiled as constants. Mode 40 exists only here: its function (src/main/shader-experiments/
+        // t26018_grazing.glsl) and its dispatch are injected by checked string overrides into the GENERATED program;
+        // cloud_atmosphere_volume.fsh and every other program are unchanged.
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_neutral_t18dir',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 35;']],
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_neutral_t18graz',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 40;',
+                     'vec3 paNeutralLighting(vec3 p, float localDensity, out float sunOpticalDepth) {':
+                             t18GrazingGlsl + 'vec3 paNeutralLighting(vec3 p, float localDensity, out float sunOpticalDepth) {',
+                     '    if (PaDiagnosticLightingMode >= 31 && PaDiagnosticLightingMode <= 39) return paT17Lighting(q, light, gradAmbient);':
+                             '    if (PaDiagnosticLightingMode == 40) return paT18Grazing(q, light); // T260.18 L-graz (injected)\n'
+                             + '    if (PaDiagnosticLightingMode >= 31 && PaDiagnosticLightingMode <= 39) return paT17Lighting(q, light, gradAmbient);',
+                     '    if (PaDiagnosticLightingMode >= 20 && PaDiagnosticLightingMode <= 39) {':
+                             '    if (PaDiagnosticLightingMode >= 20 && PaDiagnosticLightingMode <= 40) {']],
+        // T260.18 stage 2: L-graz-c (mode 41), the per-surface (budget) form of L-graz, injected the same way.
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_neutral_t18grazc',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 41;',
+                     'vec3 paNeutralLighting(vec3 p, float localDensity, out float sunOpticalDepth) {':
+                             t18GrazingCachedGlsl + 'vec3 paNeutralLighting(vec3 p, float localDensity, out float sunOpticalDepth) {',
+                     '    if (PaDiagnosticLightingMode >= 31 && PaDiagnosticLightingMode <= 39) return paT17Lighting(q, light, gradAmbient);':
+                             '    if (PaDiagnosticLightingMode == 41) return paT18GrazingCached(q, light); // T260.18 L-graz-c (injected)\n'
+                             + '    if (PaDiagnosticLightingMode >= 31 && PaDiagnosticLightingMode <= 39) return paT17Lighting(q, light, gradAmbient);',
+                     '    if (PaDiagnosticLightingMode >= 20 && PaDiagnosticLightingMode <= 39) {':
+                             '    if (PaDiagnosticLightingMode >= 20 && PaDiagnosticLightingMode <= 41) {']],
+        // T260.L-family (Architecture B): the production lighting family (mode 42) on the frozen fixture, fed by the baked
+        // light lattice. Its function (src/main/shader-experiments/t260_lighting_family.glsl) and its dispatch in
+        // sampleLighting are injected into this GENERATED program only; cloud_atmosphere_volume.fsh is unchanged.
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_neutral_lfam',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 42;',
+                     'vec3 paNeutralLighting(vec3 p, float localDensity, out float sunOpticalDepth) {':
+                             lFamilyGlsl + 'vec3 paNeutralLighting(vec3 p, float localDensity, out float sunOpticalDepth) {',
+                     '    if (PaDiagnosticLightingMode >= 20 && PaDiagnosticLightingMode <= 39) {':
+                             '    if (PaDiagnosticLightingMode == 42) return paLFamilyLighting(p, localDensity, false, diagnosticLightOpticalDepth); // T260.L-family (injected)\n'
+                             + '    if (PaDiagnosticLightingMode >= 20 && PaDiagnosticLightingMode <= 39) {']],
+        // T260.L-family controlled arm (mode 43): mode 42 with a two-tap sun-ward skin cone ahead of the baked depth.
+        [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_neutral_lfam_cone',
+         defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],
+         overrides: ['uniform int PaMorphologyPrototype;': 'const int PaMorphologyPrototype = 1;',
+                     'uniform int PaMorphologyScale;': 'const int PaMorphologyScale = 1;',
+                     'uniform int PaStormFieldEnabled;': 'const int PaStormFieldEnabled = 0;',
+                     'uniform int PaDiagnosticLightingMode;': 'const int PaDiagnosticLightingMode = 43;',
+                     'vec3 paNeutralLighting(vec3 p, float localDensity, out float sunOpticalDepth) {':
+                             lFamilyGlsl + 'vec3 paNeutralLighting(vec3 p, float localDensity, out float sunOpticalDepth) {',
+                     '    if (PaDiagnosticLightingMode >= 20 && PaDiagnosticLightingMode <= 39) {':
+                             '    if (PaDiagnosticLightingMode == 43) return paLFamilyLighting(p, localDensity, true, diagnosticLightOpticalDepth); // T260.L-family (injected)\n'
+                             + '    if (PaDiagnosticLightingMode >= 20 && PaDiagnosticLightingMode <= 39) {']],
         [name: 'cloud_atmosphere_volume_growth_morphology_convective_system_parity',
          defines: ['PA_MORPHOLOGY_EXPERIMENT 1', 'PA_CONVECTIVE_SYSTEM_T260 1', 'PA_ARM_NO_RAIN_SEGMENT 1', 'PA_PRECIPITATION_ABSENT 1'],
          keepUniforms: ['PaMorphologyOrigin', 'PaMorphologyMin', 'PaMorphologyMax', 'PaMorphologyIntervals', 'PaOracleBaseSize'],

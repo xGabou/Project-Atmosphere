@@ -28,8 +28,29 @@ import java.util.Locale;
  */
 public final class PuffLobeSpatialIndex {
     public static final int GRID_SIZE = 256;
-    public static final int MAX_LOBES = 32;
-    public static final int CANDIDATES_PER_TILE = 8;
+    /** C2 (stabilisation capacity): was 32 (about 4 detailed cumulus). */
+    public static final int MAX_LOBES = 256;
+    /**
+     * C2. The candidate map is RGBA32F, GRID_SIZE wide and TARGET_HEIGHT tall: rows [0, GRID_SIZE) the packed
+     * candidates, then DESC_ROW (3 texels per lobe: posRadius, shape, media; replaces the uniform arrays),
+     * then LIST_ROW: per 128-block occupancy tile, LIST_TEXELS texels = count (r) + LIST_CAP lobe indices,
+     * the lobes whose padded footprint touches the tile or a neighbour (count LIST_CAP + 1 = overflow, the
+     * shader then loops over all lobes). Shader constants PUFF_* must match.
+     */
+    /** S12: the largest puff lobe warp in lobe radii (shader PA_PUFF_WARP_MAX); every lobe bound is padded for it. */
+    public static final float PUFF_WARP_MAX = 0.25F;
+    public static final int DESC_ROW = 256;
+    public static final int LIST_ROW = DESC_ROW + 3 * ((MAX_LOBES + 255) / 256);
+    public static final int LIST_TEXELS = 9;
+    public static final int LIST_CAP = LIST_TEXELS * 4 - 1;
+    /**
+     * S20 (stabilisation, cumulus seams): 16 candidates per 16-block tile (was 8). A 14-17-lobe clustered cumulus
+     * put 12-16 lobes in one tile; the 8-cap dropped the least central ones there and cut the cloud along the tile
+     * edge. Ranks 8-15 sit in a second packed grid at rows CANDIDATE2_ROW.. (shader PUFF_CANDIDATE2_ROW).
+     */
+    public static final int CANDIDATE2_ROW = LIST_ROW + (32 * 32 * LIST_TEXELS + 255) / 256;
+    public static final int TARGET_HEIGHT = CANDIDATE2_ROW + GRID_SIZE;
+    public static final int CANDIDATES_PER_TILE = 16;
 
     // Descriptor indices are encoded as 1..32; zero means empty. Two base-33
     // digits fit exactly in one half float (maximum 1088, below the exact
@@ -46,7 +67,27 @@ public final class PuffLobeSpatialIndex {
     private static final float[] TILE_SCORES =
             new float[GRID_SIZE * GRID_SIZE * CANDIDATES_PER_TILE];
     private static final int[] TILE_COUNTS = new int[GRID_SIZE * GRID_SIZE];
+    /**
+     * P1 (stabilisation perf). 32 x 32 occupancy bits over the weather extent (128-block tiles at 4096): bit x of
+     * row z is set where a lobe's padded footprint (the segment test's 1.05 radius) touches tile (x, z) or one of
+     * its eight neighbours. A coarse march segment (<= 112 blocks, < one tile) lies inside its start tile's 3 x 3
+     * neighbourhood, so a clear start-tile bit proves the segment misses every lobe; the shader then skips its
+     * per-step loop over all lobes (the march cost that grew with the cloud count, perf p3).
+     */
+    public static final int OCCUPANCY_SIZE = 32;
+    private static final int[] OCCUPANCY = new int[OCCUPANCY_SIZE];
+    private static final float[] LISTS = new float[OCCUPANCY_SIZE * OCCUPANCY_SIZE * LIST_TEXELS * 4];
+    private static final java.nio.FloatBuffer LIST_UPLOAD = BufferUtils.createFloatBuffer(
+            (CANDIDATE2_ROW - LIST_ROW) * 256 * 4);
+    private static final java.nio.FloatBuffer DESC_UPLOAD = BufferUtils.createFloatBuffer(
+            (LIST_ROW - DESC_ROW) * 256 * 4);
+    private static long uploadedDescriptorSignature = Long.MIN_VALUE;
+    private static int uploadedDescriptorTexture;
+    private static long listOverflowTiles;
     private static final FloatBuffer UPLOAD =
+            BufferUtils.createFloatBuffer(GRID_SIZE * GRID_SIZE * 4);
+    /** S20: ranks 8-15. */
+    private static final FloatBuffer UPLOAD2 =
             BufferUtils.createFloatBuffer(GRID_SIZE * GRID_SIZE * 4);
 
     private static int lobeCount;
@@ -122,8 +163,9 @@ public final class PuffLobeSpatialIndex {
                     return nearest;
                 }));
             }
+            int budget = lobeBudget();
             for (List<VolumetricRenderCell> cloud : ordered) {
-                if (lobeCount + cloud.size() > MAX_LOBES) {
+                if (lobeCount + cloud.size() > budget) {
                     truncatedLobes += cloud.size();
                     excludedClouds++;
                     continue;
@@ -134,6 +176,20 @@ public final class PuffLobeSpatialIndex {
             }
         }
         descriptorSignature = descriptorSignature();
+    }
+
+    /**
+     * C2. Detailed lobes by quality (nearest clouds first; the rest use the weather-map path). p9: 100 cumulus at
+     * ULTRA (256 lobes, ~32 detailed clouds) cost +1.5..2.5 ms over 32 lobes, for clearly puffier mid-distance clouds.
+     */
+    static int lobeBudget() {
+        return switch (net.Gabou.projectatmosphere.config.AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.get()) {
+            case LOW -> 32;
+            case LOW_24 -> 48;
+            case MEDIUM -> 96;
+            case HIGH -> 160;
+            case ULTRA -> MAX_LOBES;
+        };
     }
 
     private static void writeDescriptor(VolumetricRenderCell cell) {
@@ -173,10 +229,11 @@ public final class PuffLobeSpatialIndex {
     public static void rebuildIfNeeded(RenderTarget target, double originX, double originZ, float extent) {
         RenderSystem.assertOnRenderThread();
         if (target == null || target.getColorTextureId() <= 0
-                || target.width != GRID_SIZE || target.height != GRID_SIZE
+                || target.width != GRID_SIZE || target.height != TARGET_HEIGHT
                 || !Float.isFinite(extent) || extent <= 0.0F) {
             return;
         }
+        uploadDescriptorRows(target.getColorTextureId());
 
         gridRequests++;
         int textureId = target.getColorTextureId();
@@ -202,6 +259,7 @@ public final class PuffLobeSpatialIndex {
         Arrays.fill(TILE_INDICES, -1);
         Arrays.fill(TILE_SCORES, Float.POSITIVE_INFINITY);
         Arrays.fill(TILE_COUNTS, 0);
+        buildOccupancy(originX, originZ, extent);
         float tileWorld = extent / GRID_SIZE;
         float halfDiagonal = tileWorld * 0.70710677F;
 
@@ -211,14 +269,16 @@ public final class PuffLobeSpatialIndex {
             float centerZ = POS_RADIUS[base + 1];
             float radiusMajor = POS_RADIUS[base + 2];
             float radiusMinor = POS_RADIUS[base + 3];
-            float bound = Math.max(radiusMajor, radiusMinor) + halfDiagonal;
+            // S12: the lobe warp can move its surface by PUFF_WARP_MAX radii.
+            float bound = Math.max(radiusMajor, radiusMinor) * (1.0F + PUFF_WARP_MAX) + halfDiagonal;
             int minX = tileCoordinate(centerX - bound, originX, tileWorld);
             int maxX = tileCoordinate(centerX + bound, originX, tileWorld);
             int minZ = tileCoordinate(centerZ - bound, originZ, tileWorld);
             int maxZ = tileCoordinate(centerZ + bound, originZ, tileWorld);
             float cos = (float) Math.cos(-SHAPE[base]);
             float sin = (float) Math.sin(-SHAPE[base]);
-            float conservativeMargin = halfDiagonal / Math.max(1.0F, Math.min(radiusMajor, radiusMinor));
+            float conservativeMargin = halfDiagonal / Math.max(1.0F, Math.min(radiusMajor, radiusMinor))
+                    + PUFF_WARP_MAX * Math.max(radiusMajor, radiusMinor) / Math.max(1.0F, Math.min(radiusMajor, radiusMinor));
 
             for (int z = minZ; z <= maxZ; z++) {
                 float worldZ = (float) originZ + (z + 0.5F) * tileWorld;
@@ -245,6 +305,7 @@ public final class PuffLobeSpatialIndex {
         overflowTiles = 0;
         maxCandidatesPerTile = 0;
         UPLOAD.clear();
+        UPLOAD2.clear();
         for (int tile = 0; tile < TILE_COUNTS.length; tile++) {
             int count = TILE_COUNTS[tile];
             if (count > 0) {
@@ -259,9 +320,11 @@ public final class PuffLobeSpatialIndex {
                 int first = TILE_INDICES[base + pair * 2];
                 int second = TILE_INDICES[base + pair * 2 + 1];
                 UPLOAD.put((float) packPair(first, second));
+                UPLOAD2.put((float) packPair(TILE_INDICES[base + 8 + pair * 2], TILE_INDICES[base + 9 + pair * 2]));
             }
         }
         UPLOAD.flip();
+        UPLOAD2.flip();
 
         int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
         try (PixelUnpackState ignored = PixelUnpackState.beginTightCpuUpload()) {
@@ -278,6 +341,17 @@ public final class PuffLobeSpatialIndex {
                         GL11.GL_FLOAT,
                         UPLOAD
                 );
+                // C2: the per-tile lobe lists (built with the occupancy bits).
+                LIST_UPLOAD.clear();
+                LIST_UPLOAD.put(LISTS);
+                while (LIST_UPLOAD.hasRemaining()) {
+                    LIST_UPLOAD.put(0.0F);
+                }
+                LIST_UPLOAD.flip();
+                GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, LIST_ROW, GRID_SIZE, CANDIDATE2_ROW - LIST_ROW,
+                        GL11.GL_RGBA, GL11.GL_FLOAT, LIST_UPLOAD);
+                GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, CANDIDATE2_ROW, GRID_SIZE, GRID_SIZE,
+                        GL11.GL_RGBA, GL11.GL_FLOAT, UPLOAD2);
             } finally {
                 RenderSystem.bindTexture(previousTexture);
             }
@@ -299,20 +373,96 @@ public final class PuffLobeSpatialIndex {
 
     /** Uploads only the compact descriptor arrays; the candidate texture owns indices. */
     public static void uploadDescriptors(int program) {
-        uploadVec4Array(program, "PuffPosRadius", POS_RADIUS);
-        uploadVec4Array(program, "PuffShape", SHAPE);
-        uploadVec4Array(program, "PuffMedia", MEDIA);
+        // C2: the descriptors are rows of the candidate map now (uploadDescriptorRows); only the bits remain.
+        int location = GL20.glGetUniformLocation(program, "PuffOccupancy");
+        if (location < 0) {
+            location = GL20.glGetUniformLocation(program, "PuffOccupancy[0]");
+        }
+        if (location >= 0) {
+            GL20.glUniform1iv(location, OCCUPANCY);
+        }
+    }
+
+    /** C2. Writes the descriptor rows (3 texels per lobe) whenever the descriptors or the texture changed. */
+    private static void uploadDescriptorRows(int textureId) {
+        if (textureId <= 0 || (textureId == uploadedDescriptorTexture && descriptorSignature == uploadedDescriptorSignature)) {
+            return;
+        }
+        DESC_UPLOAD.clear();
+        int rows = LIST_ROW - DESC_ROW;
+        for (int block = 0; block < rows / 3; block++) {
+            for (int texel = 0; texel < 3; texel++) {
+                float[] source = texel == 0 ? POS_RADIUS : texel == 1 ? SHAPE : MEDIA;
+                for (int x = 0; x < 256; x++) {
+                    int lobe = block * 256 + x;
+                    if (lobe < MAX_LOBES) {
+                        DESC_UPLOAD.put(source, lobe * 4, 4);
+                    } else {
+                        DESC_UPLOAD.put(0.0F).put(0.0F).put(0.0F).put(0.0F);
+                    }
+                }
+            }
+        }
+        DESC_UPLOAD.flip();
+        int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        try (PixelUnpackState ignored = PixelUnpackState.beginTightCpuUpload()) {
+            try {
+                RenderSystem.bindTexture(textureId);
+                GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, DESC_ROW, GRID_SIZE, rows, GL11.GL_RGBA,
+                        GL11.GL_FLOAT, DESC_UPLOAD);
+            } finally {
+                RenderSystem.bindTexture(previousTexture);
+            }
+        }
+        uploadedDescriptorTexture = textureId;
+        uploadedDescriptorSignature = descriptorSignature;
+    }
+
+    /** P1: see {@link #OCCUPANCY}. Same origin / extent as the candidate grid (the shader's WeatherOrigin / Extent). */
+    private static void buildOccupancy(double originX, double originZ, float extent) {
+        Arrays.fill(OCCUPANCY, 0);
+        Arrays.fill(LISTS, 0.0F);
+        float tile = extent / OCCUPANCY_SIZE;
+        for (int slot = 0; slot < lobeCount; slot++) {
+            int base = slot * 4;
+            float bound = Math.max(Math.max(POS_RADIUS[base + 2], POS_RADIUS[base + 3]) * (1.05F + PUFF_WARP_MAX), 1.0F);
+            int minX = (int) Math.floor((POS_RADIUS[base] - bound - originX) / tile) - 1;
+            int maxX = (int) Math.floor((POS_RADIUS[base] + bound - originX) / tile) + 1;
+            int minZ = (int) Math.floor((POS_RADIUS[base + 1] - bound - originZ) / tile) - 1;
+            int maxZ = (int) Math.floor((POS_RADIUS[base + 1] + bound - originZ) / tile) + 1;
+            for (int z = Math.max(minZ, 0); z <= Math.min(maxZ, OCCUPANCY_SIZE - 1); z++) {
+                for (int x = Math.max(minX, 0); x <= Math.min(maxX, OCCUPANCY_SIZE - 1); x++) {
+                    OCCUPANCY[z] |= 1 << x;
+                    int list = (z * OCCUPANCY_SIZE + x) * LIST_TEXELS * 4;
+                    int n = (int) LISTS[list];
+                    if (n < LIST_CAP) {
+                        LISTS[list + 1 + n] = slot;
+                        LISTS[list] = n + 1;
+                    } else if (n == LIST_CAP) {
+                        LISTS[list] = LIST_CAP + 1; // overflow: the shader loops over every lobe
+                        listOverflowTiles++;
+                    }
+                }
+            }
+        }
     }
 
     public static int lobeCount() {
         return lobeCount;
     }
 
+    /** C2: true restores the legacy rule (any tile overflow drops every cloud to the weather-map path). */
+    static final boolean STRICT_OVERFLOW = false;
+
     public static boolean directRepresentationComplete() {
         // Whole clouds left out by the lobe budget are not a hole in the
         // representation: they are drawn by the weather-map path.
+        // C2 (stabilisation capacity): a tile with more than CANDIDATES_PER_TILE lobes keeps its 16 (S20) most central
+        // (insertCandidate sorts by the lobe-space radius), so the loss stays local to that 16-block tile. It used to
+        // switch every cloud to the weather-map path at once - with 256 lobes, two overlapping 8-lobe cumulus were
+        // enough. STRICT_OVERFLOW restores that behaviour for diagnostics.
         return lobeCount > 0
-                && overflowTiles == 0
+                && (!STRICT_OVERFLOW || overflowTiles == 0)
                 && uploadedTarget != null
                 && uploadedTextureId > 0
                 && uploadedTextureId == uploadedTarget.getColorTextureId()

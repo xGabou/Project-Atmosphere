@@ -12,7 +12,10 @@
     "Position",
     "UV0"
   ],
-  "samplers": [],
+  "samplers": [
+    { "name": "CellDataSampler" },
+    { "name": "CellTileSampler" }
+  ],
   "uniforms": [
     { "name": "WeatherOrigin", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
     { "name": "WeatherExtent", "type": "float", "count": 1, "values": [ 4096.0 ] },
